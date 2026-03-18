@@ -1,0 +1,85 @@
+"""Filesystem contracts for configs, artifacts, and reports."""
+
+from __future__ import annotations
+
+import os
+import re
+from pathlib import Path
+
+ARTIFACT_ROOT_ENV = "MODEL_FAILURE_LAB_ARTIFACT_ROOT"
+CONFIG_ROOT_ENV = "MODEL_FAILURE_LAB_CONFIG_ROOT"
+_SEGMENT_PATTERN = re.compile(r"[^a-z0-9]+")
+
+
+def repository_root() -> Path:
+    """Return the repository root for the current source tree."""
+    return Path(__file__).resolve().parents[3]
+
+
+def _normalize_segment(value: str) -> str:
+    normalized = _SEGMENT_PATTERN.sub("_", value.strip().lower()).strip("_")
+    return normalized or "default"
+
+
+def _resolve_root(env_var: str, default_relative_path: str) -> Path:
+    default_root = repository_root() / default_relative_path
+    env_raw = os.environ.get(env_var)
+    if env_raw:
+        resolved_root = Path(env_raw).expanduser().resolve()
+        resolved_root.mkdir(parents=True, exist_ok=True)
+        return resolved_root
+    default_root.mkdir(parents=True, exist_ok=True)
+    return default_root
+
+
+def artifact_root() -> Path:
+    """Return the artifact root, honoring test overrides."""
+    return _resolve_root(ARTIFACT_ROOT_ENV, "artifacts")
+
+
+def config_root() -> Path:
+    """Return the config root, honoring test overrides."""
+    return _resolve_root(CONFIG_ROOT_ENV, "configs")
+
+
+def build_baseline_run_dir(model_name: str, run_id: str, create: bool = False) -> Path:
+    """Return the canonical baseline run directory."""
+    run_dir = (
+        artifact_root() / "baselines" / _normalize_segment(model_name) / _normalize_segment(run_id)
+    )
+    if create:
+        run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
+def build_mitigation_run_dir(
+    method_name: str,
+    model_name: str,
+    run_id: str,
+    create: bool = False,
+) -> Path:
+    """Return the canonical mitigation run directory."""
+    run_dir = (
+        artifact_root()
+        / "mitigations"
+        / _normalize_segment(method_name)
+        / _normalize_segment(model_name)
+        / _normalize_segment(run_id)
+    )
+    if create:
+        run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
+def build_report_dir(
+    experiment_group: str | None = None,
+    category: str = "comparisons",
+    create: bool = False,
+) -> Path:
+    """Return the report directory for a comparison or summary group."""
+    report_dir = artifact_root() / "reports" / _normalize_segment(category)
+    if experiment_group:
+        report_dir = report_dir / _normalize_segment(experiment_group)
+    if create:
+        report_dir.mkdir(parents=True, exist_ok=True)
+    return report_dir
