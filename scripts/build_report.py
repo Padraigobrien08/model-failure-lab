@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import Sequence
+
+from model_failure_lab.config import apply_cli_overrides, load_experiment_config
+from model_failure_lab.runners.dispatch import build_scaffold_metrics, dispatch_report
+from model_failure_lab.tracking import (
+    append_experiment_index,
+    build_index_entry,
+    build_run_metadata,
+    generate_run_id,
+    write_metadata,
+    write_metrics,
+)
+from model_failure_lab.utils.paths import build_report_dir
+
+DEFAULT_PRESET = "civilcomments_distilbert_baseline"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Bootstrap a report build run.")
+    parser.add_argument("--experiment-group", required=True)
+    parser.add_argument("--preset", default=DEFAULT_PRESET)
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--notes")
+    return parser
+
+
+def run_command(argv: Sequence[str] | None = None):
+    args = build_parser().parse_args(list(argv) if argv is not None else None)
+    config = load_experiment_config(args.preset)
+    config = apply_cli_overrides(
+        config,
+        {
+            "seed": args.seed,
+            "notes": args.notes,
+            "run_id": generate_run_id("report"),
+            "experiment_group": args.experiment_group,
+        },
+    )
+
+    report_root = build_report_dir(
+        experiment_group=args.experiment_group,
+        category="comparisons",
+        create=True,
+    )
+    run_dir = report_root / Path(config["run_id"])
+    command = "python scripts/build_report.py " + " ".join(argv or [])
+    metadata = build_run_metadata(
+        run_id=config["run_id"],
+        experiment_type="report",
+        model_name=config["model_name"],
+        dataset_name=config["dataset_name"],
+        split_details=config["split_details"],
+        random_seed=config["seed"],
+        resolved_config=config,
+        command=command.strip(),
+        run_dir=run_dir,
+        notes=config.get("notes", ""),
+        tags=[*config.get("tags", []), "report"],
+        status="scaffold_ready",
+    )
+    metadata_path = write_metadata(run_dir, metadata)
+    metrics_path = write_metrics(run_dir, build_scaffold_metrics(config))
+    append_experiment_index(build_index_entry(metadata_path, metadata))
+    return dispatch_report(
+        config=config,
+        experiment_group=args.experiment_group,
+        run_dir=run_dir,
+        metadata_path=metadata_path,
+        metrics_path=metrics_path,
+        preset_name=args.preset,
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    result = run_command(argv)
+    print(result.message)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

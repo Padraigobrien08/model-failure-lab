@@ -28,11 +28,19 @@ def _write_json(path: Path, payload: dict[str, Any]) -> Path:
 
 def resolve_git_commit_hash(cwd: Path | None = None) -> str | None:
     """Return the current git commit hash when available."""
+    resolved_cwd = cwd
+    while resolved_cwd is not None and not resolved_cwd.exists():
+        parent = resolved_cwd.parent
+        if parent == resolved_cwd:
+            resolved_cwd = None
+            break
+        resolved_cwd = parent
+
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         capture_output=True,
         check=False,
-        cwd=cwd,
+        cwd=resolved_cwd,
         text=True,
     )
     if result.returncode != 0:
