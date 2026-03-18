@@ -7,6 +7,7 @@ import pytest
 from scripts.build_report import run_command as run_build_report_command
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
+from scripts.run_mitigation import run_command as run_mitigation_command
 from scripts.run_shift_eval import run_command as run_shift_eval_command
 
 
@@ -25,6 +26,29 @@ def test_run_baseline_bootstrap_writes_metadata(temp_artifact_root, model_name, 
     assert metadata["model_name"] == model_name
     assert metadata["status"] == "scaffold_ready"
     assert result.metadata_path.name == "metadata.json"
+
+
+@pytest.mark.parametrize(
+    ("method_name", "expected_segment"),
+    [
+        ("reweighting", "artifacts/mitigations/reweighting"),
+        ("calibration", "artifacts/mitigations/calibration"),
+    ],
+)
+def test_run_mitigation_bootstrap_uses_separate_root(
+    temp_artifact_root,
+    method_name,
+    expected_segment,
+):
+    result = run_mitigation_command(
+        ["--run-id", "baseline_parent_001", "--method", method_name, "--output-run-id", method_name]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert expected_segment in result.run_dir.as_posix()
+    assert metadata["parent_run_id"] == "baseline_parent_001"
+    assert metadata["status"] == "scaffold_ready"
+    assert "artifacts/baselines" not in result.run_dir.as_posix()
 
 
 def test_shift_eval_bootstrap_writes_metadata(temp_artifact_root):

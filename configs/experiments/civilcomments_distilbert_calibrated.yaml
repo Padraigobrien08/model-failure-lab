@@ -1,0 +1,14 @@
+experiment_name: civilcomments_distilbert_calibrated
+experiment_group: mitigations
+experiment_type: mitigation
+dataset_name: civilcomments
+model_name: distilbert
+data_config: configs/data/civilcomments.yaml
+model_config: configs/model/distilbert.yaml
+train_config: configs/train/default.yaml
+eval_config: configs/eval/default.yaml
+tags:
+  - mitigation
+  - distilbert
+  - calibration
+notes: CivilComments DistilBERT calibration scaffold preset.

@@ -16,8 +16,8 @@ from model_failure_lab.tracking import (
 from model_failure_lab.utils.paths import build_mitigation_run_dir
 
 METHOD_PRESETS = {
-    "reweighting": "civilcomments_distilbert_baseline",
-    "calibration": "civilcomments_distilbert_baseline",
+    "reweighting": "civilcomments_distilbert_reweighting",
+    "calibration": "civilcomments_distilbert_calibrated",
 }
 
 
