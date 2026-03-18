@@ -1,0 +1,10 @@
+dataset_name: civilcomments
+text_field: comment_text
+label_field: toxicity
+group_field: identity
+split_details:
+  train: train
+  validation: val
+  id_validation: id_val
+  id_test: id_test
+  ood_test: test

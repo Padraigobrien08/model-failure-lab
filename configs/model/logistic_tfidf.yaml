@@ -1,0 +1,4 @@
+model_name: logistic_tfidf
+model_family: linear
+feature_backend: tfidf
+output_type: probability

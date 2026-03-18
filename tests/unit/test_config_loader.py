@@ -121,3 +121,17 @@ def test_apply_cli_overrides_rejects_unknown_keys():
 
     with pytest.raises(ValueError, match="Unsupported config override keys"):
         apply_cli_overrides(config, {"model_name": "should_fail"})
+
+
+def test_repository_baseline_presets_resolve():
+    logistic_config = load_experiment_config(
+        "configs/experiments/civilcomments_logistic_baseline.yaml"
+    )
+    distilbert_config = load_experiment_config(
+        "configs/experiments/civilcomments_distilbert_baseline.yaml"
+    )
+
+    assert logistic_config["model_name"] == "logistic_tfidf"
+    assert distilbert_config["model_name"] == "distilbert"
+    assert logistic_config["dataset_name"] == "civilcomments"
+    assert distilbert_config["split_details"]["id_test"] == "id_test"

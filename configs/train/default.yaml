@@ -1,0 +1,6 @@
+seed: 13
+batch_size: 16
+max_epochs: 1
+num_workers: 0
+checkpoint_policy: latest
+scaffold_status: bootstrap_only

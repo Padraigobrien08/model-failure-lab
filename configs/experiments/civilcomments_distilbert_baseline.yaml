@@ -1,0 +1,13 @@
+experiment_name: civilcomments_distilbert_baseline
+experiment_group: baselines
+experiment_type: baseline
+dataset_name: civilcomments
+model_name: distilbert
+data_config: configs/data/civilcomments.yaml
+model_config: configs/model/distilbert.yaml
+train_config: configs/train/default.yaml
+eval_config: configs/eval/default.yaml
+tags:
+  - baseline
+  - distilbert
+notes: CivilComments DistilBERT baseline scaffold preset.

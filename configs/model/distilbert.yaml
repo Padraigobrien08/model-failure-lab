@@ -1,0 +1,4 @@
+model_name: distilbert
+model_family: transformer
+pretrained_name: distilbert-base-uncased
+output_type: probability

@@ -1,0 +1,13 @@
+experiment_name: civilcomments_logistic_baseline
+experiment_group: baselines
+experiment_type: baseline
+dataset_name: civilcomments
+model_name: logistic_tfidf
+data_config: configs/data/civilcomments.yaml
+model_config: configs/model/logistic_tfidf.yaml
+train_config: configs/train/default.yaml
+eval_config: configs/eval/default.yaml
+tags:
+  - baseline
+  - logistic_tfidf
+notes: CivilComments logistic regression baseline scaffold preset.
