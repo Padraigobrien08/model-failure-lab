@@ -31,6 +31,12 @@ ALLOWED_OVERRIDE_KEYS = {
     "report_name",
     "output_format",
     "top_k_subgroups",
+    "source_split",
+    "max_source_samples",
+    "families",
+    "severities",
+    "selection_seed",
+    "perturbation_seed",
 }
 
 
@@ -98,6 +104,7 @@ def load_experiment_config(preset_path: str | Path) -> dict[str, Any]:
         "mitigation_method": preset_payload.get("mitigation_method", mitigation_method),
         "mitigation_config": preset_payload.get("mitigation_config", mitigation_payload),
         "mitigation": mitigation_payload,
+        "perturbation": preset_payload.get("perturbation"),
         "preset_path": str(resolved_preset_path),
     }
 
@@ -155,7 +162,10 @@ def apply_cli_overrides(config: dict[str, Any], overrides: dict[str, Any]) -> di
         elif key == "calibration_bins":
             updated_config.setdefault("eval", {})["calibration_bins"] = int(value)
         elif key == "output_tag":
-            updated_config.setdefault("eval", {})["output_tag"] = str(value)
+            if str(updated_config.get("experiment_type")) == "perturbation_eval":
+                updated_config.setdefault("perturbation", {})["output_tag"] = str(value)
+            else:
+                updated_config.setdefault("eval", {})["output_tag"] = str(value)
         elif key == "eval_ids":
             if isinstance(value, str):
                 eval_id_values = [item.strip() for item in value.split(",") if item.strip()]
@@ -168,6 +178,27 @@ def apply_cli_overrides(config: dict[str, Any], overrides: dict[str, Any]) -> di
             updated_config.setdefault("report", {})["output_format"] = str(value)
         elif key == "top_k_subgroups":
             updated_config.setdefault("report", {})["top_k_subgroups"] = int(value)
+        elif key == "source_split":
+            updated_config.setdefault("perturbation", {})["source_split"] = str(value)
+        elif key == "max_source_samples":
+            updated_config.setdefault("perturbation", {})["max_source_samples"] = int(value)
+        elif key == "families":
+            if isinstance(value, str):
+                family_values = [item.strip() for item in value.split(",") if item.strip()]
+            else:
+                family_values = [str(item).strip() for item in value if str(item).strip()]
+            updated_config.setdefault("perturbation", {})["families"] = family_values
+            updated_config.setdefault("perturbation", {})["default_family_order"] = family_values
+        elif key == "severities":
+            if isinstance(value, str):
+                severity_values = [item.strip() for item in value.split(",") if item.strip()]
+            else:
+                severity_values = [str(item).strip() for item in value if str(item).strip()]
+            updated_config.setdefault("perturbation", {})["severities"] = severity_values
+        elif key == "selection_seed":
+            updated_config.setdefault("perturbation", {})["selection_seed"] = int(value)
+        elif key == "perturbation_seed":
+            updated_config.setdefault("perturbation", {})["perturbation_seed"] = int(value)
 
     validated = RunConfig.from_dict(updated_config)
     return validated.to_dict()

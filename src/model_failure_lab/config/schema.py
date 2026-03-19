@@ -21,12 +21,26 @@ REQUIRED_TEMPERATURE_SCALING_FIELDS = {
     "apply_to_splits",
     "allow_checkpoint_regeneration",
 }
+REQUIRED_PERTURBATION_FIELDS = {
+    "source_split",
+    "max_source_samples",
+    "families",
+    "severities",
+    "selection_seed",
+    "perturbation_seed",
+}
 REQUIRED_COMPARISON_TOLERANCE_FIELDS = {
     "id_macro_f1_max_drop",
     "overall_macro_f1_max_drop",
     "ece_neutral_tolerance",
 }
 SUPPORTED_MITIGATION_METHODS = {"reweighting", "temperature_scaling"}
+SUPPORTED_PERTURBATION_FAMILIES = {
+    "typo_noise",
+    "format_degradation",
+    "slang_rewrite",
+}
+SUPPORTED_PERTURBATION_SEVERITIES = {"low", "medium", "high"}
 DEFAULT_TRACKED_METRICS = ["accuracy", "macro_f1", "auroc", "loss"]
 
 
@@ -350,6 +364,84 @@ def _validate_mitigation_config(payload: object) -> dict[str, Any] | None:
     return normalized
 
 
+def _validate_perturbation_config(payload: object) -> dict[str, Any] | None:
+    if payload in (None, {}):
+        return None
+    if not isinstance(payload, dict):
+        raise ValueError("perturbation must be a mapping when provided")
+
+    missing_fields = sorted(REQUIRED_PERTURBATION_FIELDS - set(map(str, payload.keys())))
+    if missing_fields:
+        missing_text = ", ".join(missing_fields)
+        raise ValueError(f"perturbation is missing required fields: {missing_text}")
+
+    max_source_samples = int(payload["max_source_samples"])
+    if max_source_samples <= 0:
+        raise ValueError("perturbation.max_source_samples must be positive")
+
+    selection_seed = int(payload["selection_seed"])
+    perturbation_seed = int(payload["perturbation_seed"])
+
+    families_payload = payload["families"]
+    if not isinstance(families_payload, list) or not families_payload:
+        raise ValueError("perturbation.families must be a non-empty list")
+    families = [str(item) for item in families_payload]
+    unsupported_families = sorted(set(families) - SUPPORTED_PERTURBATION_FAMILIES)
+    if unsupported_families:
+        unsupported_text = ", ".join(unsupported_families)
+        raise ValueError(
+            "Unsupported perturbation families: "
+            f"{unsupported_text}"
+        )
+
+    severities_payload = payload["severities"]
+    if not isinstance(severities_payload, list) or not severities_payload:
+        raise ValueError("perturbation.severities must be a non-empty list")
+    severities = [str(item) for item in severities_payload]
+    unsupported_severities = sorted(set(severities) - SUPPORTED_PERTURBATION_SEVERITIES)
+    if unsupported_severities:
+        unsupported_text = ", ".join(unsupported_severities)
+        raise ValueError(
+            "Unsupported perturbation severities: "
+            f"{unsupported_text}"
+        )
+
+    default_family_order_payload = payload.get("default_family_order", families)
+    if not isinstance(default_family_order_payload, list) or not default_family_order_payload:
+        raise ValueError("perturbation.default_family_order must be a non-empty list")
+    default_family_order = [str(item) for item in default_family_order_payload]
+    order_set = set(default_family_order)
+    family_set = set(families)
+    if order_set != family_set:
+        raise ValueError(
+            "perturbation.default_family_order must contain the same families as perturbation.families"
+        )
+
+    slang_mapping = payload.get("slang_mapping")
+    normalized_mapping: dict[str, str] | None = None
+    if slang_mapping is not None:
+        normalized_mapping = _coerce_string_mapping(
+            slang_mapping,
+            name="perturbation.slang_mapping",
+        )
+
+    return {
+        **dict(payload),
+        "source_split": str(payload["source_split"]),
+        "max_source_samples": max_source_samples,
+        "families": families,
+        "severities": severities,
+        "selection_seed": selection_seed,
+        "perturbation_seed": perturbation_seed,
+        "default_family_order": default_family_order,
+        "output_tag": (
+            str(payload["output_tag"]) if payload.get("output_tag") is not None else None
+        ),
+        "slang_mapping_name": str(payload.get("slang_mapping_name", "default")),
+        "slang_mapping": normalized_mapping,
+    }
+
+
 @dataclass(slots=True)
 class RunConfig:
     """Resolved experiment configuration used by scripts and tracking."""
@@ -370,6 +462,7 @@ class RunConfig:
     mitigation_method: str | None = None
     mitigation_config: dict[str, Any] | None = None
     mitigation: dict[str, Any] | None = None
+    perturbation: dict[str, Any] | None = None
     data: dict[str, Any] = field(default_factory=dict)
     model: dict[str, Any] = field(default_factory=dict)
     train: dict[str, Any] = field(default_factory=dict)
@@ -410,6 +503,7 @@ class RunConfig:
 
         data = _validate_data_config(payload["data"])
         mitigation = _validate_mitigation_config(payload.get("mitigation"))
+        perturbation = _validate_perturbation_config(payload.get("perturbation"))
         mitigation_config_payload = payload.get("mitigation_config", mitigation)
         mitigation_config = (
             _validate_mitigation_config(mitigation_config_payload)
@@ -446,6 +540,7 @@ class RunConfig:
             ),
             mitigation_config=mitigation_config,
             mitigation=mitigation,
+            perturbation=perturbation,
             data=data,
             model=dict(payload["model"]),
             train=dict(payload["train"]),

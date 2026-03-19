@@ -202,6 +202,35 @@ def build_evaluation_artifact_paths(eval_dir: Path) -> dict[str, str]:
     }
 
 
+def build_perturbation_run_dir(
+    source_run_dir: Path,
+    perturbation_id: str,
+    create: bool = False,
+) -> Path:
+    """Return the canonical perturbation bundle directory for a source run."""
+    perturbation_dir = source_run_dir / "perturbations" / _normalize_segment(perturbation_id)
+    if create:
+        perturbation_dir.mkdir(parents=True, exist_ok=True)
+    return perturbation_dir
+
+
+def build_perturbation_artifact_paths(run_dir: Path) -> dict[str, str]:
+    """Return the persisted artifact paths for a perturbation bundle."""
+    return {
+        "suite_manifest_json": str(run_dir / "suite_manifest.json"),
+        "perturbed_samples_jsonl": str(run_dir / "perturbed_samples.jsonl"),
+        "sample_preview_jsonl": str(run_dir / "sample_preview.jsonl"),
+        "predictions_perturbed_parquet": str(run_dir / "predictions_perturbed.parquet"),
+        "suite_summary_csv": str(run_dir / "suite_summary.csv"),
+        "family_summary_csv": str(run_dir / "family_summary.csv"),
+        "severity_summary_csv": str(run_dir / "severity_summary.csv"),
+        "family_severity_matrix_csv": str(run_dir / "family_severity_matrix.csv"),
+        "source_delta_summary_csv": str(run_dir / "source_delta_summary.csv"),
+        "figures_dir": str(run_dir / "figures"),
+        "plots": str(run_dir / "figures"),
+    }
+
+
 def find_run_metadata_path(run_id: str) -> Path:
     """Resolve a saved baseline or mitigation metadata path by run ID."""
     normalized_run_id = _normalize_segment(run_id)

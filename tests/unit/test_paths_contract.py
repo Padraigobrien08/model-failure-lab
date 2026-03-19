@@ -5,6 +5,8 @@ from model_failure_lab.utils.paths import (
     build_baseline_run_dir,
     build_evaluation_run_dir,
     build_mitigation_run_dir,
+    build_perturbation_artifact_paths,
+    build_perturbation_run_dir,
     build_report_artifact_paths,
     build_report_dir,
     build_report_run_dir,
@@ -79,6 +81,18 @@ def test_evaluation_run_dir_nests_under_source_run(temp_artifact_root):
     evaluation_dir = build_evaluation_run_dir(source_run_dir, "eval_run")
 
     assert evaluation_dir == source_run_dir / "evaluations" / "eval_run"
+
+
+def test_perturbation_run_dir_nests_under_source_run(temp_artifact_root):
+    source_run_dir = build_baseline_run_dir("distilbert", "source_run", create=True)
+    perturbation_dir = build_perturbation_run_dir(source_run_dir, "stress run", create=True)
+    artifact_paths = build_perturbation_artifact_paths(perturbation_dir)
+
+    assert perturbation_dir == source_run_dir / "perturbations" / "stress_run"
+    assert "evaluations" not in perturbation_dir.parts
+    assert artifact_paths["suite_manifest_json"].endswith("suite_manifest.json")
+    assert artifact_paths["perturbed_samples_jsonl"].endswith("perturbed_samples.jsonl")
+    assert artifact_paths["plots"].endswith("figures")
 
 
 def test_find_run_metadata_path_resolves_saved_baseline_run(temp_artifact_root):

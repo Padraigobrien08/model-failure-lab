@@ -21,6 +21,7 @@ from scripts.build_report import run_command as run_build_report_command
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
 from scripts.run_mitigation import run_command as run_mitigation_command
+from scripts.run_perturbation_eval import run_command as run_perturbation_eval_command
 from scripts.run_shift_eval import run_command as run_shift_eval_command
 
 
@@ -819,6 +820,39 @@ def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_arti
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
+
+
+def test_run_perturbation_eval_materializes_suite_bundle(temp_artifact_root, monkeypatch):
+    source_run_id = _create_saved_evaluation_source_run()
+    monkeypatch.setattr(
+        "scripts.run_perturbation_eval.load_canonical_civilcomments_dataset",
+        lambda *_args, **_kwargs: _baseline_dataset(),
+    )
+
+    result = run_perturbation_eval_command(
+        [
+            "--run-id",
+            source_run_id,
+            "--output-run-id",
+            "perturbation_suite",
+            "--max-source-samples",
+            "2",
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert "artifacts/baselines/logistic_tfidf/shift_eval_source/perturbations" in (
+        result.run_dir.as_posix()
+    )
+    assert metadata["experiment_type"] == "perturbation_eval"
+    assert metadata["status"] == "completed"
+    assert metadata["source_run_id"] == source_run_id
+    assert metadata["selected_source_count"] == 2
+    assert metadata["perturbed_sample_count"] == 18
+    assert metadata["artifact_paths"]["suite_manifest_json"].endswith("suite_manifest.json")
+    assert Path(metadata["artifact_paths"]["perturbed_samples_jsonl"]).exists()
+    assert Path(metadata["artifact_paths"]["sample_preview_jsonl"]).exists()
+    assert result.metrics_path.name == "suite_manifest.json"
 
 
 def test_shift_eval_writes_completed_evaluation_bundle(temp_artifact_root):
