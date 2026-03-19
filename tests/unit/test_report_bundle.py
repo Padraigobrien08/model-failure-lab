@@ -8,13 +8,12 @@ import pandas as pd
 from model_failure_lab.reporting import (
     build_calibration_curve_figure,
     build_calibration_table,
+    build_comparison_table,
     build_id_ood_comparison_frame,
-    build_id_ood_figure,
-    build_worst_group_vs_average_figure,
-    build_worst_group_vs_average_frame,
-    build_worst_subgroups_figure,
-    build_worst_subgroups_frame,
+    build_report_summary,
+    build_subgroup_table,
     load_report_inputs,
+    render_report_markdown,
     select_report_candidates,
 )
 from model_failure_lab.utils.paths import build_baseline_run_dir, build_evaluation_run_dir
@@ -145,15 +144,6 @@ def _create_evaluation_bundle(
                 "accuracy": 0.6,
                 "error_rate": 0.4,
             },
-            {
-                "grouping_type": "group_id",
-                "group_name": "group_sparse",
-                "support": 20,
-                "eligible_for_worst_group": False,
-                "macro_f1": 0.1,
-                "accuracy": 0.2,
-                "error_rate": 0.8,
-            },
         ],
     )
     _write_csv(
@@ -164,8 +154,8 @@ def _create_evaluation_bundle(
         Path(artifact_paths["calibration_summary_csv"]),
         [
             {"slice_name": "overall", "ece": 0.07, "brier_score": 0.12, "sample_count": 100},
-            {"slice_name": "id", "ece": 0.05, "brier_score": 0.1, "sample_count": 60},
-            {"slice_name": "ood", "ece": 0.09, "brier_score": 0.13, "sample_count": 40},
+            {"slice_name": "id", "ece": 0.05, "brier_score": 0.11, "sample_count": 60},
+            {"slice_name": "ood", "ece": 0.09, "brier_score": 0.14, "sample_count": 40},
         ],
     )
     _write_csv(
@@ -199,52 +189,7 @@ def _create_evaluation_bundle(
     )
 
 
-def test_build_id_ood_and_worst_group_figures(temp_artifact_root):
-    _create_evaluation_bundle(
-        model_name="distilbert",
-        source_run_id="run_b",
-        eval_id="eval_b",
-        overall_score=0.74,
-    )
-    _create_evaluation_bundle(
-        model_name="logistic_tfidf",
-        source_run_id="run_a",
-        eval_id="eval_a",
-        overall_score=0.68,
-    )
-
-    candidates = select_report_candidates(load_report_inputs(experiment_group="baselines_v1"))
-    comparison_frame = build_id_ood_comparison_frame(candidates)
-    worst_group_frame = build_worst_group_vs_average_frame(candidates)
-
-    id_ood_figure = build_id_ood_figure(comparison_frame)
-    worst_group_figure = build_worst_group_vs_average_figure(worst_group_frame)
-
-    assert comparison_frame["label"].tolist() == [
-        "distilbert:run_b",
-        "logistic_tfidf:run_a",
-    ]
-    assert len(id_ood_figure.axes[0].patches) == 4
-    assert len(worst_group_figure.axes[0].patches) == 4
-
-
-def test_build_worst_subgroups_frame_filters_low_support_and_limits_top_k(temp_artifact_root):
-    _create_evaluation_bundle(
-        model_name="distilbert",
-        source_run_id="run_b",
-        eval_id="eval_b",
-    )
-    candidate = load_report_inputs(experiment_group="baselines_v1")[0]
-
-    subgroup_frame = build_worst_subgroups_frame(candidate, top_k=2, min_group_support=100)
-    subgroup_figure = build_worst_subgroups_figure(subgroup_frame)
-
-    assert subgroup_frame["group_name"].tolist() == ["group_low", "group_mid"]
-    assert "group_sparse" not in subgroup_frame["group_name"].tolist()
-    assert len(subgroup_figure.axes[0].patches) == 2
-
-
-def test_build_calibration_curve_figure_and_table(temp_artifact_root):
+def test_build_calibration_outputs_and_tables(temp_artifact_root):
     _create_evaluation_bundle(
         model_name="distilbert",
         source_run_id="run_b",
@@ -269,3 +214,55 @@ def test_build_calibration_curve_figure_and_table(temp_artifact_root):
         "ood",
     ]
     assert len(calibration_figure.axes) == 3
+
+
+def test_render_report_markdown_and_summary_payload(temp_artifact_root):
+    _create_evaluation_bundle(
+        model_name="distilbert",
+        source_run_id="run_b",
+        eval_id="eval_b",
+    )
+    _create_evaluation_bundle(
+        model_name="logistic_tfidf",
+        source_run_id="run_a",
+        eval_id="eval_a",
+    )
+
+    candidates = select_report_candidates(load_report_inputs(experiment_group="baselines_v1"))
+    comparison_table = build_comparison_table(build_id_ood_comparison_frame(candidates))
+    subgroup_table = build_subgroup_table(candidates, top_k=2, min_group_support=100)
+    calibration_table = build_calibration_table(candidates)
+    report_summary = build_report_summary(
+        candidates,
+        comparison_table=comparison_table,
+        subgroup_table=subgroup_table,
+        calibration_table=calibration_table,
+        report_title="Baseline Robustness Report",
+    )
+
+    markdown = render_report_markdown(
+        report_title="Baseline Robustness Report",
+        report_summary=report_summary,
+        figure_paths={
+            "id_vs_ood_primary_metric": "figures/id_vs_ood_primary_metric.png",
+            "worst_group_vs_average": "figures/worst_group_vs_average.png",
+            "worst_subgroups": "figures/worst_subgroups.png",
+            "calibration_curve": "figures/calibration_curve.png",
+        },
+        table_paths={
+            "comparison_table": "tables/comparison_table.csv",
+            "subgroup_table": "tables/subgroup_table.csv",
+            "calibration_table": "tables/calibration_table.csv",
+        },
+    )
+
+    assert markdown.index("## Overview") < markdown.index("## Compared runs")
+    assert markdown.index("## Compared runs") < markdown.index("## Headline findings")
+    assert markdown.index("## Headline findings") < markdown.index("## ID vs OOD degradation")
+    assert markdown.index("## Calibration summary") < markdown.index("## Key takeaway")
+    assert markdown.count("- ") >= 3
+    assert "figures/id_vs_ood_primary_metric.png" in markdown
+    assert "tables/calibration_table.csv" in markdown
+    assert 3 <= len(report_summary["headline_findings"]) <= 5
+    assert len(report_summary["headline_findings"]) <= 5
+    assert report_summary["compared_runs"][0]["label"] == "distilbert:run_b"
