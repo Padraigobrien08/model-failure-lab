@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Callable
 
 import joblib
-import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
@@ -18,6 +17,7 @@ from .common import (
     load_baseline_canonical_dataset,
     set_random_seed,
 )
+from .export import build_prediction_records, write_prediction_exports
 
 DatasetLoader = Callable[..., CanonicalDataset]
 
@@ -27,38 +27,10 @@ class LogisticBaselineArtifacts:
     """Artifacts produced by a completed logistic baseline run."""
 
     metrics_payload: dict[str, Any]
-    prediction_path: Path
+    prediction_paths: dict[str, Path]
     vectorizer_path: Path
     model_path: Path
     checkpoint_dir: Path
-
-
-def _prediction_records(
-    *,
-    run_id: str,
-    model_name: str,
-    texts_view: Any,
-    predicted_labels: list[int],
-    probability_rows: list[list[float]],
-) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    for index, sample_id in enumerate(texts_view.sample_ids):
-        probability_positive = float(probability_rows[index][1])
-        record = {
-            "run_id": run_id,
-            "sample_id": sample_id,
-            "split": texts_view.splits[index],
-            "model_name": model_name,
-            "true_label": int(texts_view.labels[index]),
-            "pred_label": int(predicted_labels[index]),
-            "pred_score": probability_positive,
-            "prob_0": float(probability_rows[index][0]),
-            "prob_1": probability_positive,
-            "is_correct": int(predicted_labels[index]) == int(texts_view.labels[index]),
-            "group_id": texts_view.group_ids[index],
-        }
-        records.append(record)
-    return records
 
 
 def _checkpoint_paths(run_dir: Path) -> tuple[Path, Path, Path]:
@@ -110,6 +82,8 @@ def train_logistic_baseline(
     validation_matrix = vectorizer.transform(validation_view.texts)
     classifier.fit(train_matrix, train_view.labels)
 
+    train_probability_rows = classifier.predict_proba(train_matrix).tolist()
+    train_predicted_labels = classifier.predict(train_matrix).tolist()
     probability_rows = classifier.predict_proba(validation_matrix).tolist()
     predicted_labels = classifier.predict(validation_matrix).tolist()
     probability_positive = [float(row[1]) for row in probability_rows]
@@ -140,20 +114,37 @@ def train_logistic_baseline(
         "validation_metrics": validation_metrics,
     }
 
-    prediction_filename = str(
-        config.get("eval", {}).get("prediction_filename", "predictions.parquet")
+    prediction_paths = write_prediction_exports(
+        run_dir,
+        {
+            "train": build_prediction_records(
+                run_id=str(config["run_id"]),
+                model_name=str(config["model_name"]),
+                sample_ids=train_view.sample_ids,
+                splits=train_view.splits,
+                true_labels=[int(label) for label in train_view.labels],
+                predicted_labels=[int(label) for label in train_predicted_labels],
+                probability_rows=[
+                    [float(row[0]), float(row[1])] for row in train_probability_rows
+                ],
+                group_ids=train_view.group_ids,
+                is_id_flags=train_view.is_id_flags,
+                is_ood_flags=train_view.is_ood_flags,
+            ),
+            "validation": build_prediction_records(
+                run_id=str(config["run_id"]),
+                model_name=str(config["model_name"]),
+                sample_ids=validation_view.sample_ids,
+                splits=validation_view.splits,
+                true_labels=[int(label) for label in validation_view.labels],
+                predicted_labels=[int(label) for label in predicted_labels],
+                probability_rows=[[float(row[0]), float(row[1])] for row in probability_rows],
+                group_ids=validation_view.group_ids,
+                is_id_flags=validation_view.is_id_flags,
+                is_ood_flags=validation_view.is_ood_flags,
+            ),
+        },
     )
-    prediction_path = run_dir / prediction_filename
-    prediction_frame = pd.DataFrame(
-        _prediction_records(
-            run_id=str(config["run_id"]),
-            model_name=str(config["model_name"]),
-            texts_view=validation_view,
-            predicted_labels=[int(label) for label in predicted_labels],
-            probability_rows=[[float(row[0]), float(row[1])] for row in probability_rows],
-        )
-    )
-    prediction_frame.to_parquet(prediction_path, index=False)
 
     checkpoint_dir, vectorizer_path, model_path = _checkpoint_paths(run_dir)
     joblib.dump(vectorizer, vectorizer_path)
@@ -161,7 +152,7 @@ def train_logistic_baseline(
 
     return LogisticBaselineArtifacts(
         metrics_payload=metrics_payload,
-        prediction_path=prediction_path,
+        prediction_paths=prediction_paths,
         vectorizer_path=vectorizer_path,
         model_path=model_path,
         checkpoint_dir=checkpoint_dir,

@@ -113,7 +113,8 @@ def test_train_logistic_baseline_writes_artifacts_without_validation_vocab_leaka
     vectorizer = joblib.load(artifacts.vectorizer_path)
     assert "validation_only_token" not in vectorizer.vocabulary_
     assert artifacts.model_path.exists()
-    assert artifacts.prediction_path.exists()
+    assert artifacts.prediction_paths["train"].exists()
+    assert artifacts.prediction_paths["validation"].exists()
     assert artifacts.metrics_payload["primary_metric"]["name"] == "macro_f1"
     assert artifacts.metrics_payload["validation_metrics"]["macro_f1"] is not None
 
@@ -133,6 +134,12 @@ def test_run_baseline_command_executes_real_logistic_path(temp_artifact_root, mo
 
     assert result.status == "completed"
     assert metadata["status"] == "completed"
+    assert metadata["artifact_paths"]["predictions"]["train"].endswith(
+        "predictions_train.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
+        "predictions_val.parquet"
+    )
     assert metrics["primary_metric"]["value"] is not None
     assert (result.run_dir / "checkpoint" / "vectorizer.joblib").exists()
     assert (result.run_dir / "checkpoint" / "logistic_model.joblib").exists()

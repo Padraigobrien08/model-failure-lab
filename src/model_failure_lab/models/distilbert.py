@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-import pandas as pd
 import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
@@ -25,6 +24,7 @@ from .common import (
     load_baseline_canonical_dataset,
     set_random_seed,
 )
+from .export import build_prediction_records, write_prediction_exports
 
 DatasetLoader = Callable[..., CanonicalDataset]
 TokenizerFactory = Callable[[str], Any]
@@ -36,7 +36,7 @@ class DistilBertBaselineArtifacts:
     """Artifacts produced by a completed DistilBERT baseline run."""
 
     metrics_payload: dict[str, Any]
-    prediction_path: Path
+    prediction_paths: dict[str, Path]
     checkpoint_dir: Path
     checkpoint_path: Path
     history_path: Path
@@ -287,6 +287,13 @@ def train_distilbert_baseline(
         num_workers=int(train_config.get("num_workers", 0)),
         collate_fn=collate_fn,
     )
+    train_eval_loader = DataLoader(
+        train_dataset,
+        batch_size=eval_batch_size,
+        shuffle=False,
+        num_workers=int(train_config.get("num_workers", 0)),
+        collate_fn=collate_fn,
+    )
     validation_loader = DataLoader(
         validation_dataset,
         batch_size=eval_batch_size,
@@ -402,20 +409,40 @@ def train_distilbert_baseline(
     if hasattr(tokenizer, "save_pretrained"):
         tokenizer.save_pretrained(checkpoint_dir / "tokenizer")
 
-    prediction_filename = str(eval_config.get("prediction_filename", "predictions.parquet"))
-    prediction_path = run_dir / prediction_filename
-    prediction_frame = pd.DataFrame(
-        _prediction_records(
-            run_id=str(config["run_id"]),
-            model_name=str(config["model_name"]),
-            true_labels=best_validation_result["labels"],
-            predicted_labels=best_validation_result["predictions"],
-            probability_rows=best_validation_result["probabilities"],
-            logits_rows=best_validation_result["logits"],
-            metadata=best_validation_result["metadata"],
-        )
+    model.load_state_dict(best_state_dict)
+    train_export_result = _run_validation(model, train_eval_loader, device=device)
+    validation_export_result = _run_validation(model, validation_loader, device=device)
+    prediction_paths = write_prediction_exports(
+        run_dir,
+        {
+            "train": build_prediction_records(
+                run_id=str(config["run_id"]),
+                model_name=str(config["model_name"]),
+                sample_ids=train_export_result["metadata"]["sample_id"],
+                splits=train_export_result["metadata"]["split"],
+                true_labels=train_export_result["labels"],
+                predicted_labels=train_export_result["predictions"],
+                probability_rows=train_export_result["probabilities"],
+                group_ids=train_export_result["metadata"]["group_id"],
+                is_id_flags=train_export_result["metadata"]["is_id"],
+                is_ood_flags=train_export_result["metadata"]["is_ood"],
+                logits_rows=train_export_result["logits"],
+            ),
+            "validation": build_prediction_records(
+                run_id=str(config["run_id"]),
+                model_name=str(config["model_name"]),
+                sample_ids=validation_export_result["metadata"]["sample_id"],
+                splits=validation_export_result["metadata"]["split"],
+                true_labels=validation_export_result["labels"],
+                predicted_labels=validation_export_result["predictions"],
+                probability_rows=validation_export_result["probabilities"],
+                group_ids=validation_export_result["metadata"]["group_id"],
+                is_id_flags=validation_export_result["metadata"]["is_id"],
+                is_ood_flags=validation_export_result["metadata"]["is_ood"],
+                logits_rows=validation_export_result["logits"],
+            ),
+        },
     )
-    prediction_frame.to_parquet(prediction_path, index=False)
 
     validation_metrics = dict(best_validation_result["metrics"])
     metrics_payload = {
@@ -446,7 +473,7 @@ def train_distilbert_baseline(
 
     return DistilBertBaselineArtifacts(
         metrics_payload=metrics_payload,
-        prediction_path=prediction_path,
+        prediction_paths=prediction_paths,
         checkpoint_dir=checkpoint_dir,
         checkpoint_path=checkpoint_path,
         history_path=history_path,

@@ -7,6 +7,7 @@ from model_failure_lab.config import apply_cli_overrides, load_experiment_config
 from model_failure_lab.runners.dispatch import build_scaffold_metrics, dispatch_baseline
 from model_failure_lab.tracking import (
     append_experiment_index,
+    build_artifact_paths,
     build_index_entry,
     build_run_metadata,
     generate_run_id,
@@ -45,6 +46,9 @@ def run_command(argv: Sequence[str] | None = None):
 
     run_dir = build_baseline_run_dir(config["model_name"], config["run_id"], create=True)
     command = "python scripts/run_baseline.py " + " ".join(argv or [])
+    prediction_splits = ["train", "validation"]
+    if bool(config.get("train", {}).get("export_blind_test_predictions", False)):
+        prediction_splits.append("test")
     metadata = build_run_metadata(
         run_id=config["run_id"],
         experiment_type="baseline",
@@ -55,6 +59,7 @@ def run_command(argv: Sequence[str] | None = None):
         resolved_config=config,
         command=command.strip(),
         run_dir=run_dir,
+        artifact_paths=build_artifact_paths(run_dir, prediction_splits=prediction_splits),
         notes=config.get("notes", ""),
         tags=config.get("tags", []),
         status="scaffold_ready",

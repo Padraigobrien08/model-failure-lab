@@ -165,7 +165,8 @@ def test_train_distilbert_baseline_writes_checkpoint_and_history(temp_artifact_r
     assert artifacts.checkpoint_path.exists()
     assert artifacts.history_path.exists()
     assert artifacts.tokenizer_config_path.exists()
-    assert artifacts.prediction_path.exists()
+    assert artifacts.prediction_paths["train"].exists()
+    assert artifacts.prediction_paths["validation"].exists()
     assert artifacts.metrics_payload["primary_metric"]["name"] == "macro_f1"
     assert (
         artifacts.metrics_payload["selected_checkpoint"]["source"]
@@ -196,6 +197,12 @@ def test_run_baseline_command_executes_real_distilbert_path(temp_artifact_root, 
 
     assert result.status == "completed"
     assert metadata["status"] == "completed"
+    assert metadata["artifact_paths"]["predictions"]["train"].endswith(
+        "predictions_train.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
+        "predictions_val.parquet"
+    )
     assert metrics["primary_metric"]["value"] is not None
     assert (result.run_dir / "checkpoint" / "best_model.pt").exists()
     assert (result.run_dir / "checkpoint" / "training_history.json").exists()

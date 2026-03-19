@@ -9,6 +9,8 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
+from model_failure_lab.utils.paths import build_prediction_artifact_paths
+
 DEFAULT_VERSION_PACKAGES = {
     "torch": "torch",
     "scikit_learn": "scikit-learn",
@@ -59,11 +61,20 @@ def resolve_library_versions() -> dict[str, str | None]:
     return versions
 
 
-def build_artifact_paths(run_dir: Path) -> dict[str, str]:
+def build_artifact_paths(
+    run_dir: Path,
+    *,
+    prediction_splits: list[str] | None = None,
+) -> dict[str, Any]:
     """Build the standard artifact path map for a run directory."""
+    predictions: str | dict[str, str]
+    if prediction_splits:
+        predictions = build_prediction_artifact_paths(run_dir, prediction_splits)
+    else:
+        predictions = str(run_dir / "predictions.parquet")
     return {
         "checkpoint": str(run_dir / "checkpoint"),
-        "predictions": str(run_dir / "predictions.parquet"),
+        "predictions": predictions,
         "metrics_json": str(run_dir / "metrics.json"),
         "plots": str(run_dir / "figures"),
     }

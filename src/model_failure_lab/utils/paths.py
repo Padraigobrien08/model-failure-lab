@@ -9,6 +9,14 @@ from pathlib import Path
 ARTIFACT_ROOT_ENV = "MODEL_FAILURE_LAB_ARTIFACT_ROOT"
 CONFIG_ROOT_ENV = "MODEL_FAILURE_LAB_CONFIG_ROOT"
 _SEGMENT_PATTERN = re.compile(r"[^a-z0-9]+")
+_PREDICTION_SPLIT_SUFFIXES = {
+    "train": "train",
+    "validation": "val",
+    "val": "val",
+    "test": "test",
+    "id_test": "id_test",
+    "ood_test": "ood_test",
+}
 
 
 def repository_root() -> Path:
@@ -113,3 +121,18 @@ def build_data_manifest_path(dataset_name: str) -> Path:
     """Return the canonical manifest path for a dataset."""
     manifest_name = f"{_normalize_segment(dataset_name)}_manifest.json"
     return build_data_manifest_dir(create=True) / manifest_name
+
+
+def build_prediction_artifact_path(run_dir: Path, split: str) -> Path:
+    """Return the canonical prediction artifact path for a split."""
+    normalized_split = _normalize_segment(split)
+    suffix = _PREDICTION_SPLIT_SUFFIXES.get(normalized_split, normalized_split)
+    return run_dir / f"predictions_{suffix}.parquet"
+
+
+def build_prediction_artifact_paths(run_dir: Path, splits: list[str]) -> dict[str, str]:
+    """Return canonical prediction artifact paths keyed by split name."""
+    return {
+        str(split): str(build_prediction_artifact_path(run_dir, str(split)))
+        for split in splits
+    }

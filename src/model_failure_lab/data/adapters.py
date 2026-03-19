@@ -35,6 +35,8 @@ class TfidfAdapterView:
     sample_ids: list[str]
     splits: list[str]
     group_ids: list[str]
+    is_id_flags: list[bool]
+    is_ood_flags: list[bool]
 
 
 @dataclass(slots=True)
@@ -64,6 +66,8 @@ def prepare_tfidf_adapter(
         sample_ids=[str(sample["sample_id"]) for sample in normalized_samples],
         splits=[str(sample["split"]) for sample in normalized_samples],
         group_ids=[str(sample["group_id"]) for sample in normalized_samples],
+        is_id_flags=[bool(sample["is_id"]) for sample in normalized_samples],
+        is_ood_flags=[bool(sample["is_ood"]) for sample in normalized_samples],
     )
 
 
@@ -86,11 +90,13 @@ def prepare_transformer_adapter(
         {
             "text": str(sample["text"]),
             "label": int(sample["label"]),
-            "sample_id": str(sample["sample_id"]),
-            "split": str(sample["split"]),
-            "group_id": str(sample["group_id"]),
-            "group_attributes": dict(sample["group_attributes"]),
-        }
+                "sample_id": str(sample["sample_id"]),
+                "split": str(sample["split"]),
+                "group_id": str(sample["group_id"]),
+                "is_id": bool(sample["is_id"]),
+                "is_ood": bool(sample["is_ood"]),
+                "group_attributes": dict(sample["group_attributes"]),
+            }
         for sample in normalized_samples
     ]
     return TransformerAdapterView(

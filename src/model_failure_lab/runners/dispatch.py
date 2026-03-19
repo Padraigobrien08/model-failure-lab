@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from model_failure_lab.models import train_distilbert_baseline, train_logistic_baseline
-from model_failure_lab.tracking import build_run_metadata, write_metadata, write_metrics
+from model_failure_lab.tracking import (
+    build_artifact_paths,
+    build_run_metadata,
+    write_metadata,
+    write_metrics,
+)
 from model_failure_lab.tracking.metrics import build_metrics_payload
 
 from .contracts import DispatchResult
@@ -46,9 +51,12 @@ def dispatch_baseline(
         metrics_path = write_metrics(run_dir, artifacts.metrics_payload)
 
         existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        artifact_paths = dict(existing_metadata.get("artifact_paths", {}))
+        artifact_paths = build_artifact_paths(run_dir, prediction_splits=["train", "validation"])
         artifact_paths["checkpoint"] = str(artifacts.checkpoint_dir)
-        artifact_paths["predictions"] = str(artifacts.prediction_path)
+        artifact_paths["predictions"] = {
+            split: str(path) for split, path in artifacts.prediction_paths.items()
+        }
+        artifact_paths["selected_checkpoint"] = str(artifacts.model_path)
         metadata_payload = build_run_metadata(
             run_id=str(config["run_id"]),
             experiment_type="baseline",
@@ -83,9 +91,13 @@ def dispatch_baseline(
         metrics_path = write_metrics(run_dir, artifacts.metrics_payload)
 
         existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        artifact_paths = dict(existing_metadata.get("artifact_paths", {}))
+        artifact_paths = build_artifact_paths(run_dir, prediction_splits=["train", "validation"])
         artifact_paths["checkpoint"] = str(artifacts.checkpoint_dir)
-        artifact_paths["predictions"] = str(artifacts.prediction_path)
+        artifact_paths["predictions"] = {
+            split: str(path) for split, path in artifacts.prediction_paths.items()
+        }
+        artifact_paths["selected_checkpoint"] = str(artifacts.checkpoint_path)
+        artifact_paths["training_history_json"] = str(artifacts.history_path)
         metadata_payload = build_run_metadata(
             run_id=str(config["run_id"]),
             experiment_type="baseline",
