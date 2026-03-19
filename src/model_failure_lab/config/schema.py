@@ -15,11 +15,18 @@ REQUIRED_REWEIGHTING_FIELDS = {
     "max_weight",
     "normalize_mean",
 }
+REQUIRED_TEMPERATURE_SCALING_FIELDS = {
+    "fitting_split",
+    "objective",
+    "apply_to_splits",
+    "allow_checkpoint_regeneration",
+}
 REQUIRED_COMPARISON_TOLERANCE_FIELDS = {
     "id_macro_f1_max_drop",
     "overall_macro_f1_max_drop",
     "ece_neutral_tolerance",
 }
+SUPPORTED_MITIGATION_METHODS = {"reweighting", "temperature_scaling"}
 DEFAULT_TRACKED_METRICS = ["accuracy", "macro_f1", "auroc", "loss"]
 
 
@@ -253,6 +260,41 @@ def _validate_reweighting_config(payload: object) -> dict[str, Any]:
     }
 
 
+def _validate_temperature_scaling_config(payload: object) -> dict[str, Any]:
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("mitigation.temperature_scaling must be a non-empty mapping")
+
+    missing_fields = sorted(
+        REQUIRED_TEMPERATURE_SCALING_FIELDS - set(map(str, payload.keys()))
+    )
+    if missing_fields:
+        missing_text = ", ".join(missing_fields)
+        raise ValueError(
+            "mitigation.temperature_scaling is missing required fields: "
+            f"{missing_text}"
+        )
+
+    apply_to_splits = payload["apply_to_splits"]
+    if not isinstance(apply_to_splits, list) or not apply_to_splits:
+        raise ValueError(
+            "mitigation.temperature_scaling.apply_to_splits must be a non-empty list"
+        )
+
+    objective = str(payload["objective"])
+    if objective != "nll":
+        raise ValueError(
+            "mitigation.temperature_scaling.objective must be 'nll' for MVP"
+        )
+
+    return {
+        **dict(payload),
+        "fitting_split": str(payload["fitting_split"]),
+        "objective": objective,
+        "apply_to_splits": [str(split) for split in apply_to_splits],
+        "allow_checkpoint_regeneration": bool(payload["allow_checkpoint_regeneration"]),
+    }
+
+
 def _validate_mitigation_config(payload: object) -> dict[str, Any] | None:
     if payload in (None, {}):
         return None
@@ -281,10 +323,26 @@ def _validate_mitigation_config(payload: object) -> dict[str, Any] | None:
         "comparison_tolerances": comparison_tolerances,
     }
 
+    if normalized["method"] not in SUPPORTED_MITIGATION_METHODS:
+        supported = ", ".join(sorted(SUPPORTED_MITIGATION_METHODS))
+        raise ValueError(
+            f"Unsupported mitigation.method {normalized['method']!r}; expected one of: "
+            f"{supported}"
+        )
+
     if normalized["method"] == "reweighting":
         normalized["reweighting"] = _validate_reweighting_config(payload.get("reweighting"))
     elif payload.get("reweighting") is not None:
         normalized["reweighting"] = _validate_reweighting_config(payload.get("reweighting"))
+
+    if normalized["method"] == "temperature_scaling":
+        normalized["temperature_scaling"] = _validate_temperature_scaling_config(
+            payload.get("temperature_scaling")
+        )
+    elif payload.get("temperature_scaling") is not None:
+        normalized["temperature_scaling"] = _validate_temperature_scaling_config(
+            payload.get("temperature_scaling")
+        )
 
     for key, value in payload.items():
         normalized.setdefault(str(key), value)

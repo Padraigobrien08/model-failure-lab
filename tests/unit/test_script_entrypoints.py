@@ -11,6 +11,7 @@ from torch import nn
 
 from model_failure_lab.config import load_experiment_config
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
+from model_failure_lab.models.export import build_prediction_records
 from model_failure_lab.tracking import build_run_metadata, write_metadata
 from model_failure_lab.utils.paths import (
     build_baseline_run_dir,
@@ -199,6 +200,81 @@ def _baseline_dataset() -> CanonicalDataset:
             ),
         ],
     )
+
+
+def _write_distilbert_parent_run(
+    run_id: str,
+    *,
+    with_saved_logits: bool = False,
+) -> None:
+    baseline_config = load_experiment_config(
+        "configs/experiments/civilcomments_distilbert_baseline.yaml"
+    )
+    baseline_config["run_id"] = run_id
+    run_dir = build_baseline_run_dir("distilbert", run_id, create=True)
+    checkpoint_path = run_dir / "checkpoint" / "best_model.pt"
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint_path.write_text("checkpoint", encoding="utf-8")
+
+    artifact_paths = {
+        "checkpoint": str(run_dir / "checkpoint"),
+        "predictions": {},
+        "metrics_json": str(run_dir / "metrics.json"),
+        "plots": str(run_dir / "figures"),
+        "selected_checkpoint": str(checkpoint_path),
+    }
+
+    if with_saved_logits:
+        dataset = _baseline_dataset()
+        samples_by_split = {
+            "train": [sample for sample in dataset.samples if sample.split == "train"],
+            "validation": [sample for sample in dataset.samples if sample.split == "validation"],
+        }
+        for split, samples in samples_by_split.items():
+            logits_rows = []
+            for index, sample in enumerate(samples):
+                if sample.label == 0:
+                    logits_rows.append([2.0 + (0.1 * index), -0.4])
+                else:
+                    logits_rows.append([-0.4, 1.2 + (0.1 * index)])
+            probability_rows = torch.softmax(
+                torch.tensor(logits_rows, dtype=torch.float32),
+                dim=-1,
+            ).tolist()
+            predicted_labels = [int(row[1] >= row[0]) for row in probability_rows]
+            records = build_prediction_records(
+                run_id=run_id,
+                model_name="distilbert",
+                sample_ids=[sample.sample_id for sample in samples],
+                splits=[sample.split for sample in samples],
+                true_labels=[sample.label for sample in samples],
+                predicted_labels=predicted_labels,
+                probability_rows=probability_rows,
+                group_ids=[sample.group_id for sample in samples],
+                is_id_flags=[sample.is_id for sample in samples],
+                is_ood_flags=[sample.is_ood for sample in samples],
+                logits_rows=logits_rows,
+            )
+            prediction_path = build_prediction_artifact_path(run_dir, split)
+            pd.DataFrame(records).to_parquet(prediction_path, index=False)
+            artifact_paths["predictions"][split] = str(prediction_path)
+
+    parent_metadata = build_run_metadata(
+        run_id=run_id,
+        experiment_type="baseline",
+        model_name="distilbert",
+        dataset_name=baseline_config["dataset_name"],
+        split_details=baseline_config["split_details"],
+        random_seed=int(baseline_config["seed"]),
+        resolved_config=baseline_config,
+        command="python scripts/run_baseline.py --model distilbert",
+        run_dir=run_dir,
+        artifact_paths=artifact_paths,
+        notes="parent fixture",
+        tags=["baseline", "distilbert"],
+        status="completed",
+    )
+    write_metadata(run_dir, parent_metadata)
 
 
 class _FakeTokenizer:
@@ -621,53 +697,12 @@ def test_run_distilbert_baseline_writes_completed_artifacts(temp_artifact_root, 
     assert result.metadata_path.name == "metadata.json"
 
 
-@pytest.mark.parametrize(
-    ("method_name", "expected_segment"),
-    [
-        ("calibration", "artifacts/mitigations/calibration"),
-    ],
-)
-def test_run_mitigation_bootstrap_uses_separate_root(
-    temp_artifact_root,
-    method_name,
-    expected_segment,
-):
-    result = run_mitigation_command(
-        ["--run-id", "baseline_parent_001", "--method", method_name, "--output-run-id", method_name]
-    )
-    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
-
-    assert expected_segment in result.run_dir.as_posix()
-    assert metadata["parent_run_id"] == "baseline_parent_001"
-    assert metadata["status"] == "scaffold_ready"
-    assert "artifacts/baselines" not in result.run_dir.as_posix()
-
-
 def test_run_mitigation_reweighting_writes_completed_artifacts(
     temp_artifact_root,
     monkeypatch,
 ):
     parent_run_id = "distilbert_parent_runtime"
-    baseline_config = load_experiment_config(
-        "configs/experiments/civilcomments_distilbert_baseline.yaml"
-    )
-    baseline_config["run_id"] = parent_run_id
-    parent_run_dir = build_baseline_run_dir("distilbert", parent_run_id, create=True)
-    parent_metadata = build_run_metadata(
-        run_id=parent_run_id,
-        experiment_type="baseline",
-        model_name="distilbert",
-        dataset_name=baseline_config["dataset_name"],
-        split_details=baseline_config["split_details"],
-        random_seed=int(baseline_config["seed"]),
-        resolved_config=baseline_config,
-        command="python scripts/run_baseline.py --model distilbert",
-        run_dir=parent_run_dir,
-        notes="parent fixture",
-        tags=["baseline", "distilbert"],
-        status="completed",
-    )
-    write_metadata(parent_run_dir, parent_metadata)
+    _write_distilbert_parent_run(parent_run_id)
 
     monkeypatch.setattr(
         "model_failure_lab.mitigations.reweighting.load_baseline_canonical_dataset",
@@ -700,6 +735,39 @@ def test_run_mitigation_reweighting_writes_completed_artifacts(
     assert metadata["mitigation_method"] == "reweighting"
     assert metadata["artifact_paths"]["group_weights_csv"].endswith("group_weights.csv")
     assert Path(metadata["artifact_paths"]["group_weights_csv"]).exists()
+    assert metadata["artifact_paths"]["predictions"]["train"].endswith(
+        "predictions_train.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
+        "predictions_val.parquet"
+    )
+
+
+def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_artifact_root):
+    parent_run_id = "distilbert_parent_temperature"
+    _write_distilbert_parent_run(parent_run_id, with_saved_logits=True)
+
+    result = run_mitigation_command(
+        [
+            "--run-id",
+            parent_run_id,
+            "--method",
+            "temperature_scaling",
+            "--output-run-id",
+            "temperature_scaling_runtime",
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert "artifacts/mitigations/temperature_scaling" in result.run_dir.as_posix()
+    assert metadata["status"] == "completed"
+    assert metadata["parent_run_id"] == parent_run_id
+    assert metadata["mitigation_method"] == "temperature_scaling"
+    assert metadata["learned_temperature"] > 0.0
+    assert metadata["artifact_paths"]["temperature_scaler_json"].endswith(
+        "temperature_scaler.json"
+    )
+    assert Path(metadata["artifact_paths"]["temperature_scaler_json"]).exists()
     assert metadata["artifact_paths"]["predictions"]["train"].endswith(
         "predictions_train.parquet"
     )

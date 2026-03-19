@@ -22,7 +22,7 @@ from model_failure_lab.utils.paths import build_mitigation_run_dir
 
 METHOD_PRESETS = {
     "reweighting": "civilcomments_distilbert_reweighting",
-    "calibration": "civilcomments_distilbert_calibrated",
+    "temperature_scaling": "civilcomments_distilbert_temperature_scaling",
 }
 
 
@@ -48,13 +48,9 @@ def run_command(argv: Sequence[str] | None = None):
             "run_id": args.output_run_id or generate_run_id(args.method),
         },
     )
-    if args.method == "reweighting":
-        parent_context = load_parent_run_context(args.run_id)
-        validate_distilbert_parent_run(parent_context)
-        config = build_inherited_mitigation_config(parent_context, preset_config)
-    else:
-        config = preset_config
-        config["parent_run_id"] = args.run_id
+    parent_context = load_parent_run_context(args.run_id)
+    validate_distilbert_parent_run(parent_context)
+    config = build_inherited_mitigation_config(parent_context, preset_config)
 
     run_dir = build_mitigation_run_dir(
         method_name=args.method,

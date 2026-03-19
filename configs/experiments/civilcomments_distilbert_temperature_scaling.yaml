@@ -1,0 +1,28 @@
+experiment_name: civilcomments_distilbert_temperature_scaling
+experiment_group: mitigations
+experiment_type: mitigation
+dataset_name: civilcomments
+model_name: distilbert
+data_config: configs/data/civilcomments.yaml
+model_config: configs/model/distilbert.yaml
+train_config: configs/train/default.yaml
+eval_config: configs/eval/default.yaml
+tags:
+  - mitigation
+  - distilbert
+  - temperature_scaling
+notes: CivilComments DistilBERT temperature scaling mitigation preset.
+mitigation:
+  method: temperature_scaling
+  parent_model_name: distilbert
+  comparison_tolerances:
+    id_macro_f1_max_drop: 0.01
+    overall_macro_f1_max_drop: 0.01
+    ece_neutral_tolerance: 0.005
+  temperature_scaling:
+    fitting_split: validation
+    objective: nll
+    apply_to_splits:
+      - train
+      - validation
+    allow_checkpoint_regeneration: true
