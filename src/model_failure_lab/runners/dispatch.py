@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from model_failure_lab.data import load_canonical_civilcomments_dataset
 from model_failure_lab.evaluation import (
     build_confidence_summary,
     build_diagnostics_payload,
@@ -26,22 +27,44 @@ from model_failure_lab.mitigations import (
     train_distilbert_reweighting,
 )
 from model_failure_lab.models import train_distilbert_baseline, train_logistic_baseline
+from model_failure_lab.perturbations import (
+    build_family_severity_matrix,
+    build_family_summary,
+    build_severity_summary,
+    build_source_delta_summary,
+    build_suite_summary,
+    generate_perturbation_suite,
+    load_clean_source_predictions,
+    load_saved_run_scorer,
+    score_perturbation_suite,
+    select_source_samples,
+    write_perturbation_bundle,
+)
 from model_failure_lab.reporting import (
     build_calibration_curve_figure,
     build_calibration_table,
+    build_clean_vs_perturbed_figure,
     build_comparison_table,
     build_id_ood_comparison_frame,
     build_id_ood_figure,
     build_mitigation_comparison_table,
+    build_perturbation_family_drop_figure,
+    build_perturbation_report_metadata,
+    build_perturbation_report_summary,
+    build_perturbation_report_tables,
     build_report_metadata,
     build_report_summary,
+    build_severity_ladder_figure,
     build_subgroup_table,
     build_worst_group_vs_average_figure,
     build_worst_group_vs_average_frame,
     build_worst_subgroups_figure,
+    load_perturbation_report_inputs,
     load_report_inputs,
+    render_perturbation_report_markdown,
     render_report_markdown,
     select_report_candidates,
+    write_perturbation_report_bundle,
     write_report_bundle,
 )
 from model_failure_lab.tracking import (
@@ -405,6 +428,122 @@ def dispatch_shift_eval(
     )
 
 
+def dispatch_perturbation_eval(
+    *,
+    config: dict[str, Any],
+    target_run_id: str,
+    source_metadata_path: Path,
+    run_dir: Path,
+    metadata_path: Path,
+    metrics_path: Path,
+    preset_name: str,
+    dataset_loader: Any | None = None,
+    scorer_loader: Any | None = None,
+) -> DispatchResult:
+    source_metadata = json.loads(source_metadata_path.read_text(encoding="utf-8"))
+    resolved_dataset_loader = dataset_loader or load_canonical_civilcomments_dataset
+    resolved_scorer_loader = scorer_loader or load_saved_run_scorer
+
+    dataset = resolved_dataset_loader(config, download=True)
+    perturbation_config = dict(config["perturbation"])
+    selected_source_samples = select_source_samples(
+        dataset.samples,
+        split=str(perturbation_config["source_split"]),
+        max_samples=int(perturbation_config["max_source_samples"]),
+        selection_seed=int(perturbation_config["selection_seed"]),
+    )
+    suite = generate_perturbation_suite(
+        selected_source_samples,
+        source_run_id=str(source_metadata["run_id"]),
+        model_name=str(config["model_name"]),
+        families=list(perturbation_config["default_family_order"]),
+        severities=list(perturbation_config["severities"]),
+        selection_seed=int(perturbation_config["selection_seed"]),
+        perturbation_seed=int(perturbation_config["perturbation_seed"]),
+        slang_mapping=perturbation_config.get("slang_mapping"),
+    )
+    clean_prediction_frame = load_clean_source_predictions(
+        source_metadata,
+        split=str(perturbation_config["source_split"]),
+        source_sample_ids=[sample["sample_id"] for sample in selected_source_samples],
+    )
+    scorer = resolved_scorer_loader(source_metadata)
+    perturbed_prediction_frame = score_perturbation_suite(
+        suite.to_records(),
+        run_id=str(config["run_id"]),
+        scorer=scorer,
+    )
+    suite_summary = build_suite_summary(clean_prediction_frame, perturbed_prediction_frame)
+    family_summary = build_family_summary(clean_prediction_frame, perturbed_prediction_frame)
+    severity_summary = build_severity_summary(clean_prediction_frame, perturbed_prediction_frame)
+    family_severity_matrix = build_family_severity_matrix(
+        clean_prediction_frame,
+        perturbed_prediction_frame,
+    )
+    source_delta_summary = build_source_delta_summary(
+        clean_prediction_frame,
+        perturbed_prediction_frame,
+    )
+    artifact_paths = write_perturbation_bundle(
+        run_dir,
+        suite=suite,
+        source_run_metadata=source_metadata,
+        resolved_config=config,
+        perturbed_predictions=perturbed_prediction_frame,
+        suite_summary=suite_summary,
+        family_summary=family_summary,
+        severity_summary=severity_summary,
+        family_severity_matrix=family_severity_matrix,
+        source_delta_summary=source_delta_summary,
+        preview_limit=5,
+    )
+
+    existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata_payload = build_run_metadata(
+        run_id=str(config["run_id"]),
+        experiment_type="perturbation_eval",
+        model_name=str(config["model_name"]),
+        dataset_name=str(config["dataset_name"]),
+        split_details=dict(config["split_details"]),
+        random_seed=int(config["seed"]),
+        resolved_config=config,
+        command=str(existing_metadata.get("command", "")),
+        run_dir=run_dir,
+        git_commit_hash=existing_metadata.get("git_commit_hash"),
+        library_versions=existing_metadata.get("library_versions"),
+        artifact_paths=artifact_paths,
+        parent_run_id=str(source_metadata["run_id"]),
+        notes=str(config.get("notes", "")),
+        tags=list(config.get("tags", [])),
+        timestamp=existing_metadata.get("timestamp"),
+        status="completed",
+    )
+    metadata_payload["source_run_id"] = str(source_metadata["run_id"])
+    metadata_payload["source_metadata_path"] = str(source_metadata_path)
+    metadata_payload["selected_source_count"] = suite.source_sample_count
+    metadata_payload["perturbed_sample_count"] = suite.perturbed_sample_count
+    metadata_payload["perturbation_schema_version"] = suite.schema_version
+    metadata_payload["source_split"] = str(perturbation_config["source_split"])
+    metadata_payload["output_tag"] = perturbation_config.get("output_tag")
+    metadata_path = write_metadata(run_dir, metadata_payload, create_checkpoint_dir=False)
+    return DispatchResult(
+        status="completed",
+        message=(
+            "Perturbation evaluation completed for "
+            f"{config['model_name']} with {suite.perturbed_sample_count} samples"
+        ),
+        run_dir=run_dir,
+        metadata_path=metadata_path,
+        metrics_path=metrics_path,
+        preset_name=preset_name,
+        extras={
+            "source_run_id": target_run_id,
+            "selected_source_count": suite.source_sample_count,
+            "perturbed_sample_count": suite.perturbed_sample_count,
+        },
+    )
+
+
 def dispatch_report(
     *,
     config: dict[str, Any],
@@ -501,6 +640,105 @@ def dispatch_report(
         run_dir=run_dir,
         metadata_path=metadata_path,
         metrics_path=Path(artifact_paths["report_summary_json"]),
+        preset_name=preset_name,
+        extras={
+            "experiment_group": experiment_group,
+            "source_eval_ids": [candidate.eval_id for candidate in selected_candidates],
+        },
+    )
+
+
+def dispatch_perturbation_report(
+    *,
+    config: dict[str, Any],
+    experiment_group: str | None,
+    run_dir: Path,
+    metadata_path: Path,
+    metrics_path: Path,
+    preset_name: str,
+) -> DispatchResult:
+    report_config = config.get("report", {})
+    eval_ids = report_config.get("eval_ids")
+    selected_candidates = load_perturbation_report_inputs(
+        experiment_group=experiment_group if not eval_ids else None,
+        eval_ids=eval_ids,
+    )
+    tables = build_perturbation_report_tables(selected_candidates)
+    report_title = str(
+        report_config.get("report_name")
+        or experiment_group
+        or "Synthetic Perturbation Report"
+    )
+    report_summary = build_perturbation_report_summary(
+        selected_candidates,
+        suite_summary=tables["suite_summary"],
+        family_summary=tables["family_summary"],
+        severity_summary=tables["severity_summary"],
+        report_title=report_title,
+    )
+    markdown = render_perturbation_report_markdown(
+        report_title=report_title,
+        report_summary=report_summary,
+        figure_paths={
+            "clean_vs_perturbed_primary_metric": "figures/clean_vs_perturbed_primary_metric.png",
+            "perturbation_family_drop": "figures/perturbation_family_drop.png",
+            "severity_ladder": "figures/severity_ladder.png",
+        },
+        table_paths={
+            "suite_summary": "tables/suite_summary.csv",
+            "family_summary": "tables/family_summary.csv",
+            "severity_summary": "tables/severity_summary.csv",
+            "family_severity_matrix": "tables/family_severity_matrix.csv",
+        },
+    )
+    artifact_paths = write_perturbation_report_bundle(
+        run_dir,
+        markdown=markdown,
+        report_summary=report_summary,
+        figures={
+            "clean_vs_perturbed_primary_metric": build_clean_vs_perturbed_figure(
+                tables["suite_summary"]
+            ),
+            "perturbation_family_drop": build_perturbation_family_drop_figure(
+                tables["family_summary"]
+            ),
+            "severity_ladder": build_severity_ladder_figure(tables["severity_summary"]),
+        },
+        suite_summary=tables["suite_summary"],
+        family_summary=tables["family_summary"],
+        severity_summary=tables["severity_summary"],
+        family_severity_matrix=tables["family_severity_matrix"],
+    )
+
+    existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    first_candidate = selected_candidates[0]
+    metadata_payload = build_perturbation_report_metadata(
+        report_id=str(config["run_id"]),
+        report_scope=str(experiment_group or report_title),
+        selection_mode="eval_ids" if eval_ids else "experiment_group",
+        source_eval_ids=[candidate.eval_id for candidate in selected_candidates],
+        resolved_config=config,
+        command=str(existing_metadata.get("command", "")),
+        run_dir=run_dir,
+        dataset_name=str(first_candidate.metadata.get("dataset_name", config["dataset_name"])),
+        split_details=dict(first_candidate.metadata.get("split_details", config["split_details"])),
+        artifact_paths=artifact_paths,
+        git_commit_hash=existing_metadata.get("git_commit_hash"),
+        library_versions=existing_metadata.get("library_versions"),
+        timestamp=existing_metadata.get("timestamp"),
+        status="completed",
+    )
+    metadata_payload["source_split"] = str(first_candidate.metadata.get("source_split", ""))
+    metadata_payload["perturbation_schema_version"] = str(
+        first_candidate.metadata.get("perturbation_schema_version", "unknown")
+    )
+    metadata_path = write_metadata(run_dir, metadata_payload, create_checkpoint_dir=False)
+    return DispatchResult(
+        status="completed",
+        message=f"Perturbation report completed for {experiment_group or report_title}",
+        run_dir=run_dir,
+        metadata_path=metadata_path,
+        metrics_path=metrics_path,
         preset_name=preset_name,
         extras={
             "experiment_group": experiment_group,

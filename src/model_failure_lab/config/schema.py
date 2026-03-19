@@ -414,7 +414,8 @@ def _validate_perturbation_config(payload: object) -> dict[str, Any] | None:
     family_set = set(families)
     if order_set != family_set:
         raise ValueError(
-            "perturbation.default_family_order must contain the same families as perturbation.families"
+            "perturbation.default_family_order must contain the same families as "
+            "perturbation.families"
         )
 
     slang_mapping = payload.get("slang_mapping")

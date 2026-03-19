@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from .discovery import ReportCandidate
+from .discovery import PerturbationReportCandidate, ReportCandidate
 from .selection import report_label
 
 MAX_HEADLINE_FINDINGS = 5
@@ -120,4 +120,60 @@ def build_report_summary(
         "compared_runs": compared_runs,
         "key_takeaway": key_takeaway,
         "next_experiment": next_experiment,
+    }
+
+
+def build_perturbation_report_summary(
+    candidates: list[PerturbationReportCandidate],
+    *,
+    suite_summary: pd.DataFrame,
+    family_summary: pd.DataFrame,
+    severity_summary: pd.DataFrame,
+    report_title: str,
+) -> dict[str, Any]:
+    """Build the machine-readable summary payload for a perturbation report."""
+    findings: list[str] = []
+
+    if not suite_summary.empty:
+        largest_drop = suite_summary.sort_values(by="macro_f1_drop", ascending=False).iloc[0]
+        findings.append(
+            f"{largest_drop['label']} drops by {_format_score(largest_drop['macro_f1_drop'])} "
+            "Macro F1 on average under the perturbation suite."
+        )
+
+    if not family_summary.empty:
+        worst_family = family_summary.sort_values(by="macro_f1_drop", ascending=False).iloc[0]
+        findings.append(
+            f"The worst perturbation family is {worst_family['perturbation_family']} for "
+            f"{worst_family['label']} with Macro F1 drop "
+            f"{_format_score(worst_family['macro_f1_drop'])}."
+        )
+
+    if not severity_summary.empty:
+        steepest_severity = severity_summary.sort_values(
+            by="macro_f1_drop",
+            ascending=False,
+        ).iloc[0]
+        findings.append(
+            f"Severity {steepest_severity['severity']} is the harshest setting for "
+            f"{steepest_severity['label']} with Macro F1 drop "
+            f"{_format_score(steepest_severity['macro_f1_drop'])}."
+        )
+
+    compared_runs = [
+        {
+            "eval_id": candidate.eval_id,
+            "label": report_label(candidate),
+            "model_name": candidate.metadata.get("model_name"),
+            "source_run_id": candidate.metadata.get("source_run_id"),
+        }
+        for candidate in candidates
+    ]
+    key_takeaway = findings[0] if findings else "No perturbation findings available."
+    return {
+        "report_title": report_title,
+        "headline_findings": findings[:MAX_HEADLINE_FINDINGS],
+        "compared_runs": compared_runs,
+        "key_takeaway": key_takeaway,
+        "next_experiment": "Compare mitigation runs on the same perturbation suite.",
     }

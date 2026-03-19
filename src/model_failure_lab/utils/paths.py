@@ -109,6 +109,22 @@ def build_report_run_dir(
     return run_dir
 
 
+def build_perturbation_report_run_dir(
+    report_scope: str,
+    report_id: str,
+    create: bool = False,
+) -> Path:
+    """Return the canonical perturbation report package directory."""
+    run_dir = build_report_dir(
+        experiment_group=report_scope,
+        category="perturbations",
+        create=create,
+    ) / _normalize_segment(report_id)
+    if create:
+        run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
 def build_report_artifact_paths(report_dir: Path) -> dict[str, str]:
     """Return persisted artifact paths for a report package."""
     return {
@@ -128,6 +144,28 @@ def build_report_artifact_paths(report_dir: Path) -> dict[str, str]:
         "worst_group_vs_average_png": str(report_dir / "figures" / "worst_group_vs_average.png"),
         "worst_subgroups_png": str(report_dir / "figures" / "worst_subgroups.png"),
         "calibration_curve_png": str(report_dir / "figures" / "calibration_curve.png"),
+        "plots": str(report_dir / "figures"),
+    }
+
+
+def build_perturbation_report_artifact_paths(report_dir: Path) -> dict[str, str]:
+    """Return persisted artifact paths for a perturbation report package."""
+    return {
+        "report_markdown": str(report_dir / "report.md"),
+        "report_summary_json": str(report_dir / "report_summary.json"),
+        "figures_dir": str(report_dir / "figures"),
+        "tables_dir": str(report_dir / "tables"),
+        "suite_summary_csv": str(report_dir / "tables" / "suite_summary.csv"),
+        "family_summary_csv": str(report_dir / "tables" / "family_summary.csv"),
+        "severity_summary_csv": str(report_dir / "tables" / "severity_summary.csv"),
+        "family_severity_matrix_csv": str(report_dir / "tables" / "family_severity_matrix.csv"),
+        "clean_vs_perturbed_primary_metric_png": str(
+            report_dir / "figures" / "clean_vs_perturbed_primary_metric.png"
+        ),
+        "perturbation_family_drop_png": str(
+            report_dir / "figures" / "perturbation_family_drop.png"
+        ),
+        "severity_ladder_png": str(report_dir / "figures" / "severity_ladder.png"),
         "plots": str(report_dir / "figures"),
     }
 

@@ -4,8 +4,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import joblib
 import pandas as pd
 import torch
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 from torch import nn
 
 from model_failure_lab.config import load_experiment_config
@@ -17,6 +20,7 @@ from model_failure_lab.utils.paths import (
     build_evaluation_run_dir,
     build_prediction_artifact_path,
 )
+from scripts.build_perturbation_report import run_command as run_build_perturbation_report_command
 from scripts.build_report import run_command as run_build_report_command
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
@@ -353,8 +357,19 @@ def _saved_prediction_row(
 def _create_saved_evaluation_source_run() -> str:
     run_id = "shift_eval_source"
     run_dir = build_baseline_run_dir("logistic_tfidf", run_id, create=True)
+    checkpoint_dir = run_dir / "checkpoint"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
     validation_path = build_prediction_artifact_path(run_dir, "validation")
     test_path = build_prediction_artifact_path(run_dir, "test")
+
+    dataset = _baseline_dataset()
+    train_samples = [sample for sample in dataset.samples if sample.split == "train"]
+    vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=1, sublinear_tf=True)
+    train_matrix = vectorizer.fit_transform([sample.text for sample in train_samples])
+    classifier = LogisticRegression(max_iter=1000, solver="liblinear", random_state=13)
+    classifier.fit(train_matrix, [sample.label for sample in train_samples])
+    joblib.dump(vectorizer, checkpoint_dir / "vectorizer.joblib")
+    joblib.dump(classifier, checkpoint_dir / "logistic_model.joblib")
 
     pd.DataFrame(
         [
@@ -487,6 +502,8 @@ def _create_saved_evaluation_source_run() -> str:
             },
         },
         "artifact_paths": {
+            "checkpoint": str(checkpoint_dir),
+            "selected_checkpoint": str(checkpoint_dir / "logistic_model.joblib"),
             "predictions": {
                 "validation": str(validation_path),
                 "test": str(test_path),
@@ -852,7 +869,10 @@ def test_run_perturbation_eval_materializes_suite_bundle(temp_artifact_root, mon
     assert metadata["artifact_paths"]["suite_manifest_json"].endswith("suite_manifest.json")
     assert Path(metadata["artifact_paths"]["perturbed_samples_jsonl"]).exists()
     assert Path(metadata["artifact_paths"]["sample_preview_jsonl"]).exists()
-    assert result.metrics_path.name == "suite_manifest.json"
+    assert Path(metadata["artifact_paths"]["predictions_perturbed_parquet"]).exists()
+    assert Path(metadata["artifact_paths"]["suite_summary_csv"]).exists()
+    assert Path(metadata["artifact_paths"]["family_summary_csv"]).exists()
+    assert result.metrics_path.name == "suite_summary.csv"
 
 
 def test_shift_eval_writes_completed_evaluation_bundle(temp_artifact_root):
@@ -960,6 +980,43 @@ def test_build_report_writes_mitigation_comparison_table(temp_artifact_root):
     assert mitigation_table_path.exists()
     assert "tradeoff" not in markdown
     assert "verdict win" in markdown
+
+
+def test_build_perturbation_report_writes_completed_report_package(temp_artifact_root, monkeypatch):
+    source_run_id = _create_saved_evaluation_source_run()
+    monkeypatch.setattr(
+        "scripts.run_perturbation_eval.load_canonical_civilcomments_dataset",
+        lambda *_args, **_kwargs: _baseline_dataset(),
+    )
+    run_perturbation_eval_command(
+        [
+            "--run-id",
+            source_run_id,
+            "--output-run-id",
+            "perturbation_suite",
+            "--max-source-samples",
+            "2",
+        ]
+    )
+
+    result = run_build_perturbation_report_command(
+        [
+            "--experiment-group",
+            "baselines",
+            "--report-name",
+            "synthetic_stress_report",
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert "artifacts/reports/perturbations/baselines" in result.run_dir.as_posix()
+    assert metadata["experiment_type"] == "perturbation_report"
+    assert metadata["status"] == "completed"
+    assert metadata["selection_mode"] == "experiment_group"
+    assert (result.run_dir / "report.md").exists()
+    assert (result.run_dir / "figures" / "clean_vs_perturbed_primary_metric.png").exists()
+    assert (result.run_dir / "tables" / "suite_summary.csv").exists()
+    assert result.metrics_path.name == "report_summary.json"
 
 
 def test_download_data_bootstrap_writes_metadata(temp_artifact_root):

@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from model_failure_lab.utils.paths import build_perturbation_artifact_paths
 
 from .schema import PerturbationSuite
@@ -23,6 +25,22 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> Path:
         for row in rows:
             handle.write(json.dumps(row, sort_keys=True))
             handle.write("\n")
+    return path
+
+
+def _write_dataframe(path: Path, frame: pd.DataFrame | None) -> Path | None:
+    if frame is None:
+        return None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(path, index=False)
+    return path
+
+
+def _write_parquet(path: Path, frame: pd.DataFrame | None) -> Path | None:
+    if frame is None:
+        return None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_parquet(path, index=False)
     return path
 
 
@@ -57,6 +75,12 @@ def write_perturbation_bundle(
     suite: PerturbationSuite,
     source_run_metadata: dict[str, Any],
     resolved_config: dict[str, Any],
+    perturbed_predictions: pd.DataFrame | None = None,
+    suite_summary: pd.DataFrame | None = None,
+    family_summary: pd.DataFrame | None = None,
+    severity_summary: pd.DataFrame | None = None,
+    family_severity_matrix: pd.DataFrame | None = None,
+    source_delta_summary: pd.DataFrame | None = None,
     preview_limit: int = 5,
 ) -> dict[str, str]:
     """Persist the perturbation suite contract under one bundle directory."""
@@ -70,6 +94,17 @@ def write_perturbation_bundle(
     records = suite.to_records()
     _write_jsonl(Path(artifact_paths["perturbed_samples_jsonl"]), records)
     _write_jsonl(Path(artifact_paths["sample_preview_jsonl"]), records[:preview_limit])
+    _write_parquet(Path(artifact_paths["predictions_perturbed_parquet"]), perturbed_predictions)
+    _write_dataframe(Path(artifact_paths["suite_summary_csv"]), suite_summary)
+    _write_dataframe(Path(artifact_paths["family_summary_csv"]), family_summary)
+    _write_dataframe(Path(artifact_paths["severity_summary_csv"]), severity_summary)
+    _write_dataframe(
+        Path(artifact_paths["family_severity_matrix_csv"]),
+        family_severity_matrix,
+    )
+    _write_dataframe(
+        Path(artifact_paths["source_delta_summary_csv"]),
+        source_delta_summary,
+    )
     Path(artifact_paths["figures_dir"]).mkdir(parents=True, exist_ok=True)
     return artifact_paths
-

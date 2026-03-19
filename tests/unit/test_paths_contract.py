@@ -6,6 +6,8 @@ from model_failure_lab.utils.paths import (
     build_evaluation_run_dir,
     build_mitigation_run_dir,
     build_perturbation_artifact_paths,
+    build_perturbation_report_artifact_paths,
+    build_perturbation_report_run_dir,
     build_perturbation_run_dir,
     build_report_artifact_paths,
     build_report_dir,
@@ -93,6 +95,24 @@ def test_perturbation_run_dir_nests_under_source_run(temp_artifact_root):
     assert artifact_paths["suite_manifest_json"].endswith("suite_manifest.json")
     assert artifact_paths["perturbed_samples_jsonl"].endswith("perturbed_samples.jsonl")
     assert artifact_paths["plots"].endswith("figures")
+
+
+def test_perturbation_report_run_dir_and_artifact_paths_use_expected_structure(temp_artifact_root):
+    report_run_dir = build_perturbation_report_run_dir(
+        "Synthetic Stress",
+        "report_run",
+        create=True,
+    )
+    artifact_paths = build_perturbation_report_artifact_paths(report_run_dir)
+
+    assert report_run_dir == (
+        temp_artifact_root / "reports" / "perturbations" / "synthetic_stress" / "report_run"
+    )
+    assert artifact_paths["report_markdown"].endswith("report.md")
+    assert artifact_paths["suite_summary_csv"].endswith("tables/suite_summary.csv")
+    assert artifact_paths["clean_vs_perturbed_primary_metric_png"].endswith(
+        "figures/clean_vs_perturbed_primary_metric.png"
+    )
 
 
 def test_find_run_metadata_path_resolves_saved_baseline_run(temp_artifact_root):

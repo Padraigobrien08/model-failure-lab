@@ -201,3 +201,95 @@ def build_worst_subgroups_figure(
     ax.set_xlim(left=0.0)
     fig.tight_layout()
     return fig
+
+
+def build_clean_vs_perturbed_figure(
+    suite_summary: pd.DataFrame,
+    *,
+    metric_name: str = PRIMARY_METRIC,
+) -> Figure:
+    """Build the grouped bar chart for clean versus perturbed validation performance."""
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    x_positions = list(range(len(suite_summary)))
+    width = 0.35
+    clean_values = suite_summary[f"clean_{metric_name}"].fillna(0.0).astype(float).tolist()
+    perturbed_values = suite_summary[f"perturbed_{metric_name}"].fillna(0.0).astype(float).tolist()
+    labels = suite_summary["label"].astype(str).tolist()
+
+    ax.bar([position - width / 2 for position in x_positions], clean_values, width, label="Clean")
+    ax.bar(
+        [position + width / 2 for position in x_positions],
+        perturbed_values,
+        width,
+        label="Perturbed",
+    )
+    ax.set_ylabel(_metric_label(metric_name))
+    ax.set_title(f"Clean vs Perturbed {_metric_label(metric_name)}")
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(labels, rotation=20, ha="right")
+    ax.legend()
+    ax.set_ylim(bottom=0.0)
+    fig.tight_layout()
+    return fig
+
+
+def build_perturbation_family_drop_figure(
+    family_summary: pd.DataFrame,
+    *,
+    metric_name: str = PRIMARY_METRIC,
+) -> Figure:
+    """Build the family-level degradation chart."""
+    fig, ax = plt.subplots(figsize=(8.5, 4.8))
+    drop_column = f"{metric_name}_drop"
+    labels = (
+        family_summary["label"].astype(str)
+        + " / "
+        + family_summary["perturbation_family"].astype(str)
+    ).tolist()
+    drop_values = family_summary[drop_column].fillna(0.0).astype(float).tolist()
+
+    ax.barh(labels, drop_values)
+    ax.set_xlabel(f"{_metric_label(metric_name)} Drop")
+    ax.set_title("Performance Drop by Perturbation Family")
+    ax.invert_yaxis()
+    ax.set_xlim(left=0.0)
+    fig.tight_layout()
+    return fig
+
+
+def build_severity_ladder_figure(
+    severity_summary: pd.DataFrame,
+    *,
+    metric_name: str = PRIMARY_METRIC,
+) -> Figure:
+    """Build the severity ladder chart for perturbation degradation."""
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    drop_column = f"{metric_name}_drop"
+    severity_order = ["low", "medium", "high"]
+    x_positions = list(range(len(severity_order)))
+
+    for label, label_frame in severity_summary.groupby("label"):
+        ordered = (
+            label_frame.assign(
+                severity_rank=label_frame["severity"].apply(
+                    lambda value: severity_order.index(str(value))
+                )
+            )
+            .sort_values(by="severity_rank")
+            .reset_index(drop=True)
+        )
+        ax.plot(
+            x_positions,
+            ordered[drop_column].fillna(0.0).astype(float).tolist(),
+            marker="o",
+            label=str(label),
+        )
+
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(severity_order)
+    ax.set_ylabel(f"{_metric_label(metric_name)} Drop")
+    ax.set_title("Severity Sensitivity")
+    ax.set_ylim(bottom=0.0)
+    ax.legend()
+    fig.tight_layout()
+    return fig

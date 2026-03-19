@@ -28,6 +28,19 @@ class ReportCandidate:
     calibration_bins: pd.DataFrame
 
 
+@dataclass(slots=True)
+class PerturbationReportCandidate:
+    """Loaded perturbation bundle ready for synthetic-stress reporting."""
+
+    eval_id: str
+    metadata_path: Path
+    metadata: dict[str, Any]
+    suite_summary: pd.DataFrame
+    family_summary: pd.DataFrame
+    severity_summary: pd.DataFrame
+    family_severity_matrix: pd.DataFrame
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -42,6 +55,17 @@ def _iter_evaluation_metadata_paths() -> list[Path]:
     patterns = [
         artifact_root().glob("baselines/*/*/evaluations/*/metadata.json"),
         artifact_root().glob("mitigations/*/*/*/evaluations/*/metadata.json"),
+    ]
+    paths: list[Path] = []
+    for matches in patterns:
+        paths.extend(matches)
+    return sorted(path.resolve() for path in paths)
+
+
+def _iter_perturbation_metadata_paths() -> list[Path]:
+    patterns = [
+        artifact_root().glob("baselines/*/*/perturbations/*/metadata.json"),
+        artifact_root().glob("mitigations/*/*/*/perturbations/*/metadata.json"),
     ]
     paths: list[Path] = []
     for matches in patterns:
@@ -75,6 +99,21 @@ def _load_candidate(metadata_path: Path) -> ReportCandidate:
         worst_group_summary=_read_json(Path(artifact_paths["worst_group_summary_json"])),
         calibration_summary=_read_csv(Path(artifact_paths["calibration_summary_csv"])),
         calibration_bins=_read_csv(Path(artifact_paths["calibration_bins_csv"])),
+    )
+
+
+def _load_perturbation_candidate(metadata_path: Path) -> PerturbationReportCandidate:
+    metadata = _read_json(metadata_path)
+    artifact_paths = dict(metadata.get("artifact_paths", {}))
+    eval_id = str(metadata.get("run_id"))
+    return PerturbationReportCandidate(
+        eval_id=eval_id,
+        metadata_path=metadata_path,
+        metadata=metadata,
+        suite_summary=_read_csv(Path(artifact_paths["suite_summary_csv"])),
+        family_summary=_read_csv(Path(artifact_paths["family_summary_csv"])),
+        severity_summary=_read_csv(Path(artifact_paths["severity_summary_csv"])),
+        family_severity_matrix=_read_csv(Path(artifact_paths["family_severity_matrix_csv"])),
     )
 
 
@@ -130,3 +169,55 @@ def load_report_inputs(
         eval_ids=eval_ids,
     )
     return [_load_candidate(path) for path in metadata_paths]
+
+
+def discover_perturbation_bundles(
+    *,
+    experiment_group: str | None = None,
+    eval_ids: list[str] | None = None,
+) -> list[Path]:
+    """Return metadata paths for saved perturbation bundles."""
+    if not experiment_group and not eval_ids:
+        raise ValueError("Either experiment_group or eval_ids must be provided")
+
+    metadata_paths = _iter_perturbation_metadata_paths()
+    if eval_ids:
+        requested = {str(item).strip() for item in eval_ids if str(item).strip()}
+        matched = []
+        for metadata_path in metadata_paths:
+            metadata = _read_json(metadata_path)
+            eval_id = str(metadata.get("run_id"))
+            if eval_id in requested:
+                matched.append(metadata_path)
+
+        found_ids = {str(_read_json(path).get("run_id")) for path in matched}
+        missing_ids = sorted(requested - found_ids)
+        if missing_ids:
+            missing_text = ", ".join(missing_ids)
+            raise FileNotFoundError(f"Saved perturbation bundle(s) not found: {missing_text}")
+        return sorted(matched)
+
+    assert experiment_group is not None
+    matched = []
+    for metadata_path in metadata_paths:
+        metadata = _read_json(metadata_path)
+        if _matches_experiment_group(metadata, experiment_group):
+            matched.append(metadata_path)
+    if not matched:
+        raise FileNotFoundError(
+            f"No saved perturbation bundles found for experiment group: {experiment_group}"
+        )
+    return sorted(matched)
+
+
+def load_perturbation_candidates(
+    *,
+    experiment_group: str | None = None,
+    eval_ids: list[str] | None = None,
+) -> list[PerturbationReportCandidate]:
+    """Load perturbation report candidates from saved perturbation bundles."""
+    metadata_paths = discover_perturbation_bundles(
+        experiment_group=experiment_group,
+        eval_ids=eval_ids,
+    )
+    return [_load_perturbation_candidate(path) for path in metadata_paths]
