@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from copy import deepcopy
 
 from model_failure_lab.config.loader import load_experiment_config
 from model_failure_lab.data import (
@@ -114,7 +114,10 @@ def test_prepare_tfidf_and_transformer_adapters_share_canonical_inputs():
     samples, _ = _build_canonical_samples()
 
     tfidf_view = prepare_tfidf_adapter(samples)
-    transformer_view = prepare_transformer_adapter(samples, tokenizer_name="distilbert-base-uncased")
+    transformer_view = prepare_transformer_adapter(
+        samples,
+        tokenizer_name="distilbert-base-uncased",
+    )
 
     assert len(tfidf_view.texts) == len(samples)
     assert tfidf_view.sample_ids[0] == transformer_view.records[0]["sample_id"]

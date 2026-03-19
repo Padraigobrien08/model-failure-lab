@@ -1,13 +1,13 @@
 """CivilComments data loading and materialization helpers."""
 
-from .civilcomments import DataDependencyError, load_civilcomments_dataset, resolve_split_policy
-from .canonical import build_canonical_dataset, build_canonical_samples, build_sample_id
 from .adapters import (
     TfidfAdapterView,
     TransformerAdapterView,
     prepare_tfidf_adapter,
     prepare_transformer_adapter,
 )
+from .canonical import build_canonical_dataset, build_canonical_samples, build_sample_id
+from .civilcomments import DataDependencyError, load_civilcomments_dataset, resolve_split_policy
 from .grouping import build_group_attributes, build_group_id
 from .materialization import (
     MaterializationResult,

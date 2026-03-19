@@ -111,4 +111,5 @@ def build_data_summary_dir(create: bool = False) -> Path:
 
 def build_data_manifest_path(dataset_name: str) -> Path:
     """Return the canonical manifest path for a dataset."""
-    return build_data_manifest_dir(create=True) / f"{_normalize_segment(dataset_name)}_manifest.json"
+    manifest_name = f"{_normalize_segment(dataset_name)}_manifest.json"
+    return build_data_manifest_dir(create=True) / manifest_name

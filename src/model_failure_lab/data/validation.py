@@ -153,7 +153,8 @@ def write_validation_summaries(
             "count": sum(
                 1
                 for candidate in normalized_samples
-                if candidate["split"] == sample["split"] and candidate["group_id"] == sample["group_id"]
+                if candidate["split"] == sample["split"]
+                and candidate["group_id"] == sample["group_id"]
             ),
         }
         for sample in normalized_samples

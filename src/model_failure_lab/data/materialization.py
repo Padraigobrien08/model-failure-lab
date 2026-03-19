@@ -54,7 +54,8 @@ def _extract_source_records(dataset: Any, data_config: dict[str, Any]) -> list[d
     rows = metadata_df.to_dict(orient="records")
     indices = list(getattr(metadata_df, "index", range(len(rows))))
     split_lookup = {
-        str(split_id): split_name for split_name, split_id in getattr(dataset, "split_dict", {}).items()
+        str(split_id): split_name
+        for split_name, split_id in getattr(dataset, "split_dict", {}).items()
     }
     text_values = list(getattr(dataset, "_text_array", []))
     label_values = getattr(dataset, "y_array", getattr(dataset, "_y_array", None))
@@ -108,9 +109,13 @@ def build_data_manifest_payload(
         "dataset_name": str(config["dataset_name"]),
         "source": {
             "provider": "wilds",
-            "wilds_dataset_name": str(data_config.get("wilds_dataset_name", config["dataset_name"])),
+            "wilds_dataset_name": str(
+                data_config.get("wilds_dataset_name", config["dataset_name"])
+            ),
             "root_dir": str(data_config.get("wilds_root_dir", "data/wilds")),
-            "data_dir": str(getattr(dataset, "data_dir", data_config.get("wilds_root_dir", "data/wilds"))),
+            "data_dir": str(
+                getattr(dataset, "data_dir", data_config.get("wilds_root_dir", "data/wilds"))
+            ),
             "split_scheme": str(data_config.get("split_scheme", "official")),
             "version": getattr(dataset, "version", None),
         },

@@ -111,7 +111,9 @@ def build_canonical_samples(
         text = str(record[text_field])
         label = int(record[label_field])
         group_attributes = build_group_attributes(record, data_config)
-        excluded_fields = set(data_config["group_fields"]) | set(data_config.get("auxiliary_fields", []))
+        excluded_fields = set(data_config["group_fields"]) | set(
+            data_config.get("auxiliary_fields", [])
+        )
         excluded_fields.update({text_field, label_field, "raw_split", "raw_index"})
         source_metadata = {
             str(key): value for key, value in record.items() if str(key) not in excluded_fields

@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
 
 import pytest
 
 from model_failure_lab.config.loader import load_experiment_config
-from model_failure_lab.data import DataDependencyError, materialize_civilcomments, resolve_split_policy
-from scripts.download_data import run_command as run_download_data_command
+from model_failure_lab.data import (
+    DataDependencyError,
+    materialize_civilcomments,
+    resolve_split_policy,
+)
 from model_failure_lab.utils.paths import (
     build_data_dir,
     build_data_manifest_dir,
     build_data_manifest_path,
     build_data_summary_dir,
 )
+from scripts.download_data import run_command as run_download_data_command
 
 
 def test_repository_civilcomments_config_preserves_raw_split_policy(temp_artifact_root):
