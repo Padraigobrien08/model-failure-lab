@@ -9,6 +9,7 @@ REQUIRED_SPLIT_DETAIL_KEYS = {"train", "validation", "id_test", "ood_test"}
 REQUIRED_RAW_SPLIT_KEYS = {"train", "val", "test"}
 REQUIRED_SPLIT_ROLE_KEYS = {"train", "validation", "id_test", "ood_test"}
 REQUIRED_POLICY_FIELDS = {"raw_split", "selector", "is_id", "is_ood"}
+DEFAULT_TRACKED_METRICS = ["accuracy", "macro_f1", "auroc", "loss"]
 
 
 def _coerce_string_mapping(
@@ -118,6 +119,36 @@ def _validate_data_config(payload: object) -> dict[str, Any]:
     }
 
 
+def _validate_eval_config(payload: object) -> dict[str, Any]:
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("eval must be a non-empty mapping")
+
+    tracked_metrics = payload.get("tracked_metrics", DEFAULT_TRACKED_METRICS)
+    if not isinstance(tracked_metrics, list) or not tracked_metrics:
+        raise ValueError("eval.tracked_metrics must be a non-empty list")
+
+    calibration_bins = int(payload.get("calibration_bins", 10))
+    if calibration_bins <= 0:
+        raise ValueError("eval.calibration_bins must be a positive integer")
+
+    min_group_support = int(payload.get("min_group_support", 100))
+    if min_group_support < 0:
+        raise ValueError("eval.min_group_support must be zero or greater")
+
+    return {
+        **dict(payload),
+        "primary_metric": str(payload.get("primary_metric", "macro_f1")),
+        "worst_group_metric": str(payload.get("worst_group_metric", "accuracy")),
+        "robustness_gap_metric": str(payload.get("robustness_gap_metric", "accuracy_delta")),
+        "calibration_metric": str(payload.get("calibration_metric", "ece")),
+        "prediction_filename": str(payload.get("prediction_filename", "predictions.parquet")),
+        "tracked_metrics": [str(metric) for metric in tracked_metrics],
+        "min_group_support": min_group_support,
+        "calibration_bins": calibration_bins,
+        "calibration_strategy": str(payload.get("calibration_strategy", "uniform")),
+    }
+
+
 @dataclass(slots=True)
 class RunConfig:
     """Resolved experiment configuration used by scripts and tracking."""
@@ -187,7 +218,7 @@ class RunConfig:
             data=data,
             model=dict(payload["model"]),
             train=dict(payload["train"]),
-            eval=dict(payload["eval"]),
+            eval=_validate_eval_config(payload["eval"]),
         )
 
     def to_dict(self) -> dict[str, Any]:
