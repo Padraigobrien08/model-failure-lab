@@ -17,9 +17,49 @@ def test_load_experiment_config_composes_sections(temp_config_root):
         temp_config_root / "data" / "civilcomments.yaml",
         """
 dataset_name: civilcomments
+wilds_dataset_name: civilcomments
+wilds_root_dir: data/wilds
+split_scheme: official
+text_field: comment_text
+label_field: toxicity
+group_fields:
+  - male
+  - female
+raw_splits:
+  train: train
+  val: val
+  test: test
 split_details:
   train: train
   validation: val
+  id_test: train_holdout
+  ood_test: test
+split_role_policy:
+  train:
+    raw_split: train
+    selector: train_remainder
+    is_id: true
+    is_ood: false
+  validation:
+    raw_split: val
+    selector: full_split
+    is_id: false
+    is_ood: true
+  id_test:
+    raw_split: train
+    selector: deterministic_holdout
+    is_id: true
+    is_ood: false
+    holdout_fraction: 0.1
+    holdout_seed: 13
+  ood_test:
+    raw_split: test
+    selector: full_split
+    is_id: false
+    is_ood: true
+validation:
+  subgroup_min_samples_warning: 10
+  preview_samples: 3
 """.strip(),
     )
     _write_yaml(
@@ -63,6 +103,8 @@ notes: temp preset
     assert config["dataset_name"] == "civilcomments"
     assert config["seed"] == 99
     assert config["split_details"]["validation"] == "val"
+    assert config["data"]["raw_splits"]["test"] == "test"
+    assert config["data"]["split_role_policy"]["id_test"]["selector"] == "deterministic_holdout"
 
 
 def test_apply_cli_overrides_whitelist():
@@ -73,12 +115,61 @@ def test_apply_cli_overrides_whitelist():
         "experiment_type": "baseline",
         "model_name": "distilbert",
         "dataset_name": "civilcomments",
-        "split_details": {"train": "train"},
+        "split_details": {
+            "train": "train",
+            "validation": "val",
+            "id_test": "train_holdout",
+            "ood_test": "test",
+        },
         "seed": 13,
         "tags": ["baseline"],
         "notes": "",
         "parent_run_id": None,
-        "data": {"dataset_name": "civilcomments", "split_details": {"train": "train"}},
+        "data": {
+            "dataset_name": "civilcomments",
+            "wilds_dataset_name": "civilcomments",
+            "wilds_root_dir": "data/wilds",
+            "split_scheme": "official",
+            "text_field": "comment_text",
+            "label_field": "toxicity",
+            "group_fields": ["male", "female"],
+            "raw_splits": {"train": "train", "val": "val", "test": "test"},
+            "split_details": {
+                "train": "train",
+                "validation": "val",
+                "id_test": "train_holdout",
+                "ood_test": "test",
+            },
+            "split_role_policy": {
+                "train": {
+                    "raw_split": "train",
+                    "selector": "train_remainder",
+                    "is_id": True,
+                    "is_ood": False,
+                },
+                "validation": {
+                    "raw_split": "val",
+                    "selector": "full_split",
+                    "is_id": False,
+                    "is_ood": True,
+                },
+                "id_test": {
+                    "raw_split": "train",
+                    "selector": "deterministic_holdout",
+                    "is_id": True,
+                    "is_ood": False,
+                    "holdout_fraction": 0.1,
+                    "holdout_seed": 13,
+                },
+                "ood_test": {
+                    "raw_split": "test",
+                    "selector": "full_split",
+                    "is_id": False,
+                    "is_ood": True,
+                },
+            },
+            "validation": {"subgroup_min_samples_warning": 25, "preview_samples": 5},
+        },
         "model": {"model_name": "distilbert"},
         "train": {"seed": 13},
         "eval": {"primary_metric": "accuracy"},
@@ -108,12 +199,61 @@ def test_apply_cli_overrides_rejects_unknown_keys():
         "experiment_type": "baseline",
         "model_name": "distilbert",
         "dataset_name": "civilcomments",
-        "split_details": {"train": "train"},
+        "split_details": {
+            "train": "train",
+            "validation": "val",
+            "id_test": "train_holdout",
+            "ood_test": "test",
+        },
         "seed": 13,
         "tags": [],
         "notes": "",
         "parent_run_id": None,
-        "data": {"dataset_name": "civilcomments", "split_details": {"train": "train"}},
+        "data": {
+            "dataset_name": "civilcomments",
+            "wilds_dataset_name": "civilcomments",
+            "wilds_root_dir": "data/wilds",
+            "split_scheme": "official",
+            "text_field": "comment_text",
+            "label_field": "toxicity",
+            "group_fields": ["male", "female"],
+            "raw_splits": {"train": "train", "val": "val", "test": "test"},
+            "split_details": {
+                "train": "train",
+                "validation": "val",
+                "id_test": "train_holdout",
+                "ood_test": "test",
+            },
+            "split_role_policy": {
+                "train": {
+                    "raw_split": "train",
+                    "selector": "train_remainder",
+                    "is_id": True,
+                    "is_ood": False,
+                },
+                "validation": {
+                    "raw_split": "val",
+                    "selector": "full_split",
+                    "is_id": False,
+                    "is_ood": True,
+                },
+                "id_test": {
+                    "raw_split": "train",
+                    "selector": "deterministic_holdout",
+                    "is_id": True,
+                    "is_ood": False,
+                    "holdout_fraction": 0.1,
+                    "holdout_seed": 13,
+                },
+                "ood_test": {
+                    "raw_split": "test",
+                    "selector": "full_split",
+                    "is_id": False,
+                    "is_ood": True,
+                },
+            },
+            "validation": {"subgroup_min_samples_warning": 25, "preview_samples": 5},
+        },
         "model": {"model_name": "distilbert"},
         "train": {"seed": 13},
         "eval": {"primary_metric": "accuracy"},
@@ -134,4 +274,5 @@ def test_repository_baseline_presets_resolve():
     assert logistic_config["model_name"] == "logistic_tfidf"
     assert distilbert_config["model_name"] == "distilbert"
     assert logistic_config["dataset_name"] == "civilcomments"
-    assert distilbert_config["split_details"]["id_test"] == "id_test"
+    assert distilbert_config["split_details"]["id_test"] == "train_holdout"
+    assert distilbert_config["data"]["raw_splits"]["val"] == "val"

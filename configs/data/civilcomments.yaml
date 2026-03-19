@@ -1,10 +1,58 @@
 dataset_name: civilcomments
+wilds_dataset_name: civilcomments
+wilds_root_dir: data/wilds
+split_scheme: official
 text_field: comment_text
 label_field: toxicity
-group_field: identity
+group_fields:
+  - male
+  - female
+  - LGBTQ
+  - christian
+  - muslim
+  - other_religions
+  - black
+  - white
+auxiliary_fields:
+  - identity_any
+  - severe_toxicity
+  - obscene
+  - threat
+  - insult
+  - identity_attack
+  - sexual_explicit
+raw_splits:
+  train: train
+  val: val
+  test: test
 split_details:
   train: train
   validation: val
-  id_validation: id_val
-  id_test: id_test
+  id_test: train_holdout
   ood_test: test
+split_role_policy:
+  train:
+    raw_split: train
+    selector: train_remainder
+    is_id: true
+    is_ood: false
+  validation:
+    raw_split: val
+    selector: full_split
+    is_id: false
+    is_ood: true
+  id_test:
+    raw_split: train
+    selector: deterministic_holdout
+    is_id: true
+    is_ood: false
+    holdout_fraction: 0.1
+    holdout_seed: 13
+  ood_test:
+    raw_split: test
+    selector: full_split
+    is_id: false
+    is_ood: true
+validation:
+  subgroup_min_samples_warning: 25
+  preview_samples: 5

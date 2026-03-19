@@ -83,3 +83,32 @@ def build_report_dir(
     if create:
         report_dir.mkdir(parents=True, exist_ok=True)
     return report_dir
+
+
+def build_data_dir(create: bool = False) -> Path:
+    """Return the root directory for persisted data artifacts."""
+    data_dir = artifact_root() / "data"
+    if create:
+        data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+
+def build_data_manifest_dir(create: bool = False) -> Path:
+    """Return the directory for dataset manifest files."""
+    manifest_dir = build_data_dir(create=create) / "manifests"
+    if create:
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+    return manifest_dir
+
+
+def build_data_summary_dir(create: bool = False) -> Path:
+    """Return the directory for dataset validation summaries."""
+    summary_dir = build_data_dir(create=create) / "summaries"
+    if create:
+        summary_dir.mkdir(parents=True, exist_ok=True)
+    return summary_dir
+
+
+def build_data_manifest_path(dataset_name: str) -> Path:
+    """Return the canonical manifest path for a dataset."""
+    return build_data_manifest_dir(create=True) / f"{_normalize_segment(dataset_name)}_manifest.json"
