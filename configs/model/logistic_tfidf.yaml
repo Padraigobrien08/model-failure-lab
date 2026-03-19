@@ -2,3 +2,18 @@ model_name: logistic_tfidf
 model_family: linear
 feature_backend: tfidf
 output_type: probability
+text_field: text
+vectorizer:
+  ngram_range: [1, 2]
+  lowercase: true
+  min_df: 3
+  max_df: 0.95
+  max_features: 50000
+  strip_accents: unicode
+  sublinear_tf: true
+classifier:
+  penalty: l2
+  c: 1.0
+  solver: liblinear
+  class_weight: balanced
+  max_iter: 1000

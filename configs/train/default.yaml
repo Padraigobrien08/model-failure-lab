@@ -2,5 +2,6 @@ seed: 13
 batch_size: 16
 max_epochs: 1
 num_workers: 0
-checkpoint_policy: latest
+checkpoint_policy: best
+export_blind_test_predictions: false
 scaffold_status: bootstrap_only

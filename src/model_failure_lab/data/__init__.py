@@ -12,6 +12,8 @@ from .grouping import build_group_attributes, build_group_id
 from .materialization import (
     MaterializationResult,
     build_data_manifest_payload,
+    extract_source_records,
+    load_canonical_civilcomments_dataset,
     materialize_civilcomments,
     write_data_manifest,
 )
@@ -31,6 +33,8 @@ __all__ = [
     "build_group_attributes",
     "build_group_id",
     "load_civilcomments_dataset",
+    "extract_source_records",
+    "load_canonical_civilcomments_dataset",
     "materialize_civilcomments",
     "prepare_tfidf_adapter",
     "prepare_transformer_adapter",

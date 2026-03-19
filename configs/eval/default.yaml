@@ -1,5 +1,10 @@
-primary_metric: accuracy
+primary_metric: macro_f1
 worst_group_metric: accuracy
 robustness_gap_metric: accuracy_delta
 calibration_metric: ece
 prediction_filename: predictions.parquet
+tracked_metrics:
+  - accuracy
+  - macro_f1
+  - auroc
+  - loss

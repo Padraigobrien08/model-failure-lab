@@ -82,6 +82,11 @@ def _extract_source_records(dataset: Any, data_config: dict[str, Any]) -> list[d
     return extracted_records
 
 
+def extract_source_records(dataset: Any, data_config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Public wrapper for source-record extraction from CivilComments datasets."""
+    return _extract_source_records(dataset, data_config)
+
+
 def _build_project_split_payload(
     split_policy: dict[str, SplitRole],
     available_raw_splits: list[str],
@@ -146,6 +151,26 @@ def write_data_manifest(dataset_name: str, payload: dict[str, Any]) -> Path:
     return _write_json(build_data_manifest_path(dataset_name), payload)
 
 
+def load_canonical_civilcomments_dataset(
+    config: dict[str, Any],
+    *,
+    download: bool = True,
+    get_dataset_fn: Callable[..., Any] | None = None,
+):
+    """Load CivilComments and return canonical samples without writing artifacts."""
+    dataset = load_civilcomments_dataset(
+        config["data"],
+        download=download,
+        get_dataset_fn=get_dataset_fn,
+    )
+    source_records = extract_source_records(dataset, config["data"])
+    return build_canonical_dataset(
+        source_records,
+        config["data"],
+        dataset_name=str(config["dataset_name"]),
+    )
+
+
 def materialize_civilcomments(
     config: dict[str, Any],
     *,
@@ -159,7 +184,7 @@ def materialize_civilcomments(
         get_dataset_fn=get_dataset_fn,
     )
     manifest_payload, split_policy, raw_split_names = build_data_manifest_payload(config, dataset)
-    source_records = _extract_source_records(dataset, config["data"])
+    source_records = extract_source_records(dataset, config["data"])
     canonical_dataset = build_canonical_dataset(source_records, config["data"])
     validation_summary = write_validation_summaries(
         canonical_dataset.samples,
