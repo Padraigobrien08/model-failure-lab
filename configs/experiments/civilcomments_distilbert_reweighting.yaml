@@ -12,3 +12,15 @@ tags:
   - distilbert
   - reweighting
 notes: CivilComments DistilBERT reweighting scaffold preset.
+mitigation:
+  method: reweighting
+  parent_model_name: distilbert
+  comparison_tolerances:
+    id_macro_f1_max_drop: 0.01
+    overall_macro_f1_max_drop: 0.01
+    ece_neutral_tolerance: 0.005
+  reweighting:
+    grouping_field: group_id
+    strategy: inverse_sqrt_frequency
+    max_weight: 5.0
+    normalize_mean: 1.0

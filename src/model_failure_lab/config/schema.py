@@ -9,6 +9,17 @@ REQUIRED_SPLIT_DETAIL_KEYS = {"train", "validation", "id_test", "ood_test"}
 REQUIRED_RAW_SPLIT_KEYS = {"train", "val", "test"}
 REQUIRED_SPLIT_ROLE_KEYS = {"train", "validation", "id_test", "ood_test"}
 REQUIRED_POLICY_FIELDS = {"raw_split", "selector", "is_id", "is_ood"}
+REQUIRED_REWEIGHTING_FIELDS = {
+    "grouping_field",
+    "strategy",
+    "max_weight",
+    "normalize_mean",
+}
+REQUIRED_COMPARISON_TOLERANCE_FIELDS = {
+    "id_macro_f1_max_drop",
+    "overall_macro_f1_max_drop",
+    "ece_neutral_tolerance",
+}
 DEFAULT_TRACKED_METRICS = ["accuracy", "macro_f1", "auroc", "loss"]
 
 
@@ -22,6 +33,24 @@ def _coerce_string_mapping(
         raise ValueError(f"{name} must be a non-empty mapping")
 
     normalized = {str(key): str(value) for key, value in payload.items()}
+    if required_keys:
+        missing_keys = sorted(required_keys - set(normalized))
+        if missing_keys:
+            missing_text = ", ".join(missing_keys)
+            raise ValueError(f"{name} is missing required keys: {missing_text}")
+    return normalized
+
+
+def _coerce_float_mapping(
+    payload: object,
+    *,
+    name: str,
+    required_keys: set[str] | None = None,
+) -> dict[str, float]:
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError(f"{name} must be a non-empty mapping")
+
+    normalized = {str(key): float(value) for key, value in payload.items()}
     if required_keys:
         missing_keys = sorted(required_keys - set(normalized))
         if missing_keys:
@@ -198,6 +227,71 @@ def _validate_report_config(payload: object) -> dict[str, Any]:
     }
 
 
+def _validate_reweighting_config(payload: object) -> dict[str, Any]:
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("mitigation.reweighting must be a non-empty mapping")
+
+    missing_fields = sorted(REQUIRED_REWEIGHTING_FIELDS - set(map(str, payload.keys())))
+    if missing_fields:
+        missing_text = ", ".join(missing_fields)
+        raise ValueError(f"mitigation.reweighting is missing required fields: {missing_text}")
+
+    max_weight = float(payload["max_weight"])
+    if max_weight <= 0:
+        raise ValueError("mitigation.reweighting.max_weight must be positive")
+
+    normalize_mean = float(payload["normalize_mean"])
+    if normalize_mean <= 0:
+        raise ValueError("mitigation.reweighting.normalize_mean must be positive")
+
+    return {
+        **dict(payload),
+        "grouping_field": str(payload["grouping_field"]),
+        "strategy": str(payload["strategy"]),
+        "max_weight": max_weight,
+        "normalize_mean": normalize_mean,
+    }
+
+
+def _validate_mitigation_config(payload: object) -> dict[str, Any] | None:
+    if payload in (None, {}):
+        return None
+    if not isinstance(payload, dict):
+        raise ValueError("mitigation must be a mapping when provided")
+
+    method = payload.get("method")
+    if method is None:
+        raise ValueError("mitigation.method is required when mitigation is provided")
+
+    parent_model_name = payload.get("parent_model_name")
+    if parent_model_name is None:
+        raise ValueError(
+            "mitigation.parent_model_name is required when mitigation is provided"
+        )
+
+    comparison_tolerances = _coerce_float_mapping(
+        payload.get("comparison_tolerances"),
+        name="mitigation.comparison_tolerances",
+        required_keys=REQUIRED_COMPARISON_TOLERANCE_FIELDS,
+    )
+
+    normalized = {
+        "method": str(method),
+        "parent_model_name": str(parent_model_name),
+        "comparison_tolerances": comparison_tolerances,
+    }
+
+    if normalized["method"] == "reweighting":
+        normalized["reweighting"] = _validate_reweighting_config(payload.get("reweighting"))
+    elif payload.get("reweighting") is not None:
+        normalized["reweighting"] = _validate_reweighting_config(payload.get("reweighting"))
+
+    for key, value in payload.items():
+        normalized.setdefault(str(key), value)
+
+    return normalized
+
+
 @dataclass(slots=True)
 class RunConfig:
     """Resolved experiment configuration used by scripts and tracking."""
@@ -212,7 +306,12 @@ class RunConfig:
     seed: int
     tags: list[str] = field(default_factory=list)
     notes: str = ""
+    preset_path: str | None = None
     parent_run_id: str | None = None
+    parent_model_name: str | None = None
+    mitigation_method: str | None = None
+    mitigation_config: dict[str, Any] | None = None
+    mitigation: dict[str, Any] | None = None
     data: dict[str, Any] = field(default_factory=dict)
     model: dict[str, Any] = field(default_factory=dict)
     train: dict[str, Any] = field(default_factory=dict)
@@ -252,6 +351,19 @@ class RunConfig:
             raise ValueError("seed must be an integer")
 
         data = _validate_data_config(payload["data"])
+        mitigation = _validate_mitigation_config(payload.get("mitigation"))
+        mitigation_config_payload = payload.get("mitigation_config", mitigation)
+        mitigation_config = (
+            _validate_mitigation_config(mitigation_config_payload)
+            if mitigation_config_payload is not None
+            else mitigation
+        )
+        mitigation_method = payload.get("mitigation_method")
+        if mitigation_method is None and mitigation is not None:
+            mitigation_method = mitigation["method"]
+        parent_model_name = payload.get("parent_model_name")
+        if parent_model_name is None and mitigation is not None:
+            parent_model_name = mitigation["parent_model_name"]
 
         return cls(
             run_id=payload.get("run_id"),
@@ -264,7 +376,18 @@ class RunConfig:
             seed=seed,
             tags=[str(tag) for tag in payload.get("tags", [])],
             notes=str(payload.get("notes", "")),
+            preset_path=(
+                str(payload["preset_path"]) if payload.get("preset_path") is not None else None
+            ),
             parent_run_id=payload.get("parent_run_id"),
+            parent_model_name=(
+                str(parent_model_name) if parent_model_name is not None else None
+            ),
+            mitigation_method=(
+                str(mitigation_method) if mitigation_method is not None else None
+            ),
+            mitigation_config=mitigation_config,
+            mitigation=mitigation,
             data=data,
             model=dict(payload["model"]),
             train=dict(payload["train"]),

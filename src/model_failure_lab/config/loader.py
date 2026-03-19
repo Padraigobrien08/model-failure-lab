@@ -78,6 +78,10 @@ def load_experiment_config(preset_path: str | Path) -> dict[str, Any]:
     """Load, compose, and validate an experiment preset."""
     resolved_preset_path = _resolve_preset_path(preset_path)
     preset_payload = _load_yaml_file(resolved_preset_path)
+    mitigation_payload = preset_payload.get("mitigation")
+    mitigation_method = None
+    if isinstance(mitigation_payload, dict):
+        mitigation_method = mitigation_payload.get("method")
 
     resolved_payload: dict[str, Any] = {
         "run_id": preset_payload.get("run_id"),
@@ -90,6 +94,10 @@ def load_experiment_config(preset_path: str | Path) -> dict[str, Any]:
         "tags": list(preset_payload.get("tags", [])),
         "notes": preset_payload.get("notes", ""),
         "parent_run_id": preset_payload.get("parent_run_id"),
+        "parent_model_name": preset_payload.get("parent_model_name"),
+        "mitigation_method": preset_payload.get("mitigation_method", mitigation_method),
+        "mitigation_config": preset_payload.get("mitigation_config", mitigation_payload),
+        "mitigation": mitigation_payload,
         "preset_path": str(resolved_preset_path),
     }
 
