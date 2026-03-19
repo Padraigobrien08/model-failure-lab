@@ -81,6 +81,7 @@ def write_report_bundle(
     report_summary: dict[str, Any],
     figures: dict[str, Figure],
     comparison_table: pd.DataFrame,
+    mitigation_comparison_table: pd.DataFrame | None = None,
     subgroup_table: pd.DataFrame,
     calibration_table: pd.DataFrame,
 ) -> dict[str, str]:
@@ -91,6 +92,12 @@ def write_report_bundle(
     Path(artifact_paths["tables_dir"]).mkdir(parents=True, exist_ok=True)
     Path(artifact_paths["report_markdown"]).write_text(markdown, encoding="utf-8")
     _write_csv(Path(artifact_paths["comparison_table_csv"]), comparison_table)
+    _write_csv(
+        Path(artifact_paths["mitigation_comparison_table_csv"]),
+        mitigation_comparison_table
+        if mitigation_comparison_table is not None
+        else pd.DataFrame(),
+    )
     _write_csv(Path(artifact_paths["subgroup_table_csv"]), subgroup_table)
     _write_csv(Path(artifact_paths["calibration_table_csv"]), calibration_table)
 

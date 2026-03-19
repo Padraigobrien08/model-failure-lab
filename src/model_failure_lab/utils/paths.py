@@ -117,6 +117,9 @@ def build_report_artifact_paths(report_dir: Path) -> dict[str, str]:
         "figures_dir": str(report_dir / "figures"),
         "tables_dir": str(report_dir / "tables"),
         "comparison_table_csv": str(report_dir / "tables" / "comparison_table.csv"),
+        "mitigation_comparison_table_csv": str(
+            report_dir / "tables" / "mitigation_comparison_table.csv"
+        ),
         "subgroup_table_csv": str(report_dir / "tables" / "subgroup_table.csv"),
         "calibration_table_csv": str(report_dir / "tables" / "calibration_table.csv"),
         "id_vs_ood_primary_metric_png": str(

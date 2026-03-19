@@ -22,6 +22,7 @@ def _build_headline_findings(
     comparison_table: pd.DataFrame,
     subgroup_table: pd.DataFrame,
     calibration_table: pd.DataFrame,
+    mitigation_comparison_table: pd.DataFrame,
 ) -> list[str]:
     findings: list[str] = []
 
@@ -54,6 +55,28 @@ def _build_headline_findings(
                 f"{_format_score(best_ece['ece'])}."
             )
 
+    if not mitigation_comparison_table.empty:
+        best_verdict = mitigation_comparison_table.iloc[0]
+        findings.append(
+            f"{best_verdict['mitigation_label']} is classified as "
+            f"{best_verdict['verdict']} versus {best_verdict['parent_label']}."
+        )
+
+    return findings[:MAX_HEADLINE_FINDINGS]
+
+
+def _build_mitigation_findings(mitigation_comparison_table: pd.DataFrame) -> list[str]:
+    if mitigation_comparison_table.empty:
+        return []
+
+    findings: list[str] = []
+    for _, row in mitigation_comparison_table.iterrows():
+        findings.append(
+            f"{row['mitigation_label']} vs {row['parent_label']}: verdict "
+            f"{row['verdict']} (OOD Macro F1 delta {_format_score(row['ood_macro_f1_delta'])}, "
+            f"worst-group F1 delta {_format_score(row['worst_group_f1_delta'])}, "
+            f"ECE delta {_format_score(row['ece_delta'])})."
+        )
     return findings[:MAX_HEADLINE_FINDINGS]
 
 
@@ -63,14 +86,22 @@ def build_report_summary(
     comparison_table: pd.DataFrame,
     subgroup_table: pd.DataFrame,
     calibration_table: pd.DataFrame,
+    mitigation_comparison_table: pd.DataFrame | None = None,
     report_title: str,
 ) -> dict[str, Any]:
     """Build the optional machine-readable summary payload for a report."""
+    resolved_mitigation_table = (
+        mitigation_comparison_table
+        if mitigation_comparison_table is not None
+        else pd.DataFrame()
+    )
     headline_findings = _build_headline_findings(
         comparison_table,
         subgroup_table,
         calibration_table,
+        resolved_mitigation_table,
     )
+    mitigation_findings = _build_mitigation_findings(resolved_mitigation_table)
     compared_runs = [
         {
             "eval_id": candidate.eval_id,
@@ -85,6 +116,7 @@ def build_report_summary(
     return {
         "report_title": report_title,
         "headline_findings": headline_findings,
+        "mitigation_findings": mitigation_findings,
         "compared_runs": compared_runs,
         "key_takeaway": key_takeaway,
         "next_experiment": next_experiment,

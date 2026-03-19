@@ -19,6 +19,10 @@ def _render_headline_findings(findings: list[str]) -> str:
     return "\n".join(f"- {finding}" for finding in findings[:5])
 
 
+def _render_mitigation_findings(findings: list[str]) -> str:
+    return "\n".join(f"- {finding}" for finding in findings[:5])
+
+
 def render_report_markdown(
     *,
     report_title: str,
@@ -29,6 +33,7 @@ def render_report_markdown(
     """Render the canonical Phase 5 Markdown findings report."""
     compared_runs = report_summary.get("compared_runs", [])
     headline_findings = list(report_summary.get("headline_findings", []))[:5]
+    mitigation_findings = list(report_summary.get("mitigation_findings", []))[:5]
     key_takeaway = str(report_summary.get("key_takeaway", "No key takeaway available."))
     next_experiment = str(
         report_summary.get("next_experiment", "Choose the next comparable evaluation bundle.")
@@ -55,6 +60,13 @@ def render_report_markdown(
         "## Calibration summary",
         f"![Calibration curve]({figure_paths['calibration_curve']})",
         f"- Calibration table: `{table_paths['calibration_table']}`",
+        "## Mitigation comparison" if mitigation_findings else "",
+        _render_mitigation_findings(mitigation_findings) if mitigation_findings else "",
+        (
+            f"- Mitigation comparison table: `{table_paths['mitigation_comparison_table']}`"
+            if mitigation_findings
+            else ""
+        ),
         "## Key takeaway",
         key_takeaway,
         "## Next experiment",

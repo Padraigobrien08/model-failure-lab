@@ -104,6 +104,12 @@ def build_evaluation_metadata(
     )
     metadata["eval_id"] = eval_id
     metadata["source_run_id"] = str(source_run_metadata["run_id"])
+    if source_run_metadata.get("parent_run_id") is not None:
+        metadata["source_parent_run_id"] = str(source_run_metadata["parent_run_id"])
+    if source_run_metadata.get("mitigation_method") is not None:
+        metadata["mitigation_method"] = str(source_run_metadata["mitigation_method"])
+    if source_run_metadata.get("mitigation_config") is not None:
+        metadata["mitigation_config"] = dict(source_run_metadata["mitigation_config"])
     metadata["source_metadata_path"] = str(source_metadata_path)
     metadata["evaluator_version"] = metadata.get("git_commit_hash")
     metadata["min_group_support"] = int(min_group_support)

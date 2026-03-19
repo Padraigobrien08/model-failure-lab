@@ -503,8 +503,27 @@ def _create_saved_report_evaluation_bundle(
     source_run_id: str,
     eval_id: str,
     experiment_group: str = "baselines_v1",
+    root_kind: str = "baseline",
+    mitigation_method: str | None = None,
+    source_parent_run_id: str | None = None,
+    id_score: float = 0.8,
+    ood_score: float = 0.62,
+    overall_score: float = 0.68,
+    worst_group_score: float = 0.44,
+    ece: float = 0.07,
+    brier_score: float = 0.12,
 ) -> None:
-    source_run_dir = build_baseline_run_dir(model_name, source_run_id, create=True)
+    if root_kind == "mitigation":
+        from model_failure_lab.utils.paths import build_mitigation_run_dir
+
+        source_run_dir = build_mitigation_run_dir(
+            mitigation_method or "reweighting",
+            model_name,
+            source_run_id,
+            create=True,
+        )
+    else:
+        source_run_dir = build_baseline_run_dir(model_name, source_run_id, create=True)
     eval_dir = build_evaluation_run_dir(source_run_dir, eval_id, create=True)
     figures_dir = eval_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -522,58 +541,68 @@ def _create_saved_report_evaluation_bundle(
         "diagnostics_json": str(eval_dir / "diagnostics.json"),
         "plots": str(figures_dir),
     }
-    (eval_dir / "metadata.json").write_text(
-        json.dumps(
-            {
-                "run_id": eval_id,
-                "eval_id": eval_id,
-                "source_run_id": source_run_id,
-                "experiment_type": "shift_eval",
-                "model_name": model_name,
+    metadata_payload: dict[str, object] = {
+        "run_id": eval_id,
+        "eval_id": eval_id,
+        "source_run_id": source_run_id,
+        "experiment_type": "shift_eval",
+        "model_name": model_name,
+        "dataset_name": "civilcomments",
+        "split_details": {
+            "train": "train",
+            "validation": "validation",
+            "id_test": "id_test",
+            "ood_test": "ood_test",
+        },
+        "resolved_config": {
+            "experiment_group": experiment_group,
+            "data": {
                 "dataset_name": "civilcomments",
-                "split_details": {
-                    "train": "train",
-                    "validation": "validation",
-                    "id_test": "id_test",
-                    "ood_test": "ood_test",
+                "label_field": "toxicity",
+                "text_field": "comment_text",
+                "group_fields": ["male", "female"],
+            },
+        },
+        "artifact_paths": artifact_paths,
+        "evaluator_version": "eval-schema-v1",
+        "git_commit_hash": "eval-schema-v1",
+        "min_group_support": 100,
+        "tags": [experiment_group],
+    }
+    if source_parent_run_id is not None:
+        metadata_payload["source_parent_run_id"] = source_parent_run_id
+        metadata_payload["mitigation_method"] = mitigation_method
+        metadata_payload["resolved_config"] = {
+            **dict(metadata_payload["resolved_config"]),
+            "mitigation": {
+                "method": mitigation_method,
+                "comparison_tolerances": {
+                    "id_macro_f1_max_drop": 0.01,
+                    "overall_macro_f1_max_drop": 0.01,
+                    "ece_neutral_tolerance": 0.005,
                 },
-                "resolved_config": {
-                    "experiment_group": experiment_group,
-                    "data": {
-                        "dataset_name": "civilcomments",
-                        "label_field": "toxicity",
-                        "text_field": "comment_text",
-                        "group_fields": ["male", "female"],
-                    },
-                },
-                "artifact_paths": artifact_paths,
-                "evaluator_version": "eval-schema-v1",
-                "git_commit_hash": "eval-schema-v1",
-                "min_group_support": 100,
-                "tags": [experiment_group],
-            }
-        ),
-        encoding="utf-8",
-    )
+            },
+        }
+    (eval_dir / "metadata.json").write_text(json.dumps(metadata_payload), encoding="utf-8")
     (eval_dir / "overall_metrics.json").write_text(
         json.dumps(
             {
                 "headline_metrics": {
-                    "accuracy": 0.72,
-                    "macro_f1": 0.68,
-                    "auroc": 0.8,
-                    "worst_group_f1": 0.44,
-                    "robustness_gap_f1": 0.18,
+                    "accuracy": overall_score,
+                    "macro_f1": overall_score,
+                    "auroc": overall_score + 0.12,
+                    "worst_group_f1": worst_group_score,
+                    "robustness_gap_f1": round(id_score - ood_score, 3),
                 },
-                "overall": {"macro_f1": 0.68},
-                "id": {"macro_f1": 0.8},
-                "ood": {"macro_f1": 0.62},
+                "overall": {"macro_f1": overall_score},
+                "id": {"macro_f1": id_score},
+                "ood": {"macro_f1": ood_score},
             }
         ),
         encoding="utf-8",
     )
     (eval_dir / "worst_group_summary.json").write_text(
-        json.dumps({"worst_group_f1": {"group_id": "group_low", "value": 0.44}}),
+        json.dumps({"worst_group_f1": {"group_id": "group_low", "value": worst_group_score}}),
         encoding="utf-8",
     )
     (eval_dir / "confidence_summary.json").write_text(json.dumps({"overall": {}}), encoding="utf-8")
@@ -583,13 +612,20 @@ def _create_saved_report_evaluation_bundle(
     )
     pd.DataFrame(
         [
-            {"slice_name": "overall", "macro_f1": 0.68},
-            {"slice_name": "id", "macro_f1": 0.8},
-            {"slice_name": "ood", "macro_f1": 0.62},
+            {"slice_name": "overall", "macro_f1": overall_score},
+            {"slice_name": "id", "macro_f1": id_score},
+            {"slice_name": "ood", "macro_f1": ood_score},
         ]
     ).to_csv(eval_dir / "split_metrics.csv", index=False)
     pd.DataFrame(
-        [{"metric": "macro_f1", "id_value": 0.8, "ood_value": 0.62, "delta": 0.18}]
+        [
+            {
+                "metric": "macro_f1",
+                "id_value": id_score,
+                "ood_value": ood_score,
+                "delta": round(id_score - ood_score, 3),
+            }
+        ]
     ).to_csv(eval_dir / "id_ood_comparison.csv", index=False)
     pd.DataFrame(
         [
@@ -598,9 +634,9 @@ def _create_saved_report_evaluation_bundle(
                 "group_name": "group_low",
                 "support": 150,
                 "eligible_for_worst_group": True,
-                "macro_f1": 0.44,
-                "accuracy": 0.49,
-                "error_rate": 0.51,
+                "macro_f1": worst_group_score,
+                "accuracy": worst_group_score + 0.05,
+                "error_rate": 1.0 - (worst_group_score + 0.05),
             }
         ]
     ).to_csv(eval_dir / "subgroup_metrics.csv", index=False)
@@ -610,9 +646,19 @@ def _create_saved_report_evaluation_bundle(
     )
     pd.DataFrame(
         [
-            {"slice_name": "overall", "ece": 0.07, "brier_score": 0.12, "sample_count": 100},
-            {"slice_name": "id", "ece": 0.05, "brier_score": 0.11, "sample_count": 60},
-            {"slice_name": "ood", "ece": 0.09, "brier_score": 0.14, "sample_count": 40},
+            {"slice_name": "overall", "ece": ece, "brier_score": brier_score, "sample_count": 100},
+            {
+                "slice_name": "id",
+                "ece": max(ece - 0.02, 0.0),
+                "brier_score": max(brier_score - 0.01, 0.0),
+                "sample_count": 60,
+            },
+            {
+                "slice_name": "ood",
+                "ece": ece + 0.02,
+                "brier_score": brier_score + 0.02,
+                "sample_count": 40,
+            },
         ]
     ).to_csv(eval_dir / "calibration_summary.csv", index=False)
     pd.DataFrame(
@@ -837,6 +883,50 @@ def test_build_report_writes_completed_report_package(temp_artifact_root):
     assert (result.run_dir / "figures" / "id_vs_ood_primary_metric.png").exists()
     assert result.metrics_path.name == "report_summary.json"
     assert result.metadata_path.exists()
+
+
+def test_build_report_writes_mitigation_comparison_table(temp_artifact_root):
+    _create_saved_report_evaluation_bundle(
+        model_name="distilbert",
+        source_run_id="baseline_parent",
+        eval_id="eval_parent",
+        experiment_group="mitigation_suite",
+    )
+    _create_saved_report_evaluation_bundle(
+        model_name="distilbert",
+        source_run_id="reweight_child",
+        eval_id="eval_reweight",
+        experiment_group="mitigation_suite",
+        root_kind="mitigation",
+        mitigation_method="reweighting",
+        source_parent_run_id="baseline_parent",
+        id_score=0.795,
+        ood_score=0.66,
+        overall_score=0.69,
+        worst_group_score=0.48,
+        ece=0.069,
+        brier_score=0.119,
+    )
+
+    result = run_build_report_command(
+        [
+            "--experiment-group",
+            "mitigation_suite",
+            "--report-name",
+            "mitigation_report",
+            "--top-k-subgroups",
+            "2",
+            "--min-group-support",
+            "100",
+        ]
+    )
+
+    mitigation_table_path = result.run_dir / "tables" / "mitigation_comparison_table.csv"
+    markdown = (result.run_dir / "report.md").read_text(encoding="utf-8")
+
+    assert mitigation_table_path.exists()
+    assert "tradeoff" not in markdown
+    assert "verdict win" in markdown
 
 
 def test_download_data_bootstrap_writes_metadata(temp_artifact_root):

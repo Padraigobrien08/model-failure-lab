@@ -32,6 +32,7 @@ from model_failure_lab.reporting import (
     build_comparison_table,
     build_id_ood_comparison_frame,
     build_id_ood_figure,
+    build_mitigation_comparison_table,
     build_report_metadata,
     build_report_summary,
     build_subgroup_table,
@@ -430,6 +431,7 @@ def dispatch_report(
         min_group_support=int(config.get("eval", {}).get("min_group_support", 100)),
     )
     calibration_table = build_calibration_table(selected_candidates)
+    mitigation_comparison_table = build_mitigation_comparison_table(selected_candidates)
     report_title = str(
         report_config.get("report_name")
         or experiment_group
@@ -440,6 +442,7 @@ def dispatch_report(
         comparison_table=comparison_table,
         subgroup_table=subgroup_table,
         calibration_table=calibration_table,
+        mitigation_comparison_table=mitigation_comparison_table,
         report_title=report_title,
     )
     markdown = render_report_markdown(
@@ -453,6 +456,7 @@ def dispatch_report(
         },
         table_paths={
             "comparison_table": "tables/comparison_table.csv",
+            "mitigation_comparison_table": "tables/mitigation_comparison_table.csv",
             "subgroup_table": "tables/subgroup_table.csv",
             "calibration_table": "tables/calibration_table.csv",
         },
@@ -468,6 +472,7 @@ def dispatch_report(
             "calibration_curve": build_calibration_curve_figure(selected_candidates),
         },
         comparison_table=comparison_table,
+        mitigation_comparison_table=mitigation_comparison_table,
         subgroup_table=subgroup_table,
         calibration_table=calibration_table,
     )
