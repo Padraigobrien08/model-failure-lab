@@ -27,6 +27,10 @@ ALLOWED_OVERRIDE_KEYS = {
     "min_group_support",
     "calibration_bins",
     "output_tag",
+    "eval_ids",
+    "report_name",
+    "output_format",
+    "top_k_subgroups",
 }
 
 
@@ -144,6 +148,18 @@ def apply_cli_overrides(config: dict[str, Any], overrides: dict[str, Any]) -> di
             updated_config.setdefault("eval", {})["calibration_bins"] = int(value)
         elif key == "output_tag":
             updated_config.setdefault("eval", {})["output_tag"] = str(value)
+        elif key == "eval_ids":
+            if isinstance(value, str):
+                eval_id_values = [item.strip() for item in value.split(",") if item.strip()]
+            else:
+                eval_id_values = [str(item).strip() for item in value if str(item).strip()]
+            updated_config.setdefault("report", {})["eval_ids"] = eval_id_values
+        elif key == "report_name":
+            updated_config.setdefault("report", {})["report_name"] = str(value)
+        elif key == "output_format":
+            updated_config.setdefault("report", {})["output_format"] = str(value)
+        elif key == "top_k_subgroups":
+            updated_config.setdefault("report", {})["top_k_subgroups"] = int(value)
 
     validated = RunConfig.from_dict(updated_config)
     return validated.to_dict()

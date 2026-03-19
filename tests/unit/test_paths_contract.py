@@ -5,7 +5,9 @@ from model_failure_lab.utils.paths import (
     build_baseline_run_dir,
     build_evaluation_run_dir,
     build_mitigation_run_dir,
+    build_report_artifact_paths,
     build_report_dir,
+    build_report_run_dir,
     config_root,
     find_run_metadata_path,
 )
@@ -56,6 +58,20 @@ def test_report_dir_uses_reports_root_without_shared_dumping_ground(temp_artifac
     assert summary_dir == temp_artifact_root / "reports" / "summary_tables" / "table_export"
     assert report_dir.parent.name == "comparisons"
     assert summary_dir.parent.name == "summary_tables"
+
+
+def test_report_run_dir_and_artifact_paths_use_expected_structure(temp_artifact_root):
+    report_run_dir = build_report_run_dir("MVP Comparison", "report_run", create=True)
+    artifact_paths = build_report_artifact_paths(report_run_dir)
+
+    assert report_run_dir == (
+        temp_artifact_root / "reports" / "comparisons" / "mvp_comparison" / "report_run"
+    )
+    assert artifact_paths["report_markdown"].endswith("report.md")
+    assert artifact_paths["comparison_table_csv"].endswith("tables/comparison_table.csv")
+    assert artifact_paths["id_vs_ood_primary_metric_png"].endswith(
+        "figures/id_vs_ood_primary_metric.png"
+    )
 
 
 def test_evaluation_run_dir_nests_under_source_run(temp_artifact_root):

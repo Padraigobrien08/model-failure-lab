@@ -186,7 +186,12 @@ def build_worst_subgroups_figure(
 ) -> Figure:
     """Build the worst-subgroups horizontal bar chart."""
     fig, ax = plt.subplots(figsize=(8, 4.5))
-    labels = subgroup_frame["group_name"].astype(str).tolist()
+    if "label" in subgroup_frame.columns:
+        labels = (
+            subgroup_frame["label"].astype(str) + " / " + subgroup_frame["group_name"].astype(str)
+        ).tolist()
+    else:
+        labels = subgroup_frame["group_name"].astype(str).tolist()
     scores = subgroup_frame[metric_name].fillna(0.0).astype(float).tolist()
 
     ax.barh(labels, scores)

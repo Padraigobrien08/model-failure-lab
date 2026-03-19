@@ -1,5 +1,6 @@
 """Saved-evaluation reporting helpers."""
 
+from .bundle import build_report_metadata, write_report_bundle
 from .calibration import build_calibration_curve_figure, build_calibration_table
 from .discovery import ReportCandidate, discover_evaluation_bundles, load_report_inputs
 from .figures import (
@@ -21,6 +22,8 @@ __all__ = [
     "PRIMARY_METRIC",
     "PRIMARY_METRIC_LABEL",
     "ReportCandidate",
+    "build_report_metadata",
+    "write_report_bundle",
     "build_calibration_curve_figure",
     "build_calibration_table",
     "build_comparison_table",

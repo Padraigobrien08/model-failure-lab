@@ -51,4 +51,12 @@ def build_subgroup_table(
         return pd.DataFrame(
             columns=["label", "group_name", "support", "accuracy", "macro_f1", "error_rate"]
         )
-    return pd.concat(frames, ignore_index=True)
+    combined = pd.concat(frames, ignore_index=True)
+    return (
+        combined.sort_values(
+            by=["macro_f1", "support", "label", "group_name"],
+            ascending=[True, False, True, True],
+        )
+        .head(top_k)
+        .reset_index(drop=True)
+    )

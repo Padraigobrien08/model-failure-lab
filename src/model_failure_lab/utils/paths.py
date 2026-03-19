@@ -93,6 +93,42 @@ def build_report_dir(
     return report_dir
 
 
+def build_report_run_dir(
+    report_scope: str,
+    report_id: str,
+    create: bool = False,
+) -> Path:
+    """Return the canonical report package directory."""
+    run_dir = build_report_dir(
+        experiment_group=report_scope,
+        category="comparisons",
+        create=create,
+    ) / _normalize_segment(report_id)
+    if create:
+        run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
+def build_report_artifact_paths(report_dir: Path) -> dict[str, str]:
+    """Return persisted artifact paths for a report package."""
+    return {
+        "report_markdown": str(report_dir / "report.md"),
+        "report_summary_json": str(report_dir / "report_summary.json"),
+        "figures_dir": str(report_dir / "figures"),
+        "tables_dir": str(report_dir / "tables"),
+        "comparison_table_csv": str(report_dir / "tables" / "comparison_table.csv"),
+        "subgroup_table_csv": str(report_dir / "tables" / "subgroup_table.csv"),
+        "calibration_table_csv": str(report_dir / "tables" / "calibration_table.csv"),
+        "id_vs_ood_primary_metric_png": str(
+            report_dir / "figures" / "id_vs_ood_primary_metric.png"
+        ),
+        "worst_group_vs_average_png": str(report_dir / "figures" / "worst_group_vs_average.png"),
+        "worst_subgroups_png": str(report_dir / "figures" / "worst_subgroups.png"),
+        "calibration_curve_png": str(report_dir / "figures" / "calibration_curve.png"),
+        "plots": str(report_dir / "figures"),
+    }
+
+
 def build_data_dir(create: bool = False) -> Path:
     """Return the root directory for persisted data artifacts."""
     data_dir = artifact_root() / "data"

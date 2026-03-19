@@ -10,11 +10,17 @@ from model_failure_lab.reporting import (
     build_calibration_table,
     build_comparison_table,
     build_id_ood_comparison_frame,
+    build_id_ood_figure,
+    build_report_metadata,
     build_report_summary,
     build_subgroup_table,
+    build_worst_group_vs_average_figure,
+    build_worst_group_vs_average_frame,
+    build_worst_subgroups_figure,
     load_report_inputs,
     render_report_markdown,
     select_report_candidates,
+    write_report_bundle,
 )
 from model_failure_lab.utils.paths import build_baseline_run_dir, build_evaluation_run_dir
 
@@ -266,3 +272,94 @@ def test_render_report_markdown_and_summary_payload(temp_artifact_root):
     assert 3 <= len(report_summary["headline_findings"]) <= 5
     assert len(report_summary["headline_findings"]) <= 5
     assert report_summary["compared_runs"][0]["label"] == "distilbert:run_b"
+
+
+def test_write_report_bundle_and_metadata(temp_artifact_root):
+    _create_evaluation_bundle(
+        model_name="distilbert",
+        source_run_id="run_b",
+        eval_id="eval_b",
+    )
+    _create_evaluation_bundle(
+        model_name="logistic_tfidf",
+        source_run_id="run_a",
+        eval_id="eval_a",
+    )
+
+    candidates = select_report_candidates(load_report_inputs(experiment_group="baselines_v1"))
+    comparison_table = build_comparison_table(build_id_ood_comparison_frame(candidates))
+    subgroup_table = build_subgroup_table(candidates, top_k=2, min_group_support=100)
+    calibration_table = build_calibration_table(candidates)
+    report_summary = build_report_summary(
+        candidates,
+        comparison_table=comparison_table,
+        subgroup_table=subgroup_table,
+        calibration_table=calibration_table,
+        report_title="Baseline Robustness Report",
+    )
+    markdown = render_report_markdown(
+        report_title="Baseline Robustness Report",
+        report_summary=report_summary,
+        figure_paths={
+            "id_vs_ood_primary_metric": "figures/id_vs_ood_primary_metric.png",
+            "worst_group_vs_average": "figures/worst_group_vs_average.png",
+            "worst_subgroups": "figures/worst_subgroups.png",
+            "calibration_curve": "figures/calibration_curve.png",
+        },
+        table_paths={
+            "comparison_table": "tables/comparison_table.csv",
+            "subgroup_table": "tables/subgroup_table.csv",
+            "calibration_table": "tables/calibration_table.csv",
+        },
+    )
+    report_run_dir = temp_artifact_root / "reports" / "comparisons" / "baselines_v1" / "report_run"
+    artifact_paths = write_report_bundle(
+        report_run_dir,
+        markdown=markdown,
+        report_summary=report_summary,
+        figures={
+            "id_vs_ood_primary_metric": build_id_ood_figure(
+                build_id_ood_comparison_frame(candidates)
+            ),
+            "worst_group_vs_average": build_worst_group_vs_average_figure(
+                build_worst_group_vs_average_frame(candidates)
+            ),
+            "worst_subgroups": build_worst_subgroups_figure(subgroup_table),
+            "calibration_curve": build_calibration_curve_figure(candidates),
+        },
+        comparison_table=comparison_table,
+        subgroup_table=subgroup_table,
+        calibration_table=calibration_table,
+    )
+    metadata = build_report_metadata(
+        report_id="report_run",
+        report_scope="baselines_v1",
+        selection_mode="experiment_group",
+        source_eval_ids=[candidate.eval_id for candidate in candidates],
+        resolved_config={
+            "seed": 13,
+            "notes": "",
+            "tags": ["report"],
+            "report": {"report_name": "Baseline Robustness Report", "top_k_subgroups": 2},
+            "eval": {"min_group_support": 100},
+        },
+        command="python scripts/build_report.py --experiment-group baselines_v1",
+        run_dir=report_run_dir,
+        dataset_name="civilcomments",
+        split_details={
+            "train": "train",
+            "validation": "validation",
+            "id_test": "id_test",
+            "ood_test": "ood_test",
+        },
+        artifact_paths=artifact_paths,
+        git_commit_hash="abc123",
+        library_versions={"pandas": "2.1.1"},
+        status="completed",
+    )
+
+    assert Path(artifact_paths["report_markdown"]).exists()
+    assert Path(artifact_paths["comparison_table_csv"]).exists()
+    assert Path(artifact_paths["id_vs_ood_primary_metric_png"]).exists()
+    assert metadata["selection_mode"] == "experiment_group"
+    assert metadata["source_eval_ids"] == ["eval_b", "eval_a"]

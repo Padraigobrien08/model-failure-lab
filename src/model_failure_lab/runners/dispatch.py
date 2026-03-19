@@ -22,6 +22,23 @@ from model_failure_lab.evaluation.bundle import (
     write_evaluation_bundle,
 )
 from model_failure_lab.models import train_distilbert_baseline, train_logistic_baseline
+from model_failure_lab.reporting import (
+    build_calibration_curve_figure,
+    build_calibration_table,
+    build_comparison_table,
+    build_id_ood_comparison_frame,
+    build_id_ood_figure,
+    build_report_metadata,
+    build_report_summary,
+    build_subgroup_table,
+    build_worst_group_vs_average_figure,
+    build_worst_group_vs_average_frame,
+    build_worst_subgroups_figure,
+    load_report_inputs,
+    render_report_markdown,
+    select_report_candidates,
+    write_report_bundle,
+)
 from model_failure_lab.tracking import (
     build_artifact_paths,
     build_run_metadata,
@@ -264,20 +281,100 @@ def dispatch_shift_eval(
 def dispatch_report(
     *,
     config: dict[str, Any],
-    experiment_group: str,
+    experiment_group: str | None,
     run_dir: Path,
     metadata_path: Path,
     metrics_path: Path,
     preset_name: str,
 ) -> DispatchResult:
+    report_config = config.get("report", {})
+    eval_ids = report_config.get("eval_ids")
+    selected_candidates = select_report_candidates(
+        load_report_inputs(
+            experiment_group=experiment_group if not eval_ids else None,
+            eval_ids=eval_ids,
+        )
+    )
+    comparison_frame = build_id_ood_comparison_frame(selected_candidates)
+    comparison_table = build_comparison_table(comparison_frame)
+    worst_group_frame = build_worst_group_vs_average_frame(selected_candidates)
+    subgroup_table = build_subgroup_table(
+        selected_candidates,
+        top_k=int(report_config.get("top_k_subgroups", 5)),
+        min_group_support=int(config.get("eval", {}).get("min_group_support", 100)),
+    )
+    calibration_table = build_calibration_table(selected_candidates)
+    report_title = str(
+        report_config.get("report_name")
+        or experiment_group
+        or "Explicit Evaluation Report"
+    )
+    report_summary = build_report_summary(
+        selected_candidates,
+        comparison_table=comparison_table,
+        subgroup_table=subgroup_table,
+        calibration_table=calibration_table,
+        report_title=report_title,
+    )
+    markdown = render_report_markdown(
+        report_title=report_title,
+        report_summary=report_summary,
+        figure_paths={
+            "id_vs_ood_primary_metric": "figures/id_vs_ood_primary_metric.png",
+            "worst_group_vs_average": "figures/worst_group_vs_average.png",
+            "worst_subgroups": "figures/worst_subgroups.png",
+            "calibration_curve": "figures/calibration_curve.png",
+        },
+        table_paths={
+            "comparison_table": "tables/comparison_table.csv",
+            "subgroup_table": "tables/subgroup_table.csv",
+            "calibration_table": "tables/calibration_table.csv",
+        },
+    )
+    artifact_paths = write_report_bundle(
+        run_dir,
+        markdown=markdown,
+        report_summary=report_summary,
+        figures={
+            "id_vs_ood_primary_metric": build_id_ood_figure(comparison_frame),
+            "worst_group_vs_average": build_worst_group_vs_average_figure(worst_group_frame),
+            "worst_subgroups": build_worst_subgroups_figure(subgroup_table),
+            "calibration_curve": build_calibration_curve_figure(selected_candidates),
+        },
+        comparison_table=comparison_table,
+        subgroup_table=subgroup_table,
+        calibration_table=calibration_table,
+    )
+    existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    first_candidate = selected_candidates[0]
+    metadata_payload = build_report_metadata(
+        report_id=str(config["run_id"]),
+        report_scope=str(experiment_group or report_title),
+        selection_mode="eval_ids" if eval_ids else "experiment_group",
+        source_eval_ids=[candidate.eval_id for candidate in selected_candidates],
+        resolved_config=config,
+        command=str(existing_metadata.get("command", "")),
+        run_dir=run_dir,
+        dataset_name=str(first_candidate.metadata.get("dataset_name", config["dataset_name"])),
+        split_details=dict(first_candidate.metadata.get("split_details", config["split_details"])),
+        artifact_paths=artifact_paths,
+        git_commit_hash=existing_metadata.get("git_commit_hash"),
+        library_versions=existing_metadata.get("library_versions"),
+        timestamp=existing_metadata.get("timestamp"),
+        status="completed",
+    )
+    metadata_path = write_metadata(run_dir, metadata_payload, create_checkpoint_dir=False)
     return DispatchResult(
-        status="scaffold_ready",
-        message=f"Report scaffold ready for {experiment_group}",
+        status="completed",
+        message=f"Report completed for {experiment_group or report_title}",
         run_dir=run_dir,
         metadata_path=metadata_path,
-        metrics_path=metrics_path,
+        metrics_path=Path(artifact_paths["report_summary_json"]),
         preset_name=preset_name,
-        extras={"experiment_group": experiment_group, "model_name": config["model_name"]},
+        extras={
+            "experiment_group": experiment_group,
+            "source_eval_ids": [candidate.eval_id for candidate in selected_candidates],
+        },
     )
 
 

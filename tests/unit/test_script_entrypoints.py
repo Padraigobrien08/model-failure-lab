@@ -10,7 +10,11 @@ from torch import nn
 
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
 from model_failure_lab.tracking import write_metadata
-from model_failure_lab.utils.paths import build_baseline_run_dir, build_prediction_artifact_path
+from model_failure_lab.utils.paths import (
+    build_baseline_run_dir,
+    build_evaluation_run_dir,
+    build_prediction_artifact_path,
+)
 from scripts.build_report import run_command as run_build_report_command
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
@@ -415,6 +419,154 @@ def _create_saved_evaluation_source_run() -> str:
     return run_id
 
 
+def _create_saved_report_evaluation_bundle(
+    *,
+    model_name: str,
+    source_run_id: str,
+    eval_id: str,
+    experiment_group: str = "baselines_v1",
+) -> None:
+    source_run_dir = build_baseline_run_dir(model_name, source_run_id, create=True)
+    eval_dir = build_evaluation_run_dir(source_run_dir, eval_id, create=True)
+    figures_dir = eval_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    artifact_paths = {
+        "overall_metrics_json": str(eval_dir / "overall_metrics.json"),
+        "split_metrics_csv": str(eval_dir / "split_metrics.csv"),
+        "id_ood_comparison_csv": str(eval_dir / "id_ood_comparison.csv"),
+        "subgroup_metrics_csv": str(eval_dir / "subgroup_metrics.csv"),
+        "worst_group_summary_json": str(eval_dir / "worst_group_summary.json"),
+        "subgroup_support_report_csv": str(eval_dir / "subgroup_support_report.csv"),
+        "calibration_summary_csv": str(eval_dir / "calibration_summary.csv"),
+        "calibration_bins_csv": str(eval_dir / "calibration_bins.csv"),
+        "confidence_summary_json": str(eval_dir / "confidence_summary.json"),
+        "diagnostics_json": str(eval_dir / "diagnostics.json"),
+        "plots": str(figures_dir),
+    }
+    (eval_dir / "metadata.json").write_text(
+        json.dumps(
+            {
+                "run_id": eval_id,
+                "eval_id": eval_id,
+                "source_run_id": source_run_id,
+                "experiment_type": "shift_eval",
+                "model_name": model_name,
+                "dataset_name": "civilcomments",
+                "split_details": {
+                    "train": "train",
+                    "validation": "validation",
+                    "id_test": "id_test",
+                    "ood_test": "ood_test",
+                },
+                "resolved_config": {
+                    "experiment_group": experiment_group,
+                    "data": {
+                        "dataset_name": "civilcomments",
+                        "label_field": "toxicity",
+                        "text_field": "comment_text",
+                        "group_fields": ["male", "female"],
+                    },
+                },
+                "artifact_paths": artifact_paths,
+                "evaluator_version": "eval-schema-v1",
+                "git_commit_hash": "eval-schema-v1",
+                "min_group_support": 100,
+                "tags": [experiment_group],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (eval_dir / "overall_metrics.json").write_text(
+        json.dumps(
+            {
+                "headline_metrics": {
+                    "accuracy": 0.72,
+                    "macro_f1": 0.68,
+                    "auroc": 0.8,
+                    "worst_group_f1": 0.44,
+                    "robustness_gap_f1": 0.18,
+                },
+                "overall": {"macro_f1": 0.68},
+                "id": {"macro_f1": 0.8},
+                "ood": {"macro_f1": 0.62},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (eval_dir / "worst_group_summary.json").write_text(
+        json.dumps({"worst_group_f1": {"group_id": "group_low", "value": 0.44}}),
+        encoding="utf-8",
+    )
+    (eval_dir / "confidence_summary.json").write_text(json.dumps({"overall": {}}), encoding="utf-8")
+    (eval_dir / "diagnostics.json").write_text(
+        json.dumps({"score_distribution": {}}),
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {"slice_name": "overall", "macro_f1": 0.68},
+            {"slice_name": "id", "macro_f1": 0.8},
+            {"slice_name": "ood", "macro_f1": 0.62},
+        ]
+    ).to_csv(eval_dir / "split_metrics.csv", index=False)
+    pd.DataFrame(
+        [{"metric": "macro_f1", "id_value": 0.8, "ood_value": 0.62, "delta": 0.18}]
+    ).to_csv(eval_dir / "id_ood_comparison.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "grouping_type": "group_id",
+                "group_name": "group_low",
+                "support": 150,
+                "eligible_for_worst_group": True,
+                "macro_f1": 0.44,
+                "accuracy": 0.49,
+                "error_rate": 0.51,
+            }
+        ]
+    ).to_csv(eval_dir / "subgroup_metrics.csv", index=False)
+    pd.DataFrame([{"group_name": "group_low", "support": 150}]).to_csv(
+        eval_dir / "subgroup_support_report.csv",
+        index=False,
+    )
+    pd.DataFrame(
+        [
+            {"slice_name": "overall", "ece": 0.07, "brier_score": 0.12, "sample_count": 100},
+            {"slice_name": "id", "ece": 0.05, "brier_score": 0.11, "sample_count": 60},
+            {"slice_name": "ood", "ece": 0.09, "brier_score": 0.14, "sample_count": 40},
+        ]
+    ).to_csv(eval_dir / "calibration_summary.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "slice_name": "overall",
+                "avg_confidence": 0.2,
+                "empirical_accuracy": 0.3,
+                "count": 20,
+            },
+            {
+                "slice_name": "overall",
+                "avg_confidence": 0.8,
+                "empirical_accuracy": 0.7,
+                "count": 20,
+            },
+            {
+                "slice_name": "id",
+                "avg_confidence": 0.2,
+                "empirical_accuracy": 0.25,
+                "count": 10,
+            },
+            {
+                "slice_name": "ood",
+                "avg_confidence": 0.8,
+                "empirical_accuracy": 0.6,
+                "count": 10,
+            },
+        ]
+    ).to_csv(eval_dir / "calibration_bins.csv", index=False)
+
+
 def test_run_logistic_baseline_writes_completed_artifacts(temp_artifact_root, monkeypatch):
     monkeypatch.setattr(
         "model_failure_lab.models.logistic_tfidf.load_baseline_canonical_dataset",
@@ -516,12 +668,40 @@ def test_shift_eval_writes_completed_evaluation_bundle(temp_artifact_root):
     assert result.metrics_path.name == "overall_metrics.json"
 
 
-def test_build_report_bootstrap_writes_metadata(temp_artifact_root):
-    result = run_build_report_command(["--experiment-group", "mvp_summary"])
+def test_build_report_writes_completed_report_package(temp_artifact_root):
+    _create_saved_report_evaluation_bundle(
+        model_name="distilbert",
+        source_run_id="baseline_b",
+        eval_id="eval_b",
+    )
+    _create_saved_report_evaluation_bundle(
+        model_name="logistic_tfidf",
+        source_run_id="baseline_a",
+        eval_id="eval_a",
+    )
+
+    result = run_build_report_command(
+        [
+            "--experiment-group",
+            "baselines_v1",
+            "--report-name",
+            "baseline_report",
+            "--top-k-subgroups",
+            "2",
+            "--min-group-support",
+            "100",
+        ]
+    )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
 
-    assert "artifacts/reports/comparisons/mvp_summary" in result.run_dir.as_posix()
+    assert "artifacts/reports/comparisons/baselines_v1" in result.run_dir.as_posix()
     assert metadata["experiment_type"] == "report"
+    assert metadata["status"] == "completed"
+    assert metadata["selection_mode"] == "experiment_group"
+    assert metadata["source_eval_ids"] == ["eval_b", "eval_a"]
+    assert (result.run_dir / "report.md").exists()
+    assert (result.run_dir / "figures" / "id_vs_ood_primary_metric.png").exists()
+    assert result.metrics_path.name == "report_summary.json"
     assert result.metadata_path.exists()
 
 

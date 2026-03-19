@@ -1,28 +1,33 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+import json
 from typing import Sequence
 
 from model_failure_lab.config import apply_cli_overrides, load_experiment_config
-from model_failure_lab.runners.dispatch import build_scaffold_metrics, dispatch_report
+from model_failure_lab.runners.dispatch import dispatch_report
 from model_failure_lab.tracking import (
     append_experiment_index,
     build_index_entry,
     build_run_metadata,
     generate_run_id,
     write_metadata,
-    write_metrics,
 )
-from model_failure_lab.utils.paths import build_report_dir
+from model_failure_lab.utils.paths import build_report_artifact_paths, build_report_run_dir
 
 DEFAULT_PRESET = "civilcomments_distilbert_baseline"
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Bootstrap a report build run.")
-    parser.add_argument("--experiment-group", required=True)
+    selection_group = parser.add_mutually_exclusive_group(required=True)
+    selection_group.add_argument("--experiment-group")
+    selection_group.add_argument("--eval-ids")
     parser.add_argument("--preset", default=DEFAULT_PRESET)
+    parser.add_argument("--report-name")
+    parser.add_argument("--output-format", default="markdown", choices=["markdown"])
+    parser.add_argument("--top-k-subgroups", type=int)
+    parser.add_argument("--min-group-support", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--notes")
     return parser
@@ -31,48 +36,55 @@ def build_parser() -> argparse.ArgumentParser:
 def run_command(argv: Sequence[str] | None = None):
     args = build_parser().parse_args(list(argv) if argv is not None else None)
     config = load_experiment_config(args.preset)
+    report_scope = args.experiment_group or args.report_name or "explicit_selection"
     config = apply_cli_overrides(
         config,
         {
             "seed": args.seed,
             "notes": args.notes,
             "run_id": generate_run_id("report"),
-            "experiment_group": args.experiment_group,
+            "experiment_group": report_scope,
+            "eval_ids": args.eval_ids,
+            "report_name": args.report_name or report_scope,
+            "output_format": args.output_format,
+            "top_k_subgroups": args.top_k_subgroups,
+            "min_group_support": args.min_group_support,
         },
     )
 
-    report_root = build_report_dir(
-        experiment_group=args.experiment_group,
-        category="comparisons",
+    run_dir = build_report_run_dir(
+        report_scope,
+        str(config["run_id"]),
         create=True,
     )
-    run_dir = report_root / Path(config["run_id"])
     command = "python scripts/build_report.py " + " ".join(argv or [])
     metadata = build_run_metadata(
-        run_id=config["run_id"],
+        run_id=str(config["run_id"]),
         experiment_type="report",
-        model_name=config["model_name"],
-        dataset_name=config["dataset_name"],
-        split_details=config["split_details"],
-        random_seed=config["seed"],
+        model_name="comparison_report",
+        dataset_name=str(config["dataset_name"]),
+        split_details=dict(config["split_details"]),
+        random_seed=int(config["seed"]),
         resolved_config=config,
         command=command.strip(),
         run_dir=run_dir,
-        notes=config.get("notes", ""),
+        artifact_paths=build_report_artifact_paths(run_dir),
+        notes=str(config.get("notes", "")),
         tags=[*config.get("tags", []), "report"],
-        status="scaffold_ready",
+        status="running",
     )
-    metadata_path = write_metadata(run_dir, metadata)
-    metrics_path = write_metrics(run_dir, build_scaffold_metrics(config))
-    append_experiment_index(build_index_entry(metadata_path, metadata))
-    return dispatch_report(
+    metadata_path = write_metadata(run_dir, metadata, create_checkpoint_dir=False)
+    result = dispatch_report(
         config=config,
         experiment_group=args.experiment_group,
         run_dir=run_dir,
         metadata_path=metadata_path,
-        metrics_path=metrics_path,
+        metrics_path=run_dir / "report_summary.json",
         preset_name=args.preset,
     )
+    final_metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+    append_experiment_index(build_index_entry(result.metadata_path, final_metadata))
+    return result
 
 
 def main(argv: Sequence[str] | None = None) -> int:

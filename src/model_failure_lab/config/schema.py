@@ -159,6 +159,45 @@ def _validate_eval_config(payload: object) -> dict[str, Any]:
     }
 
 
+def _validate_report_config(payload: object) -> dict[str, Any]:
+    if payload in (None, {}):
+        return {
+            "report_name": None,
+            "output_format": "markdown",
+            "top_k_subgroups": 5,
+            "eval_ids": None,
+        }
+
+    if not isinstance(payload, dict):
+        raise ValueError("report must be a mapping when provided")
+
+    output_format = str(payload.get("output_format", "markdown"))
+    if output_format != "markdown":
+        raise ValueError("report.output_format must currently be 'markdown'")
+
+    top_k_subgroups = int(payload.get("top_k_subgroups", 5))
+    if top_k_subgroups <= 0:
+        raise ValueError("report.top_k_subgroups must be a positive integer")
+
+    eval_ids = payload.get("eval_ids")
+    if eval_ids is not None:
+        if not isinstance(eval_ids, list):
+            raise ValueError("report.eval_ids must be a list when provided")
+        normalized_eval_ids = [str(item) for item in eval_ids]
+    else:
+        normalized_eval_ids = None
+
+    return {
+        **dict(payload),
+        "report_name": (
+            str(payload["report_name"]) if payload.get("report_name") is not None else None
+        ),
+        "output_format": output_format,
+        "top_k_subgroups": top_k_subgroups,
+        "eval_ids": normalized_eval_ids,
+    }
+
+
 @dataclass(slots=True)
 class RunConfig:
     """Resolved experiment configuration used by scripts and tracking."""
@@ -178,6 +217,7 @@ class RunConfig:
     model: dict[str, Any] = field(default_factory=dict)
     train: dict[str, Any] = field(default_factory=dict)
     eval: dict[str, Any] = field(default_factory=dict)
+    report: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "RunConfig":
@@ -229,6 +269,7 @@ class RunConfig:
             model=dict(payload["model"]),
             train=dict(payload["train"]),
             eval=_validate_eval_config(payload["eval"]),
+            report=_validate_report_config(payload.get("report")),
         )
 
     def to_dict(self) -> dict[str, Any]:
