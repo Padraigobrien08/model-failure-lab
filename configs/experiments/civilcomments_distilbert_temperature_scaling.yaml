@@ -25,4 +25,6 @@ mitigation:
     apply_to_splits:
       - train
       - validation
+      - id_test
+      - ood_test
     allow_checkpoint_regeneration: true

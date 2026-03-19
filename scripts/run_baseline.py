@@ -11,6 +11,7 @@ from model_failure_lab.tracking import (
     build_index_entry,
     build_run_metadata,
     generate_run_id,
+    resolve_prediction_splits,
     write_metadata,
     write_metrics,
 )
@@ -46,9 +47,7 @@ def run_command(argv: Sequence[str] | None = None):
 
     run_dir = build_baseline_run_dir(config["model_name"], config["run_id"], create=True)
     command = "python scripts/run_baseline.py " + " ".join(argv or [])
-    prediction_splits = ["train", "validation"]
-    if bool(config.get("train", {}).get("export_blind_test_predictions", False)):
-        prediction_splits.append("test")
+    prediction_splits = resolve_prediction_splits(config)
     metadata = build_run_metadata(
         run_id=config["run_id"],
         experiment_type="baseline",

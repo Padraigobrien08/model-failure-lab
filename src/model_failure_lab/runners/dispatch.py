@@ -70,6 +70,7 @@ from model_failure_lab.reporting import (
 from model_failure_lab.tracking import (
     build_artifact_paths,
     build_run_metadata,
+    resolve_prediction_splits,
     write_metadata,
     write_metrics,
 )
@@ -128,11 +129,14 @@ def dispatch_baseline(
         metrics_path = write_metrics(run_dir, artifacts.metrics_payload)
 
         existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        artifact_paths = build_artifact_paths(run_dir, prediction_splits=["train", "validation"])
+        prediction_splits = resolve_prediction_splits(config)
+        artifact_paths = build_artifact_paths(run_dir, prediction_splits=prediction_splits)
         artifact_paths["checkpoint"] = str(artifacts.checkpoint_dir)
-        artifact_paths["predictions"] = {
-            split: str(path) for split, path in artifacts.prediction_paths.items()
-        }
+        reserved_prediction_paths = dict(artifact_paths["predictions"])
+        reserved_prediction_paths.update(
+            {split: str(path) for split, path in artifacts.prediction_paths.items()}
+        )
+        artifact_paths["predictions"] = reserved_prediction_paths
         artifact_paths["selected_checkpoint"] = str(artifacts.model_path)
         metadata_payload = build_run_metadata(
             run_id=str(config["run_id"]),
@@ -168,11 +172,14 @@ def dispatch_baseline(
         metrics_path = write_metrics(run_dir, artifacts.metrics_payload)
 
         existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        artifact_paths = build_artifact_paths(run_dir, prediction_splits=["train", "validation"])
+        prediction_splits = resolve_prediction_splits(config)
+        artifact_paths = build_artifact_paths(run_dir, prediction_splits=prediction_splits)
         artifact_paths["checkpoint"] = str(artifacts.checkpoint_dir)
-        artifact_paths["predictions"] = {
-            split: str(path) for split, path in artifacts.prediction_paths.items()
-        }
+        reserved_prediction_paths = dict(artifact_paths["predictions"])
+        reserved_prediction_paths.update(
+            {split: str(path) for split, path in artifacts.prediction_paths.items()}
+        )
+        artifact_paths["predictions"] = reserved_prediction_paths
         artifact_paths["selected_checkpoint"] = str(artifacts.checkpoint_path)
         artifact_paths["training_history_json"] = str(artifacts.history_path)
         metadata_payload = build_run_metadata(
@@ -232,11 +239,14 @@ def dispatch_mitigation(
         metrics_path = write_metrics(run_dir, artifacts.metrics_payload)
 
         existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        artifact_paths = build_artifact_paths(run_dir, prediction_splits=["train", "validation"])
+        prediction_splits = resolve_prediction_splits(config)
+        artifact_paths = build_artifact_paths(run_dir, prediction_splits=prediction_splits)
         artifact_paths["checkpoint"] = str(artifacts.checkpoint_dir)
-        artifact_paths["predictions"] = {
-            split: str(path) for split, path in artifacts.prediction_paths.items()
-        }
+        reserved_prediction_paths = dict(artifact_paths["predictions"])
+        reserved_prediction_paths.update(
+            {split: str(path) for split, path in artifacts.prediction_paths.items()}
+        )
+        artifact_paths["predictions"] = reserved_prediction_paths
         artifact_paths["selected_checkpoint"] = str(artifacts.checkpoint_path)
         artifact_paths["training_history_json"] = str(artifacts.history_path)
         artifact_paths["group_weights_csv"] = str(artifacts.group_weights_path)
@@ -283,12 +293,19 @@ def dispatch_mitigation(
         metrics_path = write_metrics(run_dir, artifacts.metrics_payload)
 
         existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        prediction_splits = list(artifacts.prediction_paths)
+        requested_splits = (
+            dict(config.get("mitigation_config") or config.get("mitigation") or {})
+            .get("temperature_scaling", {})
+            .get("apply_to_splits")
+        )
+        prediction_splits = resolve_prediction_splits(config, requested_splits=requested_splits)
         artifact_paths = build_artifact_paths(run_dir, prediction_splits=prediction_splits)
         artifact_paths["checkpoint"] = str(artifacts.checkpoint_dir)
-        artifact_paths["predictions"] = {
-            split: str(path) for split, path in artifacts.prediction_paths.items()
-        }
+        reserved_prediction_paths = dict(artifact_paths["predictions"])
+        reserved_prediction_paths.update(
+            {split: str(path) for split, path in artifacts.prediction_paths.items()}
+        )
+        artifact_paths["predictions"] = reserved_prediction_paths
         artifact_paths["selected_checkpoint"] = str(artifacts.selected_checkpoint_path)
         artifact_paths["temperature_scaler_json"] = str(artifacts.temperature_scaler_path)
         metadata_payload = build_run_metadata(

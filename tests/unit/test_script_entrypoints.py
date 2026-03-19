@@ -202,6 +202,34 @@ def _baseline_dataset() -> CanonicalDataset:
                 split="validation",
                 group_id="group_b",
             ),
+            _baseline_sample(
+                sample_id="id_test_0",
+                text="negative calm blind_id",
+                label=0,
+                split="id_test",
+                group_id="group_a",
+            ),
+            _baseline_sample(
+                sample_id="id_test_1",
+                text="positive toxic blind_id",
+                label=1,
+                split="id_test",
+                group_id="group_b",
+            ),
+            _baseline_sample(
+                sample_id="ood_test_0",
+                text="negative calm blind_ood",
+                label=0,
+                split="ood_test",
+                group_id="group_a",
+            ),
+            _baseline_sample(
+                sample_id="ood_test_1",
+                text="positive toxic blind_ood",
+                label=1,
+                split="ood_test",
+                group_id="group_b",
+            ),
         ],
     )
 
@@ -231,8 +259,8 @@ def _write_distilbert_parent_run(
     if with_saved_logits:
         dataset = _baseline_dataset()
         samples_by_split = {
-            "train": [sample for sample in dataset.samples if sample.split == "train"],
-            "validation": [sample for sample in dataset.samples if sample.split == "validation"],
+            split: [sample for sample in dataset.samples if sample.split == split]
+            for split in ("train", "validation", "id_test", "ood_test")
         }
         for split, samples in samples_by_split.items():
             logits_rows = []
@@ -728,6 +756,12 @@ def test_run_logistic_baseline_writes_completed_artifacts(temp_artifact_root, mo
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
+    )
     assert result.metadata_path.name == "metadata.json"
 
 
@@ -756,6 +790,12 @@ def test_run_distilbert_baseline_writes_completed_artifacts(temp_artifact_root, 
     )
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
     )
     assert result.metadata_path.name == "metadata.json"
 
@@ -804,6 +844,12 @@ def test_run_mitigation_reweighting_writes_completed_artifacts(
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
+    )
 
 
 def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_artifact_root):
@@ -836,6 +882,12 @@ def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_arti
     )
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
     )
 
 
