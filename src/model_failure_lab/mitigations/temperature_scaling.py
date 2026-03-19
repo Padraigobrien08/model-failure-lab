@@ -87,7 +87,10 @@ def _require_logits(frame: pd.DataFrame, *, split: str) -> pd.DataFrame:
     return frame
 
 
-def _load_saved_prediction_frame(parent_metadata: dict[str, Any], split: str) -> pd.DataFrame | None:
+def _load_saved_prediction_frame(
+    parent_metadata: dict[str, Any],
+    split: str,
+) -> pd.DataFrame | None:
     prediction_path = _prediction_path_for_split(parent_metadata, split)
     if prediction_path is None or not prediction_path.exists():
         return None

@@ -132,7 +132,12 @@ def classify_mitigation_verdict(
                 deltas.get("worst_group_f1_delta"),
             )
         )
-        if id_regression or overall_regression or calibration_regression or classification_regression:
+        if (
+            id_regression
+            or overall_regression
+            or calibration_regression
+            or classification_regression
+        ):
             return "tradeoff"
         return "win"
 

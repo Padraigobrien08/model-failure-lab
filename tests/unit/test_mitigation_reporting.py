@@ -141,7 +141,14 @@ def _create_evaluation_bundle(
     )
     _write_csv(
         Path(artifact_paths["id_ood_comparison_csv"]),
-        [{"metric": "macro_f1", "id_value": id_score, "ood_value": ood_score, "delta": id_score - ood_score}],
+        [
+            {
+                "metric": "macro_f1",
+                "id_value": id_score,
+                "ood_value": ood_score,
+                "delta": id_score - ood_score,
+            }
+        ],
     )
     _write_csv(
         Path(artifact_paths["subgroup_metrics_csv"]),
@@ -164,17 +171,42 @@ def _create_evaluation_bundle(
     _write_csv(
         Path(artifact_paths["calibration_summary_csv"]),
         [
-            {"slice_name": "overall", "ece": ece, "brier_score": brier_score, "sample_count": 100},
-            {"slice_name": "id", "ece": max(ece - 0.01, 0.0), "brier_score": max(brier_score - 0.01, 0.0), "sample_count": 60},
-            {"slice_name": "ood", "ece": ece + 0.02, "brier_score": brier_score + 0.02, "sample_count": 40},
+            {
+                "slice_name": "overall",
+                "ece": ece,
+                "brier_score": brier_score,
+                "sample_count": 100,
+            },
+            {
+                "slice_name": "id",
+                "ece": max(ece - 0.01, 0.0),
+                "brier_score": max(brier_score - 0.01, 0.0),
+                "sample_count": 60,
+            },
+            {
+                "slice_name": "ood",
+                "ece": ece + 0.02,
+                "brier_score": brier_score + 0.02,
+                "sample_count": 40,
+            },
         ],
     )
     _write_csv(
         Path(artifact_paths["calibration_bins_csv"]),
         [
-            {"slice_name": "overall", "avg_confidence": 0.2, "empirical_accuracy": 0.3, "count": 20},
+            {
+                "slice_name": "overall",
+                "avg_confidence": 0.2,
+                "empirical_accuracy": 0.3,
+                "count": 20,
+            },
             {"slice_name": "id", "avg_confidence": 0.4, "empirical_accuracy": 0.5, "count": 10},
-            {"slice_name": "ood", "avg_confidence": 0.8, "empirical_accuracy": 0.6, "count": 10},
+            {
+                "slice_name": "ood",
+                "avg_confidence": 0.8,
+                "empirical_accuracy": 0.6,
+                "count": 10,
+            },
         ],
     )
 
