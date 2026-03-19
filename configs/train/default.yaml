@@ -1,7 +1,10 @@
 seed: 13
 batch_size: 16
-max_epochs: 1
+eval_batch_size: 32
+max_epochs: 3
 num_workers: 0
 checkpoint_policy: best
 export_blind_test_predictions: false
+early_stopping_patience: 1
+mixed_precision: false
 scaffold_status: bootstrap_only

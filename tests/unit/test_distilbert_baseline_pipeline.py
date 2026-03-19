@@ -1,0 +1,201 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import torch
+from torch import nn
+
+from model_failure_lab.config.loader import load_experiment_config
+from model_failure_lab.data import CanonicalDataset, CanonicalSample
+from model_failure_lab.models.distilbert import train_distilbert_baseline
+from model_failure_lab.utils.paths import build_baseline_run_dir
+from scripts.run_baseline import run_command as run_baseline_command
+
+
+def _sample(
+    *,
+    sample_id: str,
+    text: str,
+    label: int,
+    split: str,
+    group_id: str,
+) -> CanonicalSample:
+    return CanonicalSample(
+        sample_id=sample_id,
+        text=text,
+        label=label,
+        split=split,
+        is_id=split in {"train", "id_test"},
+        is_ood=split in {"validation", "ood_test"},
+        group_id=group_id,
+        group_attributes={"identity_any": 1},
+        dataset_name="civilcomments",
+        raw_split="train" if split == "train" else "val",
+        raw_index=sample_id,
+        source_metadata={},
+    )
+
+
+def _canonical_dataset() -> CanonicalDataset:
+    samples = [
+        _sample(
+            sample_id="train_0",
+            text="negative safe calm",
+            label=0,
+            split="train",
+            group_id="group_a",
+        ),
+        _sample(
+            sample_id="train_1",
+            text="negative quiet calm",
+            label=0,
+            split="train",
+            group_id="group_a",
+        ),
+        _sample(
+            sample_id="train_2",
+            text="negative steady calm",
+            label=0,
+            split="train",
+            group_id="group_a",
+        ),
+        _sample(
+            sample_id="train_3",
+            text="positive toxic loud",
+            label=1,
+            split="train",
+            group_id="group_b",
+        ),
+        _sample(
+            sample_id="train_4",
+            text="positive toxic sharp",
+            label=1,
+            split="train",
+            group_id="group_b",
+        ),
+        _sample(
+            sample_id="train_5",
+            text="positive toxic blunt",
+            label=1,
+            split="train",
+            group_id="group_b",
+        ),
+        _sample(
+            sample_id="val_0",
+            text="negative calm quiet",
+            label=0,
+            split="validation",
+            group_id="group_a",
+        ),
+        _sample(
+            sample_id="val_1",
+            text="positive toxic loud",
+            label=1,
+            split="validation",
+            group_id="group_b",
+        ),
+    ]
+    return CanonicalDataset(dataset_name="civilcomments", samples=samples)
+
+
+class FakeTokenizer:
+    pad_token_id = 0
+
+    def __call__(
+        self,
+        text: str,
+        *,
+        truncation: bool,
+        max_length: int,
+        padding: bool,
+    ) -> dict[str, list[int]]:
+        del truncation, padding
+        token_ids = [min(len(token) + 1, 20) for token in text.split()[:max_length]]
+        return {
+            "input_ids": token_ids,
+            "attention_mask": [1] * len(token_ids),
+        }
+
+    def save_pretrained(self, path: Path) -> None:
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "tokenizer.json").write_text("{}", encoding="utf-8")
+
+
+class TinyClassifier(nn.Module):
+    def __init__(self, vocab_size: int = 32, hidden_size: int = 8, num_labels: int = 2) -> None:
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, hidden_size)
+        self.classifier = nn.Linear(hidden_size, num_labels)
+        self.loss_fn = nn.CrossEntropyLoss()
+
+    def forward(
+        self,
+        *,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        labels: torch.Tensor | None = None,
+    ):
+        embedded = self.embedding(input_ids)
+        pooled = (embedded * attention_mask.unsqueeze(-1)).sum(dim=1) / attention_mask.sum(
+            dim=1,
+            keepdim=True,
+        ).clamp_min(1)
+        logits = self.classifier(pooled)
+        if labels is None:
+            loss = None
+        else:
+            loss = self.loss_fn(logits, labels)
+        return type("Output", (), {"loss": loss, "logits": logits})
+
+
+def test_train_distilbert_baseline_writes_checkpoint_and_history(temp_artifact_root):
+    config = load_experiment_config("configs/experiments/civilcomments_distilbert_baseline.yaml")
+    config["run_id"] = "distilbert_artifacts_test"
+    run_dir = build_baseline_run_dir(config["model_name"], config["run_id"], create=True)
+
+    artifacts = train_distilbert_baseline(
+        config,
+        run_dir,
+        dataset_loader=lambda *_args, **_kwargs: _canonical_dataset(),
+        tokenizer_factory=lambda _name: FakeTokenizer(),
+        model_factory=lambda _name, num_labels: TinyClassifier(num_labels=num_labels),
+    )
+
+    assert artifacts.checkpoint_path.exists()
+    assert artifacts.history_path.exists()
+    assert artifacts.tokenizer_config_path.exists()
+    assert artifacts.prediction_path.exists()
+    assert artifacts.metrics_payload["primary_metric"]["name"] == "macro_f1"
+    assert (
+        artifacts.metrics_payload["selected_checkpoint"]["source"]
+        == "best_validation_checkpoint"
+    )
+
+
+def test_run_baseline_command_executes_real_distilbert_path(temp_artifact_root, monkeypatch):
+    dataset = _canonical_dataset()
+    monkeypatch.setattr(
+        "model_failure_lab.models.distilbert.load_baseline_canonical_dataset",
+        lambda *_args, **_kwargs: dataset,
+    )
+    monkeypatch.setattr(
+        "model_failure_lab.models.distilbert.build_tokenizer",
+        lambda _name: FakeTokenizer(),
+    )
+    monkeypatch.setattr(
+        "model_failure_lab.models.distilbert.build_sequence_classifier",
+        lambda _name, num_labels: TinyClassifier(num_labels=num_labels),
+    )
+
+    result = run_baseline_command(
+        ["--model", "distilbert", "--run-id", "distilbert_command_test"]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+    metrics = json.loads(result.metrics_path.read_text(encoding="utf-8"))
+
+    assert result.status == "completed"
+    assert metadata["status"] == "completed"
+    assert metrics["primary_metric"]["value"] is not None
+    assert (result.run_dir / "checkpoint" / "best_model.pt").exists()
+    assert (result.run_dir / "checkpoint" / "training_history.json").exists()
