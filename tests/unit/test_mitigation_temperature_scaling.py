@@ -38,6 +38,10 @@ def _write_parent_bundle(run_id: str) -> tuple[str, list[list[float]], list[int]
     train_labels = [0, 0, 1, 1]
     validation_logits = [[2.6, -0.4], [-0.1, 1.1]]
     validation_labels = [0, 1]
+    id_test_logits = [[1.8, -0.2], [-0.3, 1.5]]
+    id_test_labels = [0, 1]
+    ood_test_logits = [[1.2, 0.1], [0.2, 1.0]]
+    ood_test_labels = [0, 1]
 
     split_payloads = {
         "train": {
@@ -57,6 +61,24 @@ def _write_parent_bundle(run_id: str) -> tuple[str, list[list[float]], list[int]
             "is_id": [False, False],
             "is_ood": [True, True],
             "logits": validation_logits,
+        },
+        "id_test": {
+            "sample_ids": ["id_test_0", "id_test_1"],
+            "splits": ["id_test", "id_test"],
+            "labels": id_test_labels,
+            "group_ids": ["group_a", "group_b"],
+            "is_id": [True, True],
+            "is_ood": [False, False],
+            "logits": id_test_logits,
+        },
+        "ood_test": {
+            "sample_ids": ["ood_test_0", "ood_test_1"],
+            "splits": ["ood_test", "ood_test"],
+            "labels": ood_test_labels,
+            "group_ids": ["group_a", "group_b"],
+            "is_id": [False, False],
+            "is_ood": [True, True],
+            "logits": ood_test_logits,
         },
     }
 
@@ -154,6 +176,8 @@ def test_run_temperature_scaling_uses_validation_logits_only_and_writes_predicti
     assert artifacts.logit_provenance == {
         "train": "saved_predictions",
         "validation": "saved_predictions",
+        "id_test": "saved_predictions",
+        "ood_test": "saved_predictions",
     }
     assert artifacts.learned_temperature == pytest.approx(
         fit_temperature_scaler(validation_logits, validation_labels),
@@ -171,3 +195,5 @@ def test_run_temperature_scaling_uses_validation_logits_only_and_writes_predicti
     assert validation_frame["run_id"].tolist() == ["temperature_scaling_child"] * 2
     assert Path(artifacts.prediction_paths["train"]).exists()
     assert Path(artifacts.prediction_paths["validation"]).exists()
+    assert Path(artifacts.prediction_paths["id_test"]).exists()
+    assert Path(artifacts.prediction_paths["ood_test"]).exists()

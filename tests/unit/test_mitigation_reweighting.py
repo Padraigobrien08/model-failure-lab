@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import torch
 from torch import nn
@@ -16,6 +17,7 @@ from model_failure_lab.mitigations import (
     train_distilbert_reweighting,
     validate_distilbert_parent_run,
 )
+from model_failure_lab.models.export import REQUIRED_PREDICTION_COLUMNS
 from model_failure_lab.runners.contracts import DispatchResult
 from model_failure_lab.tracking import build_run_metadata, write_metadata
 from model_failure_lab.utils.paths import build_baseline_run_dir, build_mitigation_run_dir
@@ -104,6 +106,34 @@ def _canonical_dataset() -> CanonicalDataset:
                 text="positive toxic validation_only",
                 label=1,
                 split="validation",
+                group_id="group_b",
+            ),
+            _sample(
+                sample_id="id_test_0",
+                text="negative calm blind_id",
+                label=0,
+                split="id_test",
+                group_id="group_a",
+            ),
+            _sample(
+                sample_id="id_test_1",
+                text="positive toxic blind_id",
+                label=1,
+                split="id_test",
+                group_id="group_b",
+            ),
+            _sample(
+                sample_id="ood_test_0",
+                text="negative calm blind_ood",
+                label=0,
+                split="ood_test",
+                group_id="group_a",
+            ),
+            _sample(
+                sample_id="ood_test_1",
+                text="positive toxic blind_ood",
+                label=1,
+                split="ood_test",
                 group_id="group_b",
             ),
         ],
@@ -293,6 +323,14 @@ def test_train_distilbert_reweighting_writes_group_weights_and_predictions(
     assert artifacts.checkpoint_path.exists()
     assert artifacts.prediction_paths["train"].exists()
     assert artifacts.prediction_paths["validation"].exists()
+    assert artifacts.prediction_paths["id_test"].exists()
+    assert artifacts.prediction_paths["ood_test"].exists()
+    id_test_frame = pd.read_parquet(artifacts.prediction_paths["id_test"])
+    ood_test_frame = pd.read_parquet(artifacts.prediction_paths["ood_test"])
+    assert list(id_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)]) == REQUIRED_PREDICTION_COLUMNS
+    assert list(ood_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)]) == REQUIRED_PREDICTION_COLUMNS
+    assert set(id_test_frame["split"]) == {"id_test"}
+    assert set(ood_test_frame["split"]) == {"ood_test"}
     assert artifacts.metrics_payload["group_weighting"]["group_count"] == 2
 
 
@@ -340,3 +378,9 @@ def test_run_mitigation_reweighting_uses_inherited_parent_config(
     assert metadata["resolved_config"]["mitigation_method"] == "reweighting"
     assert metadata["resolved_config"]["parent_model_name"] == "distilbert"
     assert metadata["parent_run_id"] == parent_run_id
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
+    )

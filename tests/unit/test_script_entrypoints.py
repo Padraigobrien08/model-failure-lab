@@ -949,6 +949,8 @@ def test_shift_eval_writes_completed_evaluation_bundle(temp_artifact_root):
     assert metadata["experiment_type"] == "shift_eval"
     assert metadata["status"] == "completed"
     assert metadata["source_run_id"] == source_run_id
+    assert metadata["experiment_group"] == "baselines"
+    assert metadata["resolved_config"]["experiment_group"] == "baselines"
     assert metadata["output_tag"] == "debug"
     assert result.metrics_path.name == "overall_metrics.json"
 
