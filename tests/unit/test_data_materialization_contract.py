@@ -49,6 +49,7 @@ class _FakeDataset:
     data_dir: str
     version: str
     metadata_fields: list[str]
+    source_records: list[dict[str, object]]
 
 
 def _fake_get_dataset(**_: object) -> _FakeDataset:
@@ -57,6 +58,71 @@ def _fake_get_dataset(**_: object) -> _FakeDataset:
         data_dir="/tmp/fake_civilcomments",
         version="1.0",
         metadata_fields=["male", "female", "y"],
+        source_records=[
+            {
+                "raw_index": 0,
+                "raw_split": "train",
+                "comment_text": "sample train zero",
+                "toxicity": 0,
+                "male": 1,
+                "female": 0,
+                "LGBTQ": 0,
+                "christian": 0,
+                "muslim": 0,
+                "other_religions": 0,
+                "black": 0,
+                "white": 1,
+                "identity_any": 1,
+                "severe_toxicity": 0,
+                "obscene": 0,
+                "threat": 0,
+                "insult": 0,
+                "identity_attack": 0,
+                "sexual_explicit": 0,
+            },
+            {
+                "raw_index": 1,
+                "raw_split": "val",
+                "comment_text": "sample val one",
+                "toxicity": 1,
+                "male": 0,
+                "female": 1,
+                "LGBTQ": 0,
+                "christian": 1,
+                "muslim": 0,
+                "other_religions": 0,
+                "black": 1,
+                "white": 0,
+                "identity_any": 1,
+                "severe_toxicity": 0,
+                "obscene": 1,
+                "threat": 0,
+                "insult": 1,
+                "identity_attack": 0,
+                "sexual_explicit": 0,
+            },
+            {
+                "raw_index": 2,
+                "raw_split": "test",
+                "comment_text": "sample test two",
+                "toxicity": 0,
+                "male": 0,
+                "female": 0,
+                "LGBTQ": 1,
+                "christian": 0,
+                "muslim": 1,
+                "other_religions": 0,
+                "black": 0,
+                "white": 1,
+                "identity_any": 1,
+                "severe_toxicity": 0,
+                "obscene": 0,
+                "threat": 0,
+                "insult": 0,
+                "identity_attack": 0,
+                "sexual_explicit": 0,
+            },
+        ],
     )
 
 
@@ -80,7 +146,8 @@ def test_materialize_civilcomments_writes_manifest_with_mocked_wilds(
     assert manifest_payload["project_splits"]["roles"]["id_test"]["selector"] == (
         "deterministic_holdout"
     )
-    assert manifest_payload["validation_status"] == "not_run"
+    assert manifest_payload["validation_status"] == "completed"
+    assert (result.summary_dir / "data_validation.json").exists()
 
 
 def test_download_data_command_materializes_with_mocked_loader(temp_artifact_root):
