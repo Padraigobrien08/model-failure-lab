@@ -69,6 +69,23 @@ def test_build_run_metadata_and_write_json(temp_artifact_root):
     assert persisted_payload["parent_run_id"] is None
 
 
+def test_write_metadata_can_skip_checkpoint_dir(temp_artifact_root):
+    run_dir = build_baseline_run_dir(
+        model_name="distilbert",
+        run_id="20260318_223050_eval_ab12",
+        create=True,
+    )
+
+    metadata_path = write_metadata(
+        run_dir,
+        {"run_id": "20260318_223050_eval_ab12"},
+        create_checkpoint_dir=False,
+    )
+
+    assert metadata_path.exists()
+    assert not (run_dir / "checkpoint").exists()
+
+
 def test_build_metrics_payload_and_write_metrics(temp_artifact_root):
     run_dir = build_baseline_run_dir(
         model_name="logistic_tfidf",
@@ -89,6 +106,23 @@ def test_build_metrics_payload_and_write_metrics(temp_artifact_root):
     assert metrics_payload["calibration_metric"]["name"] == "ece"
     persisted_metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
     assert persisted_metrics["calibration_metric"]["value"] == 0.09
+
+
+def test_write_metrics_supports_custom_filename(temp_artifact_root):
+    run_dir = build_baseline_run_dir(
+        model_name="logistic_tfidf",
+        run_id="20260318_223150_eval_cd34",
+        create=True,
+    )
+
+    metrics_path = write_metrics(
+        run_dir,
+        {"accuracy": 0.82},
+        filename="overall_metrics.json",
+    )
+
+    assert metrics_path.name == "overall_metrics.json"
+    assert json.loads(metrics_path.read_text(encoding="utf-8"))["accuracy"] == 0.82
 
 
 def test_experiment_index_appends_lines(temp_artifact_root):

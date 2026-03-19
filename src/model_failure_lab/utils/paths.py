@@ -136,3 +136,59 @@ def build_prediction_artifact_paths(run_dir: Path, splits: list[str]) -> dict[st
         str(split): str(build_prediction_artifact_path(run_dir, str(split)))
         for split in splits
     }
+
+
+def build_evaluation_run_dir(source_run_dir: Path, eval_id: str, create: bool = False) -> Path:
+    """Return the canonical evaluation bundle directory for a source run."""
+    evaluation_dir = source_run_dir / "evaluations" / _normalize_segment(eval_id)
+    if create:
+        evaluation_dir.mkdir(parents=True, exist_ok=True)
+    return evaluation_dir
+
+
+def build_evaluation_artifact_paths(eval_dir: Path) -> dict[str, str]:
+    """Return the persisted artifact paths for an evaluation bundle."""
+    return {
+        "overall_metrics_json": str(eval_dir / "overall_metrics.json"),
+        "split_metrics_csv": str(eval_dir / "split_metrics.csv"),
+        "id_ood_comparison_csv": str(eval_dir / "id_ood_comparison.csv"),
+        "subgroup_metrics_csv": str(eval_dir / "subgroup_metrics.csv"),
+        "worst_group_summary_json": str(eval_dir / "worst_group_summary.json"),
+        "subgroup_support_report_csv": str(eval_dir / "subgroup_support_report.csv"),
+        "calibration_summary_csv": str(eval_dir / "calibration_summary.csv"),
+        "calibration_bins_csv": str(eval_dir / "calibration_bins.csv"),
+        "confidence_summary_json": str(eval_dir / "confidence_summary.json"),
+        "diagnostics_json": str(eval_dir / "diagnostics.json"),
+        "plots": str(eval_dir / "figures"),
+    }
+
+
+def find_run_metadata_path(run_id: str) -> Path:
+    """Resolve a saved baseline or mitigation metadata path by run ID."""
+    normalized_run_id = _normalize_segment(run_id)
+    patterns = [
+        artifact_root() / "baselines" / "*" / normalized_run_id / "metadata.json",
+        artifact_root() / "mitigations" / "*" / "*" / normalized_run_id / "metadata.json",
+    ]
+
+    matches: list[Path] = []
+    for pattern in patterns:
+        matches.extend(sorted(pattern.parent.glob(pattern.name)))
+
+    if not matches:
+        # `glob` patterns above use a wildcard in parent segments, so expand explicitly when empty.
+        matches = sorted(
+            list((artifact_root() / "baselines").glob(f"*/{normalized_run_id}/metadata.json"))
+            + list(
+                (artifact_root() / "mitigations").glob(
+                    f"*/*/{normalized_run_id}/metadata.json"
+                )
+            )
+        )
+
+    if not matches:
+        raise FileNotFoundError(f"Saved run metadata not found for run_id: {run_id}")
+    if len(matches) > 1:
+        match_text = ", ".join(str(path) for path in matches)
+        raise ValueError(f"Multiple saved runs matched run_id {run_id!r}: {match_text}")
+    return matches[0]

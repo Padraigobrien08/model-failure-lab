@@ -6,6 +6,21 @@ import json
 from pathlib import Path
 from typing import Any
 
+from model_failure_lab.evaluation import (
+    build_confidence_summary,
+    build_diagnostics_payload,
+    build_id_ood_comparison,
+    build_split_metrics_rows,
+    build_worst_group_summary,
+    compute_calibration_summary,
+    compute_robustness_gaps,
+    compute_subgroup_metrics,
+    load_saved_predictions,
+)
+from model_failure_lab.evaluation.bundle import (
+    build_evaluation_metadata,
+    write_evaluation_bundle,
+)
 from model_failure_lab.models import train_distilbert_baseline, train_logistic_baseline
 from model_failure_lab.tracking import (
     build_artifact_paths,
@@ -162,17 +177,85 @@ def dispatch_shift_eval(
     *,
     config: dict[str, Any],
     target_run_id: str,
+    source_metadata_path: Path,
     run_dir: Path,
     metadata_path: Path,
     metrics_path: Path,
     preset_name: str,
 ) -> DispatchResult:
+    source_metadata = json.loads(source_metadata_path.read_text(encoding="utf-8"))
+    _, prediction_frame = load_saved_predictions(
+        source_metadata,
+        splits=config.get("eval", {}).get("requested_splits"),
+    )
+    split_metric_rows = build_split_metrics_rows(prediction_frame)
+    group_fields = (
+        source_metadata.get("resolved_config", {}).get("data", {}).get("group_fields", [])
+    )
+    attribute_columns = [
+        str(field) for field in group_fields if str(field) in prediction_frame.columns
+    ]
+    subgroup_rows = compute_subgroup_metrics(
+        prediction_frame,
+        min_support=int(config["eval"]["min_group_support"]),
+        attribute_columns=attribute_columns or None,
+    )
+    worst_group_summary = build_worst_group_summary(
+        subgroup_rows,
+        min_support=int(config["eval"]["min_group_support"]),
+    )
+    id_ood_comparison_rows = build_id_ood_comparison(split_metric_rows)
+    robustness_gaps = compute_robustness_gaps(split_metric_rows)
+    calibration = compute_calibration_summary(
+        prediction_frame,
+        n_bins=int(config["eval"]["calibration_bins"]),
+        strategy=str(config["eval"].get("calibration_strategy", "uniform")),
+    )
+    confidence_summary = build_confidence_summary(
+        prediction_frame,
+        bins=int(config["eval"]["calibration_bins"]),
+    )
+    diagnostics_payload = build_diagnostics_payload(prediction_frame)
+    artifact_paths = write_evaluation_bundle(
+        run_dir,
+        split_metric_rows=split_metric_rows,
+        id_ood_comparison_rows=id_ood_comparison_rows,
+        subgroup_rows=subgroup_rows,
+        worst_group_summary=worst_group_summary,
+        robustness_gaps=robustness_gaps,
+        calibration_summary_rows=calibration["summary_rows"],
+        calibration_bin_rows=calibration["bin_rows"],
+        confidence_summary=confidence_summary,
+        diagnostics_payload=diagnostics_payload,
+    )
+    existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    evaluated_splits = [
+        str(split) for split in prediction_frame["split"].dropna().astype(str).unique()
+    ]
+    metadata_payload = build_evaluation_metadata(
+        eval_id=str(config["run_id"]),
+        source_run_metadata=source_metadata,
+        source_metadata_path=source_metadata_path,
+        resolved_config=config,
+        command=str(existing_metadata.get("command", "")),
+        eval_dir=run_dir,
+        evaluated_splits=evaluated_splits,
+        min_group_support=int(config["eval"]["min_group_support"]),
+        calibration_bins=int(config["eval"]["calibration_bins"]),
+        output_tag=config["eval"].get("output_tag"),
+        artifact_paths=artifact_paths,
+        git_commit_hash=existing_metadata.get("git_commit_hash"),
+        library_versions=existing_metadata.get("library_versions"),
+        timestamp=existing_metadata.get("timestamp"),
+        status="completed",
+    )
+    metadata_path = write_metadata(run_dir, metadata_payload, create_checkpoint_dir=False)
     return DispatchResult(
-        status="scaffold_ready",
-        message=f"Shift-eval scaffold ready for {target_run_id}",
+        status="completed",
+        message=f"Shift evaluation completed for {target_run_id}",
         run_dir=run_dir,
         metadata_path=metadata_path,
-        metrics_path=metrics_path,
+        metrics_path=Path(artifact_paths["overall_metrics_json"]),
         preset_name=preset_name,
         extras={"target_run_id": target_run_id, "model_name": config["model_name"]},
     )

@@ -93,7 +93,7 @@ def build_run_metadata(
     run_dir: Path,
     git_commit_hash: str | None = None,
     library_versions: dict[str, str | None] | None = None,
-    artifact_paths: dict[str, str] | None = None,
+    artifact_paths: dict[str, Any] | None = None,
     parent_run_id: str | None = None,
     notes: str = "",
     tags: list[str] | None = None,
@@ -125,9 +125,15 @@ def build_run_metadata(
     return metadata_payload
 
 
-def write_metadata(run_dir: Path, metadata_payload: dict[str, Any]) -> Path:
+def write_metadata(
+    run_dir: Path,
+    metadata_payload: dict[str, Any],
+    *,
+    create_checkpoint_dir: bool = True,
+) -> Path:
     """Write metadata.json inside the supplied run directory."""
     run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "checkpoint").mkdir(parents=True, exist_ok=True)
+    if create_checkpoint_dir:
+        (run_dir / "checkpoint").mkdir(parents=True, exist_ok=True)
     (run_dir / "figures").mkdir(parents=True, exist_ok=True)
     return _write_json(run_dir / "metadata.json", metadata_payload)

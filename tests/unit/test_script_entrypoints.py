@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+import pandas as pd
 import pytest
 import torch
 from torch import nn
 
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
+from model_failure_lab.tracking import write_metadata
+from model_failure_lab.utils.paths import build_baseline_run_dir, build_prediction_artifact_path
 from scripts.build_report import run_command as run_build_report_command
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
@@ -236,6 +239,182 @@ class _TinyClassifier(nn.Module):
         return type("Output", (), {"loss": loss, "logits": logits})
 
 
+def _saved_prediction_row(
+    *,
+    run_id: str,
+    sample_id: str,
+    split: str,
+    true_label: int,
+    pred_label: int,
+    prob_1: float,
+    group_id: str,
+    is_id: bool,
+    is_ood: bool,
+) -> dict[str, object]:
+    return {
+        "run_id": run_id,
+        "sample_id": sample_id,
+        "split": split,
+        "model_name": "logistic_tfidf",
+        "true_label": true_label,
+        "pred_label": pred_label,
+        "pred_score": prob_1,
+        "prob_0": 1.0 - prob_1,
+        "prob_1": prob_1,
+        "is_correct": int(true_label == pred_label),
+        "group_id": group_id,
+        "is_id": is_id,
+        "is_ood": is_ood,
+    }
+
+
+def _create_saved_evaluation_source_run() -> str:
+    run_id = "shift_eval_source"
+    run_dir = build_baseline_run_dir("logistic_tfidf", run_id, create=True)
+    validation_path = build_prediction_artifact_path(run_dir, "validation")
+    test_path = build_prediction_artifact_path(run_dir, "test")
+
+    pd.DataFrame(
+        [
+            _saved_prediction_row(
+                run_id=run_id,
+                sample_id="val_0",
+                split="validation",
+                true_label=0,
+                pred_label=0,
+                prob_1=0.2,
+                group_id="group_a",
+                is_id=False,
+                is_ood=True,
+            ),
+            _saved_prediction_row(
+                run_id=run_id,
+                sample_id="val_1",
+                split="validation",
+                true_label=1,
+                pred_label=1,
+                prob_1=0.8,
+                group_id="group_b",
+                is_id=False,
+                is_ood=True,
+            ),
+        ]
+    ).to_parquet(validation_path, index=False)
+    pd.DataFrame(
+        [
+            _saved_prediction_row(
+                run_id=run_id,
+                sample_id="test_0",
+                split="test",
+                true_label=1,
+                pred_label=0,
+                prob_1=0.1,
+                group_id="group_b",
+                is_id=False,
+                is_ood=True,
+            )
+        ]
+    ).to_parquet(test_path, index=False)
+
+    metadata_payload = {
+        "run_id": run_id,
+        "model_name": "logistic_tfidf",
+        "dataset_name": "civilcomments",
+        "split_details": {
+            "train": "train",
+            "validation": "validation",
+            "id_test": "id_test",
+            "ood_test": "ood_test",
+        },
+        "resolved_config": {
+            "experiment_name": "civilcomments_logistic_baseline",
+            "experiment_group": "baselines",
+            "experiment_type": "baseline",
+            "model_name": "logistic_tfidf",
+            "dataset_name": "civilcomments",
+            "split_details": {
+                "train": "train",
+                "validation": "validation",
+                "id_test": "id_test",
+                "ood_test": "ood_test",
+            },
+            "seed": 13,
+            "tags": ["baseline", "logistic_tfidf"],
+            "notes": "",
+            "parent_run_id": None,
+            "data": {
+                "dataset_name": "civilcomments",
+                "wilds_dataset_name": "civilcomments",
+                "wilds_root_dir": "data/wilds",
+                "split_scheme": "official",
+                "text_field": "comment_text",
+                "label_field": "toxicity",
+                "group_fields": ["male", "female"],
+                "auxiliary_fields": [],
+                "raw_splits": {"train": "train", "val": "val", "test": "test"},
+                "split_details": {
+                    "train": "train",
+                    "validation": "validation",
+                    "id_test": "id_test",
+                    "ood_test": "ood_test",
+                },
+                "split_role_policy": {
+                    "train": {
+                        "raw_split": "train",
+                        "selector": "train_remainder",
+                        "is_id": True,
+                        "is_ood": False,
+                    },
+                    "validation": {
+                        "raw_split": "val",
+                        "selector": "full_split",
+                        "is_id": False,
+                        "is_ood": True,
+                    },
+                    "id_test": {
+                        "raw_split": "train",
+                        "selector": "deterministic_holdout",
+                        "is_id": True,
+                        "is_ood": False,
+                        "holdout_fraction": 0.1,
+                        "holdout_seed": 13,
+                    },
+                    "ood_test": {
+                        "raw_split": "test",
+                        "selector": "full_split",
+                        "is_id": False,
+                        "is_ood": True,
+                    },
+                },
+                "validation": {"subgroup_min_samples_warning": 25, "preview_samples": 5},
+            },
+            "model": {"model_name": "logistic_tfidf"},
+            "train": {"seed": 13},
+            "eval": {
+                "primary_metric": "macro_f1",
+                "worst_group_metric": "accuracy",
+                "robustness_gap_metric": "accuracy_delta",
+                "calibration_metric": "ece",
+                "prediction_filename": "predictions.parquet",
+                "tracked_metrics": ["accuracy", "macro_f1", "auroc", "loss"],
+                "min_group_support": 100,
+                "calibration_bins": 10,
+                "calibration_strategy": "uniform",
+                "requested_splits": None,
+                "output_tag": None,
+            },
+        },
+        "artifact_paths": {
+            "predictions": {
+                "validation": str(validation_path),
+                "test": str(test_path),
+            }
+        },
+    }
+    write_metadata(run_dir, metadata_payload)
+    return run_id
+
+
 def test_run_logistic_baseline_writes_completed_artifacts(temp_artifact_root, monkeypatch):
     monkeypatch.setattr(
         "model_failure_lab.models.logistic_tfidf.load_baseline_canonical_dataset",
@@ -311,13 +490,30 @@ def test_run_mitigation_bootstrap_uses_separate_root(
     assert "artifacts/baselines" not in result.run_dir.as_posix()
 
 
-def test_shift_eval_bootstrap_writes_metadata(temp_artifact_root):
-    result = run_shift_eval_command(["--run-id", "baseline_parent_002"])
+def test_shift_eval_writes_completed_evaluation_bundle(temp_artifact_root):
+    source_run_id = _create_saved_evaluation_source_run()
+    result = run_shift_eval_command(
+        [
+            "--run-id",
+            source_run_id,
+            "--splits",
+            "val,test",
+            "--min-group-support",
+            "1",
+            "--calibration-bins",
+            "5",
+            "--output-tag",
+            "debug",
+        ]
+    )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
 
-    assert "artifacts/reports/comparisons/baseline_parent_002" in result.run_dir.as_posix()
+    assert "/evaluations/" in result.run_dir.as_posix()
     assert metadata["experiment_type"] == "shift_eval"
-    assert metadata["parent_run_id"] == "baseline_parent_002"
+    assert metadata["status"] == "completed"
+    assert metadata["source_run_id"] == source_run_id
+    assert metadata["output_tag"] == "debug"
+    assert result.metrics_path.name == "overall_metrics.json"
 
 
 def test_build_report_bootstrap_writes_metadata(temp_artifact_root):

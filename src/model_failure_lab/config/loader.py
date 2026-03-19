@@ -18,7 +18,16 @@ COMPONENT_REFERENCE_KEYS = {
     "train": "train_config",
     "eval": "eval_config",
 }
-ALLOWED_OVERRIDE_KEYS = {"seed", "notes", "run_id", "experiment_group"}
+ALLOWED_OVERRIDE_KEYS = {
+    "seed",
+    "notes",
+    "run_id",
+    "experiment_group",
+    "eval_splits",
+    "min_group_support",
+    "calibration_bins",
+    "output_tag",
+}
 
 
 def _load_yaml_file(path: Path) -> dict[str, Any]:
@@ -123,6 +132,18 @@ def apply_cli_overrides(config: dict[str, Any], overrides: dict[str, Any]) -> di
             updated_config[key] = int(value)
         elif key in {"notes", "run_id", "experiment_group"}:
             updated_config[key] = str(value)
+        elif key == "eval_splits":
+            if isinstance(value, str):
+                split_values = [item.strip() for item in value.split(",") if item.strip()]
+            else:
+                split_values = [str(item).strip() for item in value if str(item).strip()]
+            updated_config.setdefault("eval", {})["requested_splits"] = split_values
+        elif key == "min_group_support":
+            updated_config.setdefault("eval", {})["min_group_support"] = int(value)
+        elif key == "calibration_bins":
+            updated_config.setdefault("eval", {})["calibration_bins"] = int(value)
+        elif key == "output_tag":
+            updated_config.setdefault("eval", {})["output_tag"] = str(value)
 
     validated = RunConfig.from_dict(updated_config)
     return validated.to_dict()

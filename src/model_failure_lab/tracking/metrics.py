@@ -23,9 +23,14 @@ def build_metrics_payload(
     }
 
 
-def write_metrics(run_dir: Path, metrics_payload: dict[str, Any]) -> Path:
-    """Write metrics.json into the run directory."""
+def write_metrics(
+    run_dir: Path,
+    metrics_payload: dict[str, Any],
+    *,
+    filename: str = "metrics.json",
+) -> Path:
+    """Write a metrics-style JSON payload into the run directory."""
     run_dir.mkdir(parents=True, exist_ok=True)
-    metrics_path = run_dir / "metrics.json"
+    metrics_path = run_dir / filename
     metrics_path.write_text(json.dumps(metrics_payload, indent=2, sort_keys=True), encoding="utf-8")
     return metrics_path

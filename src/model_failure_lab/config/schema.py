@@ -135,6 +135,14 @@ def _validate_eval_config(payload: object) -> dict[str, Any]:
     if min_group_support < 0:
         raise ValueError("eval.min_group_support must be zero or greater")
 
+    requested_splits = payload.get("requested_splits")
+    if requested_splits is not None:
+        if not isinstance(requested_splits, list):
+            raise ValueError("eval.requested_splits must be a list when provided")
+        normalized_requested_splits = [str(split) for split in requested_splits]
+    else:
+        normalized_requested_splits = None
+
     return {
         **dict(payload),
         "primary_metric": str(payload.get("primary_metric", "macro_f1")),
@@ -146,6 +154,8 @@ def _validate_eval_config(payload: object) -> dict[str, Any]:
         "min_group_support": min_group_support,
         "calibration_bins": calibration_bins,
         "calibration_strategy": str(payload.get("calibration_strategy", "uniform")),
+        "requested_splits": normalized_requested_splits,
+        "output_tag": str(payload["output_tag"]) if payload.get("output_tag") is not None else None,
     }
 
 

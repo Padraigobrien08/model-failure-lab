@@ -3,9 +3,11 @@ from __future__ import annotations
 from model_failure_lab.utils.paths import (
     artifact_root,
     build_baseline_run_dir,
+    build_evaluation_run_dir,
     build_mitigation_run_dir,
     build_report_dir,
     config_root,
+    find_run_metadata_path,
 )
 
 
@@ -54,3 +56,20 @@ def test_report_dir_uses_reports_root_without_shared_dumping_ground(temp_artifac
     assert summary_dir == temp_artifact_root / "reports" / "summary_tables" / "table_export"
     assert report_dir.parent.name == "comparisons"
     assert summary_dir.parent.name == "summary_tables"
+
+
+def test_evaluation_run_dir_nests_under_source_run(temp_artifact_root):
+    source_run_dir = build_baseline_run_dir("distilbert", "source_run", create=True)
+    evaluation_dir = build_evaluation_run_dir(source_run_dir, "eval_run")
+
+    assert evaluation_dir == source_run_dir / "evaluations" / "eval_run"
+
+
+def test_find_run_metadata_path_resolves_saved_baseline_run(temp_artifact_root):
+    source_run_dir = build_baseline_run_dir("distilbert", "source_run", create=True)
+    metadata_path = source_run_dir / "metadata.json"
+    metadata_path.write_text("{}", encoding="utf-8")
+
+    resolved = find_run_metadata_path("source_run")
+
+    assert resolved == metadata_path
