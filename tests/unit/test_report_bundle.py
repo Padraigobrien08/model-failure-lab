@@ -382,9 +382,13 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
         library_versions={"pandas": "2.1.1"},
         status="completed",
     )
+    report_data = json.loads(Path(artifact_paths["report_data_json"]).read_text(encoding="utf-8"))
 
     assert Path(artifact_paths["report_markdown"]).exists()
     assert Path(artifact_paths["comparison_table_csv"]).exists()
+    assert Path(artifact_paths["report_data_json"]).exists()
     assert Path(artifact_paths["id_vs_ood_primary_metric_png"]).exists()
     assert metadata["selection_mode"] == "experiment_group"
     assert metadata["source_eval_ids"] == ["eval_b", "eval_a"]
+    assert report_data["report_summary"]["report_title"] == "Baseline Robustness Report"
+    assert len(report_data["comparison_table"]) == 2

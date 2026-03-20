@@ -60,6 +60,7 @@ def test_build_run_metadata_and_write_json(temp_artifact_root):
 
     assert metadata_payload["run_id"] == "20260318_223000_baseline_ab12"
     assert metadata_payload["timestamp"]
+    assert metadata_payload["started_at"] == metadata_payload["timestamp"]
     assert metadata_payload["experiment_group"] == "baselines_v1_1"
     assert metadata_payload["resolved_config"] == resolved_config
     assert metadata_payload["artifact_paths"] == build_artifact_paths(run_dir)
@@ -69,6 +70,7 @@ def test_build_run_metadata_and_write_json(temp_artifact_root):
     persisted_payload = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert persisted_payload["artifact_paths"]["metrics_json"].endswith("metrics.json")
     assert persisted_payload["parent_run_id"] is None
+    assert persisted_payload["started_at"] == persisted_payload["timestamp"]
 
 
 def test_write_metadata_can_skip_checkpoint_dir(temp_artifact_root):
@@ -161,4 +163,8 @@ def test_experiment_index_appends_lines(temp_artifact_root):
 
     lines = index_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
-    assert json.loads(lines[0])["run_id"] == "20260318_223200_baseline_ef56"
+    index_entry = json.loads(lines[0])
+    assert index_entry["run_id"] == "20260318_223200_baseline_ef56"
+    assert index_entry["experiment_group"] is None
+    assert index_entry["seed"] is None
+    assert "started_at" in index_entry

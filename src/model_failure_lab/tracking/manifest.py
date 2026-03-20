@@ -31,6 +31,31 @@ def _write_json(path: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+def utc_now_timestamp() -> str:
+    """Return the canonical UTC timestamp format used across metadata payloads."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def compute_duration_seconds(
+    *,
+    started_at: str | None,
+    completed_at: str | None,
+) -> float | None:
+    """Return elapsed seconds between two canonical UTC timestamps."""
+    if not started_at or not completed_at:
+        return None
+    try:
+        started = datetime.strptime(started_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+        completed = datetime.strptime(completed_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError:
+        return None
+    return max(float((completed - started).total_seconds()), 0.0)
+
+
 def resolve_git_commit_hash(cwd: Path | None = None) -> str | None:
     """Return the current git commit hash when available."""
     resolved_cwd = cwd
@@ -128,11 +153,18 @@ def build_run_metadata(
     tags: list[str] | None = None,
     timestamp: str | None = None,
     status: str | None = None,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+    duration_seconds: float | None = None,
+    training_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the metadata payload for a run."""
+    resolved_timestamp = timestamp or utc_now_timestamp()
+    resolved_started_at = started_at or resolved_timestamp
     metadata_payload: dict[str, Any] = {
         "run_id": run_id,
-        "timestamp": timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": resolved_timestamp,
+        "started_at": resolved_started_at,
         "experiment_type": experiment_type,
         "experiment_group": resolved_config.get("experiment_group"),
         "model_name": model_name,
@@ -152,6 +184,20 @@ def build_run_metadata(
     }
     if status is not None:
         metadata_payload["status"] = status
+    if completed_at is not None:
+        metadata_payload["completed_at"] = completed_at
+    resolved_duration = (
+        duration_seconds
+        if duration_seconds is not None
+        else compute_duration_seconds(
+            started_at=resolved_started_at,
+            completed_at=completed_at,
+        )
+    )
+    if resolved_duration is not None:
+        metadata_payload["duration_seconds"] = float(resolved_duration)
+    if training_summary is not None:
+        metadata_payload["training_summary"] = training_summary
     return metadata_payload
 
 

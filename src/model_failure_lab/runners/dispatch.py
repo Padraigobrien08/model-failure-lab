@@ -71,6 +71,7 @@ from model_failure_lab.tracking import (
     build_artifact_paths,
     build_run_metadata,
     resolve_prediction_splits,
+    utc_now_timestamp,
     write_metadata,
     write_metrics,
 )
@@ -101,6 +102,21 @@ def _apply_mitigation_metadata_fields(
     if config.get("parent_model_name") is not None:
         metadata_payload["parent_model_name"] = str(config["parent_model_name"])
     return metadata_payload
+
+
+def _completion_metadata_kwargs(
+    existing_metadata: dict[str, Any],
+    *,
+    training_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    completed_at = utc_now_timestamp()
+    payload = {
+        "started_at": existing_metadata.get("started_at") or existing_metadata.get("timestamp"),
+        "completed_at": completed_at,
+    }
+    if training_summary is not None:
+        payload["training_summary"] = training_summary
+    return payload
 
 
 def build_scaffold_metrics(config: dict[str, Any]) -> dict[str, Any]:
@@ -163,6 +179,10 @@ def dispatch_baseline(
             tags=list(config.get("tags", [])),
             timestamp=existing_metadata.get("timestamp"),
             status="completed",
+            **_completion_metadata_kwargs(
+                existing_metadata,
+                training_summary=artifacts.training_summary,
+            ),
         )
         metadata_path = write_metadata(run_dir, metadata_payload)
         return DispatchResult(
@@ -207,6 +227,10 @@ def dispatch_baseline(
             tags=list(config.get("tags", [])),
             timestamp=existing_metadata.get("timestamp"),
             status="completed",
+            **_completion_metadata_kwargs(
+                existing_metadata,
+                training_summary=artifacts.training_summary,
+            ),
         )
         metadata_payload.update(artifacts.runtime_metadata)
         metadata_path = write_metadata(run_dir, metadata_payload)
@@ -276,6 +300,10 @@ def dispatch_mitigation(
             tags=list(config.get("tags", [])),
             timestamp=existing_metadata.get("timestamp"),
             status="completed",
+            **_completion_metadata_kwargs(
+                existing_metadata,
+                training_summary=artifacts.training_summary,
+            ),
         )
         metadata_payload = _apply_mitigation_metadata_fields(
             metadata_payload,
@@ -334,6 +362,7 @@ def dispatch_mitigation(
             tags=list(config.get("tags", [])),
             timestamp=existing_metadata.get("timestamp"),
             status="completed",
+            **_completion_metadata_kwargs(existing_metadata),
         )
         metadata_payload = _apply_mitigation_metadata_fields(
             metadata_payload,
@@ -440,6 +469,7 @@ def dispatch_shift_eval(
         library_versions=existing_metadata.get("library_versions"),
         timestamp=existing_metadata.get("timestamp"),
         status="completed",
+        **_completion_metadata_kwargs(existing_metadata),
     )
     metadata_path = write_metadata(run_dir, metadata_payload, create_checkpoint_dir=False)
     return DispatchResult(
@@ -542,6 +572,7 @@ def dispatch_perturbation_eval(
         tags=list(config.get("tags", [])),
         timestamp=existing_metadata.get("timestamp"),
         status="completed",
+        **_completion_metadata_kwargs(existing_metadata),
     )
     metadata_payload["source_run_id"] = str(source_metadata["run_id"])
     metadata_payload["source_metadata_path"] = str(source_metadata_path)
@@ -657,6 +688,7 @@ def dispatch_report(
         library_versions=existing_metadata.get("library_versions"),
         timestamp=existing_metadata.get("timestamp"),
         status="completed",
+        **_completion_metadata_kwargs(existing_metadata),
     )
     metadata_path = write_metadata(run_dir, metadata_payload, create_checkpoint_dir=False)
     return DispatchResult(
@@ -752,6 +784,7 @@ def dispatch_perturbation_report(
         library_versions=existing_metadata.get("library_versions"),
         timestamp=existing_metadata.get("timestamp"),
         status="completed",
+        **_completion_metadata_kwargs(existing_metadata),
     )
     metadata_payload["source_split"] = str(first_candidate.metadata.get("source_split", ""))
     metadata_payload["perturbation_schema_version"] = str(

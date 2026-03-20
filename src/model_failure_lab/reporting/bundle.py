@@ -29,6 +29,49 @@ def _write_csv(path: Path, frame: pd.DataFrame) -> Path:
     return path
 
 
+def _frame_records(frame: pd.DataFrame | None) -> list[dict[str, Any]]:
+    if frame is None or frame.empty:
+        return []
+    sanitized = frame.where(pd.notna(frame), None)
+    return list(sanitized.to_dict(orient="records"))
+
+
+def build_report_data_payload(
+    *,
+    report_summary: dict[str, Any],
+    comparison_table: pd.DataFrame,
+    mitigation_comparison_table: pd.DataFrame | None,
+    subgroup_table: pd.DataFrame,
+    calibration_table: pd.DataFrame,
+) -> dict[str, Any]:
+    """Build a structured report payload for future UI consumers."""
+    return {
+        "report_summary": report_summary,
+        "comparison_table": _frame_records(comparison_table),
+        "mitigation_comparison_table": _frame_records(mitigation_comparison_table),
+        "subgroup_table": _frame_records(subgroup_table),
+        "calibration_table": _frame_records(calibration_table),
+    }
+
+
+def build_perturbation_report_data_payload(
+    *,
+    report_summary: dict[str, Any],
+    suite_summary: pd.DataFrame,
+    family_summary: pd.DataFrame,
+    severity_summary: pd.DataFrame,
+    family_severity_matrix: pd.DataFrame,
+) -> dict[str, Any]:
+    """Build a structured perturbation report payload for future UI consumers."""
+    return {
+        "report_summary": report_summary,
+        "suite_summary": _frame_records(suite_summary),
+        "family_summary": _frame_records(family_summary),
+        "severity_summary": _frame_records(severity_summary),
+        "family_severity_matrix": _frame_records(family_severity_matrix),
+    }
+
+
 def build_report_metadata(
     *,
     report_id: str,
@@ -45,6 +88,9 @@ def build_report_metadata(
     library_versions: dict[str, str | None] | None = None,
     timestamp: str | None = None,
     status: str | None = None,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+    duration_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Build persisted metadata for a completed report package."""
     metadata = build_run_metadata(
@@ -64,6 +110,9 @@ def build_report_metadata(
         tags=[*resolved_config.get("tags", []), "report"],
         timestamp=timestamp,
         status=status,
+        started_at=started_at,
+        completed_at=completed_at,
+        duration_seconds=duration_seconds,
     )
     report_config = resolved_config.get("report", {})
     metadata["report_id"] = report_id
@@ -93,6 +142,9 @@ def build_perturbation_report_metadata(
     library_versions: dict[str, str | None] | None = None,
     timestamp: str | None = None,
     status: str | None = None,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+    duration_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Build persisted metadata for a completed perturbation report package."""
     metadata = build_run_metadata(
@@ -112,6 +164,9 @@ def build_perturbation_report_metadata(
         tags=[*resolved_config.get("tags", []), "perturbation_report"],
         timestamp=timestamp,
         status=status,
+        started_at=started_at,
+        completed_at=completed_at,
+        duration_seconds=duration_seconds,
     )
     report_config = resolved_config.get("report", {})
     metadata["report_id"] = report_id
@@ -136,7 +191,15 @@ def write_report_bundle(
 ) -> dict[str, str]:
     """Persist the full Phase 5 report package."""
     artifact_paths = build_report_artifact_paths(run_dir)
+    report_data = build_report_data_payload(
+        report_summary=report_summary,
+        comparison_table=comparison_table,
+        mitigation_comparison_table=mitigation_comparison_table,
+        subgroup_table=subgroup_table,
+        calibration_table=calibration_table,
+    )
     _write_json(Path(artifact_paths["report_summary_json"]), report_summary)
+    _write_json(Path(artifact_paths["report_data_json"]), report_data)
     Path(artifact_paths["figures_dir"]).mkdir(parents=True, exist_ok=True)
     Path(artifact_paths["tables_dir"]).mkdir(parents=True, exist_ok=True)
     Path(artifact_paths["report_markdown"]).write_text(markdown, encoding="utf-8")
@@ -172,7 +235,15 @@ def write_perturbation_report_bundle(
 ) -> dict[str, str]:
     """Persist the full perturbation report package."""
     artifact_paths = build_perturbation_report_artifact_paths(run_dir)
+    report_data = build_perturbation_report_data_payload(
+        report_summary=report_summary,
+        suite_summary=suite_summary,
+        family_summary=family_summary,
+        severity_summary=severity_summary,
+        family_severity_matrix=family_severity_matrix,
+    )
     _write_json(Path(artifact_paths["report_summary_json"]), report_summary)
+    _write_json(Path(artifact_paths["report_data_json"]), report_data)
     Path(artifact_paths["figures_dir"]).mkdir(parents=True, exist_ok=True)
     Path(artifact_paths["tables_dir"]).mkdir(parents=True, exist_ok=True)
     Path(artifact_paths["report_markdown"]).write_text(markdown, encoding="utf-8")

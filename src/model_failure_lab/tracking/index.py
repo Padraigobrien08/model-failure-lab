@@ -18,12 +18,25 @@ def experiment_index_path() -> Path:
 
 def build_index_entry(metadata_path: Path, metadata_payload: dict[str, Any]) -> dict[str, Any]:
     """Build a lossless index entry from run metadata."""
+    resolved_config = metadata_payload.get("resolved_config", {})
+    seed = resolved_config.get("seed") if isinstance(resolved_config, dict) else None
     return {
         "run_id": metadata_payload["run_id"],
         "experiment_type": metadata_payload["experiment_type"],
         "model_name": metadata_payload["model_name"],
+        "experiment_group": metadata_payload.get("experiment_group"),
         "tags": metadata_payload.get("tags", []),
         "dataset_name": metadata_payload["dataset_name"],
+        "status": metadata_payload.get("status"),
+        "timestamp": metadata_payload.get("timestamp"),
+        "started_at": metadata_payload.get("started_at"),
+        "completed_at": metadata_payload.get("completed_at"),
+        "duration_seconds": metadata_payload.get("duration_seconds"),
+        "seed": seed,
+        "parent_run_id": metadata_payload.get("parent_run_id"),
+        "source_run_id": metadata_payload.get("source_run_id"),
+        "mitigation_method": metadata_payload.get("mitigation_method"),
+        "report_scope": metadata_payload.get("report_scope"),
         "metadata_path": str(metadata_path),
     }
 

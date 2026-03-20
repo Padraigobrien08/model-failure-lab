@@ -64,6 +64,32 @@ def _build_overall_metrics_payload(
     }
 
 
+def build_evaluation_ui_summary(
+    *,
+    split_metric_rows: list[dict[str, Any]],
+    id_ood_comparison_rows: list[dict[str, Any]],
+    subgroup_rows: list[dict[str, Any]],
+    worst_group_summary: dict[str, Any],
+    robustness_gaps: dict[str, Any],
+    calibration_summary_rows: list[dict[str, Any]],
+    confidence_summary: dict[str, Any],
+) -> dict[str, Any]:
+    """Build a consolidated evaluation payload for future UI consumers."""
+    return {
+        "headline_metrics": _build_overall_metrics_payload(
+            split_metric_rows,
+            worst_group_summary=worst_group_summary,
+            robustness_gaps=robustness_gaps,
+        )["headline_metrics"],
+        "split_metrics": split_metric_rows,
+        "id_ood_comparison": id_ood_comparison_rows,
+        "subgroups": subgroup_rows,
+        "worst_group": worst_group_summary,
+        "calibration_summary": calibration_summary_rows,
+        "confidence_summary": confidence_summary,
+    }
+
+
 def build_evaluation_metadata(
     *,
     eval_id: str,
@@ -81,6 +107,9 @@ def build_evaluation_metadata(
     library_versions: dict[str, str | None] | None = None,
     timestamp: str | None = None,
     status: str | None = None,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+    duration_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Build the persisted metadata payload for one evaluation bundle."""
     source_resolved_config = source_run_metadata.get("resolved_config", {})
@@ -110,6 +139,9 @@ def build_evaluation_metadata(
         tags=[*resolved_config.get("tags", []), "shift_eval"],
         timestamp=timestamp,
         status=status,
+        started_at=started_at,
+        completed_at=completed_at,
+        duration_seconds=duration_seconds,
     )
     metadata["eval_id"] = eval_id
     metadata["source_run_id"] = str(source_run_metadata["run_id"])
@@ -152,7 +184,17 @@ def write_evaluation_bundle(
         worst_group_summary=worst_group_summary,
         robustness_gaps=robustness_gaps,
     )
+    ui_summary = build_evaluation_ui_summary(
+        split_metric_rows=split_metric_rows,
+        id_ood_comparison_rows=id_ood_comparison_rows,
+        subgroup_rows=subgroup_rows,
+        worst_group_summary=worst_group_summary,
+        robustness_gaps=robustness_gaps,
+        calibration_summary_rows=calibration_summary_rows,
+        confidence_summary=confidence_summary,
+    )
     _write_json(Path(artifact_paths["overall_metrics_json"]), overall_metrics)
+    _write_json(Path(artifact_paths["ui_summary_json"]), ui_summary)
     _write_json(Path(artifact_paths["worst_group_summary_json"]), worst_group_summary)
     _write_json(Path(artifact_paths["confidence_summary_json"]), confidence_summary)
     _write_json(Path(artifact_paths["diagnostics_json"]), diagnostics_payload)

@@ -130,6 +130,7 @@ def build_report_artifact_paths(report_dir: Path) -> dict[str, str]:
     return {
         "report_markdown": str(report_dir / "report.md"),
         "report_summary_json": str(report_dir / "report_summary.json"),
+        "report_data_json": str(report_dir / "report_data.json"),
         "figures_dir": str(report_dir / "figures"),
         "tables_dir": str(report_dir / "tables"),
         "comparison_table_csv": str(report_dir / "tables" / "comparison_table.csv"),
@@ -153,6 +154,7 @@ def build_perturbation_report_artifact_paths(report_dir: Path) -> dict[str, str]
     return {
         "report_markdown": str(report_dir / "report.md"),
         "report_summary_json": str(report_dir / "report_summary.json"),
+        "report_data_json": str(report_dir / "report_data.json"),
         "figures_dir": str(report_dir / "figures"),
         "tables_dir": str(report_dir / "tables"),
         "suite_summary_csv": str(report_dir / "tables" / "suite_summary.csv"),
@@ -227,6 +229,7 @@ def build_evaluation_artifact_paths(eval_dir: Path) -> dict[str, str]:
     """Return the persisted artifact paths for an evaluation bundle."""
     return {
         "overall_metrics_json": str(eval_dir / "overall_metrics.json"),
+        "ui_summary_json": str(eval_dir / "ui_summary.json"),
         "split_metrics_csv": str(eval_dir / "split_metrics.csv"),
         "id_ood_comparison_csv": str(eval_dir / "id_ood_comparison.csv"),
         "subgroup_metrics_csv": str(eval_dir / "subgroup_metrics.csv"),

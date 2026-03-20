@@ -4,7 +4,9 @@ from .index import append_experiment_index, build_index_entry, experiment_index_
 from .manifest import (
     build_artifact_paths,
     build_run_metadata,
+    compute_duration_seconds,
     resolve_prediction_splits,
+    utc_now_timestamp,
     write_metadata,
 )
 from .metrics import build_metrics_payload, write_metrics
@@ -16,9 +18,11 @@ __all__ = [
     "build_index_entry",
     "build_metrics_payload",
     "build_run_metadata",
+    "compute_duration_seconds",
     "experiment_index_path",
     "generate_run_id",
     "resolve_prediction_splits",
+    "utc_now_timestamp",
     "write_metadata",
     "write_metrics",
 ]

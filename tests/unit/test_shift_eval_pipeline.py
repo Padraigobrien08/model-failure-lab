@@ -255,6 +255,7 @@ def test_write_evaluation_bundle_persists_expected_files(temp_artifact_root):
     )
 
     assert Path(artifact_paths["overall_metrics_json"]).exists()
+    assert Path(artifact_paths["ui_summary_json"]).exists()
     assert Path(artifact_paths["split_metrics_csv"]).exists()
     assert Path(artifact_paths["calibration_bins_csv"]).exists()
     assert Path(artifact_paths["confidence_summary_json"]).exists()
@@ -310,5 +311,8 @@ def test_dispatch_shift_eval_completes_and_writes_bundle(temp_artifact_root):
     assert final_metadata["source_experiment_group"] == "baselines_v1"
     assert final_metadata["resolved_config"]["experiment_group"] == "baselines_v1"
     assert final_metadata["evaluated_splits"] == ["validation", "test"]
+    assert final_metadata["completed_at"]
+    assert final_metadata["duration_seconds"] >= 0.0
     assert Path(artifact_paths["overall_metrics_json"]).exists()
+    assert Path(artifact_paths["ui_summary_json"]).exists()
     assert Path(artifact_paths["subgroup_metrics_csv"]).exists()

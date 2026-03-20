@@ -347,10 +347,14 @@ def test_render_and_write_perturbation_report_bundle(temp_artifact_root):
         artifact_paths=artifact_paths,
         status="completed",
     )
+    report_data = json.loads(Path(artifact_paths["report_data_json"]).read_text(encoding="utf-8"))
 
     assert "synthetic perturbation bundles only" in markdown
     assert "not canonical WILDS" in markdown
     assert Path(artifact_paths["report_markdown"]).exists()
+    assert Path(artifact_paths["report_data_json"]).exists()
     assert Path(artifact_paths["clean_vs_perturbed_primary_metric_png"]).exists()
     assert metadata["selection_mode"] == "experiment_group"
     assert metadata["source_eval_ids"] == ["perturb_b", "perturb_a"]
+    assert report_data["report_summary"]["report_title"] == "Synthetic Stress Report"
+    assert len(report_data["suite_summary"]) == 2

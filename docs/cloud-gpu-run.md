@@ -137,6 +137,33 @@ All under:
 artifacts/baselines/distilbert/<run_id>/
 ```
 
+After copying those three run directories back to your local machine, finalize the local eval step
+with one helper instead of three manual commands:
+
+```bash
+chmod +x scripts/finalize_phase17_distilbert_runs.sh
+./scripts/finalize_phase17_distilbert_runs.sh
+```
+
+That helper will:
+
+- auto-discover completed official `baselines_v1_2_distilbert` runs if you do not pass run IDs
+- run `scripts/run_shift_eval.py` only for runs that still need a completed eval bundle
+- write `seed -> run_id -> eval_id` mappings to `logs/phase17_distilbert/eval_ids.txt`
+
+If you prefer to target explicit imported runs:
+
+```bash
+./scripts/finalize_phase17_distilbert_runs.sh <run_id_1> <run_id_2> <run_id_3>
+```
+
+You can also inspect the current official cohort state at any point:
+
+```bash
+python scripts/check_phase17_seed_cohorts.py
+python scripts/check_phase17_seed_cohorts.py --cohort distilbert --strict
+```
+
 ### 6. Evaluate The Saved Run
 
 ```bash

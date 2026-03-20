@@ -44,6 +44,7 @@ class DistilBertReweightingArtifacts:
     history_path: Path
     tokenizer_config_path: Path
     group_weights_path: Path
+    training_summary: dict[str, Any]
 
 
 class WeightedTokenizedTextDataset(Dataset):
@@ -498,4 +499,21 @@ def train_distilbert_reweighting(
         history_path=history_path,
         tokenizer_config_path=tokenizer_config_path,
         group_weights_path=group_weights_path,
+        training_summary={
+            "best_epoch": max(
+                (
+                    int(item["epoch"])
+                    for item in history
+                    if item.get("validation_metrics", {}).get(primary_metric_name)
+                    == validation_metrics.get(primary_metric_name)
+                ),
+                default=1,
+            ),
+            "best_validation_metric_name": primary_metric_name,
+            "best_validation_metric_value": validation_metrics.get(primary_metric_name),
+            "selected_checkpoint_path": str(checkpoint_path),
+            "train_sample_count": len(train_view.records),
+            "validation_sample_count": len(validation_view.records),
+            "completed_epochs": len(history),
+        },
     )

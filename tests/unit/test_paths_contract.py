@@ -72,6 +72,7 @@ def test_report_run_dir_and_artifact_paths_use_expected_structure(temp_artifact_
         temp_artifact_root / "reports" / "comparisons" / "mvp_comparison" / "report_run"
     )
     assert artifact_paths["report_markdown"].endswith("report.md")
+    assert artifact_paths["report_data_json"].endswith("report_data.json")
     assert artifact_paths["comparison_table_csv"].endswith("tables/comparison_table.csv")
     assert artifact_paths["id_vs_ood_primary_metric_png"].endswith(
         "figures/id_vs_ood_primary_metric.png"
@@ -109,6 +110,7 @@ def test_perturbation_report_run_dir_and_artifact_paths_use_expected_structure(t
         temp_artifact_root / "reports" / "perturbations" / "synthetic_stress" / "report_run"
     )
     assert artifact_paths["report_markdown"].endswith("report.md")
+    assert artifact_paths["report_data_json"].endswith("report_data.json")
     assert artifact_paths["suite_summary_csv"].endswith("tables/suite_summary.csv")
     assert artifact_paths["clean_vs_perturbed_primary_metric_png"].endswith(
         "figures/clean_vs_perturbed_primary_metric.png"

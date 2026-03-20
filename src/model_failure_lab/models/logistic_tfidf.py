@@ -31,6 +31,7 @@ class LogisticBaselineArtifacts:
     vectorizer_path: Path
     model_path: Path
     checkpoint_dir: Path
+    training_summary: dict[str, Any]
 
 
 def _checkpoint_paths(run_dir: Path) -> tuple[Path, Path, Path]:
@@ -166,4 +167,13 @@ def train_logistic_baseline(
         vectorizer_path=vectorizer_path,
         model_path=model_path,
         checkpoint_dir=checkpoint_dir,
+        training_summary={
+            "best_epoch": 1,
+            "best_validation_metric_name": primary_metric_name,
+            "best_validation_metric_value": validation_metrics.get(primary_metric_name),
+            "selected_checkpoint_path": str(model_path),
+            "train_sample_count": len(train_view.labels),
+            "validation_sample_count": len(validation_view.labels),
+            "completed_epochs": 1,
+        },
     )
