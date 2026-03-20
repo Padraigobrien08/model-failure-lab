@@ -327,8 +327,14 @@ def test_train_distilbert_reweighting_writes_group_weights_and_predictions(
     assert artifacts.prediction_paths["ood_test"].exists()
     id_test_frame = pd.read_parquet(artifacts.prediction_paths["id_test"])
     ood_test_frame = pd.read_parquet(artifacts.prediction_paths["ood_test"])
-    assert list(id_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)]) == REQUIRED_PREDICTION_COLUMNS
-    assert list(ood_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)]) == REQUIRED_PREDICTION_COLUMNS
+    assert (
+        list(id_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)])
+        == REQUIRED_PREDICTION_COLUMNS
+    )
+    assert (
+        list(ood_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)])
+        == REQUIRED_PREDICTION_COLUMNS
+    )
     assert set(id_test_frame["split"]) == {"id_test"}
     assert set(ood_test_frame["split"]) == {"ood_test"}
     assert artifacts.metrics_payload["group_weighting"]["group_count"] == 2

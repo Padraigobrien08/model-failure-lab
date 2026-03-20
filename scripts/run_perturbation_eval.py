@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Sequence
 
 from model_failure_lab.config import RunConfig, apply_cli_overrides, load_experiment_config
-from model_failure_lab.data import load_canonical_civilcomments_dataset
+from model_failure_lab.data import prepare_civilcomments_runtime_dataset
 from model_failure_lab.perturbations import load_saved_run_scorer
 from model_failure_lab.runners.contracts import DispatchResult
 from model_failure_lab.runners.dispatch import dispatch_perturbation_eval
@@ -161,7 +161,7 @@ def run_command(argv: Sequence[str] | None = None) -> DispatchResult:
         metadata_path=metadata_path,
         metrics_path=run_dir / "suite_summary.csv",
         preset_name=args.preset,
-        dataset_loader=load_canonical_civilcomments_dataset,
+        dataset_loader=prepare_civilcomments_runtime_dataset,
         scorer_loader=load_saved_run_scorer,
     )
     final_metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))

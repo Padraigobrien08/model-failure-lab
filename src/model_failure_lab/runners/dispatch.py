@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from model_failure_lab.data import load_canonical_civilcomments_dataset
+from model_failure_lab.data import prepare_civilcomments_runtime_dataset
 from model_failure_lab.evaluation import (
     build_confidence_summary,
     build_diagnostics_payload,
@@ -77,6 +77,13 @@ from model_failure_lab.tracking import (
 from model_failure_lab.tracking.metrics import build_metrics_payload
 
 from .contracts import DispatchResult
+
+
+def _unwrap_runtime_dataset(dataset_or_result: Any) -> Any:
+    dataset = getattr(dataset_or_result, "dataset", None)
+    if dataset is not None:
+        return dataset
+    return dataset_or_result
 
 
 def _apply_mitigation_metadata_fields(
@@ -458,10 +465,10 @@ def dispatch_perturbation_eval(
     scorer_loader: Any | None = None,
 ) -> DispatchResult:
     source_metadata = json.loads(source_metadata_path.read_text(encoding="utf-8"))
-    resolved_dataset_loader = dataset_loader or load_canonical_civilcomments_dataset
+    resolved_dataset_loader = dataset_loader or prepare_civilcomments_runtime_dataset
     resolved_scorer_loader = scorer_loader or load_saved_run_scorer
 
-    dataset = resolved_dataset_loader(config, download=True)
+    dataset = _unwrap_runtime_dataset(resolved_dataset_loader(config, download=True))
     perturbation_config = dict(config["perturbation"])
     selected_source_samples = select_source_samples(
         dataset.samples,

@@ -1,4 +1,4 @@
-"""Manifest-writing helpers for CivilComments dataset materialization."""
+"""Manifest-writing and runtime handoff helpers for CivilComments."""
 
 from __future__ import annotations
 
@@ -25,6 +25,16 @@ class MaterializationResult:
     raw_split_names: list[str]
     split_policy: dict[str, SplitRole]
     validation_summary: dict[str, Any]
+
+
+@dataclass(slots=True)
+class RuntimeDatasetResult:
+    """Runtime dataset plus the persisted materialization contract it used."""
+
+    dataset: Any
+    manifest_path: Path
+    manifest_payload: dict[str, Any]
+    summary_dir: Path
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> Path:
@@ -151,24 +161,145 @@ def write_data_manifest(dataset_name: str, payload: dict[str, Any]) -> Path:
     return _write_json(build_data_manifest_path(dataset_name), payload)
 
 
-def load_canonical_civilcomments_dataset(
+def read_data_manifest(dataset_name: str) -> dict[str, Any] | None:
+    """Load a persisted dataset manifest when it exists."""
+    manifest_path = build_data_manifest_path(dataset_name)
+    if not manifest_path.exists():
+        return None
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def _materialization_contract_error(message: str) -> ValueError:
+    return ValueError(f"CivilComments materialization contract error: {message}")
+
+
+def _expected_project_roles(
+    config: dict[str, Any],
+    *,
+    available_raw_splits: list[str],
+) -> dict[str, dict[str, Any]]:
+    return _build_project_split_payload(
+        resolve_split_policy(config["data"]),
+        available_raw_splits,
+    )
+
+
+def _validate_manifest_payload(config: dict[str, Any], manifest_payload: dict[str, Any]) -> None:
+    dataset_name = str(config["dataset_name"])
+    if str(manifest_payload.get("dataset_name")) != dataset_name:
+        raise _materialization_contract_error(
+            f"dataset_name mismatch: expected {dataset_name!r}, "
+            f"found {manifest_payload.get('dataset_name')!r}"
+        )
+
+    if manifest_payload.get("validation_status") != "completed":
+        raise _materialization_contract_error(
+            "validation_status must be 'completed' before runtime loading."
+        )
+
+    manifest_raw_splits = (
+        manifest_payload.get("raw_splits", {}) if isinstance(manifest_payload, dict) else {}
+    )
+    configured_raw_splits = manifest_raw_splits.get("configured")
+    expected_raw_splits = dict(config["data"]["raw_splits"])
+    if configured_raw_splits != expected_raw_splits:
+        raise _materialization_contract_error(
+            f"raw_splits.configured mismatch: expected {expected_raw_splits!r}, "
+            f"found {configured_raw_splits!r}"
+        )
+
+    available_raw_splits = [
+        str(split_name) for split_name in manifest_raw_splits.get("available", []) or []
+    ]
+    expected_roles = _expected_project_roles(
+        config,
+        available_raw_splits=available_raw_splits,
+    )
+    actual_roles = (
+        manifest_payload.get("project_splits", {}).get("roles")
+        if isinstance(manifest_payload.get("project_splits"), dict)
+        else None
+    )
+    if actual_roles != expected_roles:
+        raise _materialization_contract_error(
+            f"project_splits.roles mismatch: expected {expected_roles!r}, "
+            f"found {actual_roles!r}"
+        )
+
+    summary_artifacts = manifest_payload.get("summary_artifacts")
+    if not isinstance(summary_artifacts, dict) or not summary_artifacts:
+        raise _materialization_contract_error("summary_artifacts is missing or empty.")
+    missing_summary_keys = []
+    for key, raw_path in summary_artifacts.items():
+        if not raw_path or not Path(raw_path).exists():
+            missing_summary_keys.append(key)
+    if missing_summary_keys:
+        raise _materialization_contract_error(
+            "missing summary artifacts: " + ", ".join(sorted(missing_summary_keys))
+        )
+
+
+def prepare_civilcomments_runtime_dataset(
     config: dict[str, Any],
     *,
     download: bool = True,
     get_dataset_fn: Callable[..., Any] | None = None,
-):
-    """Load CivilComments and return canonical samples without writing artifacts."""
+    materialize_if_missing: bool = True,
+) -> RuntimeDatasetResult:
+    """Load canonical CivilComments samples through the saved materialization contract."""
+    dataset_name = str(config["dataset_name"])
+    manifest_path = build_data_manifest_path(dataset_name)
+    manifest_payload = read_data_manifest(dataset_name)
+
+    if manifest_payload is None:
+        if not materialize_if_missing:
+            raise _materialization_contract_error(
+                f"manifest missing at {manifest_path}; run `python scripts/download_data.py` first."
+            )
+        materialization = materialize_civilcomments(
+            config,
+            download=download,
+            get_dataset_fn=get_dataset_fn,
+        )
+        manifest_payload = materialization.manifest_payload
+        manifest_path = materialization.manifest_path
+
+    _validate_manifest_payload(config, manifest_payload)
+
     dataset = load_civilcomments_dataset(
         config["data"],
         download=download,
         get_dataset_fn=get_dataset_fn,
     )
     source_records = extract_source_records(dataset, config["data"])
-    return build_canonical_dataset(
+    canonical_dataset = build_canonical_dataset(
         source_records,
         config["data"],
-        dataset_name=str(config["dataset_name"]),
+        dataset_name=dataset_name,
     )
+
+    summary_artifacts = manifest_payload["summary_artifacts"]
+    summary_dir = Path(summary_artifacts["data_validation_json"]).parent
+    return RuntimeDatasetResult(
+        dataset=canonical_dataset,
+        manifest_path=manifest_path,
+        manifest_payload=manifest_payload,
+        summary_dir=summary_dir,
+    )
+
+
+def load_canonical_civilcomments_dataset(
+    config: dict[str, Any],
+    *,
+    download: bool = True,
+    get_dataset_fn: Callable[..., Any] | None = None,
+):
+    """Compatibility wrapper that returns canonical samples only."""
+    return prepare_civilcomments_runtime_dataset(
+        config,
+        download=download,
+        get_dataset_fn=get_dataset_fn,
+    ).dataset
 
 
 def materialize_civilcomments(

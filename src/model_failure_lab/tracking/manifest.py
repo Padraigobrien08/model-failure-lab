@@ -93,8 +93,15 @@ def resolve_prediction_splits(
     if not bool(config.get("train", {}).get("export_blind_test_predictions", False)):
         return splits
 
-    split_details = {str(key): str(value) for key, value in dict(config.get("split_details", {})).items()}
-    blind_splits = list(requested_splits) if requested_splits is not None else list(_BLIND_HELD_OUT_SPLITS)
+    split_details = {
+        str(key): str(value)
+        for key, value in dict(config.get("split_details", {})).items()
+    }
+    blind_splits = (
+        list(requested_splits)
+        if requested_splits is not None
+        else list(_BLIND_HELD_OUT_SPLITS)
+    )
     for split in blind_splits:
         normalized_split = str(split)
         if normalized_split in split_details and normalized_split not in splits:

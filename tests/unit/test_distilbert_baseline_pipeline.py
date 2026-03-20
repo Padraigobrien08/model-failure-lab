@@ -9,8 +9,8 @@ from torch import nn
 
 from model_failure_lab.config.loader import load_experiment_config
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
-from model_failure_lab.models.export import REQUIRED_PREDICTION_COLUMNS
 from model_failure_lab.models.distilbert import train_distilbert_baseline
+from model_failure_lab.models.export import REQUIRED_PREDICTION_COLUMNS
 from model_failure_lab.utils.paths import build_baseline_run_dir
 from scripts.run_baseline import run_command as run_baseline_command
 
@@ -201,8 +201,14 @@ def test_train_distilbert_baseline_writes_checkpoint_and_history(temp_artifact_r
     assert artifacts.prediction_paths["ood_test"].exists()
     id_test_frame = pd.read_parquet(artifacts.prediction_paths["id_test"])
     ood_test_frame = pd.read_parquet(artifacts.prediction_paths["ood_test"])
-    assert list(id_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)]) == REQUIRED_PREDICTION_COLUMNS
-    assert list(ood_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)]) == REQUIRED_PREDICTION_COLUMNS
+    assert (
+        list(id_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)])
+        == REQUIRED_PREDICTION_COLUMNS
+    )
+    assert (
+        list(ood_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)])
+        == REQUIRED_PREDICTION_COLUMNS
+    )
     assert set(id_test_frame["split"]) == {"id_test"}
     assert set(ood_test_frame["split"]) == {"ood_test"}
     assert artifacts.metrics_payload["primary_metric"]["name"] == "macro_f1"

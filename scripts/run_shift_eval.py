@@ -92,7 +92,6 @@ def run_command(argv: Sequence[str] | None = None):
             "seed": args.seed,
             "notes": args.notes,
             "run_id": generate_run_id("shift_eval"),
-            "experiment_group": args.run_id,
             "eval_splits": args.splits,
             "min_group_support": args.min_group_support,
             "calibration_bins": args.calibration_bins,
