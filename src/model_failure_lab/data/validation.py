@@ -146,27 +146,13 @@ def write_validation_summaries(
         {"split": split, "count": count}
         for split, count in sorted(validation_summary["split_counts"].items())
     ]
+    subgroup_coverage_counts: Counter[tuple[str, str]] = Counter(
+        (str(sample["split"]), str(sample["group_id"])) for sample in normalized_samples
+    )
     subgroup_coverage_rows = [
-        {
-            "split": sample["split"],
-            "group_id": sample["group_id"],
-            "count": sum(
-                1
-                for candidate in normalized_samples
-                if candidate["split"] == sample["split"]
-                and candidate["group_id"] == sample["group_id"]
-            ),
-        }
-        for sample in normalized_samples
+        {"split": split, "group_id": group_id, "count": count}
+        for (split, group_id), count in sorted(subgroup_coverage_counts.items())
     ]
-    deduped_subgroup_rows = []
-    seen_subgroup_pairs: set[tuple[str, str]] = set()
-    for row in subgroup_coverage_rows:
-        key = (str(row["split"]), str(row["group_id"]))
-        if key in seen_subgroup_pairs:
-            continue
-        seen_subgroup_pairs.add(key)
-        deduped_subgroup_rows.append(row)
 
     text_length_buckets: dict[str, list[int]] = {}
     for sample in normalized_samples:
@@ -191,7 +177,7 @@ def write_validation_summaries(
     )
     _write_csv(
         summary_dir / "subgroup_coverage.csv",
-        deduped_subgroup_rows,
+        subgroup_coverage_rows,
         ["split", "group_id", "count"],
     )
     _write_csv(

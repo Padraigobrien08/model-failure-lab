@@ -60,21 +60,43 @@ def select_prediction_splits(
     return selected_splits
 
 
-def _load_metadata(metadata_or_path: dict[str, Any] | Path | str) -> dict[str, Any]:
+def _load_metadata(
+    metadata_or_path: dict[str, Any] | Path | str,
+) -> tuple[dict[str, Any], Path | None]:
     if isinstance(metadata_or_path, dict):
-        return dict(metadata_or_path)
+        return dict(metadata_or_path), None
 
     metadata_path = Path(metadata_or_path)
-    return json.loads(metadata_path.read_text(encoding="utf-8"))
+    return json.loads(metadata_path.read_text(encoding="utf-8")), metadata_path
 
 
-def _resolve_prediction_paths(metadata: dict[str, Any]) -> dict[str, Path]:
+def _relocate_prediction_path(prediction_path: Path, metadata_path: Path | None) -> Path:
+    if prediction_path.exists() or metadata_path is None:
+        return prediction_path
+
+    run_dir = metadata_path.parent
+    relocated_path = run_dir / prediction_path.name
+    if relocated_path.exists():
+        return relocated_path
+    return prediction_path
+
+
+def _resolve_prediction_paths(
+    metadata: dict[str, Any],
+    *,
+    metadata_path: Path | None = None,
+) -> dict[str, Path]:
     artifact_paths = metadata.get("artifact_paths", {})
     prediction_paths = artifact_paths.get("predictions")
     if isinstance(prediction_paths, dict) and prediction_paths:
-        return {str(split): Path(path) for split, path in prediction_paths.items()}
+        return {
+            str(split): _relocate_prediction_path(Path(path), metadata_path)
+            for split, path in prediction_paths.items()
+        }
     if isinstance(prediction_paths, str) and prediction_paths:
-        return {"predictions": Path(prediction_paths)}
+        return {
+            "predictions": _relocate_prediction_path(Path(prediction_paths), metadata_path)
+        }
     raise ValueError("Run metadata does not contain saved prediction artifact paths")
 
 
@@ -84,8 +106,8 @@ def load_saved_predictions(
     splits: Iterable[str] | None = None,
 ) -> tuple[dict[str, Any], pd.DataFrame]:
     """Load saved split-specific prediction parquet artifacts into one evaluation frame."""
-    metadata = _load_metadata(metadata_or_path)
-    prediction_paths = _resolve_prediction_paths(metadata)
+    metadata, metadata_path = _load_metadata(metadata_or_path)
+    prediction_paths = _resolve_prediction_paths(metadata, metadata_path=metadata_path)
     selected_splits = select_prediction_splits(prediction_paths, splits)
 
     frames: list[pd.DataFrame] = []

@@ -31,6 +31,14 @@ TokenizerFactory = Callable[[str], Any]
 ModelFactory = Callable[[str, int], torch.nn.Module]
 
 
+def _raise_pretrained_loading_error(exc: Exception, pretrained_name: str) -> None:
+    raise RuntimeError(
+        f"Unable to load '{pretrained_name}' for DistilBERT execution. "
+        "The first run requires either network access or a pre-populated local cache. "
+        "Run `python scripts/check_environment.py` to verify benchmark prerequisites."
+    ) from exc
+
+
 @dataclass(slots=True)
 class DistilBertBaselineArtifacts:
     """Artifacts produced by a completed DistilBERT baseline run."""
@@ -41,6 +49,7 @@ class DistilBertBaselineArtifacts:
     checkpoint_path: Path
     history_path: Path
     tokenizer_config_path: Path
+    runtime_metadata: dict[str, Any]
 
 
 class TokenizedTextDataset(Dataset):
@@ -83,15 +92,21 @@ class TokenizedTextDataset(Dataset):
 
 def build_tokenizer(pretrained_name: str) -> Any:
     """Build the tokenizer for the requested pretrained checkpoint."""
-    return AutoTokenizer.from_pretrained(pretrained_name)
+    try:
+        return AutoTokenizer.from_pretrained(pretrained_name)
+    except (OSError, ValueError) as exc:
+        _raise_pretrained_loading_error(exc, pretrained_name)
 
 
 def build_sequence_classifier(pretrained_name: str, num_labels: int) -> torch.nn.Module:
     """Build the DistilBERT sequence-classification model."""
-    return AutoModelForSequenceClassification.from_pretrained(
-        pretrained_name,
-        num_labels=num_labels,
-    )
+    try:
+        return AutoModelForSequenceClassification.from_pretrained(
+            pretrained_name,
+            num_labels=num_labels,
+        )
+    except (OSError, ValueError) as exc:
+        _raise_pretrained_loading_error(exc, pretrained_name)
 
 
 def _checkpoint_paths(run_dir: Path) -> tuple[Path, Path, Path, Path]:
@@ -139,9 +154,49 @@ def _device_and_precision(config: dict[str, Any]) -> tuple[torch.device, bool]:
         "mixed_precision",
         config.get("train", {}).get("mixed_precision", False),
     )
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif (
+        getattr(torch.backends, "mps", None) is not None
+        and torch.backends.mps.is_available()
+    ):
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     use_mixed_precision = device.type == "cuda" and mixed_precision_config not in {False, "false"}
     return device, use_mixed_precision
+
+
+def _build_runtime_metadata(
+    *,
+    config: dict[str, Any],
+    device: torch.device,
+    use_mixed_precision: bool,
+    train_batch_size: int,
+    eval_batch_size: int,
+    max_length: int,
+) -> dict[str, Any]:
+    hardware = {
+        "device_type": device.type,
+        "cuda_available": bool(torch.cuda.is_available()),
+        "cuda_device_count": int(torch.cuda.device_count()) if torch.cuda.is_available() else 0,
+        "mps_available": bool(
+            getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available()
+        ),
+    }
+    if device.type == "cuda":
+        hardware["device_name"] = torch.cuda.get_device_name(0)
+
+    execution_tier = str(config.get("model", {}).get("execution_tier", "canonical"))
+    return {
+        "execution_tier": execution_tier,
+        "hardware": hardware,
+        "mixed_precision_enabled": use_mixed_precision,
+        "train_batch_size": train_batch_size,
+        "eval_batch_size": eval_batch_size,
+        "effective_batch_size": train_batch_size,
+        "max_length": max_length,
+    }
 
 
 def _prediction_records(
@@ -230,6 +285,33 @@ def _run_validation(
         "logits": all_logits,
         "metadata": metadata,
     }
+
+
+def _build_export_loader(
+    samples: list[Any],
+    *,
+    split: str,
+    tokenizer: Any,
+    pretrained_name: str,
+    max_length: int,
+    batch_size: int,
+    num_workers: int,
+    collate_fn: Any,
+) -> DataLoader:
+    split_view = prepare_transformer_adapter(
+        samples,
+        split=split,
+        tokenizer_name=pretrained_name,
+        max_length=max_length,
+    )
+    split_dataset = TokenizedTextDataset(split_view.records, tokenizer, max_length=max_length)
+    return DataLoader(
+        split_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=collate_fn,
+    )
 
 
 def train_distilbert_baseline(
@@ -410,39 +492,49 @@ def train_distilbert_baseline(
         tokenizer.save_pretrained(checkpoint_dir / "tokenizer")
 
     model.load_state_dict(best_state_dict)
-    train_export_result = _run_validation(model, train_eval_loader, device=device)
-    validation_export_result = _run_validation(model, validation_loader, device=device)
-    prediction_paths = write_prediction_exports(
-        run_dir,
-        {
-            "train": build_prediction_records(
-                run_id=str(config["run_id"]),
-                model_name=str(config["model_name"]),
-                sample_ids=train_export_result["metadata"]["sample_id"],
-                splits=train_export_result["metadata"]["split"],
-                true_labels=train_export_result["labels"],
-                predicted_labels=train_export_result["predictions"],
-                probability_rows=train_export_result["probabilities"],
-                group_ids=train_export_result["metadata"]["group_id"],
-                is_id_flags=train_export_result["metadata"]["is_id"],
-                is_ood_flags=train_export_result["metadata"]["is_ood"],
-                logits_rows=train_export_result["logits"],
-            ),
-            "validation": build_prediction_records(
-                run_id=str(config["run_id"]),
-                model_name=str(config["model_name"]),
-                sample_ids=validation_export_result["metadata"]["sample_id"],
-                splits=validation_export_result["metadata"]["split"],
-                true_labels=validation_export_result["labels"],
-                predicted_labels=validation_export_result["predictions"],
-                probability_rows=validation_export_result["probabilities"],
-                group_ids=validation_export_result["metadata"]["group_id"],
-                is_id_flags=validation_export_result["metadata"]["is_id"],
-                is_ood_flags=validation_export_result["metadata"]["is_ood"],
-                logits_rows=validation_export_result["logits"],
-            ),
-        },
-    )
+    export_loaders = {
+        "train": train_eval_loader,
+        "validation": validation_loader,
+    }
+    if bool(train_config.get("export_blind_test_predictions", False)):
+        export_loaders["id_test"] = _build_export_loader(
+            dataset.samples,
+            split="id_test",
+            tokenizer=tokenizer,
+            pretrained_name=pretrained_name,
+            max_length=max_length,
+            batch_size=eval_batch_size,
+            num_workers=int(train_config.get("num_workers", 0)),
+            collate_fn=collate_fn,
+        )
+        export_loaders["ood_test"] = _build_export_loader(
+            dataset.samples,
+            split="ood_test",
+            tokenizer=tokenizer,
+            pretrained_name=pretrained_name,
+            max_length=max_length,
+            batch_size=eval_batch_size,
+            num_workers=int(train_config.get("num_workers", 0)),
+            collate_fn=collate_fn,
+        )
+
+    prediction_exports = {}
+    for split_name, export_loader in export_loaders.items():
+        export_result = _run_validation(model, export_loader, device=device)
+        prediction_exports[split_name] = build_prediction_records(
+            run_id=str(config["run_id"]),
+            model_name=str(config["model_name"]),
+            sample_ids=export_result["metadata"]["sample_id"],
+            splits=export_result["metadata"]["split"],
+            true_labels=export_result["labels"],
+            predicted_labels=export_result["predictions"],
+            probability_rows=export_result["probabilities"],
+            group_ids=export_result["metadata"]["group_id"],
+            is_id_flags=export_result["metadata"]["is_id"],
+            is_ood_flags=export_result["metadata"]["is_ood"],
+            logits_rows=export_result["logits"],
+        )
+    prediction_paths = write_prediction_exports(run_dir, prediction_exports)
 
     validation_metrics = dict(best_validation_result["metrics"])
     metrics_payload = {
@@ -470,6 +562,14 @@ def train_distilbert_baseline(
             "mixed_precision_used": use_mixed_precision,
         },
     }
+    runtime_metadata = _build_runtime_metadata(
+        config=config,
+        device=device,
+        use_mixed_precision=use_mixed_precision,
+        train_batch_size=train_batch_size,
+        eval_batch_size=eval_batch_size,
+        max_length=max_length,
+    )
 
     return DistilBertBaselineArtifacts(
         metrics_payload=metrics_payload,
@@ -478,4 +578,5 @@ def train_distilbert_baseline(
         checkpoint_path=checkpoint_path,
         history_path=history_path,
         tokenizer_config_path=tokenizer_config_path,
+        runtime_metadata=runtime_metadata,
     )

@@ -55,6 +55,13 @@ def train_logistic_baseline(
     dataset = resolved_loader(config, download=True)
     train_view = prepare_tfidf_adapter(dataset.samples, split="train")
     validation_view = prepare_tfidf_adapter(dataset.samples, split="validation")
+    export_views = {
+        "train": train_view,
+        "validation": validation_view,
+    }
+    if bool(config.get("train", {}).get("export_blind_test_predictions", False)):
+        export_views["id_test"] = prepare_tfidf_adapter(dataset.samples, split="id_test")
+        export_views["ood_test"] = prepare_tfidf_adapter(dataset.samples, split="ood_test")
 
     model_config = dict(config.get("model", {}))
     vectorizer_config = dict(model_config.get("vectorizer", {}))
@@ -114,37 +121,40 @@ def train_logistic_baseline(
         "validation_metrics": validation_metrics,
     }
 
-    prediction_paths = write_prediction_exports(
-        run_dir,
-        {
-            "train": build_prediction_records(
-                run_id=str(config["run_id"]),
-                model_name=str(config["model_name"]),
-                sample_ids=train_view.sample_ids,
-                splits=train_view.splits,
-                true_labels=[int(label) for label in train_view.labels],
-                predicted_labels=[int(label) for label in train_predicted_labels],
-                probability_rows=[
-                    [float(row[0]), float(row[1])] for row in train_probability_rows
-                ],
-                group_ids=train_view.group_ids,
-                is_id_flags=train_view.is_id_flags,
-                is_ood_flags=train_view.is_ood_flags,
-            ),
-            "validation": build_prediction_records(
-                run_id=str(config["run_id"]),
-                model_name=str(config["model_name"]),
-                sample_ids=validation_view.sample_ids,
-                splits=validation_view.splits,
-                true_labels=[int(label) for label in validation_view.labels],
-                predicted_labels=[int(label) for label in predicted_labels],
-                probability_rows=[[float(row[0]), float(row[1])] for row in probability_rows],
-                group_ids=validation_view.group_ids,
-                is_id_flags=validation_view.is_id_flags,
-                is_ood_flags=validation_view.is_ood_flags,
-            ),
-        },
-    )
+    split_probability_rows = {
+        "train": train_probability_rows,
+        "validation": probability_rows,
+    }
+    split_predicted_labels = {
+        "train": train_predicted_labels,
+        "validation": predicted_labels,
+    }
+    for split_name in ("id_test", "ood_test"):
+        split_view = export_views.get(split_name)
+        if split_view is None:
+            continue
+        split_matrix = vectorizer.transform(split_view.texts)
+        split_probability_rows[split_name] = classifier.predict_proba(split_matrix).tolist()
+        split_predicted_labels[split_name] = classifier.predict(split_matrix).tolist()
+
+    prediction_exports = {}
+    for split_name, split_view in export_views.items():
+        prediction_exports[split_name] = build_prediction_records(
+            run_id=str(config["run_id"]),
+            model_name=str(config["model_name"]),
+            sample_ids=split_view.sample_ids,
+            splits=split_view.splits,
+            true_labels=[int(label) for label in split_view.labels],
+            predicted_labels=[int(label) for label in split_predicted_labels[split_name]],
+            probability_rows=[
+                [float(row[0]), float(row[1])] for row in split_probability_rows[split_name]
+            ],
+            group_ids=split_view.group_ids,
+            is_id_flags=split_view.is_id_flags,
+            is_ood_flags=split_view.is_ood_flags,
+        )
+
+    prediction_paths = write_prediction_exports(run_dir, prediction_exports)
 
     checkpoint_dir, vectorizer_path, model_path = _checkpoint_paths(run_dir)
     joblib.dump(vectorizer, vectorizer_path)

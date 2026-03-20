@@ -11,6 +11,9 @@ from typing import Any
 
 from model_failure_lab.utils.paths import build_prediction_artifact_paths
 
+_DEFAULT_PREDICTION_SPLITS = ("train", "validation")
+_BLIND_HELD_OUT_SPLITS = ("id_test", "ood_test")
+
 DEFAULT_VERSION_PACKAGES = {
     "torch": "torch",
     "scikit_learn": "scikit-learn",
@@ -80,6 +83,32 @@ def build_artifact_paths(
     }
 
 
+def resolve_prediction_splits(
+    config: dict[str, Any],
+    *,
+    requested_splits: list[str] | tuple[str, ...] | None = None,
+) -> list[str]:
+    """Return the canonical saved prediction split contract for a run."""
+    splits = list(_DEFAULT_PREDICTION_SPLITS)
+    if not bool(config.get("train", {}).get("export_blind_test_predictions", False)):
+        return splits
+
+    split_details = {
+        str(key): str(value)
+        for key, value in dict(config.get("split_details", {})).items()
+    }
+    blind_splits = (
+        list(requested_splits)
+        if requested_splits is not None
+        else list(_BLIND_HELD_OUT_SPLITS)
+    )
+    for split in blind_splits:
+        normalized_split = str(split)
+        if normalized_split in split_details and normalized_split not in splits:
+            splits.append(normalized_split)
+    return splits
+
+
 def build_run_metadata(
     *,
     run_id: str,
@@ -105,6 +134,7 @@ def build_run_metadata(
         "run_id": run_id,
         "timestamp": timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "experiment_type": experiment_type,
+        "experiment_group": resolved_config.get("experiment_group"),
         "model_name": model_name,
         "dataset_name": dataset_name,
         "split_details": split_details,

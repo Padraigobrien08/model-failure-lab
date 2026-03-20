@@ -128,6 +128,7 @@ def _create_saved_source_run(temp_artifact_root) -> tuple[Path, dict[str, object
         "run_id": source_run_id,
         "model_name": "logistic_tfidf",
         "dataset_name": "civilcomments",
+        "experiment_group": "baselines_v1",
         "split_details": {
             "train": "train",
             "validation": "validation",
@@ -135,6 +136,7 @@ def _create_saved_source_run(temp_artifact_root) -> tuple[Path, dict[str, object
             "ood_test": "ood_test",
         },
         "resolved_config": {
+            "experiment_group": "baselines_v1",
             "seed": 13,
             "tags": ["baseline", "logistic_tfidf"],
             "data": {"group_fields": ["male", "female"]},
@@ -263,7 +265,7 @@ def test_dispatch_shift_eval_completes_and_writes_bundle(temp_artifact_root):
     config = load_experiment_config("civilcomments_logistic_baseline")
     config["experiment_type"] = "shift_eval"
     config["run_id"] = "evaluation_bundle"
-    config["experiment_group"] = source_metadata["run_id"]
+    config["experiment_group"] = source_metadata["resolved_config"]["experiment_group"]
     config["eval"]["requested_splits"] = ["validation", "test"]
     config["eval"]["min_group_support"] = 1
     config["eval"]["calibration_bins"] = 5
@@ -304,6 +306,9 @@ def test_dispatch_shift_eval_completes_and_writes_bundle(temp_artifact_root):
     assert result.metrics_path == Path(artifact_paths["overall_metrics_json"])
     assert final_metadata["status"] == "completed"
     assert final_metadata["source_run_id"] == source_metadata["run_id"]
+    assert final_metadata["experiment_group"] == "baselines_v1"
+    assert final_metadata["source_experiment_group"] == "baselines_v1"
+    assert final_metadata["resolved_config"]["experiment_group"] == "baselines_v1"
     assert final_metadata["evaluated_splits"] == ["validation", "test"]
     assert Path(artifact_paths["overall_metrics_json"]).exists()
     assert Path(artifact_paths["subgroup_metrics_csv"]).exists()

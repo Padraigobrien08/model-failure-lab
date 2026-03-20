@@ -51,6 +51,16 @@ def _read_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
+def _relocate_artifact_path(path: Path, metadata_path: Path) -> Path:
+    if path.exists():
+        return path
+
+    relocated_path = metadata_path.parent / path.name
+    if relocated_path.exists():
+        return relocated_path
+    return path
+
+
 def _iter_evaluation_metadata_paths() -> list[Path]:
     patterns = [
         artifact_root().glob("baselines/*/*/evaluations/*/metadata.json"),
@@ -84,6 +94,38 @@ def _matches_experiment_group(metadata: dict[str, Any], experiment_group: str) -
     return experiment_group in tags
 
 
+def _is_completed_bundle(metadata: dict[str, Any]) -> bool:
+    status = metadata.get("status")
+    return status in {None, "completed"}
+
+
+def _source_run_identity(metadata: dict[str, Any]) -> str:
+    return str(
+        metadata.get("source_run_id")
+        or metadata.get("parent_run_id")
+        or metadata.get("run_id")
+        or "unknown"
+    )
+
+
+def _bundle_sort_key(metadata_path: Path, metadata: dict[str, Any]) -> tuple[str, str, str]:
+    timestamp = str(metadata.get("timestamp") or "")
+    eval_id = str(metadata.get("eval_id", metadata.get("run_id", "")))
+    return (timestamp, eval_id, str(metadata_path))
+
+
+def _latest_bundle_per_source_run(metadata_paths: list[Path]) -> list[Path]:
+    latest_by_source: dict[str, tuple[tuple[str, str, str], Path]] = {}
+    for metadata_path in metadata_paths:
+        metadata = _read_json(metadata_path)
+        source_identity = _source_run_identity(metadata)
+        sort_key = _bundle_sort_key(metadata_path, metadata)
+        current = latest_by_source.get(source_identity)
+        if current is None or sort_key > current[0]:
+            latest_by_source[source_identity] = (sort_key, metadata_path)
+    return sorted(path.resolve() for _, path in latest_by_source.values())
+
+
 def _load_candidate(metadata_path: Path) -> ReportCandidate:
     metadata = _read_json(metadata_path)
     artifact_paths = dict(metadata.get("artifact_paths", {}))
@@ -92,13 +134,27 @@ def _load_candidate(metadata_path: Path) -> ReportCandidate:
         eval_id=eval_id,
         metadata_path=metadata_path,
         metadata=metadata,
-        overall_metrics=_read_json(Path(artifact_paths["overall_metrics_json"])),
-        split_metrics=_read_csv(Path(artifact_paths["split_metrics_csv"])),
-        id_ood_comparison=_read_csv(Path(artifact_paths["id_ood_comparison_csv"])),
-        subgroup_metrics=_read_csv(Path(artifact_paths["subgroup_metrics_csv"])),
-        worst_group_summary=_read_json(Path(artifact_paths["worst_group_summary_json"])),
-        calibration_summary=_read_csv(Path(artifact_paths["calibration_summary_csv"])),
-        calibration_bins=_read_csv(Path(artifact_paths["calibration_bins_csv"])),
+        overall_metrics=_read_json(
+            _relocate_artifact_path(Path(artifact_paths["overall_metrics_json"]), metadata_path)
+        ),
+        split_metrics=_read_csv(
+            _relocate_artifact_path(Path(artifact_paths["split_metrics_csv"]), metadata_path)
+        ),
+        id_ood_comparison=_read_csv(
+            _relocate_artifact_path(Path(artifact_paths["id_ood_comparison_csv"]), metadata_path)
+        ),
+        subgroup_metrics=_read_csv(
+            _relocate_artifact_path(Path(artifact_paths["subgroup_metrics_csv"]), metadata_path)
+        ),
+        worst_group_summary=_read_json(
+            _relocate_artifact_path(Path(artifact_paths["worst_group_summary_json"]), metadata_path)
+        ),
+        calibration_summary=_read_csv(
+            _relocate_artifact_path(Path(artifact_paths["calibration_summary_csv"]), metadata_path)
+        ),
+        calibration_bins=_read_csv(
+            _relocate_artifact_path(Path(artifact_paths["calibration_bins_csv"]), metadata_path)
+        ),
     )
 
 
@@ -110,10 +166,21 @@ def _load_perturbation_candidate(metadata_path: Path) -> PerturbationReportCandi
         eval_id=eval_id,
         metadata_path=metadata_path,
         metadata=metadata,
-        suite_summary=_read_csv(Path(artifact_paths["suite_summary_csv"])),
-        family_summary=_read_csv(Path(artifact_paths["family_summary_csv"])),
-        severity_summary=_read_csv(Path(artifact_paths["severity_summary_csv"])),
-        family_severity_matrix=_read_csv(Path(artifact_paths["family_severity_matrix_csv"])),
+        suite_summary=_read_csv(
+            _relocate_artifact_path(Path(artifact_paths["suite_summary_csv"]), metadata_path)
+        ),
+        family_summary=_read_csv(
+            _relocate_artifact_path(Path(artifact_paths["family_summary_csv"]), metadata_path)
+        ),
+        severity_summary=_read_csv(
+            _relocate_artifact_path(Path(artifact_paths["severity_summary_csv"]), metadata_path)
+        ),
+        family_severity_matrix=_read_csv(
+            _relocate_artifact_path(
+                Path(artifact_paths["family_severity_matrix_csv"]),
+                metadata_path,
+            )
+        ),
     )
 
 
@@ -132,6 +199,8 @@ def discover_evaluation_bundles(
         matched = []
         for metadata_path in metadata_paths:
             metadata = _read_json(metadata_path)
+            if not _is_completed_bundle(metadata):
+                continue
             eval_id = str(metadata.get("eval_id", metadata.get("run_id")))
             if eval_id in requested:
                 matched.append(metadata_path)
@@ -149,13 +218,15 @@ def discover_evaluation_bundles(
     matched = []
     for metadata_path in metadata_paths:
         metadata = _read_json(metadata_path)
+        if not _is_completed_bundle(metadata):
+            continue
         if _matches_experiment_group(metadata, experiment_group):
             matched.append(metadata_path)
     if not matched:
         raise FileNotFoundError(
             f"No saved evaluation bundles found for experiment group: {experiment_group}"
         )
-    return sorted(matched)
+    return _latest_bundle_per_source_run(matched)
 
 
 def load_report_inputs(
@@ -186,6 +257,8 @@ def discover_perturbation_bundles(
         matched = []
         for metadata_path in metadata_paths:
             metadata = _read_json(metadata_path)
+            if not _is_completed_bundle(metadata):
+                continue
             eval_id = str(metadata.get("run_id"))
             if eval_id in requested:
                 matched.append(metadata_path)
@@ -201,6 +274,8 @@ def discover_perturbation_bundles(
     matched = []
     for metadata_path in metadata_paths:
         metadata = _read_json(metadata_path)
+        if not _is_completed_bundle(metadata):
+            continue
         if _matches_experiment_group(metadata, experiment_group):
             matched.append(metadata_path)
     if not matched:

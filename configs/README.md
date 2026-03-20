@@ -19,3 +19,10 @@ configs/
 
 Experiment presets should stay config-first. CLI flags may override a small set of iterative fields, but
 the resolved run snapshot must still be written to disk before execution work begins.
+
+Phase 11 pairs this config layout with the script-first runtime workflow:
+
+- `python scripts/check_environment.py`
+- `python scripts/download_data.py`
+- `python scripts/run_baseline.py --model logistic_tfidf`
+- `python scripts/run_baseline.py --model distilbert`

@@ -1,9 +1,18 @@
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
 import json
 from copy import deepcopy
 from typing import Sequence
+
+try:
+    from scripts._bootstrap import bootstrap_repo_paths
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_repo_paths
+
+bootstrap_repo_paths()
 
 from model_failure_lab.config import RunConfig, apply_cli_overrides, load_experiment_config
 from model_failure_lab.evaluation.bundle import build_evaluation_metadata
@@ -92,7 +101,6 @@ def run_command(argv: Sequence[str] | None = None):
             "seed": args.seed,
             "notes": args.notes,
             "run_id": generate_run_id("shift_eval"),
-            "experiment_group": args.run_id,
             "eval_splits": args.splits,
             "min_group_support": args.min_group_support,
             "calibration_bins": args.calibration_bins,

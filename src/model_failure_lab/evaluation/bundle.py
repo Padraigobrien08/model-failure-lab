@@ -83,6 +83,15 @@ def build_evaluation_metadata(
     status: str | None = None,
 ) -> dict[str, Any]:
     """Build the persisted metadata payload for one evaluation bundle."""
+    source_resolved_config = source_run_metadata.get("resolved_config", {})
+    source_experiment_group = None
+    if isinstance(source_resolved_config, dict):
+        source_experiment_group = source_resolved_config.get("experiment_group")
+    resolved_experiment_group = (
+        resolved_config.get("experiment_group")
+        or source_run_metadata.get("experiment_group")
+        or source_experiment_group
+    )
     metadata = build_run_metadata(
         run_id=eval_id,
         experiment_type="shift_eval",
@@ -104,6 +113,10 @@ def build_evaluation_metadata(
     )
     metadata["eval_id"] = eval_id
     metadata["source_run_id"] = str(source_run_metadata["run_id"])
+    if resolved_experiment_group is not None:
+        metadata["experiment_group"] = str(resolved_experiment_group)
+    if source_experiment_group is not None:
+        metadata["source_experiment_group"] = str(source_experiment_group)
     if source_run_metadata.get("parent_run_id") is not None:
         metadata["source_parent_run_id"] = str(source_run_metadata["parent_run_id"])
     if source_run_metadata.get("mitigation_method") is not None:

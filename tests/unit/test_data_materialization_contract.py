@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -9,6 +10,8 @@ from model_failure_lab.config.loader import load_experiment_config
 from model_failure_lab.data import (
     DataDependencyError,
     materialize_civilcomments,
+    prepare_civilcomments_runtime_dataset,
+    read_data_manifest,
     resolve_split_policy,
 )
 from model_failure_lab.utils.paths import (
@@ -129,11 +132,19 @@ def _fake_get_dataset(**_: object) -> _FakeDataset:
     )
 
 
-def test_load_civilcomments_dataset_requires_wilds_dependency():
+def test_load_civilcomments_dataset_requires_wilds_dependency(monkeypatch):
     config = load_experiment_config("configs/experiments/civilcomments_logistic_baseline.yaml")
+    monkeypatch.setattr(
+        "model_failure_lab.data.civilcomments.import_module",
+        lambda _name: (_ for _ in ()).throw(ModuleNotFoundError("wilds")),
+    )
 
     with pytest.raises(DataDependencyError, match="requires the 'wilds' package"):
         materialize_civilcomments(config)
+
+
+def test_read_data_manifest_returns_none_when_missing(temp_artifact_root):
+    assert read_data_manifest("civilcomments") is None
 
 
 def test_materialize_civilcomments_writes_manifest_with_mocked_wilds(
@@ -151,6 +162,103 @@ def test_materialize_civilcomments_writes_manifest_with_mocked_wilds(
     )
     assert manifest_payload["validation_status"] == "completed"
     assert (result.summary_dir / "data_validation.json").exists()
+
+
+def test_prepare_civilcomments_runtime_dataset_reuses_completed_manifest(
+    temp_artifact_root,
+    monkeypatch,
+):
+    config = load_experiment_config("configs/experiments/civilcomments_logistic_baseline.yaml")
+    materialize_civilcomments(config, get_dataset_fn=_fake_get_dataset)
+
+    def fail_materialize(*_args, **_kwargs):
+        raise AssertionError("existing manifest should be reused")
+
+    monkeypatch.setattr(
+        "model_failure_lab.data.materialization.materialize_civilcomments",
+        fail_materialize,
+    )
+
+    result = prepare_civilcomments_runtime_dataset(
+        config,
+        get_dataset_fn=_fake_get_dataset,
+    )
+
+    assert result.manifest_path == build_data_manifest_path("civilcomments")
+    assert result.summary_dir == build_data_summary_dir()
+    assert result.manifest_payload["validation_status"] == "completed"
+    assert len(result.dataset.samples) == 3
+    assert read_data_manifest("civilcomments")["dataset_name"] == "civilcomments"
+
+
+def test_prepare_civilcomments_runtime_dataset_materializes_when_manifest_missing(
+    temp_artifact_root,
+    monkeypatch,
+):
+    config = load_experiment_config("configs/experiments/civilcomments_logistic_baseline.yaml")
+    call_count = 0
+
+    def fake_materialize(runtime_config: dict[str, object], *, download: bool, get_dataset_fn=None):
+        nonlocal call_count
+        call_count += 1
+        assert runtime_config["dataset_name"] == "civilcomments"
+        assert download is True
+        return materialize_civilcomments(
+            runtime_config,
+            download=download,
+            get_dataset_fn=get_dataset_fn or _fake_get_dataset,
+        )
+
+    monkeypatch.setattr(
+        "model_failure_lab.data.materialization.materialize_civilcomments",
+        fake_materialize,
+    )
+
+    result = prepare_civilcomments_runtime_dataset(
+        config,
+        get_dataset_fn=_fake_get_dataset,
+    )
+
+    assert call_count == 1
+    assert result.manifest_path.exists()
+    assert len(result.dataset.samples) == 3
+
+
+def test_prepare_civilcomments_runtime_dataset_rejects_incompatible_split_policy(
+    temp_artifact_root,
+):
+    config = load_experiment_config("configs/experiments/civilcomments_logistic_baseline.yaml")
+    manifest_result = materialize_civilcomments(config, get_dataset_fn=_fake_get_dataset)
+    manifest_payload = json.loads(manifest_result.manifest_path.read_text(encoding="utf-8"))
+    manifest_payload["project_splits"]["roles"]["validation"]["raw_split"] = "train"
+    manifest_result.manifest_path.write_text(
+        json.dumps(manifest_payload, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="materialization contract"):
+        prepare_civilcomments_runtime_dataset(
+            config,
+            get_dataset_fn=_fake_get_dataset,
+            materialize_if_missing=False,
+        )
+
+
+def test_prepare_civilcomments_runtime_dataset_rejects_missing_summary_artifact(
+    temp_artifact_root,
+):
+    config = load_experiment_config("configs/experiments/civilcomments_logistic_baseline.yaml")
+    manifest_result = materialize_civilcomments(config, get_dataset_fn=_fake_get_dataset)
+    manifest_payload = json.loads(manifest_result.manifest_path.read_text(encoding="utf-8"))
+    split_counts_path = Path(manifest_payload["summary_artifacts"]["split_counts_csv"])
+    split_counts_path.unlink()
+
+    with pytest.raises(ValueError, match="materialization contract"):
+        prepare_civilcomments_runtime_dataset(
+            config,
+            get_dataset_fn=_fake_get_dataset,
+            materialize_if_missing=False,
+        )
 
 
 def test_download_data_command_materializes_with_mocked_loader(temp_artifact_root):

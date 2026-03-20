@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover - torch is expected via project 
 
 from sklearn.metrics import accuracy_score, f1_score, log_loss, roc_auc_score
 
-from model_failure_lab.data import CanonicalDataset, load_canonical_civilcomments_dataset
+from model_failure_lab.data import CanonicalDataset, prepare_civilcomments_runtime_dataset
 
 
 def set_random_seed(seed: int) -> None:
@@ -38,11 +38,11 @@ def load_baseline_canonical_dataset(
     get_dataset_fn: Any | None = None,
 ) -> CanonicalDataset:
     """Load canonical CivilComments samples for a baseline run."""
-    return load_canonical_civilcomments_dataset(
+    return prepare_civilcomments_runtime_dataset(
         config,
         download=download,
         get_dataset_fn=get_dataset_fn,
-    )
+    ).dataset
 
 
 def compute_binary_classification_metrics(

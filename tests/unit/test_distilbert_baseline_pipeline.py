@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 import torch
 from torch import nn
 
 from model_failure_lab.config.loader import load_experiment_config
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
 from model_failure_lab.models.distilbert import train_distilbert_baseline
+from model_failure_lab.models.export import REQUIRED_PREDICTION_COLUMNS
 from model_failure_lab.utils.paths import build_baseline_run_dir
 from scripts.run_baseline import run_command as run_baseline_command
 
@@ -95,6 +97,34 @@ def _canonical_dataset() -> CanonicalDataset:
             split="validation",
             group_id="group_b",
         ),
+        _sample(
+            sample_id="id_test_0",
+            text="negative calm blind id",
+            label=0,
+            split="id_test",
+            group_id="group_a",
+        ),
+        _sample(
+            sample_id="id_test_1",
+            text="positive toxic blind id",
+            label=1,
+            split="id_test",
+            group_id="group_b",
+        ),
+        _sample(
+            sample_id="ood_test_0",
+            text="negative calm blind ood",
+            label=0,
+            split="ood_test",
+            group_id="group_a",
+        ),
+        _sample(
+            sample_id="ood_test_1",
+            text="positive toxic blind ood",
+            label=1,
+            split="ood_test",
+            group_id="group_b",
+        ),
     ]
     return CanonicalDataset(dataset_name="civilcomments", samples=samples)
 
@@ -167,6 +197,20 @@ def test_train_distilbert_baseline_writes_checkpoint_and_history(temp_artifact_r
     assert artifacts.tokenizer_config_path.exists()
     assert artifacts.prediction_paths["train"].exists()
     assert artifacts.prediction_paths["validation"].exists()
+    assert artifacts.prediction_paths["id_test"].exists()
+    assert artifacts.prediction_paths["ood_test"].exists()
+    id_test_frame = pd.read_parquet(artifacts.prediction_paths["id_test"])
+    ood_test_frame = pd.read_parquet(artifacts.prediction_paths["ood_test"])
+    assert (
+        list(id_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)])
+        == REQUIRED_PREDICTION_COLUMNS
+    )
+    assert (
+        list(ood_test_frame.columns[: len(REQUIRED_PREDICTION_COLUMNS)])
+        == REQUIRED_PREDICTION_COLUMNS
+    )
+    assert set(id_test_frame["split"]) == {"id_test"}
+    assert set(ood_test_frame["split"]) == {"ood_test"}
     assert artifacts.metrics_payload["primary_metric"]["name"] == "macro_f1"
     assert (
         artifacts.metrics_payload["selected_checkpoint"]["source"]
@@ -190,19 +234,46 @@ def test_run_baseline_command_executes_real_distilbert_path(temp_artifact_root, 
     )
 
     result = run_baseline_command(
-        ["--model", "distilbert", "--run-id", "distilbert_command_test"]
+        [
+            "--model",
+            "distilbert",
+            "--run-id",
+            "distilbert_command_test",
+            "--tier",
+            "constrained",
+            "--experiment-group",
+            "baselines_v1_1",
+            "--tag",
+            "v1.1_baseline",
+        ]
     )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
     metrics = json.loads(result.metrics_path.read_text(encoding="utf-8"))
 
     assert result.status == "completed"
     assert metadata["status"] == "completed"
+    assert metadata["experiment_group"] == "baselines_v1_1"
+    assert metadata["resolved_config"]["experiment_group"] == "baselines_v1_1"
+    assert metadata["resolved_config"]["model"]["execution_tier"] == "constrained"
+    assert metadata["execution_tier"] == "constrained"
+    assert metadata["effective_batch_size"] == 8
+    assert metadata["max_length"] == 128
+    assert metadata["hardware"]["device_type"] in {"cpu", "cuda", "mps"}
+    assert metadata["tags"] == ["baseline", "distilbert", "constrained", "v1.1_baseline"]
     assert metadata["artifact_paths"]["predictions"]["train"].endswith(
         "predictions_train.parquet"
     )
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
+    )
     assert metrics["primary_metric"]["value"] is not None
+    assert Path(metadata["artifact_paths"]["predictions"]["id_test"]).exists()
+    assert Path(metadata["artifact_paths"]["predictions"]["ood_test"]).exists()
     assert (result.run_dir / "checkpoint" / "best_model.pt").exists()
     assert (result.run_dir / "checkpoint" / "training_history.json").exists()

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import patch
 
 import joblib
 import pandas as pd
@@ -17,16 +21,18 @@ from model_failure_lab.models.export import build_prediction_records
 from model_failure_lab.tracking import build_run_metadata, write_metadata
 from model_failure_lab.utils.paths import (
     build_baseline_run_dir,
-    build_evaluation_run_dir,
     build_prediction_artifact_path,
 )
 from scripts.build_perturbation_report import run_command as run_build_perturbation_report_command
 from scripts.build_report import run_command as run_build_report_command
+from scripts.check_environment import run_command as run_check_environment_command
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
 from scripts.run_mitigation import run_command as run_mitigation_command
 from scripts.run_perturbation_eval import run_command as run_perturbation_eval_command
 from scripts.run_shift_eval import run_command as run_shift_eval_command
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass
@@ -202,6 +208,34 @@ def _baseline_dataset() -> CanonicalDataset:
                 split="validation",
                 group_id="group_b",
             ),
+            _baseline_sample(
+                sample_id="id_test_0",
+                text="negative calm blind_id",
+                label=0,
+                split="id_test",
+                group_id="group_a",
+            ),
+            _baseline_sample(
+                sample_id="id_test_1",
+                text="positive toxic blind_id",
+                label=1,
+                split="id_test",
+                group_id="group_b",
+            ),
+            _baseline_sample(
+                sample_id="ood_test_0",
+                text="negative calm blind_ood",
+                label=0,
+                split="ood_test",
+                group_id="group_a",
+            ),
+            _baseline_sample(
+                sample_id="ood_test_1",
+                text="positive toxic blind_ood",
+                label=1,
+                split="ood_test",
+                group_id="group_b",
+            ),
         ],
     )
 
@@ -231,8 +265,8 @@ def _write_distilbert_parent_run(
     if with_saved_logits:
         dataset = _baseline_dataset()
         samples_by_split = {
-            "train": [sample for sample in dataset.samples if sample.split == "train"],
-            "validation": [sample for sample in dataset.samples if sample.split == "validation"],
+            split: [sample for sample in dataset.samples if sample.split == split]
+            for split in ("train", "validation", "id_test", "ood_test")
         }
         for split, samples in samples_by_split.items():
             logits_rows = []
@@ -530,6 +564,7 @@ def _create_saved_report_evaluation_bundle(
     ece: float = 0.07,
     brier_score: float = 0.12,
 ) -> None:
+    del overall_score, ece, brier_score
     if root_kind == "mitigation":
         from model_failure_lab.utils.paths import build_mitigation_run_dir
 
@@ -541,30 +576,72 @@ def _create_saved_report_evaluation_bundle(
         )
     else:
         source_run_dir = build_baseline_run_dir(model_name, source_run_id, create=True)
-    eval_dir = build_evaluation_run_dir(source_run_dir, eval_id, create=True)
-    figures_dir = eval_dir / "figures"
-    figures_dir.mkdir(parents=True, exist_ok=True)
 
-    artifact_paths = {
-        "overall_metrics_json": str(eval_dir / "overall_metrics.json"),
-        "split_metrics_csv": str(eval_dir / "split_metrics.csv"),
-        "id_ood_comparison_csv": str(eval_dir / "id_ood_comparison.csv"),
-        "subgroup_metrics_csv": str(eval_dir / "subgroup_metrics.csv"),
-        "worst_group_summary_json": str(eval_dir / "worst_group_summary.json"),
-        "subgroup_support_report_csv": str(eval_dir / "subgroup_support_report.csv"),
-        "calibration_summary_csv": str(eval_dir / "calibration_summary.csv"),
-        "calibration_bins_csv": str(eval_dir / "calibration_bins.csv"),
-        "confidence_summary_json": str(eval_dir / "confidence_summary.json"),
-        "diagnostics_json": str(eval_dir / "diagnostics.json"),
-        "plots": str(figures_dir),
+    group_support = {"group_low": 150, "group_mid": 140}
+    id_group_accuracy = {
+        "group_low": max(min(id_score - 0.03, 0.99), 0.0),
+        "group_mid": max(min(id_score + 0.03, 0.99), 0.0),
     }
+    ood_group_accuracy = {
+        "group_low": max(min(worst_group_score, 0.99), 0.0),
+        "group_mid": max(min((2 * ood_score) - worst_group_score, 0.99), 0.0),
+    }
+    prediction_records = {}
+    for split_name, is_id, is_ood, accuracy_lookup in (
+        ("id_test", True, False, id_group_accuracy),
+        ("ood_test", False, True, ood_group_accuracy),
+    ):
+        sample_ids: list[str] = []
+        splits: list[str] = []
+        true_labels: list[int] = []
+        predicted_labels: list[int] = []
+        probability_rows: list[list[float]] = []
+        group_ids: list[str] = []
+        is_id_flags: list[bool] = []
+        is_ood_flags: list[bool] = []
+        for group_name, support in group_support.items():
+            accuracy = float(accuracy_lookup[group_name])
+            correct_count = int(round(support * accuracy))
+            for index in range(support):
+                true_label = index % 2
+                predicted_label = true_label if index < correct_count else 1 - true_label
+                confidence = 0.83 if predicted_label == true_label else 0.76
+                prob_1 = confidence if predicted_label == 1 else 1.0 - confidence
+
+                sample_ids.append(f"{split_name}_{group_name}_{index}")
+                splits.append(split_name)
+                true_labels.append(true_label)
+                predicted_labels.append(predicted_label)
+                probability_rows.append([1.0 - prob_1, prob_1])
+                group_ids.append(group_name)
+                is_id_flags.append(is_id)
+                is_ood_flags.append(is_ood)
+
+        prediction_records[split_name] = build_prediction_records(
+            run_id=source_run_id,
+            model_name=model_name,
+            sample_ids=sample_ids,
+            splits=splits,
+            true_labels=true_labels,
+            predicted_labels=predicted_labels,
+            probability_rows=probability_rows,
+            group_ids=group_ids,
+            is_id_flags=is_id_flags,
+            is_ood_flags=is_ood_flags,
+        )
+
+    artifact_paths = {"predictions": {}}
+    for split_name, records in prediction_records.items():
+        output_path = build_prediction_artifact_path(source_run_dir, split_name)
+        pd.DataFrame(records).to_parquet(output_path, index=False)
+        artifact_paths["predictions"][split_name] = str(output_path)
+
     metadata_payload: dict[str, object] = {
-        "run_id": eval_id,
-        "eval_id": eval_id,
-        "source_run_id": source_run_id,
-        "experiment_type": "shift_eval",
+        "run_id": source_run_id,
+        "experiment_type": root_kind,
         "model_name": model_name,
         "dataset_name": "civilcomments",
+        "experiment_group": experiment_group,
         "split_details": {
             "train": "train",
             "validation": "validation",
@@ -573,22 +650,67 @@ def _create_saved_report_evaluation_bundle(
         },
         "resolved_config": {
             "experiment_group": experiment_group,
+            "seed": 13,
+            "tags": [experiment_group, root_kind, model_name],
             "data": {
                 "dataset_name": "civilcomments",
                 "label_field": "toxicity",
                 "text_field": "comment_text",
                 "group_fields": ["male", "female"],
+                "raw_splits": {"train": "train", "val": "val", "test": "test"},
+                "split_details": {
+                    "train": "train",
+                    "validation": "validation",
+                    "id_test": "id_test",
+                    "ood_test": "ood_test",
+                },
+                "split_role_policy": {
+                    "train": {
+                        "raw_split": "train",
+                        "selector": "train_remainder",
+                        "is_id": True,
+                        "is_ood": False,
+                    },
+                    "validation": {
+                        "raw_split": "val",
+                        "selector": "full_split",
+                        "is_id": False,
+                        "is_ood": True,
+                    },
+                    "id_test": {
+                        "raw_split": "train",
+                        "selector": "deterministic_holdout",
+                        "is_id": True,
+                        "is_ood": False,
+                        "holdout_fraction": 0.1,
+                        "holdout_seed": 13,
+                    },
+                    "ood_test": {
+                        "raw_split": "test",
+                        "selector": "full_split",
+                        "is_id": False,
+                        "is_ood": True,
+                    },
+                },
+                "validation": {
+                    "subgroup_min_samples_warning": 25,
+                    "preview_samples": 5,
+                },
             },
+            "eval": {"primary_metric": "macro_f1"},
         },
         "artifact_paths": artifact_paths,
-        "evaluator_version": "eval-schema-v1",
-        "git_commit_hash": "eval-schema-v1",
-        "min_group_support": 100,
-        "tags": [experiment_group],
     }
     if source_parent_run_id is not None:
-        metadata_payload["source_parent_run_id"] = source_parent_run_id
+        metadata_payload["parent_run_id"] = source_parent_run_id
         metadata_payload["mitigation_method"] = mitigation_method
+        metadata_payload["mitigation_config"] = {
+            "comparison_tolerances": {
+                "id_macro_f1_max_drop": 0.01,
+                "overall_macro_f1_max_drop": 0.01,
+                "ece_neutral_tolerance": 0.005,
+            }
+        }
         metadata_payload["resolved_config"] = {
             **dict(metadata_payload["resolved_config"]),
             "mitigation": {
@@ -600,112 +722,21 @@ def _create_saved_report_evaluation_bundle(
                 },
             },
         }
-    (eval_dir / "metadata.json").write_text(json.dumps(metadata_payload), encoding="utf-8")
-    (eval_dir / "overall_metrics.json").write_text(
-        json.dumps(
-            {
-                "headline_metrics": {
-                    "accuracy": overall_score,
-                    "macro_f1": overall_score,
-                    "auroc": overall_score + 0.12,
-                    "worst_group_f1": worst_group_score,
-                    "robustness_gap_f1": round(id_score - ood_score, 3),
-                },
-                "overall": {"macro_f1": overall_score},
-                "id": {"macro_f1": id_score},
-                "ood": {"macro_f1": ood_score},
-            }
-        ),
-        encoding="utf-8",
-    )
-    (eval_dir / "worst_group_summary.json").write_text(
-        json.dumps({"worst_group_f1": {"group_id": "group_low", "value": worst_group_score}}),
-        encoding="utf-8",
-    )
-    (eval_dir / "confidence_summary.json").write_text(json.dumps({"overall": {}}), encoding="utf-8")
-    (eval_dir / "diagnostics.json").write_text(
-        json.dumps({"score_distribution": {}}),
-        encoding="utf-8",
-    )
-    pd.DataFrame(
-        [
-            {"slice_name": "overall", "macro_f1": overall_score},
-            {"slice_name": "id", "macro_f1": id_score},
-            {"slice_name": "ood", "macro_f1": ood_score},
-        ]
-    ).to_csv(eval_dir / "split_metrics.csv", index=False)
-    pd.DataFrame(
-        [
-            {
-                "metric": "macro_f1",
-                "id_value": id_score,
-                "ood_value": ood_score,
-                "delta": round(id_score - ood_score, 3),
-            }
-        ]
-    ).to_csv(eval_dir / "id_ood_comparison.csv", index=False)
-    pd.DataFrame(
-        [
-            {
-                "grouping_type": "group_id",
-                "group_name": "group_low",
-                "support": 150,
-                "eligible_for_worst_group": True,
-                "macro_f1": worst_group_score,
-                "accuracy": worst_group_score + 0.05,
-                "error_rate": 1.0 - (worst_group_score + 0.05),
-            }
-        ]
-    ).to_csv(eval_dir / "subgroup_metrics.csv", index=False)
-    pd.DataFrame([{"group_name": "group_low", "support": 150}]).to_csv(
-        eval_dir / "subgroup_support_report.csv",
-        index=False,
-    )
-    pd.DataFrame(
-        [
-            {"slice_name": "overall", "ece": ece, "brier_score": brier_score, "sample_count": 100},
-            {
-                "slice_name": "id",
-                "ece": max(ece - 0.02, 0.0),
-                "brier_score": max(brier_score - 0.01, 0.0),
-                "sample_count": 60,
-            },
-            {
-                "slice_name": "ood",
-                "ece": ece + 0.02,
-                "brier_score": brier_score + 0.02,
-                "sample_count": 40,
-            },
-        ]
-    ).to_csv(eval_dir / "calibration_summary.csv", index=False)
-    pd.DataFrame(
-        [
-            {
-                "slice_name": "overall",
-                "avg_confidence": 0.2,
-                "empirical_accuracy": 0.3,
-                "count": 20,
-            },
-            {
-                "slice_name": "overall",
-                "avg_confidence": 0.8,
-                "empirical_accuracy": 0.7,
-                "count": 20,
-            },
-            {
-                "slice_name": "id",
-                "avg_confidence": 0.2,
-                "empirical_accuracy": 0.25,
-                "count": 10,
-            },
-            {
-                "slice_name": "ood",
-                "avg_confidence": 0.8,
-                "empirical_accuracy": 0.6,
-                "count": 10,
-            },
-        ]
-    ).to_csv(eval_dir / "calibration_bins.csv", index=False)
+    (source_run_dir / "metadata.json").write_text(json.dumps(metadata_payload), encoding="utf-8")
+
+    with patch("scripts.run_shift_eval.generate_run_id", return_value=eval_id):
+        run_shift_eval_command(
+            [
+                "--run-id",
+                source_run_id,
+                "--splits",
+                "id_test,ood_test",
+                "--min-group-support",
+                "100",
+                "--calibration-bins",
+                "5",
+            ]
+        )
 
 
 def test_run_logistic_baseline_writes_completed_artifacts(temp_artifact_root, monkeypatch):
@@ -715,18 +746,36 @@ def test_run_logistic_baseline_writes_completed_artifacts(temp_artifact_root, mo
     )
 
     result = run_baseline_command(
-        ["--model", "logistic_tfidf", "--run-id", "logistic_tfidf_baseline"]
+        [
+            "--model",
+            "logistic_tfidf",
+            "--run-id",
+            "logistic_tfidf_baseline",
+            "--experiment-group",
+            "baselines_v1_1",
+            "--tag",
+            "v1.1_baseline",
+        ]
     )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
 
     assert "artifacts/baselines/logistic_tfidf" in result.run_dir.as_posix()
     assert metadata["model_name"] == "logistic_tfidf"
+    assert metadata["experiment_group"] == "baselines_v1_1"
+    assert metadata["resolved_config"]["experiment_group"] == "baselines_v1_1"
+    assert metadata["tags"] == ["baseline", "logistic_tfidf", "v1.1_baseline"]
     assert metadata["status"] == "completed"
     assert metadata["artifact_paths"]["predictions"]["train"].endswith(
         "predictions_train.parquet"
     )
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
     )
     assert result.metadata_path.name == "metadata.json"
 
@@ -745,17 +794,40 @@ def test_run_distilbert_baseline_writes_completed_artifacts(temp_artifact_root, 
         lambda _name, num_labels: _TinyClassifier(num_labels=num_labels),
     )
 
-    result = run_baseline_command(["--model", "distilbert", "--run-id", "distilbert_baseline"])
+    result = run_baseline_command(
+        [
+            "--model",
+            "distilbert",
+            "--run-id",
+            "distilbert_baseline",
+            "--tier",
+            "constrained",
+            "--experiment-group",
+            "baselines_v1_1",
+            "--tag",
+            "v1.1_baseline",
+        ]
+    )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
 
     assert "artifacts/baselines/distilbert" in result.run_dir.as_posix()
     assert metadata["model_name"] == "distilbert"
+    assert metadata["experiment_group"] == "baselines_v1_1"
+    assert metadata["execution_tier"] == "constrained"
+    assert metadata["effective_batch_size"] == 8
+    assert metadata["max_length"] == 128
     assert metadata["status"] == "completed"
     assert metadata["artifact_paths"]["predictions"]["train"].endswith(
         "predictions_train.parquet"
     )
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
     )
     assert result.metadata_path.name == "metadata.json"
 
@@ -804,6 +876,12 @@ def test_run_mitigation_reweighting_writes_completed_artifacts(
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
+    )
 
 
 def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_artifact_root):
@@ -837,12 +915,18 @@ def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_arti
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
+    )
 
 
 def test_run_perturbation_eval_materializes_suite_bundle(temp_artifact_root, monkeypatch):
     source_run_id = _create_saved_evaluation_source_run()
     monkeypatch.setattr(
-        "scripts.run_perturbation_eval.load_canonical_civilcomments_dataset",
+        "scripts.run_perturbation_eval.prepare_civilcomments_runtime_dataset",
         lambda *_args, **_kwargs: _baseline_dataset(),
     )
 
@@ -897,6 +981,8 @@ def test_shift_eval_writes_completed_evaluation_bundle(temp_artifact_root):
     assert metadata["experiment_type"] == "shift_eval"
     assert metadata["status"] == "completed"
     assert metadata["source_run_id"] == source_run_id
+    assert metadata["experiment_group"] == "baselines"
+    assert metadata["resolved_config"]["experiment_group"] == "baselines"
     assert metadata["output_tag"] == "debug"
     assert result.metrics_path.name == "overall_metrics.json"
 
@@ -985,7 +1071,7 @@ def test_build_report_writes_mitigation_comparison_table(temp_artifact_root):
 def test_build_perturbation_report_writes_completed_report_package(temp_artifact_root, monkeypatch):
     source_run_id = _create_saved_evaluation_source_run()
     monkeypatch.setattr(
-        "scripts.run_perturbation_eval.load_canonical_civilcomments_dataset",
+        "scripts.run_perturbation_eval.prepare_civilcomments_runtime_dataset",
         lambda *_args, **_kwargs: _baseline_dataset(),
     )
     run_perturbation_eval_command(
@@ -1028,3 +1114,53 @@ def test_download_data_bootstrap_writes_metadata(temp_artifact_root):
     assert metadata["status"] == "materialized"
     assert metadata["artifact_paths"]["manifest_json"].endswith("civilcomments_manifest.json")
     assert result.metadata_path.exists()
+
+
+def test_direct_script_help_runs_without_manual_pythonpath():
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+
+    commands = [
+        [sys.executable, "scripts/check_environment.py", "--help"],
+        [sys.executable, "scripts/download_data.py", "--help"],
+        [sys.executable, "scripts/run_baseline.py", "--help"],
+        [sys.executable, "scripts/build_report.py", "--help"],
+    ]
+    for command in commands:
+        result = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "usage:" in result.stdout.lower()
+
+
+def test_check_environment_command_supports_json_output(tmp_path):
+    payload = run_check_environment_command(
+        ["--json"],
+        dependency_checker=lambda package: {
+            "package": package,
+            "available": True,
+            "version": "1.0",
+            "error": None,
+        },
+        matplotlib_dir_resolver=lambda: tmp_path / "mplconfig",
+        config_loader=lambda _preset: {
+            "model": {"pretrained_name": "distilbert-base-uncased"},
+        },
+        transformer_asset_checker=lambda pretrained_name: {
+            "pretrained_name": pretrained_name,
+            "local_cache_available": False,
+            "message": (
+                "Local cache not detected. The first DistilBERT run will require "
+                "network access or a pre-populated local cache."
+            ),
+        },
+    )
+
+    assert payload["overall_ok"] is True
+    assert payload["distilbert"]["pretrained_name"] == "distilbert-base-uncased"

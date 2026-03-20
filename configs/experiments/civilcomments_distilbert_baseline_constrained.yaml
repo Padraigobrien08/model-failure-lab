@@ -1,0 +1,14 @@
+experiment_name: civilcomments_distilbert_baseline_constrained
+experiment_group: baselines
+experiment_type: baseline
+dataset_name: civilcomments
+model_name: distilbert
+data_config: configs/data/civilcomments.yaml
+model_config: configs/model/distilbert_constrained.yaml
+train_config: configs/train/distilbert_constrained.yaml
+eval_config: configs/eval/default.yaml
+tags:
+  - baseline
+  - distilbert
+  - constrained
+notes: CivilComments DistilBERT baseline constrained preset.

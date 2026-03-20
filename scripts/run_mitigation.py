@@ -1,7 +1,16 @@
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
 from typing import Sequence
+
+try:
+    from scripts._bootstrap import bootstrap_repo_paths
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_repo_paths
+
+bootstrap_repo_paths()
 
 from model_failure_lab.config import apply_cli_overrides, load_experiment_config
 from model_failure_lab.mitigations import (
@@ -12,9 +21,11 @@ from model_failure_lab.mitigations import (
 from model_failure_lab.runners.dispatch import build_scaffold_metrics, dispatch_mitigation
 from model_failure_lab.tracking import (
     append_experiment_index,
+    build_artifact_paths,
     build_index_entry,
     build_run_metadata,
     generate_run_id,
+    resolve_prediction_splits,
     write_metadata,
     write_metrics,
 )
@@ -51,6 +62,13 @@ def run_command(argv: Sequence[str] | None = None):
     parent_context = load_parent_run_context(args.run_id)
     validate_distilbert_parent_run(parent_context)
     config = build_inherited_mitigation_config(parent_context, preset_config)
+    temperature_scaling_config = (
+        dict(config.get("mitigation_config", {})).get("temperature_scaling")
+        or dict(config.get("mitigation", {})).get("temperature_scaling")
+        or {}
+    )
+    requested_splits = temperature_scaling_config.get("apply_to_splits")
+    prediction_splits = resolve_prediction_splits(config, requested_splits=requested_splits)
 
     run_dir = build_mitigation_run_dir(
         method_name=args.method,
@@ -69,6 +87,7 @@ def run_command(argv: Sequence[str] | None = None):
         resolved_config=config,
         command=command.strip(),
         run_dir=run_dir,
+        artifact_paths=build_artifact_paths(run_dir, prediction_splits=prediction_splits),
         parent_run_id=args.run_id,
         notes=config.get("notes", ""),
         tags=config.get("tags", []),
