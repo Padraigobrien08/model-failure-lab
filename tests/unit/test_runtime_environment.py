@@ -1,11 +1,15 @@
 from __future__ import annotations
+
 from pathlib import Path
 
 import pytest
 
 from model_failure_lab.data.civilcomments import DataDependencyError, _resolve_get_dataset
 from model_failure_lab.models.distilbert import build_sequence_classifier, build_tokenizer
-from model_failure_lab.utils.runtime import check_python_dependency, ensure_matplotlib_runtime_dir
+from model_failure_lab.utils.runtime import (
+    check_python_dependency,
+    ensure_matplotlib_runtime_dir,
+)
 from scripts.check_environment import run_command as run_check_environment_command
 
 

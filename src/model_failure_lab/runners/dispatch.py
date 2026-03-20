@@ -377,7 +377,7 @@ def dispatch_shift_eval(
 ) -> DispatchResult:
     source_metadata = json.loads(source_metadata_path.read_text(encoding="utf-8"))
     _, prediction_frame = load_saved_predictions(
-        source_metadata,
+        source_metadata_path,
         splits=config.get("eval", {}).get("requested_splits"),
     )
     split_metric_rows = build_split_metrics_rows(prediction_frame)

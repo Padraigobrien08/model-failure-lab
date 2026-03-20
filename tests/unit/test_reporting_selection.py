@@ -284,6 +284,30 @@ def test_load_report_inputs_by_explicit_eval_ids(temp_artifact_root):
     assert candidates[0].overall_metrics["headline_metrics"]["macro_f1"] is not None
 
 
+def test_load_report_inputs_relocates_imported_evaluation_artifacts(temp_artifact_root):
+    metadata_path = _create_evaluation_bundle(
+        model_name="distilbert",
+        source_run_id="baseline_imported",
+        eval_id="eval_imported",
+        experiment_group="baselines_v1",
+    )
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["artifact_paths"] = {
+        key: (
+            f"/workspace/model-failure-lab/artifacts/baselines/distilbert/"
+            f"baseline_imported/evaluations/eval_imported/{Path(value).name}"
+        )
+        for key, value in dict(metadata["artifact_paths"]).items()
+    }
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    candidates = load_report_inputs(eval_ids=["eval_imported"])
+
+    assert len(candidates) == 1
+    assert candidates[0].eval_id == "eval_imported"
+    assert candidates[0].overall_metrics["headline_metrics"]["macro_f1"] is not None
+
+
 def test_select_report_candidates_rejects_non_comparable_runs(temp_artifact_root):
     _create_evaluation_bundle(
         model_name="logistic_tfidf",
@@ -304,6 +328,66 @@ def test_select_report_candidates_rejects_non_comparable_runs(temp_artifact_root
 
     with pytest.raises(ValueError, match="not comparable: dataset mismatch"):
         select_report_candidates(candidates)
+
+
+def test_discover_evaluation_bundles_ignores_incomplete_running_bundles(temp_artifact_root):
+    completed_path = _create_evaluation_bundle(
+        model_name="logistic_tfidf",
+        source_run_id="baseline_complete",
+        eval_id="eval_complete",
+        experiment_group="baselines_v1",
+    )
+    incomplete_dir = completed_path.parent.parent / "eval_incomplete"
+    incomplete_dir.mkdir(parents=True, exist_ok=True)
+    _write_json(
+        incomplete_dir / "metadata.json",
+        {
+            "eval_id": "eval_incomplete",
+            "experiment_group": "baselines_v1",
+            "status": "running",
+            "artifact_paths": {},
+        },
+    )
+
+    discovered = discover_evaluation_bundles(experiment_group="baselines_v1")
+
+    assert discovered == [completed_path.resolve()]
+
+
+def test_discover_evaluation_bundles_prefers_latest_completed_bundle_per_source_run(
+    temp_artifact_root,
+):
+    older_path = _create_evaluation_bundle(
+        model_name="logistic_tfidf",
+        source_run_id="baseline_dupe",
+        eval_id="eval_old",
+        experiment_group="baselines_v1",
+    )
+    latest_path = _create_evaluation_bundle(
+        model_name="logistic_tfidf",
+        source_run_id="baseline_dupe",
+        eval_id="eval_new",
+        experiment_group="baselines_v1",
+    )
+    other_path = _create_evaluation_bundle(
+        model_name="distilbert",
+        source_run_id="baseline_other",
+        eval_id="eval_other",
+        experiment_group="baselines_v1",
+    )
+
+    older_metadata = json.loads(older_path.read_text(encoding="utf-8"))
+    older_metadata["timestamp"] = "2026-03-20T16:00:00Z"
+    older_path.write_text(json.dumps(older_metadata), encoding="utf-8")
+
+    latest_metadata = json.loads(latest_path.read_text(encoding="utf-8"))
+    latest_metadata["timestamp"] = "2026-03-20T16:05:00Z"
+    latest_path.write_text(json.dumps(latest_metadata), encoding="utf-8")
+
+    discovered = discover_evaluation_bundles(experiment_group="baselines_v1")
+
+    assert discovered == sorted([latest_path.resolve(), other_path.resolve()])
+    assert older_path.resolve() not in discovered
 
 
 def test_select_report_candidates_orders_by_model_and_source_run(temp_artifact_root):
