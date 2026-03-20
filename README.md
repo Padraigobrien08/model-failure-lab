@@ -5,85 +5,64 @@ classification models fail under distribution shift. The benchmark workflow cent
 from WILDS, with explicit separation between baseline, mitigation, evaluation, reporting, and
 perturbation stress-test artifacts.
 
-## Installation
+## What Shipped In `v1.1`
+
+- a clean-machine script-first workflow for CivilComments
+- real Logistic Regression and DistilBERT baseline runs
+- real mitigation validation for `temperature_scaling`
+- real synthetic perturbation validation against the official DistilBERT lineage
+- repository-ready report artifacts and findings docs
+
+## Start here
+
+For the full end-to-end workflow, read:
+
+- [v1.1 reproducibility walkthrough](docs/v1_1_reproducibility.md)
+
+That document is the canonical runbook for setup, baseline execution, evaluation, mitigation, and
+perturbation reporting.
+
+## Quickstart
 
 Use Python 3.11 or newer.
 
 ```bash
 python -m pip install -e .[dev]
-```
-
-This editable install is the supported clean-machine workflow for `v1.1`. You should not need to
-export `PYTHONPATH=src` manually.
-
-## Environment Check
-
-Verify the benchmark runtime before starting any data or model runs:
-
-```bash
 python scripts/check_environment.py
-```
-
-This command checks:
-
-- importability of `matplotlib`, `wilds`, `torch`, and `transformers`
-- writable Matplotlib runtime configuration via `MPLCONFIGDIR`
-- the configured DistilBERT model name: `distilbert-base-uncased`
-- whether DistilBERT assets are already in the local cache or will need network access on first use
-
-If dependencies are missing, the checker now prints the exact supported install command:
-
-```bash
-python -m pip install -e .[dev]
-```
-
-If DistilBERT assets are not cached yet, the checker also prints a Hugging Face prefetch command.
-
-## Quickstart
-
-Materialize CivilComments and produce the first baseline artifacts:
-
-```bash
 python scripts/download_data.py
-python scripts/run_baseline.py --model logistic_tfidf --seed 13 --experiment-group baselines_v1_1 --tag v1.1_baseline
-python scripts/run_baseline.py --model distilbert --seed 13 --tier canonical --experiment-group baselines_v1_1 --tag v1.1_baseline
 ```
 
-If canonical DistilBERT settings are not practical on the local machine, use the constrained tier:
+If you only want the detailed setup guidance first, see:
 
-```bash
-python scripts/run_baseline.py --model distilbert --seed 13 --tier constrained --experiment-group baselines_v1_1 --tag v1.1_baseline
-```
+- [Runtime setup reference](docs/runtime-setup.md)
 
-Then evaluate a saved run and build a comparison report:
+## Key results
 
-```bash
-python scripts/run_shift_eval.py --run-id <id>
-python scripts/build_report.py --experiment-group baselines_v1_1
-```
+- DistilBERT is the stronger real baseline on CivilComments, with OOD Macro F1 `0.800` versus
+  `0.747` for Logistic Regression, but it still shows a measurable robustness gap of `0.071`.
+- Temperature scaling is a calibration win, not a robustness win: ECE improves by `0.011` and
+  Brier score by `0.0015`, while ID/OOD and worst-group metrics stay unchanged.
+- Under the synthetic perturbation suite, average Macro F1 drops by `0.063`, with `typo_noise`
+  the worst family and `high` the harshest severity. Calibration does not materially change that
+  brittleness.
 
-## Benchmark Workflow
+The full findings layer is here:
 
-The public workflow remains script-first:
+- [v1.1 findings](docs/v1_1_findings.md)
 
-1. `python scripts/check_environment.py`
-2. `python scripts/download_data.py`
-3. `python scripts/run_baseline.py --model logistic_tfidf --seed 13 --experiment-group baselines_v1_1 --tag v1.1_baseline`
-4. `python scripts/run_baseline.py --model distilbert --seed 13 --tier canonical --experiment-group baselines_v1_1 --tag v1.1_baseline`
-5. `python scripts/run_shift_eval.py --run-id <id>`
-6. `python scripts/build_report.py --experiment-group baselines_v1_1`
+## Official evidence
 
-Optional follow-on commands:
+The curated `v1.1` evidence package is the three-report set below:
 
-```bash
-python scripts/run_mitigation.py --run-id <distilbert_parent_id> --method reweighting
-python scripts/run_perturbation_eval.py --run-id <saved_run_id>
-python scripts/build_perturbation_report.py --experiment-group <name>
-```
+- [Baseline comparison report](artifacts/reports/comparisons/baselines_v1_1/20260320_161852_report_34b3/report.md)
+- [Mitigation comparison report](artifacts/reports/comparisons/phase13_temperature_scaling/20260320_171418_report_b3fb/report.md)
+- [Perturbation comparison report](artifacts/reports/perturbations/phase13_temperature_scaling_perturbations/20260320_172934_perturbation_report_cbd4/report.md)
 
-## More Docs
+## Deep dive docs
 
-- [Runtime setup walkthrough](docs/runtime-setup.md)
+- [v1.1 reproducibility walkthrough](docs/v1_1_reproducibility.md)
+- [v1.1 findings](docs/v1_1_findings.md)
+- [Runtime setup reference](docs/runtime-setup.md)
 - [Cloud GPU run guide](docs/cloud-gpu-run.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Configuration layout](configs/README.md)

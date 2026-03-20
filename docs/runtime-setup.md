@@ -1,24 +1,30 @@
-# Runtime Setup
+# Runtime Setup Reference
 
-This guide is the clean-machine setup path for `v1.1`.
+This is the setup companion for `v1.1`.
+
+If you want the full milestone workflow, start with:
+
+- [v1.1 reproducibility walkthrough](v1_1_reproducibility.md)
+
+This reference stays narrower: prerequisites, environment verification, and support-doc routing.
 
 ## Prerequisites
 
 - Python 3.11+
-- enough disk for the CivilComments dataset and saved run artifacts
-- network access for first-time WILDS download
+- enough disk for CivilComments plus saved artifacts
+- network access for the first WILDS download
 - network access or a pre-populated local cache for the first `distilbert-base-uncased` run
 
-## 1. Install The Project
+## Install
 
 ```bash
 python -m pip install -e .[dev]
 ```
 
-The editable install is the supported setup path. The public scripts should run without a manual
+The editable install is the supported `v1.1` path. Public scripts should run without a manual
 `PYTHONPATH=src` export.
 
-## 2. Verify The Environment
+## Verify The Environment
 
 ```bash
 python scripts/check_environment.py
@@ -27,90 +33,36 @@ python scripts/check_environment.py
 Successful output should confirm:
 
 - `matplotlib`, `wilds`, `torch`, and `transformers` are importable
-- a writable `MPLCONFIGDIR` is available for report generation
+- a writable `MPLCONFIGDIR` is available
 - the configured DistilBERT model is `distilbert-base-uncased`
 - whether DistilBERT assets are already cached locally or the first run will need network access
 
-If this command reports missing dependencies, resolve those first before launching benchmark runs.
-
-Expected next-step commands from the checker:
+If dependencies are missing, use:
 
 ```bash
 python -m pip install -e .[dev]
 ```
 
-If DistilBERT assets are not cached yet, the checker also prints a Hugging Face prefetch command so
-you can warm the cache before the first transformer run.
+If the DistilBERT cache is empty, use the prefetch command printed by the checker before the first
+transformer run.
 
-## 3. Materialize CivilComments
+## When To Use A Cloud GPU
 
-```bash
-python scripts/download_data.py
-```
-
-This prepares the manifest and validation bundle under `artifacts/data/` while keeping WILDS as the
-raw source of truth.
-
-## 4. Run The Baselines
-
-```bash
-python scripts/run_baseline.py --model logistic_tfidf --seed 13 --experiment-group baselines_v1_1 --tag v1.1_baseline
-python scripts/run_baseline.py --model distilbert --seed 13 --tier canonical --experiment-group baselines_v1_1 --tag v1.1_baseline
-```
-
-Each run writes a complete artifact bundle under `artifacts/baselines/`.
-
-If the local machine cannot sustain canonical DistilBERT settings, rerun with the constrained tier:
-
-```bash
-python scripts/run_baseline.py --model distilbert --seed 13 --tier constrained --experiment-group baselines_v1_1 --tag v1.1_baseline
-```
-
-## 5. Evaluate And Report
-
-Evaluate a saved run:
-
-```bash
-python scripts/run_shift_eval.py --run-id <id>
-```
-
-Build a comparison report from saved evaluation bundles:
-
-```bash
-python scripts/build_report.py --experiment-group baselines_v1_1
-```
-
-## 6. Optional Follow-On Paths
-
-Mitigation:
-
-```bash
-python scripts/run_mitigation.py --run-id <distilbert_parent_id> --method reweighting
-```
-
-Perturbation stress testing:
-
-```bash
-python scripts/run_perturbation_eval.py --run-id <saved_run_id>
-python scripts/build_perturbation_report.py --experiment-group <name>
-```
-
-## Cloud GPU Handoff
-
-If the local machine cannot sustain the real DistilBERT baseline, move the current repo state to a
-cloud GPU and run the same public scripts there. Use the dedicated guide:
+Use the cloud guide if the local machine cannot sustain the official DistilBERT workflow:
 
 - [Cloud GPU run guide](cloud-gpu-run.md)
 
-## Smoke Check Sequence
+For the official `v1.1` evidence path, the DistilBERT baseline was completed with the constrained
+tier. The walkthrough explains where that fits in the end-to-end flow.
 
-If you want a short confidence pass before running long jobs:
+## Troubleshooting
 
-```bash
-python scripts/check_environment.py
-python scripts/download_data.py
-python scripts/run_baseline.py --model logistic_tfidf --seed 13 --experiment-group baselines_v1_1 --tag v1.1_baseline
-```
+For environment and download failures, use:
 
-Once those succeed, the DistilBERT baseline, shift evaluation, and reporting paths are the next
-expected steps.
+- [Troubleshooting](troubleshooting.md)
+
+## Next Step
+
+Once the environment check is green, continue with:
+
+- [v1.1 reproducibility walkthrough](v1_1_reproducibility.md)
