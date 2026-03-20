@@ -167,6 +167,51 @@ def test_load_saved_predictions_relocates_imported_run_artifacts(temp_artifact_r
     assert list(frame["split"]) == ["validation"]
 
 
+def test_load_saved_predictions_relocates_imported_run_artifacts_from_metadata_dict(
+    temp_artifact_root,
+):
+    run_dir = build_baseline_run_dir(
+        "distilbert",
+        "imported_eval_loader_fixture_dict",
+        create=True,
+    )
+    validation_path = build_prediction_artifact_path(run_dir, "validation")
+
+    pd.DataFrame(
+        [
+            _prediction_row(
+                sample_id="val_0",
+                split="validation",
+                true_label=1,
+                pred_label=1,
+                prob_1=0.9,
+                group_id="group_b",
+                is_id=False,
+                is_ood=True,
+            )
+        ]
+    ).to_parquet(validation_path, index=False)
+
+    metadata_path = run_dir / "metadata.json"
+    metadata_payload = {
+        "run_id": "imported_eval_loader_fixture_dict",
+        "artifact_paths": {
+            "predictions": {
+                "validation": (
+                    "/workspace/model-failure-lab/artifacts/baselines/distilbert/"
+                    "imported_eval_loader_fixture_dict/predictions_val.parquet"
+                )
+            }
+        },
+    }
+    metadata_path.write_text(json.dumps(metadata_payload), encoding="utf-8")
+
+    metadata, frame = load_saved_predictions(metadata_payload, splits=["validation"])
+
+    assert metadata["run_id"] == "imported_eval_loader_fixture_dict"
+    assert list(frame["sample_id"]) == ["val_0"]
+
+
 def test_compute_aggregate_metrics_handles_degenerate_auroc():
     frame = pd.DataFrame(
         [

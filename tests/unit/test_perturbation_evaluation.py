@@ -242,6 +242,7 @@ def _create_distilbert_metadata(
     run_id: str,
     mitigation_method: str | None = None,
     learned_temperature: float | None = None,
+    imported_paths: bool = False,
 ) -> dict[str, object]:
     if mitigation_method == "temperature_scaling":
         run_dir = build_mitigation_run_dir("temperature_scaling", "distilbert", run_id, create=True)
@@ -261,13 +262,35 @@ def _create_distilbert_metadata(
         "checkpoint": str(checkpoint_dir),
         "selected_checkpoint": str(checkpoint_dir / "best_model.pt"),
     }
+    if imported_paths:
+        root_prefix = (
+            "mitigations/temperature_scaling/distilbert"
+            if mitigation_method == "temperature_scaling"
+            else "baselines/distilbert"
+        )
+        artifact_paths = {
+            "checkpoint": (
+                f"/workspace/model-failure-lab/artifacts/{root_prefix}/{run_id}/checkpoint"
+            ),
+            "selected_checkpoint": (
+                f"/workspace/model-failure-lab/artifacts/{root_prefix}/{run_id}/"
+                "checkpoint/best_model.pt"
+            ),
+        }
     if mitigation_method == "temperature_scaling":
         scaler_path = checkpoint_dir / "temperature_scaler.json"
         scaler_path.write_text(
             json.dumps({"learned_temperature": float(learned_temperature or 2.0)}),
             encoding="utf-8",
         )
-        artifact_paths["temperature_scaler_json"] = str(scaler_path)
+        artifact_paths["temperature_scaler_json"] = (
+            str(scaler_path)
+            if not imported_paths
+            else (
+                f"/workspace/model-failure-lab/artifacts/mitigations/temperature_scaling/"
+                f"distilbert/{run_id}/checkpoint/temperature_scaler.json"
+            )
+        )
 
     metadata = {
         "run_id": run_id,
@@ -286,6 +309,7 @@ def _create_distilbert_metadata(
     }
     if mitigation_method is not None:
         metadata["mitigation_method"] = mitigation_method
+    (run_dir / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     return metadata
 
 
@@ -434,3 +458,61 @@ def test_temperature_scaling_saved_run_scorer_applies_learned_temperature(temp_a
             strict=True,
         )
     )
+
+
+def test_saved_run_scorer_relocates_imported_distilbert_artifacts(temp_artifact_root):
+    perturbation_samples = _perturbation_samples()
+    imported_metadata = _create_distilbert_metadata(
+        run_id="distilbert_imported_temp_scaled",
+        mitigation_method="temperature_scaling",
+        learned_temperature=2.5,
+        imported_paths=True,
+    )
+
+    scorer = load_saved_run_scorer(
+        imported_metadata,
+        tokenizer_factory=lambda _name: _FakeTokenizer(),
+        model_factory=lambda _name, _num_labels: _TinyClassifier(),
+    )
+    scored = score_perturbation_suite(
+        perturbation_samples,
+        run_id="imported_scaled_eval",
+        scorer=scorer,
+    )
+
+    assert {"prob_0", "prob_1", "logit_0", "logit_1"}.issubset(scored.columns)
+    assert len(scored) == len(perturbation_samples)
+
+
+def test_saved_run_scorer_falls_back_to_offline_distilbert_shell(
+    temp_artifact_root,
+    monkeypatch,
+):
+    perturbation_samples = _perturbation_samples()
+    imported_metadata = _create_distilbert_metadata(
+        run_id="distilbert_offline_fallback",
+        mitigation_method="temperature_scaling",
+        learned_temperature=2.5,
+        imported_paths=True,
+    )
+
+    monkeypatch.setattr(
+        "model_failure_lab.perturbations.scoring._build_offline_sequence_classifier",
+        lambda _num_labels: _TinyClassifier(),
+    )
+
+    scorer = load_saved_run_scorer(
+        imported_metadata,
+        tokenizer_factory=lambda _name: _FakeTokenizer(),
+        model_factory=lambda _name, _num_labels: (_ for _ in ()).throw(
+            RuntimeError("pretrained model unavailable")
+        ),
+    )
+    scored = score_perturbation_suite(
+        perturbation_samples,
+        run_id="offline_fallback_eval",
+        scorer=scorer,
+    )
+
+    assert {"prob_0", "prob_1", "logit_0", "logit_1"}.issubset(scored.columns)
+    assert len(scored) == len(perturbation_samples)

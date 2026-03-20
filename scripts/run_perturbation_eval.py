@@ -70,7 +70,7 @@ def _build_perturbation_config(
     )
     perturbation_config = {
         **deepcopy(preset_config.get("perturbation", {})),
-        **deepcopy(source_config.get("perturbation", {})),
+        **deepcopy(source_config.get("perturbation") or {}),
     }
     return {
         "run_id": source_config.get("run_id"),

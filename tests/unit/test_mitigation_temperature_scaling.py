@@ -131,6 +131,30 @@ def _write_parent_bundle(run_id: str) -> tuple[str, list[list[float]], list[int]
     return run_id, validation_logits, validation_labels
 
 
+def _rewrite_parent_metadata_as_imported_paths(run_id: str) -> None:
+    run_dir = build_baseline_run_dir("distilbert", run_id, create=False)
+    metadata_path = run_dir / "metadata.json"
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    payload["artifact_paths"]["checkpoint"] = (
+        f"/workspace/model-failure-lab/artifacts/baselines/distilbert/{run_id}/checkpoint"
+    )
+    payload["artifact_paths"]["selected_checkpoint"] = (
+        f"/workspace/model-failure-lab/artifacts/baselines/distilbert/{run_id}/checkpoint/"
+        "best_model.pt"
+    )
+    payload["artifact_paths"]["predictions"] = {
+        split: f"/workspace/model-failure-lab/artifacts/baselines/distilbert/{run_id}/"
+        f"predictions_{suffix}.parquet"
+        for split, suffix in {
+            "train": "train",
+            "validation": "val",
+            "id_test": "id_test",
+            "ood_test": "ood_test",
+        }.items()
+    }
+    metadata_path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def test_temperature_scaling_preset_contains_mitigation_payload():
     config = load_experiment_config(
         "configs/experiments/civilcomments_distilbert_temperature_scaling.yaml"
@@ -197,3 +221,31 @@ def test_run_temperature_scaling_uses_validation_logits_only_and_writes_predicti
     assert Path(artifacts.prediction_paths["validation"]).exists()
     assert Path(artifacts.prediction_paths["id_test"]).exists()
     assert Path(artifacts.prediction_paths["ood_test"]).exists()
+
+
+def test_run_temperature_scaling_relocates_imported_parent_artifacts(temp_artifact_root):
+    parent_run_id, validation_logits, validation_labels = _write_parent_bundle(
+        "distilbert_imported_temperature_parent"
+    )
+    _rewrite_parent_metadata_as_imported_paths(parent_run_id)
+    parent_context = load_parent_run_context(parent_run_id)
+    preset_config = load_experiment_config(
+        "configs/experiments/civilcomments_distilbert_temperature_scaling.yaml"
+    )
+    preset_config["run_id"] = "temperature_scaling_imported_child"
+    config = build_inherited_mitigation_config(parent_context, preset_config)
+    run_dir = build_mitigation_run_dir(
+        "temperature_scaling",
+        "distilbert",
+        "temperature_scaling_imported_child",
+        create=True,
+    )
+
+    artifacts = run_temperature_scaling(config, run_dir)
+
+    assert artifacts.learned_temperature == pytest.approx(
+        fit_temperature_scaler(validation_logits, validation_labels),
+        rel=1.0e-4,
+    )
+    assert artifacts.selected_checkpoint_path.exists()
+    assert Path(artifacts.prediction_paths["validation"]).exists()

@@ -11,6 +11,7 @@ import joblib
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+from transformers import DistilBertConfig, DistilBertForSequenceClassification
 
 from model_failure_lab.mitigations.temperature_scaling import apply_temperature_scaling
 from model_failure_lab.models.distilbert import (
@@ -22,6 +23,7 @@ from model_failure_lab.models.distilbert import (
     build_tokenizer,
 )
 from model_failure_lab.models.export import build_prediction_records
+from model_failure_lab.utils.paths import find_run_metadata_path
 
 TokenizerFactory = Callable[[str], Any]
 ModelFactory = Callable[[str, int], torch.nn.Module]
@@ -40,7 +42,30 @@ def _artifact_path(metadata: dict[str, Any], key: str) -> Path | None:
     raw_path = dict(metadata.get("artifact_paths", {})).get(key)
     if not raw_path:
         return None
-    return Path(str(raw_path))
+    return _relocate_saved_run_artifact_path(metadata, Path(str(raw_path)))
+
+
+def _relocate_saved_run_artifact_path(metadata: dict[str, Any], raw_path: Path) -> Path:
+    if raw_path.exists():
+        return raw_path
+
+    run_id = metadata.get("run_id")
+    if not run_id:
+        return raw_path
+
+    try:
+        run_dir = find_run_metadata_path(str(run_id)).parent
+    except (FileNotFoundError, ValueError):
+        return raw_path
+
+    candidates = [
+        run_dir / raw_path.name,
+        run_dir / raw_path.parent.name / raw_path.name,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return raw_path
 
 
 def _selected_checkpoint_path(metadata: dict[str, Any]) -> Path:
@@ -110,12 +135,33 @@ def _logistic_scorer(metadata: dict[str, Any]) -> SavedRunScorer:
 
 
 def _load_tokenizer_config(metadata: dict[str, Any]) -> dict[str, Any]:
+    tokenizer_config = dict(metadata.get("resolved_config", {}).get("model", {}))
+    checkpoint_roots: list[Path] = []
     checkpoint_root = _artifact_path(metadata, "checkpoint")
     if checkpoint_root is not None:
-        config_path = checkpoint_root / "tokenizer_config.json"
+        checkpoint_roots.append(checkpoint_root)
+    selected_checkpoint_path = _artifact_path(metadata, "selected_checkpoint")
+    if selected_checkpoint_path is not None:
+        checkpoint_roots.append(selected_checkpoint_path.parent)
+
+    seen_roots: set[Path] = set()
+    for root in checkpoint_roots:
+        if root in seen_roots:
+            continue
+        seen_roots.add(root)
+        config_path = root / "tokenizer_config.json"
         if config_path.exists():
-            return json.loads(config_path.read_text(encoding="utf-8"))
-    return dict(metadata.get("resolved_config", {}).get("model", {}))
+            tokenizer_config = json.loads(config_path.read_text(encoding="utf-8"))
+        local_tokenizer_dir = root / "tokenizer"
+        if local_tokenizer_dir.exists():
+            tokenizer_config["tokenizer_source"] = str(local_tokenizer_dir)
+    return tokenizer_config
+
+
+def _build_offline_sequence_classifier(num_labels: int) -> torch.nn.Module:
+    return DistilBertForSequenceClassification(
+        DistilBertConfig(num_labels=num_labels)
+    )
 
 
 def _prepare_distilbert_records(perturbation_samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -152,9 +198,18 @@ def _distilbert_scorer(
     resolved_model_factory = model_factory or build_sequence_classifier
     tokenizer_config = _load_tokenizer_config(metadata)
     pretrained_name = str(tokenizer_config.get("pretrained_name", "distilbert-base-uncased"))
+    tokenizer_source = str(tokenizer_config.get("tokenizer_source", pretrained_name))
     max_length = int(tokenizer_config.get("max_length", 256))
-    tokenizer = resolved_tokenizer_factory(pretrained_name)
-    model = resolved_model_factory(pretrained_name, 2)
+    tokenizer = resolved_tokenizer_factory(tokenizer_source)
+    use_offline_shell = tokenizer_source != pretrained_name and Path(tokenizer_source).exists()
+    try:
+        model = (
+            _build_offline_sequence_classifier(2)
+            if use_offline_shell
+            else resolved_model_factory(pretrained_name, 2)
+        )
+    except RuntimeError:
+        model = _build_offline_sequence_classifier(2)
     checkpoint_path = _selected_checkpoint_path(metadata)
     device, _ = _device_and_precision(metadata.get("resolved_config", {}))
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))
@@ -251,4 +306,3 @@ def score_perturbation_suite(
 ) -> pd.DataFrame:
     """Score a perturbation suite through one loaded saved-run scorer."""
     return scorer.score_records(suite_records, run_id)
-
