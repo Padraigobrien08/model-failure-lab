@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from pathlib import Path
 
 import pytest
@@ -56,6 +55,39 @@ def test_check_environment_reports_dependency_and_model_status(tmp_path):
     assert payload["matplotlib"]["runtime_dir"].endswith("mplconfig")
     assert payload["distilbert"]["pretrained_name"] == "distilbert-base-uncased"
     assert "network access" in payload["distilbert"]["message"]
+
+
+def test_check_environment_human_output_includes_install_and_prefetch_guidance(
+    capsys,
+    tmp_path,
+):
+    payload = run_check_environment_command(
+        [],
+        dependency_checker=lambda package: {
+            "package": package,
+            "available": package != "wilds",
+            "version": "1.0" if package != "wilds" else None,
+            "error": None if package != "wilds" else "missing",
+        },
+        matplotlib_dir_resolver=lambda: tmp_path / "mplconfig",
+        config_loader=lambda _preset: {
+            "model": {"pretrained_name": "distilbert-base-uncased"},
+        },
+        transformer_asset_checker=lambda pretrained_name: {
+            "pretrained_name": pretrained_name,
+            "local_cache_available": False,
+            "message": (
+                "Local cache not detected. The first DistilBERT run will require "
+                "network access or a pre-populated local cache."
+            ),
+        },
+    )
+
+    captured = capsys.readouterr()
+    assert payload["overall_ok"] is False
+    assert "python -m pip install -e .[dev]" in captured.out
+    assert "AutoTokenizer.from_pretrained('distilbert-base-uncased')" in captured.out
+    assert "network access" in captured.out
 
 
 def test_missing_wilds_message_points_to_check_environment(monkeypatch):

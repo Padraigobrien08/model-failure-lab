@@ -208,6 +208,7 @@ def dispatch_baseline(
             timestamp=existing_metadata.get("timestamp"),
             status="completed",
         )
+        metadata_payload.update(artifacts.runtime_metadata)
         metadata_path = write_metadata(run_dir, metadata_payload)
         return DispatchResult(
             status="completed",

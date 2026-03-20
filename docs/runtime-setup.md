@@ -33,6 +33,15 @@ Successful output should confirm:
 
 If this command reports missing dependencies, resolve those first before launching benchmark runs.
 
+Expected next-step commands from the checker:
+
+```bash
+python -m pip install -e .[dev]
+```
+
+If DistilBERT assets are not cached yet, the checker also prints a Hugging Face prefetch command so
+you can warm the cache before the first transformer run.
+
 ## 3. Materialize CivilComments
 
 ```bash
@@ -45,11 +54,17 @@ raw source of truth.
 ## 4. Run The Baselines
 
 ```bash
-python scripts/run_baseline.py --model logistic_tfidf
-python scripts/run_baseline.py --model distilbert
+python scripts/run_baseline.py --model logistic_tfidf --seed 13 --experiment-group baselines_v1_1 --tag v1.1_baseline
+python scripts/run_baseline.py --model distilbert --seed 13 --tier canonical --experiment-group baselines_v1_1 --tag v1.1_baseline
 ```
 
 Each run writes a complete artifact bundle under `artifacts/baselines/`.
+
+If the local machine cannot sustain canonical DistilBERT settings, rerun with the constrained tier:
+
+```bash
+python scripts/run_baseline.py --model distilbert --seed 13 --tier constrained --experiment-group baselines_v1_1 --tag v1.1_baseline
+```
 
 ## 5. Evaluate And Report
 
@@ -62,7 +77,7 @@ python scripts/run_shift_eval.py --run-id <id>
 Build a comparison report from saved evaluation bundles:
 
 ```bash
-python scripts/build_report.py --experiment-group <name>
+python scripts/build_report.py --experiment-group baselines_v1_1
 ```
 
 ## 6. Optional Follow-On Paths
@@ -80,6 +95,13 @@ python scripts/run_perturbation_eval.py --run-id <saved_run_id>
 python scripts/build_perturbation_report.py --experiment-group <name>
 ```
 
+## Cloud GPU Handoff
+
+If the local machine cannot sustain the real DistilBERT baseline, move the current repo state to a
+cloud GPU and run the same public scripts there. Use the dedicated guide:
+
+- [Cloud GPU run guide](cloud-gpu-run.md)
+
 ## Smoke Check Sequence
 
 If you want a short confidence pass before running long jobs:
@@ -87,7 +109,7 @@ If you want a short confidence pass before running long jobs:
 ```bash
 python scripts/check_environment.py
 python scripts/download_data.py
-python scripts/run_baseline.py --model logistic_tfidf
+python scripts/run_baseline.py --model logistic_tfidf --seed 13 --experiment-group baselines_v1_1 --tag v1.1_baseline
 ```
 
 Once those succeed, the DistilBERT baseline, shift evaluation, and reporting paths are the next

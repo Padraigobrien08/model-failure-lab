@@ -1,0 +1,20 @@
+model_name: distilbert
+model_family: transformer
+pretrained_name: distilbert-base-uncased
+output_type: probability
+max_length: 128
+truncation: true
+dynamic_padding: true
+execution_tier: constrained
+batch_size:
+  train: 8
+  eval: 16
+optimizer:
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  gradient_clip_norm: 1.0
+mixed_precision: auto
+early_stopping:
+  enabled: true
+  patience: 1

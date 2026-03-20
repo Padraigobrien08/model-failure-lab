@@ -32,6 +32,7 @@ def test_build_run_metadata_and_write_json(temp_artifact_root):
     )
     resolved_config = {
         "experiment_name": "civilcomments_distilbert_baseline",
+        "experiment_group": "baselines_v1_1",
         "experiment_type": "baseline",
         "dataset_name": "civilcomments",
         "model_name": "distilbert",
@@ -59,6 +60,7 @@ def test_build_run_metadata_and_write_json(temp_artifact_root):
 
     assert metadata_payload["run_id"] == "20260318_223000_baseline_ab12"
     assert metadata_payload["timestamp"]
+    assert metadata_payload["experiment_group"] == "baselines_v1_1"
     assert metadata_payload["resolved_config"] == resolved_config
     assert metadata_payload["artifact_paths"] == build_artifact_paths(run_dir)
     assert metadata_payload["git_commit_hash"] == "abc123"

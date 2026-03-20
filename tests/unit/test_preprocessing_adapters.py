@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from copy import deepcopy
 
@@ -151,3 +152,19 @@ def test_write_validation_summaries_persists_required_bundle(temp_artifact_root)
     assert payload["split_integrity"]["valid"] is True
     preview_lines = (summary_dir / "sample_preview.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(preview_lines) == 2
+    with (summary_dir / "subgroup_coverage.csv").open(encoding="utf-8", newline="") as handle:
+        subgroup_rows = list(csv.DictReader(handle))
+    assert len(subgroup_rows) == len(
+        {(sample.split, sample.group_id) for sample in samples}
+    )
+    subgroup_counts = {
+        (row["split"], row["group_id"]): int(row["count"]) for row in subgroup_rows
+    }
+    assert subgroup_counts == {
+        (sample.split, sample.group_id): sum(
+            1
+            for candidate in samples
+            if candidate.split == sample.split and candidate.group_id == sample.group_id
+        )
+        for sample in samples
+    }

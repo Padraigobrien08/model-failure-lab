@@ -172,13 +172,25 @@ def test_run_baseline_command_executes_real_logistic_path(temp_artifact_root, mo
     )
 
     result = run_baseline_command(
-        ["--model", "logistic_tfidf", "--run-id", "logistic_command_test"]
+        [
+            "--model",
+            "logistic_tfidf",
+            "--run-id",
+            "logistic_command_test",
+            "--experiment-group",
+            "baselines_v1_1",
+            "--tag",
+            "v1.1_baseline",
+        ]
     )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
     metrics = json.loads(result.metrics_path.read_text(encoding="utf-8"))
 
     assert result.status == "completed"
     assert metadata["status"] == "completed"
+    assert metadata["experiment_group"] == "baselines_v1_1"
+    assert metadata["resolved_config"]["experiment_group"] == "baselines_v1_1"
+    assert metadata["tags"] == ["baseline", "logistic_tfidf", "v1.1_baseline"]
     assert metadata["artifact_paths"]["predictions"]["train"].endswith(
         "predictions_train.parquet"
     )

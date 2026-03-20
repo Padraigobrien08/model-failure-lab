@@ -49,6 +49,7 @@ class DistilBertBaselineArtifacts:
     checkpoint_path: Path
     history_path: Path
     tokenizer_config_path: Path
+    runtime_metadata: dict[str, Any]
 
 
 class TokenizedTextDataset(Dataset):
@@ -153,9 +154,49 @@ def _device_and_precision(config: dict[str, Any]) -> tuple[torch.device, bool]:
         "mixed_precision",
         config.get("train", {}).get("mixed_precision", False),
     )
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif (
+        getattr(torch.backends, "mps", None) is not None
+        and torch.backends.mps.is_available()
+    ):
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     use_mixed_precision = device.type == "cuda" and mixed_precision_config not in {False, "false"}
     return device, use_mixed_precision
+
+
+def _build_runtime_metadata(
+    *,
+    config: dict[str, Any],
+    device: torch.device,
+    use_mixed_precision: bool,
+    train_batch_size: int,
+    eval_batch_size: int,
+    max_length: int,
+) -> dict[str, Any]:
+    hardware = {
+        "device_type": device.type,
+        "cuda_available": bool(torch.cuda.is_available()),
+        "cuda_device_count": int(torch.cuda.device_count()) if torch.cuda.is_available() else 0,
+        "mps_available": bool(
+            getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available()
+        ),
+    }
+    if device.type == "cuda":
+        hardware["device_name"] = torch.cuda.get_device_name(0)
+
+    execution_tier = str(config.get("model", {}).get("execution_tier", "canonical"))
+    return {
+        "execution_tier": execution_tier,
+        "hardware": hardware,
+        "mixed_precision_enabled": use_mixed_precision,
+        "train_batch_size": train_batch_size,
+        "eval_batch_size": eval_batch_size,
+        "effective_batch_size": train_batch_size,
+        "max_length": max_length,
+    }
 
 
 def _prediction_records(
@@ -521,6 +562,14 @@ def train_distilbert_baseline(
             "mixed_precision_used": use_mixed_precision,
         },
     }
+    runtime_metadata = _build_runtime_metadata(
+        config=config,
+        device=device,
+        use_mixed_precision=use_mixed_precision,
+        train_batch_size=train_batch_size,
+        eval_batch_size=eval_batch_size,
+        max_length=max_length,
+    )
 
     return DistilBertBaselineArtifacts(
         metrics_payload=metrics_payload,
@@ -529,4 +578,5 @@ def train_distilbert_baseline(
         checkpoint_path=checkpoint_path,
         history_path=history_path,
         tokenizer_config_path=tokenizer_config_path,
+        runtime_metadata=runtime_metadata,
     )

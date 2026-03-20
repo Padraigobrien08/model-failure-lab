@@ -234,13 +234,32 @@ def test_run_baseline_command_executes_real_distilbert_path(temp_artifact_root, 
     )
 
     result = run_baseline_command(
-        ["--model", "distilbert", "--run-id", "distilbert_command_test"]
+        [
+            "--model",
+            "distilbert",
+            "--run-id",
+            "distilbert_command_test",
+            "--tier",
+            "constrained",
+            "--experiment-group",
+            "baselines_v1_1",
+            "--tag",
+            "v1.1_baseline",
+        ]
     )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
     metrics = json.loads(result.metrics_path.read_text(encoding="utf-8"))
 
     assert result.status == "completed"
     assert metadata["status"] == "completed"
+    assert metadata["experiment_group"] == "baselines_v1_1"
+    assert metadata["resolved_config"]["experiment_group"] == "baselines_v1_1"
+    assert metadata["resolved_config"]["model"]["execution_tier"] == "constrained"
+    assert metadata["execution_tier"] == "constrained"
+    assert metadata["effective_batch_size"] == 8
+    assert metadata["max_length"] == 128
+    assert metadata["hardware"]["device_type"] in {"cpu", "cuda", "mps"}
+    assert metadata["tags"] == ["baseline", "distilbert", "constrained", "v1.1_baseline"]
     assert metadata["artifact_paths"]["predictions"]["train"].endswith(
         "predictions_train.parquet"
     )

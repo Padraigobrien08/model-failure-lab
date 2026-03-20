@@ -132,8 +132,12 @@ def _fake_get_dataset(**_: object) -> _FakeDataset:
     )
 
 
-def test_load_civilcomments_dataset_requires_wilds_dependency():
+def test_load_civilcomments_dataset_requires_wilds_dependency(monkeypatch):
     config = load_experiment_config("configs/experiments/civilcomments_logistic_baseline.yaml")
+    monkeypatch.setattr(
+        "model_failure_lab.data.civilcomments.import_module",
+        lambda _name: (_ for _ in ()).throw(ModuleNotFoundError("wilds")),
+    )
 
     with pytest.raises(DataDependencyError, match="requires the 'wilds' package"):
         materialize_civilcomments(config)

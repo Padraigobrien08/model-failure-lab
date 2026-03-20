@@ -54,11 +54,41 @@ What to do:
 python scripts/check_environment.py
 ```
 
+If dependencies are missing, follow the install command printed by the checker:
+
+```bash
+python -m pip install -e .[dev]
+```
+
 Interpretation:
 
 - if the check reports local cache available, retry the run
 - if the check reports no local cache, the first DistilBERT run will require network access or a
   manually prepared local cache
+
+The checker also prints a cache prefetch command. You can run it before the first transformer
+baseline to avoid paying the model download cost inside `run_baseline.py`.
+
+## CivilComments Download Hits SSL Verification Errors
+
+Symptom:
+
+- `python scripts/download_data.py` fails while downloading the WILDS CivilComments archive
+- the error mentions SSL verification or a missing local issuer certificate
+
+What to do:
+
+```bash
+curl -L -k -o data/wilds/civilcomments_v1.0/archive.tar.gz "https://worksheets.codalab.org/rest/bundles/0x8cd3de0634154aeaad2ee6eb96723c6e/contents/blob/"
+tar -xzf data/wilds/civilcomments_v1.0/archive.tar.gz -C data/wilds/civilcomments_v1.0
+python scripts/download_data.py --skip-download
+```
+
+Why this works:
+
+- it fetches the same WILDS archive directly
+- it leaves the project-local manifest and validation path to `download_data.py`
+- it avoids repeating the SSL verification failure inside the Python downloader
 
 ## Script Runs Assume Hidden Path State
 

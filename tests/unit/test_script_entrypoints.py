@@ -746,12 +746,24 @@ def test_run_logistic_baseline_writes_completed_artifacts(temp_artifact_root, mo
     )
 
     result = run_baseline_command(
-        ["--model", "logistic_tfidf", "--run-id", "logistic_tfidf_baseline"]
+        [
+            "--model",
+            "logistic_tfidf",
+            "--run-id",
+            "logistic_tfidf_baseline",
+            "--experiment-group",
+            "baselines_v1_1",
+            "--tag",
+            "v1.1_baseline",
+        ]
     )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
 
     assert "artifacts/baselines/logistic_tfidf" in result.run_dir.as_posix()
     assert metadata["model_name"] == "logistic_tfidf"
+    assert metadata["experiment_group"] == "baselines_v1_1"
+    assert metadata["resolved_config"]["experiment_group"] == "baselines_v1_1"
+    assert metadata["tags"] == ["baseline", "logistic_tfidf", "v1.1_baseline"]
     assert metadata["status"] == "completed"
     assert metadata["artifact_paths"]["predictions"]["train"].endswith(
         "predictions_train.parquet"
@@ -782,11 +794,28 @@ def test_run_distilbert_baseline_writes_completed_artifacts(temp_artifact_root, 
         lambda _name, num_labels: _TinyClassifier(num_labels=num_labels),
     )
 
-    result = run_baseline_command(["--model", "distilbert", "--run-id", "distilbert_baseline"])
+    result = run_baseline_command(
+        [
+            "--model",
+            "distilbert",
+            "--run-id",
+            "distilbert_baseline",
+            "--tier",
+            "constrained",
+            "--experiment-group",
+            "baselines_v1_1",
+            "--tag",
+            "v1.1_baseline",
+        ]
+    )
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
 
     assert "artifacts/baselines/distilbert" in result.run_dir.as_posix()
     assert metadata["model_name"] == "distilbert"
+    assert metadata["experiment_group"] == "baselines_v1_1"
+    assert metadata["execution_tier"] == "constrained"
+    assert metadata["effective_batch_size"] == 8
+    assert metadata["max_length"] == 128
     assert metadata["status"] == "completed"
     assert metadata["artifact_paths"]["predictions"]["train"].endswith(
         "predictions_train.parquet"

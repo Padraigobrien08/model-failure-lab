@@ -23,6 +23,7 @@ ALLOWED_OVERRIDE_KEYS = {
     "notes",
     "run_id",
     "experiment_group",
+    "tags",
     "eval_splits",
     "min_group_support",
     "calibration_bins",
@@ -151,6 +152,17 @@ def apply_cli_overrides(config: dict[str, Any], overrides: dict[str, Any]) -> di
             updated_config[key] = int(value)
         elif key in {"notes", "run_id", "experiment_group"}:
             updated_config[key] = str(value)
+        elif key == "tags":
+            if isinstance(value, str):
+                tag_values = [item.strip() for item in value.split(",") if item.strip()]
+            else:
+                tag_values = [str(item).strip() for item in value if str(item).strip()]
+            existing_tags = [str(item) for item in updated_config.get("tags", [])]
+            merged_tags: list[str] = []
+            for tag in existing_tags + tag_values:
+                if tag and tag not in merged_tags:
+                    merged_tags.append(tag)
+            updated_config["tags"] = merged_tags
         elif key == "eval_splits":
             if isinstance(value, str):
                 split_values = [item.strip() for item in value.split(",") if item.strip()]

@@ -134,6 +134,7 @@ def build_run_metadata(
         "run_id": run_id,
         "timestamp": timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "experiment_type": experiment_type,
+        "experiment_group": resolved_config.get("experiment_group"),
         "model_name": model_name,
         "dataset_name": dataset_name,
         "split_details": split_details,

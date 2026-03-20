@@ -21,6 +21,15 @@ from model_failure_lab.utils.runtime import (
 
 _DEPENDENCIES = ("matplotlib", "wilds", "torch", "transformers")
 _DISTILBERT_PRESET = "civilcomments_distilbert_baseline"
+_INSTALL_COMMAND = "python -m pip install -e .[dev]"
+
+
+def _distilbert_prefetch_command(pretrained_name: str) -> str:
+    return (
+        "python -c \"from transformers import AutoModelForSequenceClassification, "
+        f"AutoTokenizer; AutoTokenizer.from_pretrained('{pretrained_name}'); "
+        f"AutoModelForSequenceClassification.from_pretrained('{pretrained_name}')\""
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -96,17 +105,32 @@ def run_command(
     if args.as_json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
+        missing_packages = [
+            package_name
+            for package_name, status in dependency_status.items()
+            if not bool(status["available"])
+        ]
         print("Model Failure Lab environment check")
         print(f"Matplotlib runtime dir: {payload['matplotlib']['runtime_dir']}")
         for package_name, status in dependency_status.items():
             state = "ok" if status["available"] else "missing"
             version = status["version"] or "unknown"
             print(f"{package_name}: {state} ({version})")
+        if missing_packages:
+            print(
+                "Install missing benchmark dependencies with:\n"
+                f"  {_INSTALL_COMMAND}"
+            )
         print(
             f"DistilBERT model: {transformer_assets['pretrained_name']} "
             f"(local cache: {'yes' if transformer_assets['local_cache_available'] else 'no'})"
         )
         print(transformer_assets["message"])
+        if not transformer_assets["local_cache_available"]:
+            print(
+                "To pre-populate the Hugging Face cache before the first run, use:\n"
+                f"  {_distilbert_prefetch_command(pretrained_name)}"
+            )
 
     return payload
 
