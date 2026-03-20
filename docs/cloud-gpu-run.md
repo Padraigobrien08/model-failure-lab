@@ -97,6 +97,46 @@ When it finishes, note the run id under:
 artifacts/baselines/distilbert/<run_id>/
 ```
 
+### 5b. Run The Full `v1.2` Seed Matrix Unattended
+
+For the current `v1.2` milestone, you can leave the three constrained official seeds running in a
+single `tmux` session with the helper script:
+
+```bash
+tmux new -s mfl-seeds
+chmod +x scripts/run_phase17_distilbert_seeds.sh
+./scripts/run_phase17_distilbert_seeds.sh
+```
+
+Detach with:
+
+```bash
+Ctrl-b d
+```
+
+Reattach later with:
+
+```bash
+tmux attach -t mfl-seeds
+```
+
+The helper writes:
+
+- per-seed logs under `logs/phase17_distilbert/`
+- the discovered run IDs under `logs/phase17_distilbert/run_ids.txt`
+
+Expected official outputs:
+
+- `seed_13`
+- `seed_42`
+- `seed_87`
+
+All under:
+
+```bash
+artifacts/baselines/distilbert/<run_id>/
+```
+
 ### 6. Evaluate The Saved Run
 
 ```bash
