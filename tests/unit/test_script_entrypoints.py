@@ -534,6 +534,7 @@ def _create_saved_evaluation_source_run() -> str:
                 "requested_splits": None,
                 "output_tag": None,
             },
+            "perturbation": None,
         },
         "artifact_paths": {
             "checkpoint": str(checkpoint_dir),

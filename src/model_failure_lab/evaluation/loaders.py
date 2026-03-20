@@ -9,6 +9,7 @@ from typing import Any, Iterable
 import pandas as pd
 
 from model_failure_lab.models.export import REQUIRED_PREDICTION_COLUMNS
+from model_failure_lab.utils.paths import find_run_metadata_path
 
 _SPLIT_ALIASES = {
     "train": "train",
@@ -64,7 +65,14 @@ def _load_metadata(
     metadata_or_path: dict[str, Any] | Path | str,
 ) -> tuple[dict[str, Any], Path | None]:
     if isinstance(metadata_or_path, dict):
-        return dict(metadata_or_path), None
+        metadata = dict(metadata_or_path)
+        run_id = metadata.get("run_id")
+        if run_id is not None:
+            try:
+                return metadata, find_run_metadata_path(str(run_id))
+            except (FileNotFoundError, ValueError):
+                return metadata, None
+        return metadata, None
 
     metadata_path = Path(metadata_or_path)
     return json.loads(metadata_path.read_text(encoding="utf-8")), metadata_path

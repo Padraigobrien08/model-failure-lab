@@ -57,19 +57,43 @@ def _prediction_path_for_split(parent_metadata: dict[str, Any], split: str) -> P
     if isinstance(predictions, dict):
         raw_path = predictions.get(split)
         if raw_path:
-            return Path(str(raw_path))
+            return _relocate_parent_artifact_path(
+                Path(str(raw_path)),
+                run_dir=Path(str(parent_metadata.get("_resolved_run_dir", ""))),
+            )
     return None
+
+
+def _relocate_parent_artifact_path(raw_path: Path, *, run_dir: Path) -> Path:
+    if raw_path.exists() or not run_dir:
+        return raw_path
+
+    candidates = [
+        run_dir / raw_path.name,
+        run_dir / raw_path.parent.name / raw_path.name,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return raw_path
 
 
 def _selected_checkpoint_path(parent_metadata: dict[str, Any]) -> Path:
     artifact_paths = dict(parent_metadata.get("artifact_paths", {}))
     raw_path = artifact_paths.get("selected_checkpoint")
     if raw_path:
-        return Path(str(raw_path))
+        return _relocate_parent_artifact_path(
+            Path(str(raw_path)),
+            run_dir=Path(str(parent_metadata.get("_resolved_run_dir", ""))),
+        )
 
     checkpoint_root = artifact_paths.get("checkpoint")
     if checkpoint_root:
-        checkpoint_path = Path(str(checkpoint_root)) / "best_model.pt"
+        checkpoint_root_path = _relocate_parent_artifact_path(
+            Path(str(checkpoint_root)),
+            run_dir=Path(str(parent_metadata.get("_resolved_run_dir", ""))),
+        )
+        checkpoint_path = checkpoint_root_path / "best_model.pt"
         if checkpoint_path.exists():
             return checkpoint_path
 
@@ -172,6 +196,7 @@ def _load_logits_frame(
     model_factory: ModelFactory,
 ) -> tuple[pd.DataFrame, str]:
     parent_metadata = dict(parent_context["metadata"])
+    parent_metadata["_resolved_run_dir"] = str(parent_context["run_dir"])
     saved_frame = _load_saved_prediction_frame(parent_metadata, split)
     if saved_frame is not None:
         return _require_logits(saved_frame, split=split), "saved_predictions"
@@ -298,6 +323,8 @@ def run_temperature_scaling(
         raise ValueError("Temperature scaling requires config.parent_run_id")
 
     parent_context = validate_distilbert_parent_run(load_parent_run_context(str(parent_run_id)))
+    parent_metadata = dict(parent_context["metadata"])
+    parent_metadata["_resolved_run_dir"] = str(parent_context["run_dir"])
     mitigation_config = dict(config.get("mitigation_config") or config.get("mitigation") or {})
     scaling_config = dict(mitigation_config.get("temperature_scaling", {}))
     fitting_split = str(scaling_config.get("fitting_split", "validation"))
@@ -310,7 +337,7 @@ def run_temperature_scaling(
     resolved_dataset_loader = dataset_loader or load_baseline_canonical_dataset
     resolved_tokenizer_factory = tokenizer_factory or build_tokenizer
     resolved_model_factory = model_factory or build_sequence_classifier
-    selected_checkpoint_path = _selected_checkpoint_path(parent_context["metadata"])
+    selected_checkpoint_path = _selected_checkpoint_path(parent_metadata)
 
     requested_splits = list(dict.fromkeys([*apply_to_splits, fitting_split]))
     split_frames: dict[str, pd.DataFrame] = {}
