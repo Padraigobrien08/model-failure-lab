@@ -1,15 +1,12 @@
+# ruff: noqa: E402
+
 """Calibration reporting helpers for saved evaluation bundles."""
 
 from __future__ import annotations
 
-import os
-import tempfile
-from pathlib import Path
+from model_failure_lab.utils.runtime import ensure_matplotlib_runtime_dir
 
-if "MPLCONFIGDIR" not in os.environ:
-    mpl_config_dir = Path(tempfile.gettempdir()) / "model_failure_lab_mplconfig"
-    mpl_config_dir.mkdir(parents=True, exist_ok=True)
-    os.environ["MPLCONFIGDIR"] = str(mpl_config_dir)
+ensure_matplotlib_runtime_dir()
 
 import matplotlib
 

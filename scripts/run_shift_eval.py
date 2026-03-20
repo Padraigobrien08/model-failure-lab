@@ -1,9 +1,18 @@
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
 import json
 from copy import deepcopy
 from typing import Sequence
+
+try:
+    from scripts._bootstrap import bootstrap_repo_paths
+except ModuleNotFoundError:
+    from _bootstrap import bootstrap_repo_paths
+
+bootstrap_repo_paths()
 
 from model_failure_lab.config import RunConfig, apply_cli_overrides, load_experiment_config
 from model_failure_lab.evaluation.bundle import build_evaluation_metadata

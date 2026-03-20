@@ -31,6 +31,14 @@ TokenizerFactory = Callable[[str], Any]
 ModelFactory = Callable[[str, int], torch.nn.Module]
 
 
+def _raise_pretrained_loading_error(exc: Exception, pretrained_name: str) -> None:
+    raise RuntimeError(
+        f"Unable to load '{pretrained_name}' for DistilBERT execution. "
+        "The first run requires either network access or a pre-populated local cache. "
+        "Run `python scripts/check_environment.py` to verify benchmark prerequisites."
+    ) from exc
+
+
 @dataclass(slots=True)
 class DistilBertBaselineArtifacts:
     """Artifacts produced by a completed DistilBERT baseline run."""
@@ -83,15 +91,21 @@ class TokenizedTextDataset(Dataset):
 
 def build_tokenizer(pretrained_name: str) -> Any:
     """Build the tokenizer for the requested pretrained checkpoint."""
-    return AutoTokenizer.from_pretrained(pretrained_name)
+    try:
+        return AutoTokenizer.from_pretrained(pretrained_name)
+    except (OSError, ValueError) as exc:
+        _raise_pretrained_loading_error(exc, pretrained_name)
 
 
 def build_sequence_classifier(pretrained_name: str, num_labels: int) -> torch.nn.Module:
     """Build the DistilBERT sequence-classification model."""
-    return AutoModelForSequenceClassification.from_pretrained(
-        pretrained_name,
-        num_labels=num_labels,
-    )
+    try:
+        return AutoModelForSequenceClassification.from_pretrained(
+            pretrained_name,
+            num_labels=num_labels,
+        )
+    except (OSError, ValueError) as exc:
+        _raise_pretrained_loading_error(exc, pretrained_name)
 
 
 def _checkpoint_paths(run_dir: Path) -> tuple[Path, Path, Path, Path]:

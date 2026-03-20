@@ -34,12 +34,16 @@ def _resolve_get_dataset(
     except ModuleNotFoundError as exc:
         raise DataDependencyError(
             "CivilComments materialization requires the 'wilds' package. "
-            "Install project dependencies, then rerun `python scripts/download_data.py`."
+            "Install project dependencies, run `python scripts/check_environment.py`, "
+            "and then rerun `python scripts/download_data.py`."
         ) from exc
 
     get_dataset = getattr(module, "get_dataset", None)
     if not callable(get_dataset):
-        raise DataDependencyError("The installed 'wilds' package does not expose get_dataset().")
+        raise DataDependencyError(
+            "The installed 'wilds' package does not expose get_dataset(). "
+            "Run `python scripts/check_environment.py` to verify benchmark prerequisites."
+        )
     return get_dataset
 
 

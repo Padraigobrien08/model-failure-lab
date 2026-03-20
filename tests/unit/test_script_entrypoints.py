@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import patch
@@ -22,11 +25,14 @@ from model_failure_lab.utils.paths import (
 )
 from scripts.build_perturbation_report import run_command as run_build_perturbation_report_command
 from scripts.build_report import run_command as run_build_report_command
+from scripts.check_environment import run_command as run_check_environment_command
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
 from scripts.run_mitigation import run_command as run_mitigation_command
 from scripts.run_perturbation_eval import run_command as run_perturbation_eval_command
 from scripts.run_shift_eval import run_command as run_shift_eval_command
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass
@@ -1079,3 +1085,53 @@ def test_download_data_bootstrap_writes_metadata(temp_artifact_root):
     assert metadata["status"] == "materialized"
     assert metadata["artifact_paths"]["manifest_json"].endswith("civilcomments_manifest.json")
     assert result.metadata_path.exists()
+
+
+def test_direct_script_help_runs_without_manual_pythonpath():
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+
+    commands = [
+        [sys.executable, "scripts/check_environment.py", "--help"],
+        [sys.executable, "scripts/download_data.py", "--help"],
+        [sys.executable, "scripts/run_baseline.py", "--help"],
+        [sys.executable, "scripts/build_report.py", "--help"],
+    ]
+    for command in commands:
+        result = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "usage:" in result.stdout.lower()
+
+
+def test_check_environment_command_supports_json_output(tmp_path):
+    payload = run_check_environment_command(
+        ["--json"],
+        dependency_checker=lambda package: {
+            "package": package,
+            "available": True,
+            "version": "1.0",
+            "error": None,
+        },
+        matplotlib_dir_resolver=lambda: tmp_path / "mplconfig",
+        config_loader=lambda _preset: {
+            "model": {"pretrained_name": "distilbert-base-uncased"},
+        },
+        transformer_asset_checker=lambda pretrained_name: {
+            "pretrained_name": pretrained_name,
+            "local_cache_available": False,
+            "message": (
+                "Local cache not detected. The first DistilBERT run will require "
+                "network access or a pre-populated local cache."
+            ),
+        },
+    )
+
+    assert payload["overall_ok"] is True
+    assert payload["distilbert"]["pretrained_name"] == "distilbert-base-uncased"
