@@ -165,6 +165,60 @@ def test_temperature_scaling_preset_contains_mitigation_payload():
     assert config["mitigation"]["temperature_scaling"]["allow_checkpoint_regeneration"] is True
 
 
+def test_build_inherited_temperature_scaling_config_filters_baseline_only_tags(
+    temp_artifact_root,
+):
+    parent_run_id, _, _ = _write_parent_bundle("distilbert_temperature_parent_tags")
+    parent_run_dir = build_baseline_run_dir("distilbert", parent_run_id, create=False)
+    metadata_path = parent_run_dir / "metadata.json"
+    metadata_payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata_payload["resolved_config"]["tags"] = [
+        "baseline",
+        "distilbert",
+        "constrained",
+        "official",
+        "v1.2_baseline",
+        "seed_13",
+    ]
+    metadata_payload["tags"] = list(metadata_payload["resolved_config"]["tags"])
+    metadata_path.write_text(json.dumps(metadata_payload), encoding="utf-8")
+
+    parent_context = load_parent_run_context(parent_run_id)
+    preset_config = load_experiment_config(
+        "configs/experiments/civilcomments_distilbert_temperature_scaling.yaml"
+    )
+    preset_config["run_id"] = "temperature_scaling_child_tags"
+    preset_config["experiment_group"] = "temperature_scaling_v1_2"
+    preset_config["tags"] = [
+        "mitigation",
+        "distilbert",
+        "temperature_scaling",
+        "v1.2_mitigation",
+        "official",
+        "seed_13",
+        f"parent_{parent_run_id}",
+    ]
+
+    child_config = build_inherited_mitigation_config(parent_context, preset_config)
+
+    assert child_config["experiment_group"] == "temperature_scaling_v1_2"
+    assert child_config["parent_run_id"] == parent_run_id
+    assert child_config["parent_model_name"] == "distilbert"
+    assert child_config["mitigation_method"] == "temperature_scaling"
+    assert "baseline" not in child_config["tags"]
+    assert "v1.2_baseline" not in child_config["tags"]
+    assert set(child_config["tags"]) == {
+        "distilbert",
+        "constrained",
+        "official",
+        "seed_13",
+        "mitigation",
+        "temperature_scaling",
+        "v1.2_mitigation",
+        f"parent_{parent_run_id}",
+    }
+
+
 def test_fit_temperature_scaler_returns_positive_temperature():
     temperature = fit_temperature_scaler(
         [[3.0, -2.0], [-0.5, 1.0], [0.2, -0.1]],

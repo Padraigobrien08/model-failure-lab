@@ -42,6 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-id", required=True, help="Parent baseline run ID.")
     parser.add_argument("--method", choices=sorted(METHOD_PRESETS), required=True)
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--experiment-group")
+    parser.add_argument("--tag", action="append", dest="tags")
     parser.add_argument("--notes")
     parser.add_argument("--output-run-id")
     return parser
@@ -55,6 +57,8 @@ def run_command(argv: Sequence[str] | None = None):
         preset_config,
         {
             "seed": args.seed,
+            "experiment_group": args.experiment_group,
+            "tags": args.tags,
             "notes": args.notes,
             "run_id": args.output_run_id or generate_run_id(args.method),
         },

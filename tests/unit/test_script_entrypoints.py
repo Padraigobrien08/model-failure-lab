@@ -924,6 +924,59 @@ def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_arti
     )
 
 
+def test_run_mitigation_temperature_scaling_supports_official_seeded_metadata(
+    temp_artifact_root,
+):
+    parent_run_id = "distilbert_parent_temperature_seeded"
+    _write_distilbert_parent_run(parent_run_id, with_saved_logits=True)
+
+    result = run_mitigation_command(
+        [
+            "--run-id",
+            parent_run_id,
+            "--method",
+            "temperature_scaling",
+            "--seed",
+            "13",
+            "--experiment-group",
+            "temperature_scaling_v1_2",
+            "--tag",
+            "mitigation",
+            "--tag",
+            "temperature_scaling",
+            "--tag",
+            "v1.2_mitigation",
+            "--tag",
+            "official",
+            "--tag",
+            "seed_13",
+            "--tag",
+            f"parent_{parent_run_id}",
+            "--output-run-id",
+            "temperature_scaling_seeded_runtime",
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert metadata["experiment_group"] == "temperature_scaling_v1_2"
+    assert metadata["resolved_config"]["experiment_group"] == "temperature_scaling_v1_2"
+    assert metadata["parent_run_id"] == parent_run_id
+    assert metadata["resolved_config"]["parent_run_id"] == parent_run_id
+    assert metadata["resolved_config"]["parent_model_name"] == "distilbert"
+    assert metadata["resolved_config"]["seed"] == 13
+    assert "baseline" not in metadata["tags"]
+    assert "v1.2_baseline" not in metadata["tags"]
+    assert set(metadata["tags"]) >= {
+        "distilbert",
+        "mitigation",
+        "temperature_scaling",
+        "v1.2_mitigation",
+        "official",
+        "seed_13",
+        f"parent_{parent_run_id}",
+    }
+
+
 def test_run_perturbation_eval_materializes_suite_bundle(temp_artifact_root, monkeypatch):
     source_run_id = _create_saved_evaluation_source_run()
     monkeypatch.setattr(

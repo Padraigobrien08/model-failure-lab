@@ -66,6 +66,17 @@ def _merge_tags(parent_tags: list[Any], child_tags: list[Any]) -> list[str]:
     return merged
 
 
+def _filter_parent_tags_for_child(parent_tags: list[Any]) -> list[str]:
+    filtered: list[str] = []
+    for raw_tag in parent_tags:
+        tag = str(raw_tag)
+        if tag == "baseline" or tag.endswith("_baseline"):
+            continue
+        if tag not in filtered:
+            filtered.append(tag)
+    return filtered
+
+
 def build_inherited_mitigation_config(
     parent_context: dict[str, Any],
     mitigation_preset_config: dict[str, Any],
@@ -96,7 +107,7 @@ def build_inherited_mitigation_config(
         mitigation_preset_config.get("seed", parent_resolved_config["seed"])
     )
     child_config["tags"] = _merge_tags(
-        list(parent_resolved_config.get("tags", [])),
+        _filter_parent_tags_for_child(list(parent_resolved_config.get("tags", []))),
         list(mitigation_preset_config.get("tags", [])),
     )
     child_config["notes"] = str(mitigation_preset_config.get("notes", ""))
