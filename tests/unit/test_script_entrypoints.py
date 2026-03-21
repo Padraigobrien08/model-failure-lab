@@ -16,12 +16,14 @@ from sklearn.linear_model import LogisticRegression
 from torch import nn
 
 from model_failure_lab.config import load_experiment_config
+from model_failure_lab.config.loader import _load_yaml_file
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
 from model_failure_lab.models.export import build_prediction_records
 from model_failure_lab.tracking import build_run_metadata, write_metadata
 from model_failure_lab.utils.paths import (
     build_baseline_run_dir,
     build_prediction_artifact_path,
+    config_root,
 )
 from scripts.build_perturbation_report import run_command as run_build_perturbation_report_command
 from scripts.build_report import run_command as run_build_report_command
@@ -244,11 +246,20 @@ def _write_distilbert_parent_run(
     run_id: str,
     *,
     with_saved_logits: bool = False,
+    constrained: bool = False,
+    tags: list[str] | None = None,
 ) -> None:
     baseline_config = load_experiment_config(
         "configs/experiments/civilcomments_distilbert_baseline.yaml"
     )
     baseline_config["run_id"] = run_id
+    if constrained:
+        baseline_config["model"] = _load_yaml_file(
+            config_root() / "model" / "distilbert_constrained.yaml"
+        )
+        baseline_config["train"] = _load_yaml_file(
+            config_root() / "train" / "distilbert_constrained.yaml"
+        )
     run_dir = build_baseline_run_dir("distilbert", run_id, create=True)
     checkpoint_path = run_dir / "checkpoint" / "best_model.pt"
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -309,7 +320,7 @@ def _write_distilbert_parent_run(
         run_dir=run_dir,
         artifact_paths=artifact_paths,
         notes="parent fixture",
-        tags=["baseline", "distilbert"],
+        tags=tags or ["baseline", "distilbert"],
         status="completed",
     )
     write_metadata(run_dir, parent_metadata)
@@ -883,6 +894,82 @@ def test_run_mitigation_reweighting_writes_completed_artifacts(
     assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
         "predictions_ood_test.parquet"
     )
+
+
+def test_run_mitigation_reweighting_supports_official_seeded_metadata(
+    temp_artifact_root,
+    monkeypatch,
+):
+    parent_run_id = "distilbert_parent_reweighting_seeded"
+    _write_distilbert_parent_run(
+        parent_run_id,
+        constrained=True,
+        tags=["baseline", "distilbert", "v1.2_baseline", "official", "seed_13"],
+    )
+
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.reweighting.load_baseline_canonical_dataset",
+        lambda *_args, **_kwargs: _baseline_dataset(),
+    )
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.reweighting.build_tokenizer",
+        lambda _name: _FakeTokenizer(),
+    )
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.reweighting.build_sequence_classifier",
+        lambda _name, num_labels: _TinyClassifier(num_labels=num_labels),
+    )
+
+    result = run_mitigation_command(
+        [
+            "--run-id",
+            parent_run_id,
+            "--method",
+            "reweighting",
+            "--seed",
+            "13",
+            "--experiment-group",
+            "reweighting_v1_2",
+            "--tag",
+            "mitigation",
+            "--tag",
+            "reweighting",
+            "--tag",
+            "v1.2_mitigation",
+            "--tag",
+            "official",
+            "--tag",
+            "seed_13",
+            "--tag",
+            f"parent_{parent_run_id}",
+            "--output-run-id",
+            "reweighting_seeded_runtime",
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert metadata["experiment_group"] == "reweighting_v1_2"
+    assert metadata["resolved_config"]["experiment_group"] == "reweighting_v1_2"
+    assert metadata["parent_run_id"] == parent_run_id
+    assert metadata["resolved_config"]["parent_run_id"] == parent_run_id
+    assert metadata["resolved_config"]["parent_model_name"] == "distilbert"
+    assert metadata["resolved_config"]["seed"] == 13
+    assert metadata["resolved_config"]["model"]["execution_tier"] == "constrained"
+    assert metadata["resolved_config"]["train"]["batch_size"] == 8
+    assert metadata["resolved_config"]["train"]["eval_batch_size"] == 16
+    assert metadata["resolved_config"]["train"]["max_epochs"] == 2
+    assert metadata["resolved_config"]["train"]["num_workers"] == 0
+    assert "baseline" not in metadata["tags"]
+    assert "v1.2_baseline" not in metadata["tags"]
+    assert set(metadata["tags"]) >= {
+        "distilbert",
+        "mitigation",
+        "reweighting",
+        "v1.2_mitigation",
+        "official",
+        "seed_13",
+        f"parent_{parent_run_id}",
+    }
 
 
 def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_artifact_root):

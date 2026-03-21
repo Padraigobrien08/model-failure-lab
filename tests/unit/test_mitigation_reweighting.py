@@ -8,7 +8,7 @@ import pytest
 import torch
 from torch import nn
 
-from model_failure_lab.config.loader import load_experiment_config
+from model_failure_lab.config.loader import _load_yaml_file, load_experiment_config
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
 from model_failure_lab.mitigations import (
     build_group_weight_table,
@@ -20,7 +20,11 @@ from model_failure_lab.mitigations import (
 from model_failure_lab.models.export import REQUIRED_PREDICTION_COLUMNS
 from model_failure_lab.runners.contracts import DispatchResult
 from model_failure_lab.tracking import build_run_metadata, write_metadata
-from model_failure_lab.utils.paths import build_baseline_run_dir, build_mitigation_run_dir
+from model_failure_lab.utils.paths import (
+    build_baseline_run_dir,
+    build_mitigation_run_dir,
+    config_root,
+)
 from scripts.run_mitigation import run_command as run_mitigation_command
 
 
@@ -192,6 +196,8 @@ def _write_parent_metadata(
     run_id: str,
     model_name: str = "distilbert",
     experiment_type: str = "baseline",
+    constrained: bool = False,
+    tags: list[str] | None = None,
 ) -> str:
     resolved_config = load_experiment_config(
         "configs/experiments/civilcomments_distilbert_baseline.yaml"
@@ -200,6 +206,13 @@ def _write_parent_metadata(
     resolved_config["experiment_type"] = experiment_type
     resolved_config["model_name"] = model_name
     resolved_config["model"]["model_name"] = model_name
+    if constrained:
+        resolved_config["model"] = _load_yaml_file(
+            config_root() / "model" / "distilbert_constrained.yaml"
+        )
+        resolved_config["train"] = _load_yaml_file(
+            config_root() / "train" / "distilbert_constrained.yaml"
+        )
 
     run_dir = build_baseline_run_dir(model_name, run_id, create=True)
     metadata_payload = build_run_metadata(
@@ -213,7 +226,7 @@ def _write_parent_metadata(
         command="python scripts/run_baseline.py --model distilbert",
         run_dir=run_dir,
         notes="parent fixture",
-        tags=[experiment_type, model_name],
+        tags=tags or [experiment_type, model_name],
         status="completed",
     )
     write_metadata(run_dir, metadata_payload)
@@ -272,6 +285,55 @@ def test_build_inherited_mitigation_config_clones_parent_resolved_config(temp_ar
     assert child_config["train"] == parent_context["resolved_config"]["train"]
     assert child_config["eval"] == parent_context["resolved_config"]["eval"]
     assert child_config["preset_path"].endswith("civilcomments_distilbert_baseline.yaml")
+
+
+def test_build_inherited_mitigation_config_preserves_constrained_parent_runtime_and_seeded_tags(
+    temp_artifact_root,
+):
+    parent_run_id = _write_parent_metadata(
+        run_id="distilbert_parent_constrained_seeded",
+        constrained=True,
+        tags=["baseline", "distilbert", "v1.2_baseline", "official", "seed_13"],
+    )
+    parent_context = load_parent_run_context(parent_run_id)
+    mitigation_preset = load_experiment_config(
+        "configs/experiments/civilcomments_distilbert_reweighting.yaml"
+    )
+    mitigation_preset["run_id"] = "reweighting_child_seeded"
+    mitigation_preset["experiment_group"] = "reweighting_v1_2"
+    mitigation_preset["seed"] = 13
+    mitigation_preset["tags"] = [
+        "mitigation",
+        "reweighting",
+        "v1.2_mitigation",
+        "official",
+        "seed_13",
+        f"parent_{parent_run_id}",
+    ]
+
+    child_config = build_inherited_mitigation_config(parent_context, mitigation_preset)
+
+    assert child_config["experiment_group"] == "reweighting_v1_2"
+    assert child_config["parent_run_id"] == parent_run_id
+    assert child_config["seed"] == 13
+    assert child_config["model"] == parent_context["resolved_config"]["model"]
+    assert child_config["train"] == parent_context["resolved_config"]["train"]
+    assert child_config["model"]["execution_tier"] == "constrained"
+    assert child_config["train"]["batch_size"] == 8
+    assert child_config["train"]["eval_batch_size"] == 16
+    assert child_config["train"]["max_epochs"] == 2
+    assert child_config["train"]["num_workers"] == 0
+    assert "baseline" not in child_config["tags"]
+    assert "v1.2_baseline" not in child_config["tags"]
+    assert set(child_config["tags"]) >= {
+        "distilbert",
+        "mitigation",
+        "reweighting",
+        "v1.2_mitigation",
+        "official",
+        "seed_13",
+        f"parent_{parent_run_id}",
+    }
 
 
 def test_build_group_weight_table_uses_train_only_group_counts():
