@@ -299,6 +299,43 @@ def test_render_report_markdown_and_summary_payload(temp_artifact_root):
     assert report_summary["compared_runs"][0]["label"] == "distilbert:run_b"
 
 
+def test_render_report_markdown_includes_seeded_mitigation_summary():
+    markdown = render_report_markdown(
+        report_title="Seeded Mitigation Report",
+        report_summary={
+            "compared_runs": [
+                {
+                    "eval_id": "eval_seed_13",
+                    "label": "distilbert:seed13_child",
+                    "source_run_id": "child_seed_13",
+                }
+            ],
+            "headline_findings": ["Temperature scaling preserves classification metrics."],
+            "mitigation_findings": ["seed_13 is a win versus its parent baseline."],
+            "mitigation_verdict_counts": {"win": 2, "tradeoff": 1, "failure": 0},
+            "seeded_interpretation": "stable",
+            "key_takeaway": "Calibration wins are directionally consistent across seeds.",
+            "next_experiment": "Run reweighting against the same seeded parent cohort.",
+        },
+        figure_paths={
+            "id_vs_ood_primary_metric": "figures/id_vs_ood_primary_metric.png",
+            "worst_group_vs_average": "figures/worst_group_vs_average.png",
+            "worst_subgroups": "figures/worst_subgroups.png",
+            "calibration_curve": "figures/calibration_curve.png",
+        },
+        table_paths={
+            "comparison_table": "tables/comparison_table.csv",
+            "mitigation_comparison_table": "tables/mitigation_comparison_table.csv",
+            "subgroup_table": "tables/subgroup_table.csv",
+            "calibration_table": "tables/calibration_table.csv",
+        },
+    )
+
+    assert "## Seeded mitigation summary" in markdown
+    assert "Seeded interpretation: `stable`" in markdown
+    assert "Verdict counts: `win=2`, `tradeoff=1`, `failure=0`" in markdown
+
+
 def test_write_report_bundle_and_metadata(temp_artifact_root):
     _create_evaluation_bundle(
         model_name="distilbert",
@@ -315,11 +352,46 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
     comparison_table = build_comparison_table(build_id_ood_comparison_frame(candidates))
     subgroup_table = build_subgroup_table(candidates, top_k=2, min_group_support=100)
     calibration_table = build_calibration_table(candidates)
+    mitigation_comparison_table = pd.DataFrame(
+        [
+            {
+                "parent_eval_id": "eval_parent_13",
+                "mitigation_eval_id": "eval_child_13",
+                "parent_label": "distilbert:seed13_parent",
+                "mitigation_label": "temperature_scaling:seed13_child",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": -0.01,
+            },
+            {
+                "parent_eval_id": "eval_parent_42",
+                "mitigation_eval_id": "eval_child_42",
+                "parent_label": "distilbert:seed42_parent",
+                "mitigation_label": "temperature_scaling:seed42_child",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": -0.01,
+            },
+            {
+                "parent_eval_id": "eval_parent_87",
+                "mitigation_eval_id": "eval_child_87",
+                "parent_label": "distilbert:seed87_parent",
+                "mitigation_label": "temperature_scaling:seed87_child",
+                "verdict": "tradeoff",
+                "ood_macro_f1_delta": -0.01,
+                "worst_group_f1_delta": -0.01,
+                "ece_delta": -0.01,
+            },
+        ]
+    )
     report_summary = build_report_summary(
         candidates,
         comparison_table=comparison_table,
         subgroup_table=subgroup_table,
         calibration_table=calibration_table,
+        mitigation_comparison_table=mitigation_comparison_table,
         report_title="Baseline Robustness Report",
     )
     markdown = render_report_markdown(
@@ -333,6 +405,7 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
         },
         table_paths={
             "comparison_table": "tables/comparison_table.csv",
+            "mitigation_comparison_table": "tables/mitigation_comparison_table.csv",
             "subgroup_table": "tables/subgroup_table.csv",
             "calibration_table": "tables/calibration_table.csv",
         },
@@ -353,6 +426,7 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
             "calibration_curve": build_calibration_curve_figure(candidates),
         },
         comparison_table=comparison_table,
+        mitigation_comparison_table=mitigation_comparison_table,
         subgroup_table=subgroup_table,
         calibration_table=calibration_table,
     )
@@ -391,4 +465,10 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
     assert metadata["selection_mode"] == "experiment_group"
     assert metadata["source_eval_ids"] == ["eval_b", "eval_a"]
     assert report_data["report_summary"]["report_title"] == "Baseline Robustness Report"
+    assert report_data["mitigation_verdict_counts"] == {
+        "win": 2,
+        "tradeoff": 1,
+        "failure": 0,
+    }
+    assert report_data["seeded_interpretation"] == "stable"
     assert len(report_data["comparison_table"]) == 2

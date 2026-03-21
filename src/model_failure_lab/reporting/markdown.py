@@ -23,6 +23,25 @@ def _render_mitigation_findings(findings: list[str]) -> str:
     return "\n".join(f"- {finding}" for finding in findings[:5])
 
 
+def _render_seeded_mitigation_summary(report_summary: dict[str, Any]) -> str:
+    verdict_counts = report_summary.get("mitigation_verdict_counts")
+    seeded_interpretation = report_summary.get("seeded_interpretation")
+    if not isinstance(verdict_counts, dict) or not seeded_interpretation:
+        return ""
+
+    return "\n".join(
+        [
+            f"- Seeded interpretation: `{seeded_interpretation}`",
+            (
+                "- Verdict counts: "
+                f"`win={int(verdict_counts.get('win', 0))}`, "
+                f"`tradeoff={int(verdict_counts.get('tradeoff', 0))}`, "
+                f"`failure={int(verdict_counts.get('failure', 0))}`"
+            ),
+        ]
+    )
+
+
 def render_report_markdown(
     *,
     report_title: str,
@@ -34,6 +53,7 @@ def render_report_markdown(
     compared_runs = report_summary.get("compared_runs", [])
     headline_findings = list(report_summary.get("headline_findings", []))[:5]
     mitigation_findings = list(report_summary.get("mitigation_findings", []))[:5]
+    seeded_mitigation_summary = _render_seeded_mitigation_summary(report_summary)
     key_takeaway = str(report_summary.get("key_takeaway", "No key takeaway available."))
     next_experiment = str(
         report_summary.get("next_experiment", "Choose the next comparable evaluation bundle.")
@@ -67,6 +87,8 @@ def render_report_markdown(
             if mitigation_findings
             else ""
         ),
+        "## Seeded mitigation summary" if seeded_mitigation_summary else "",
+        seeded_mitigation_summary,
         "## Key takeaway",
         key_takeaway,
         "## Next experiment",

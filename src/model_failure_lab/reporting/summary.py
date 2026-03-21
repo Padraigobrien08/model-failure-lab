@@ -10,6 +10,7 @@ from .discovery import PerturbationReportCandidate, ReportCandidate
 from .selection import report_label
 
 MAX_HEADLINE_FINDINGS = 5
+MITIGATION_VERDICTS = ("win", "tradeoff", "failure")
 
 
 def _format_score(value: object) -> str:
@@ -80,6 +81,41 @@ def _build_mitigation_findings(mitigation_comparison_table: pd.DataFrame) -> lis
     return findings[:MAX_HEADLINE_FINDINGS]
 
 
+def _build_mitigation_verdict_counts(
+    mitigation_comparison_table: pd.DataFrame,
+) -> dict[str, int] | None:
+    if mitigation_comparison_table.empty or len(mitigation_comparison_table.index) <= 1:
+        return None
+
+    verdict_series = mitigation_comparison_table.get("verdict")
+    if verdict_series is None:
+        return None
+
+    return {
+        verdict: int((verdict_series == verdict).sum())
+        for verdict in MITIGATION_VERDICTS
+    }
+
+
+def _build_seeded_interpretation(
+    mitigation_verdict_counts: dict[str, int] | None,
+) -> str | None:
+    if mitigation_verdict_counts is None:
+        return None
+
+    wins = int(mitigation_verdict_counts["win"])
+    tradeoffs = int(mitigation_verdict_counts["tradeoff"])
+    failures = int(mitigation_verdict_counts["failure"])
+
+    if wins >= 2 and failures == 0:
+        return "stable"
+    if wins >= 1 and (tradeoffs >= 1 or failures >= 1):
+        return "mixed"
+    if wins == 0 or failures > max(wins, tradeoffs):
+        return "unsupported"
+    return "unsupported"
+
+
 def build_report_summary(
     candidates: list[ReportCandidate],
     *,
@@ -102,6 +138,10 @@ def build_report_summary(
         resolved_mitigation_table,
     )
     mitigation_findings = _build_mitigation_findings(resolved_mitigation_table)
+    mitigation_verdict_counts = _build_mitigation_verdict_counts(
+        resolved_mitigation_table
+    )
+    seeded_interpretation = _build_seeded_interpretation(mitigation_verdict_counts)
     compared_runs = [
         {
             "eval_id": candidate.eval_id,
@@ -120,6 +160,8 @@ def build_report_summary(
         "compared_runs": compared_runs,
         "key_takeaway": key_takeaway,
         "next_experiment": next_experiment,
+        "mitigation_verdict_counts": mitigation_verdict_counts,
+        "seeded_interpretation": seeded_interpretation,
     }
 
 

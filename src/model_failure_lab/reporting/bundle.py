@@ -47,6 +47,8 @@ def build_report_data_payload(
     """Build a structured report payload for future UI consumers."""
     return {
         "report_summary": report_summary,
+        "mitigation_verdict_counts": report_summary.get("mitigation_verdict_counts"),
+        "seeded_interpretation": report_summary.get("seeded_interpretation"),
         "comparison_table": _frame_records(comparison_table),
         "mitigation_comparison_table": _frame_records(mitigation_comparison_table),
         "subgroup_table": _frame_records(subgroup_table),

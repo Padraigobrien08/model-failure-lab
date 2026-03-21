@@ -10,6 +10,7 @@ import pytest
 from model_failure_lab.models.export import build_prediction_records
 from model_failure_lab.reporting import (
     build_mitigation_comparison_table,
+    build_report_summary,
     classify_mitigation_verdict,
     load_report_inputs,
     pair_mitigation_candidates_with_parents,
@@ -326,3 +327,50 @@ def test_classify_mitigation_verdict_covers_tradeoff_and_failure_cases():
 
     assert tradeoff == "tradeoff"
     assert failure == "failure"
+
+
+def test_build_report_summary_computes_seeded_verdict_counts():
+    mitigation_comparison_table = pd.DataFrame(
+        [
+            {
+                "parent_label": "distilbert:seed13_parent",
+                "mitigation_label": "temperature_scaling:seed13_child",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": -0.01,
+            },
+            {
+                "parent_label": "distilbert:seed42_parent",
+                "mitigation_label": "temperature_scaling:seed42_child",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": -0.02,
+            },
+            {
+                "parent_label": "distilbert:seed87_parent",
+                "mitigation_label": "temperature_scaling:seed87_child",
+                "verdict": "tradeoff",
+                "ood_macro_f1_delta": -0.01,
+                "worst_group_f1_delta": -0.01,
+                "ece_delta": -0.01,
+            },
+        ]
+    )
+
+    report_summary = build_report_summary(
+        [],
+        comparison_table=pd.DataFrame(),
+        subgroup_table=pd.DataFrame(),
+        calibration_table=pd.DataFrame(),
+        mitigation_comparison_table=mitigation_comparison_table,
+        report_title="Phase 18 Seeded Temperature Scaling",
+    )
+
+    assert report_summary["mitigation_verdict_counts"] == {
+        "win": 2,
+        "tradeoff": 1,
+        "failure": 0,
+    }
+    assert report_summary["seeded_interpretation"] == "stable"
