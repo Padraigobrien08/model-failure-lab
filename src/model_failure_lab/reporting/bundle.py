@@ -49,6 +49,7 @@ def build_report_data_payload(
         "report_summary": report_summary,
         "mitigation_verdict_counts": report_summary.get("mitigation_verdict_counts"),
         "seeded_interpretation": report_summary.get("seeded_interpretation"),
+        "mitigation_method_summaries": report_summary.get("mitigation_method_summaries"),
         "comparison_table": _frame_records(comparison_table),
         "mitigation_comparison_table": _frame_records(mitigation_comparison_table),
         "subgroup_table": _frame_records(subgroup_table),

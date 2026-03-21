@@ -333,24 +333,30 @@ def test_build_report_summary_computes_seeded_verdict_counts():
     mitigation_comparison_table = pd.DataFrame(
         [
             {
+                "parent_eval_id": "eval_parent_13",
                 "parent_label": "distilbert:seed13_parent",
                 "mitigation_label": "temperature_scaling:seed13_child",
+                "mitigation_method": "temperature_scaling",
                 "verdict": "win",
                 "ood_macro_f1_delta": 0.0,
                 "worst_group_f1_delta": 0.0,
                 "ece_delta": -0.01,
             },
             {
+                "parent_eval_id": "eval_parent_42",
                 "parent_label": "distilbert:seed42_parent",
                 "mitigation_label": "temperature_scaling:seed42_child",
+                "mitigation_method": "temperature_scaling",
                 "verdict": "win",
                 "ood_macro_f1_delta": 0.0,
                 "worst_group_f1_delta": 0.0,
                 "ece_delta": -0.02,
             },
             {
+                "parent_eval_id": "eval_parent_87",
                 "parent_label": "distilbert:seed87_parent",
                 "mitigation_label": "temperature_scaling:seed87_child",
+                "mitigation_method": "temperature_scaling",
                 "verdict": "tradeoff",
                 "ood_macro_f1_delta": -0.01,
                 "worst_group_f1_delta": -0.01,
@@ -374,3 +380,99 @@ def test_build_report_summary_computes_seeded_verdict_counts():
         "failure": 0,
     }
     assert report_summary["seeded_interpretation"] == "stable"
+    assert report_summary["mitigation_method_summaries"] is None
+
+
+def test_build_report_summary_computes_method_aware_seeded_mitigation_summaries():
+    mitigation_comparison_table = pd.DataFrame(
+        [
+            {
+                "parent_eval_id": "eval_parent_13",
+                "parent_label": "distilbert:seed13_parent",
+                "mitigation_label": "temperature_scaling:seed13_child",
+                "mitigation_method": "temperature_scaling",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": -0.01,
+            },
+            {
+                "parent_eval_id": "eval_parent_42",
+                "parent_label": "distilbert:seed42_parent",
+                "mitigation_label": "temperature_scaling:seed42_child",
+                "mitigation_method": "temperature_scaling",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": -0.01,
+            },
+            {
+                "parent_eval_id": "eval_parent_87",
+                "parent_label": "distilbert:seed87_parent",
+                "mitigation_label": "temperature_scaling:seed87_child",
+                "mitigation_method": "temperature_scaling",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": -0.01,
+            },
+            {
+                "parent_eval_id": "eval_parent_13",
+                "parent_label": "distilbert:seed13_parent",
+                "mitigation_label": "reweighting:seed13_child",
+                "mitigation_method": "reweighting",
+                "verdict": "tradeoff",
+                "ood_macro_f1_delta": 0.02,
+                "worst_group_f1_delta": 0.01,
+                "ece_delta": 0.0,
+            },
+            {
+                "parent_eval_id": "eval_parent_42",
+                "parent_label": "distilbert:seed42_parent",
+                "mitigation_label": "reweighting:seed42_child",
+                "mitigation_method": "reweighting",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.03,
+                "worst_group_f1_delta": 0.02,
+                "ece_delta": 0.0,
+            },
+            {
+                "parent_eval_id": "eval_parent_87",
+                "parent_label": "distilbert:seed87_parent",
+                "mitigation_label": "reweighting:seed87_child",
+                "mitigation_method": "reweighting",
+                "verdict": "failure",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": 0.0,
+            },
+        ]
+    )
+
+    report_summary = build_report_summary(
+        [],
+        comparison_table=pd.DataFrame(),
+        subgroup_table=pd.DataFrame(),
+        calibration_table=pd.DataFrame(),
+        mitigation_comparison_table=mitigation_comparison_table,
+        report_title="Phase 19 Seeded Reweighting",
+    )
+
+    assert report_summary["mitigation_verdict_counts"] == {
+        "win": 4,
+        "tradeoff": 1,
+        "failure": 1,
+    }
+    assert report_summary["seeded_interpretation"] == "mixed"
+    assert report_summary["mitigation_method_summaries"] == {
+        "temperature_scaling": {
+            "comparison_count": 3,
+            "verdict_counts": {"win": 3, "tradeoff": 0, "failure": 0},
+            "seeded_interpretation": "stable",
+        },
+        "reweighting": {
+            "comparison_count": 3,
+            "verdict_counts": {"win": 1, "tradeoff": 1, "failure": 1},
+            "seeded_interpretation": "mixed",
+        },
+    }

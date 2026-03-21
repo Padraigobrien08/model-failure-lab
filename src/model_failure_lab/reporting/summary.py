@@ -11,6 +11,10 @@ from .selection import report_label
 
 MAX_HEADLINE_FINDINGS = 5
 MITIGATION_VERDICTS = ("win", "tradeoff", "failure")
+PREFERRED_MITIGATION_METHOD_ORDER = {
+    "temperature_scaling": 0,
+    "reweighting": 1,
+}
 
 
 def _format_score(value: object) -> str:
@@ -81,20 +85,38 @@ def _build_mitigation_findings(mitigation_comparison_table: pd.DataFrame) -> lis
     return findings[:MAX_HEADLINE_FINDINGS]
 
 
+def _has_seeded_parent_coverage(mitigation_comparison_table: pd.DataFrame) -> bool:
+    if mitigation_comparison_table.empty:
+        return False
+    parent_eval_ids = mitigation_comparison_table.get("parent_eval_id")
+    if parent_eval_ids is None:
+        return False
+    return int(parent_eval_ids.nunique(dropna=True)) > 1
+
+
+def _verdict_counts_for_table(mitigation_comparison_table: pd.DataFrame) -> dict[str, int]:
+    verdict_series = mitigation_comparison_table.get("verdict")
+    return {
+        verdict: int((verdict_series == verdict).sum()) if verdict_series is not None else 0
+        for verdict in MITIGATION_VERDICTS
+    }
+
+
 def _build_mitigation_verdict_counts(
     mitigation_comparison_table: pd.DataFrame,
 ) -> dict[str, int] | None:
-    if mitigation_comparison_table.empty or len(mitigation_comparison_table.index) <= 1:
+    if (
+        mitigation_comparison_table.empty
+        or len(mitigation_comparison_table.index) <= 1
+        or not _has_seeded_parent_coverage(mitigation_comparison_table)
+    ):
         return None
 
     verdict_series = mitigation_comparison_table.get("verdict")
     if verdict_series is None:
         return None
 
-    return {
-        verdict: int((verdict_series == verdict).sum())
-        for verdict in MITIGATION_VERDICTS
-    }
+    return _verdict_counts_for_table(mitigation_comparison_table)
 
 
 def _build_seeded_interpretation(
@@ -114,6 +136,42 @@ def _build_seeded_interpretation(
     if wins == 0 or failures > max(wins, tradeoffs):
         return "unsupported"
     return "unsupported"
+
+
+def _method_sort_key(method_name: str) -> tuple[int, str]:
+    return (
+        PREFERRED_MITIGATION_METHOD_ORDER.get(method_name, len(PREFERRED_MITIGATION_METHOD_ORDER)),
+        method_name,
+    )
+
+
+def _build_mitigation_method_summaries(
+    mitigation_comparison_table: pd.DataFrame,
+) -> dict[str, dict[str, Any]] | None:
+    if (
+        mitigation_comparison_table.empty
+        or "mitigation_method" not in mitigation_comparison_table.columns
+        or not _has_seeded_parent_coverage(mitigation_comparison_table)
+    ):
+        return None
+
+    sanitized = mitigation_comparison_table.copy()
+    sanitized["mitigation_method"] = sanitized["mitigation_method"].fillna("unknown").astype(str)
+    method_names = sorted(sanitized["mitigation_method"].unique().tolist(), key=_method_sort_key)
+    if len(method_names) <= 1:
+        return None
+
+    method_summaries: dict[str, dict[str, Any]] = {}
+    for method_name in method_names:
+        method_rows = sanitized.loc[sanitized["mitigation_method"] == method_name]
+        verdict_counts = _verdict_counts_for_table(method_rows)
+        method_summaries[method_name] = {
+            "comparison_count": int(len(method_rows.index)),
+            "verdict_counts": verdict_counts,
+            "seeded_interpretation": _build_seeded_interpretation(verdict_counts),
+        }
+
+    return method_summaries
 
 
 def build_report_summary(
@@ -142,6 +200,9 @@ def build_report_summary(
         resolved_mitigation_table
     )
     seeded_interpretation = _build_seeded_interpretation(mitigation_verdict_counts)
+    mitigation_method_summaries = _build_mitigation_method_summaries(
+        resolved_mitigation_table
+    )
     compared_runs = [
         {
             "eval_id": candidate.eval_id,
@@ -162,6 +223,7 @@ def build_report_summary(
         "next_experiment": next_experiment,
         "mitigation_verdict_counts": mitigation_verdict_counts,
         "seeded_interpretation": seeded_interpretation,
+        "mitigation_method_summaries": mitigation_method_summaries,
     }
 
 

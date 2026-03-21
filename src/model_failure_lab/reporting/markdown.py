@@ -42,6 +42,35 @@ def _render_seeded_mitigation_summary(report_summary: dict[str, Any]) -> str:
     )
 
 
+def _render_method_aware_seeded_mitigation_summary(report_summary: dict[str, Any]) -> str:
+    method_summaries = report_summary.get("mitigation_method_summaries")
+    if not isinstance(method_summaries, dict) or len(method_summaries) <= 1:
+        return ""
+
+    lines: list[str] = []
+    for method_name, summary in method_summaries.items():
+        if not isinstance(summary, dict):
+            continue
+        verdict_counts = summary.get("verdict_counts", {})
+        if not isinstance(verdict_counts, dict):
+            verdict_counts = {}
+        seeded_interpretation = summary.get("seeded_interpretation", "unsupported")
+        comparison_count = int(summary.get("comparison_count", 0))
+        lines.append(
+            f"- `{method_name}`: interpretation `{seeded_interpretation}` across "
+            f"`n={comparison_count}` seeded comparisons."
+        )
+        lines.append(
+            (
+                f"- `{method_name}` verdict counts: "
+                f"`win={int(verdict_counts.get('win', 0))}`, "
+                f"`tradeoff={int(verdict_counts.get('tradeoff', 0))}`, "
+                f"`failure={int(verdict_counts.get('failure', 0))}`"
+            )
+        )
+    return "\n".join(lines)
+
+
 def render_report_markdown(
     *,
     report_title: str,
@@ -54,6 +83,9 @@ def render_report_markdown(
     headline_findings = list(report_summary.get("headline_findings", []))[:5]
     mitigation_findings = list(report_summary.get("mitigation_findings", []))[:5]
     seeded_mitigation_summary = _render_seeded_mitigation_summary(report_summary)
+    method_aware_seeded_mitigation_summary = _render_method_aware_seeded_mitigation_summary(
+        report_summary
+    )
     key_takeaway = str(report_summary.get("key_takeaway", "No key takeaway available."))
     next_experiment = str(
         report_summary.get("next_experiment", "Choose the next comparable evaluation bundle.")
@@ -89,6 +121,12 @@ def render_report_markdown(
         ),
         "## Seeded mitigation summary" if seeded_mitigation_summary else "",
         seeded_mitigation_summary,
+        (
+            "## Method-aware seeded mitigation summary"
+            if method_aware_seeded_mitigation_summary
+            else ""
+        ),
+        method_aware_seeded_mitigation_summary,
         "## Key takeaway",
         key_takeaway,
         "## Next experiment",

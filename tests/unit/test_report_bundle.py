@@ -334,6 +334,63 @@ def test_render_report_markdown_includes_seeded_mitigation_summary():
     assert "## Seeded mitigation summary" in markdown
     assert "Seeded interpretation: `stable`" in markdown
     assert "Verdict counts: `win=2`, `tradeoff=1`, `failure=0`" in markdown
+    assert "## Method-aware seeded mitigation summary" not in markdown
+
+
+def test_render_report_markdown_includes_method_aware_seeded_mitigation_summary():
+    markdown = render_report_markdown(
+        report_title="Method-Aware Seeded Mitigation Report",
+        report_summary={
+            "compared_runs": [
+                {
+                    "eval_id": "eval_seed_13",
+                    "label": "distilbert:seed13_parent",
+                    "source_run_id": "parent_seed_13",
+                }
+            ],
+            "headline_findings": ["Temperature scaling remains stable while reweighting is mixed."],
+            "mitigation_findings": [
+                "temperature_scaling is stable across seeds.",
+                "reweighting shows mixed seed behavior.",
+            ],
+            "mitigation_verdict_counts": {"win": 4, "tradeoff": 1, "failure": 1},
+            "seeded_interpretation": "mixed",
+            "mitigation_method_summaries": {
+                "temperature_scaling": {
+                    "comparison_count": 3,
+                    "verdict_counts": {"win": 3, "tradeoff": 0, "failure": 0},
+                    "seeded_interpretation": "stable",
+                },
+                "reweighting": {
+                    "comparison_count": 3,
+                    "verdict_counts": {"win": 1, "tradeoff": 1, "failure": 1},
+                    "seeded_interpretation": "mixed",
+                },
+            },
+            "key_takeaway": "Reweighting is less stable than temperature scaling across seeds.",
+            "next_experiment": "Aggregate the same methods across additional seeds.",
+        },
+        figure_paths={
+            "id_vs_ood_primary_metric": "figures/id_vs_ood_primary_metric.png",
+            "worst_group_vs_average": "figures/worst_group_vs_average.png",
+            "worst_subgroups": "figures/worst_subgroups.png",
+            "calibration_curve": "figures/calibration_curve.png",
+        },
+        table_paths={
+            "comparison_table": "tables/comparison_table.csv",
+            "mitigation_comparison_table": "tables/mitigation_comparison_table.csv",
+            "subgroup_table": "tables/subgroup_table.csv",
+            "calibration_table": "tables/calibration_table.csv",
+        },
+    )
+
+    assert "## Method-aware seeded mitigation summary" in markdown
+    assert (
+        "`temperature_scaling`: interpretation `stable` across `n=3` seeded comparisons."
+        in markdown
+    )
+    assert "`reweighting`: interpretation `mixed` across `n=3` seeded comparisons." in markdown
+    assert "`reweighting` verdict counts: `win=1`, `tradeoff=1`, `failure=1`" in markdown
 
 
 def test_write_report_bundle_and_metadata(temp_artifact_root):
@@ -359,6 +416,7 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
                 "mitigation_eval_id": "eval_child_13",
                 "parent_label": "distilbert:seed13_parent",
                 "mitigation_label": "temperature_scaling:seed13_child",
+                "mitigation_method": "temperature_scaling",
                 "verdict": "win",
                 "ood_macro_f1_delta": 0.0,
                 "worst_group_f1_delta": 0.0,
@@ -369,6 +427,7 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
                 "mitigation_eval_id": "eval_child_42",
                 "parent_label": "distilbert:seed42_parent",
                 "mitigation_label": "temperature_scaling:seed42_child",
+                "mitigation_method": "temperature_scaling",
                 "verdict": "win",
                 "ood_macro_f1_delta": 0.0,
                 "worst_group_f1_delta": 0.0,
@@ -379,10 +438,44 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
                 "mitigation_eval_id": "eval_child_87",
                 "parent_label": "distilbert:seed87_parent",
                 "mitigation_label": "temperature_scaling:seed87_child",
+                "mitigation_method": "temperature_scaling",
                 "verdict": "tradeoff",
                 "ood_macro_f1_delta": -0.01,
                 "worst_group_f1_delta": -0.01,
                 "ece_delta": -0.01,
+            },
+            {
+                "parent_eval_id": "eval_parent_13",
+                "mitigation_eval_id": "eval_child_reweight_13",
+                "parent_label": "distilbert:seed13_parent",
+                "mitigation_label": "reweighting:seed13_child",
+                "mitigation_method": "reweighting",
+                "verdict": "win",
+                "ood_macro_f1_delta": 0.02,
+                "worst_group_f1_delta": 0.01,
+                "ece_delta": 0.0,
+            },
+            {
+                "parent_eval_id": "eval_parent_42",
+                "mitigation_eval_id": "eval_child_reweight_42",
+                "parent_label": "distilbert:seed42_parent",
+                "mitigation_label": "reweighting:seed42_child",
+                "mitigation_method": "reweighting",
+                "verdict": "tradeoff",
+                "ood_macro_f1_delta": 0.01,
+                "worst_group_f1_delta": 0.01,
+                "ece_delta": 0.0,
+            },
+            {
+                "parent_eval_id": "eval_parent_87",
+                "mitigation_eval_id": "eval_child_reweight_87",
+                "parent_label": "distilbert:seed87_parent",
+                "mitigation_label": "reweighting:seed87_child",
+                "mitigation_method": "reweighting",
+                "verdict": "failure",
+                "ood_macro_f1_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": 0.0,
             },
         ]
     )
@@ -466,9 +559,21 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
     assert metadata["source_eval_ids"] == ["eval_b", "eval_a"]
     assert report_data["report_summary"]["report_title"] == "Baseline Robustness Report"
     assert report_data["mitigation_verdict_counts"] == {
-        "win": 2,
-        "tradeoff": 1,
-        "failure": 0,
+        "win": 3,
+        "tradeoff": 2,
+        "failure": 1,
     }
-    assert report_data["seeded_interpretation"] == "stable"
+    assert report_data["seeded_interpretation"] == "mixed"
+    assert report_data["mitigation_method_summaries"] == {
+        "temperature_scaling": {
+            "comparison_count": 3,
+            "verdict_counts": {"win": 2, "tradeoff": 1, "failure": 0},
+            "seeded_interpretation": "stable",
+        },
+        "reweighting": {
+            "comparison_count": 3,
+            "verdict_counts": {"win": 1, "tradeoff": 1, "failure": 1},
+            "seeded_interpretation": "mixed",
+        },
+    }
     assert len(report_data["comparison_table"]) == 2
