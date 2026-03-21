@@ -11,6 +11,8 @@ import pandas as pd
 from model_failure_lab.tracking import build_run_metadata
 from model_failure_lab.utils.paths import build_evaluation_artifact_paths
 
+EVALUATION_SCHEMA_VERSION = "shift_eval_v1"
+
 
 def _write_json(path: Path, payload: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +158,7 @@ def build_evaluation_metadata(
     if source_run_metadata.get("mitigation_config") is not None:
         metadata["mitigation_config"] = dict(source_run_metadata["mitigation_config"])
     metadata["source_metadata_path"] = str(source_metadata_path)
+    metadata["evaluation_schema_version"] = EVALUATION_SCHEMA_VERSION
     metadata["evaluator_version"] = metadata.get("git_commit_hash")
     metadata["min_group_support"] = int(min_group_support)
     metadata["calibration_bins"] = int(calibration_bins)

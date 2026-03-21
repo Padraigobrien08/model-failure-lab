@@ -330,6 +330,38 @@ def test_select_report_candidates_rejects_non_comparable_runs(temp_artifact_root
         select_report_candidates(candidates)
 
 
+def test_select_report_candidates_allows_matching_eval_schema_across_git_hashes(
+    temp_artifact_root,
+):
+    first_path = _create_evaluation_bundle(
+        model_name="logistic_tfidf",
+        source_run_id="baseline_a",
+        eval_id="eval_a",
+        experiment_group="baselines_v1",
+    )
+    second_path = _create_evaluation_bundle(
+        model_name="distilbert",
+        source_run_id="baseline_b",
+        eval_id="eval_b",
+        experiment_group="baselines_v1",
+    )
+
+    for path, git_hash in (
+        (first_path, "1111111111111111111111111111111111111111"),
+        (second_path, "2222222222222222222222222222222222222222"),
+    ):
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+        metadata.pop("evaluation_schema_version", None)
+        metadata["git_commit_hash"] = git_hash
+        metadata["evaluator_version"] = git_hash
+        path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    candidates = load_report_inputs(experiment_group="baselines_v1")
+    selected = select_report_candidates(candidates)
+
+    assert [candidate.eval_id for candidate in selected] == ["eval_b", "eval_a"]
+
+
 def test_discover_evaluation_bundles_ignores_incomplete_running_bundles(temp_artifact_root):
     completed_path = _create_evaluation_bundle(
         model_name="logistic_tfidf",

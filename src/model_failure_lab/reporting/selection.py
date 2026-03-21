@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .discovery import ReportCandidate
@@ -20,9 +21,29 @@ def _task_signature(metadata: dict[str, Any]) -> str:
 
 
 def _schema_version(metadata: dict[str, Any]) -> str:
+    explicit_schema_version = metadata.get("evaluation_schema_version")
+    if explicit_schema_version is not None:
+        return str(explicit_schema_version)
+
+    resolved_config = metadata.get("resolved_config", {})
+    eval_config = resolved_config.get("eval", {}) if isinstance(resolved_config, dict) else {}
+    schema_payload = {
+        "experiment_type": metadata.get("experiment_type"),
+        "primary_metric": eval_config.get("primary_metric"),
+        "tracked_metrics": sorted(str(metric) for metric in eval_config.get("tracked_metrics", [])),
+        "calibration_metric": eval_config.get("calibration_metric"),
+        "calibration_strategy": eval_config.get("calibration_strategy"),
+        "calibration_bins": metadata.get("calibration_bins"),
+        "min_group_support": metadata.get("min_group_support"),
+        "robustness_gap_metric": eval_config.get("robustness_gap_metric"),
+        "worst_group_metric": eval_config.get("worst_group_metric"),
+        "evaluated_splits": sorted(str(split) for split in metadata.get("evaluated_splits", [])),
+    }
+    if any(value not in (None, [], {}) for value in schema_payload.values()):
+        return json.dumps(schema_payload, sort_keys=True)
+
     return str(
-        metadata.get("evaluation_schema_version")
-        or metadata.get("evaluator_version")
+        metadata.get("evaluator_version")
         or metadata.get("git_commit_hash")
         or "unknown"
     )
