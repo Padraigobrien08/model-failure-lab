@@ -187,6 +187,32 @@ def build_stability_report_artifact_paths(report_dir: Path) -> dict[str, str]:
     }
 
 
+def build_artifact_contract_dir(
+    contract_name: str,
+    *,
+    version: str = "v1",
+    create: bool = False,
+) -> Path:
+    """Return the canonical directory for a generated artifact contract."""
+    contract_dir = (
+        artifact_root()
+        / "contracts"
+        / _normalize_segment(contract_name)
+        / _normalize_segment(version)
+    )
+    if create:
+        contract_dir.mkdir(parents=True, exist_ok=True)
+    return contract_dir
+
+
+def build_artifact_index_path(*, version: str = "v1", create: bool = False) -> Path:
+    """Return the canonical path for the artifact-index manifest."""
+    contract_dir = build_artifact_contract_dir("artifact_index", version=version, create=create)
+    if create:
+        contract_dir.mkdir(parents=True, exist_ok=True)
+    return contract_dir / "index.json"
+
+
 def build_data_dir(create: bool = False) -> Path:
     """Return the root directory for persisted data artifacts."""
     data_dir = artifact_root() / "data"
@@ -227,8 +253,7 @@ def build_prediction_artifact_path(run_dir: Path, split: str) -> Path:
 def build_prediction_artifact_paths(run_dir: Path, splits: list[str]) -> dict[str, str]:
     """Return canonical prediction artifact paths keyed by split name."""
     return {
-        str(split): str(build_prediction_artifact_path(run_dir, str(split)))
-        for split in splits
+        str(split): str(build_prediction_artifact_path(run_dir, str(split))) for split in splits
     }
 
 
@@ -303,11 +328,7 @@ def find_run_metadata_path(run_id: str) -> Path:
         # `glob` patterns above use a wildcard in parent segments, so expand explicitly when empty.
         matches = sorted(
             list((artifact_root() / "baselines").glob(f"*/{normalized_run_id}/metadata.json"))
-            + list(
-                (artifact_root() / "mitigations").glob(
-                    f"*/*/{normalized_run_id}/metadata.json"
-                )
-            )
+            + list((artifact_root() / "mitigations").glob(f"*/*/{normalized_run_id}/metadata.json"))
         )
 
     if not matches:

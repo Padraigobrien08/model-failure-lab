@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from model_failure_lab.utils.paths import (
     artifact_root,
+    build_artifact_index_path,
     build_baseline_run_dir,
     build_evaluation_run_dir,
     build_mitigation_run_dir,
@@ -133,6 +134,16 @@ def test_stability_report_artifact_paths_use_expected_structure(temp_artifact_ro
         "tables/temperature_scaling_deltas.csv"
     )
     assert artifact_paths["reweighting_deltas_csv"].endswith("tables/reweighting_deltas.csv")
+
+
+def test_artifact_index_path_uses_expected_contract_structure(temp_artifact_root):
+    artifact_index_path = build_artifact_index_path(version="v1", create=True)
+
+    assert (
+        artifact_index_path
+        == temp_artifact_root / "contracts" / "artifact_index" / "v1" / "index.json"
+    )
+    assert artifact_index_path.parent.exists()
 
 
 def test_find_run_metadata_path_resolves_saved_baseline_run(temp_artifact_root):

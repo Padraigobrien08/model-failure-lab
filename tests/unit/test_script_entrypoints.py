@@ -22,10 +22,13 @@ from model_failure_lab.models.export import build_prediction_records
 from model_failure_lab.reporting.discovery import ReportCandidate
 from model_failure_lab.tracking import build_run_metadata, write_metadata
 from model_failure_lab.utils.paths import (
+    build_artifact_index_path,
     build_baseline_run_dir,
     build_prediction_artifact_path,
+    build_report_run_dir,
     config_root,
 )
+from scripts.build_artifact_index import run_command as run_build_artifact_index_command
 from scripts.build_perturbation_report import run_command as run_build_perturbation_report_command
 from scripts.build_report import run_command as run_build_report_command
 from scripts.build_stability_report import run_command as run_build_stability_report_command
@@ -35,6 +38,7 @@ from scripts.run_baseline import run_command as run_baseline_command
 from scripts.run_mitigation import run_command as run_mitigation_command
 from scripts.run_perturbation_eval import run_command as run_perturbation_eval_command
 from scripts.run_shift_eval import run_command as run_shift_eval_command
+from scripts.validate_artifact_index import run_command as run_validate_artifact_index_command
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -626,7 +630,7 @@ def _create_saved_evaluation_source_run() -> str:
             "predictions": {
                 "validation": str(validation_path),
                 "test": str(test_path),
-            }
+            },
         },
     }
     write_metadata(run_dir, metadata_payload)
@@ -850,9 +854,7 @@ def test_run_logistic_baseline_writes_completed_artifacts(temp_artifact_root, mo
     assert metadata["resolved_config"]["experiment_group"] == "baselines_v1_1"
     assert metadata["tags"] == ["baseline", "logistic_tfidf", "v1.1_baseline"]
     assert metadata["status"] == "completed"
-    assert metadata["artifact_paths"]["predictions"]["train"].endswith(
-        "predictions_train.parquet"
-    )
+    assert metadata["artifact_paths"]["predictions"]["train"].endswith("predictions_train.parquet")
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
@@ -902,9 +904,7 @@ def test_run_distilbert_baseline_writes_completed_artifacts(temp_artifact_root, 
     assert metadata["effective_batch_size"] == 8
     assert metadata["max_length"] == 128
     assert metadata["status"] == "completed"
-    assert metadata["artifact_paths"]["predictions"]["train"].endswith(
-        "predictions_train.parquet"
-    )
+    assert metadata["artifact_paths"]["predictions"]["train"].endswith("predictions_train.parquet")
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
@@ -955,9 +955,7 @@ def test_run_mitigation_reweighting_writes_completed_artifacts(
     assert metadata["mitigation_method"] == "reweighting"
     assert metadata["artifact_paths"]["group_weights_csv"].endswith("group_weights.csv")
     assert Path(metadata["artifact_paths"]["group_weights_csv"]).exists()
-    assert metadata["artifact_paths"]["predictions"]["train"].endswith(
-        "predictions_train.parquet"
-    )
+    assert metadata["artifact_paths"]["predictions"]["train"].endswith("predictions_train.parquet")
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
@@ -1066,13 +1064,9 @@ def test_run_mitigation_temperature_scaling_writes_completed_artifacts(temp_arti
     assert metadata["parent_run_id"] == parent_run_id
     assert metadata["mitigation_method"] == "temperature_scaling"
     assert metadata["learned_temperature"] > 0.0
-    assert metadata["artifact_paths"]["temperature_scaler_json"].endswith(
-        "temperature_scaler.json"
-    )
+    assert metadata["artifact_paths"]["temperature_scaler_json"].endswith("temperature_scaler.json")
     assert Path(metadata["artifact_paths"]["temperature_scaler_json"]).exists()
-    assert metadata["artifact_paths"]["predictions"]["train"].endswith(
-        "predictions_train.parquet"
-    )
+    assert metadata["artifact_paths"]["predictions"]["train"].endswith("predictions_train.parquet")
     assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
         "predictions_val.parquet"
     )
@@ -1576,6 +1570,155 @@ def test_build_stability_report_writes_completed_report_package(temp_artifact_ro
     assert summary["cohort_summaries"]["reweighting"]["label"] == "mixed"
 
 
+def _write_index_json(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _create_artifact_index_fixture(temp_artifact_root: Path) -> None:
+    logistic_run = build_baseline_run_dir("logistic_tfidf", "logistic_seed_13", create=True)
+    (logistic_run / "checkpoint").mkdir(parents=True, exist_ok=True)
+    (logistic_run / "figures").mkdir(parents=True, exist_ok=True)
+    (logistic_run / "metrics.json").write_text("{}", encoding="utf-8")
+    _write_index_json(
+        logistic_run / "metadata.json",
+        {
+            "run_id": "logistic_seed_13",
+            "experiment_type": "baseline",
+            "experiment_group": "baselines_v1_2_logistic",
+            "model_name": "logistic_tfidf",
+            "dataset_name": "civilcomments",
+            "random_seed": 13,
+            "resolved_config": {
+                "seed": 13,
+                "experiment_group": "baselines_v1_2_logistic",
+                "tags": ["baseline", "official", "seed_13"],
+            },
+            "artifact_paths": {
+                "checkpoint": str(logistic_run / "checkpoint"),
+                "metrics_json": str(logistic_run / "metrics.json"),
+                "plots": str(logistic_run / "figures"),
+            },
+            "tags": ["baseline", "official", "seed_13"],
+            "status": "completed",
+        },
+    )
+    eval_dir = logistic_run / "evaluations" / "logistic_eval_13"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    _write_index_json(
+        eval_dir / "ui_summary.json",
+        {
+            "headline_metrics": {
+                "id_macro_f1": 0.8,
+                "ood_macro_f1": 0.74,
+                "robustness_gap_f1": 0.06,
+                "worst_group_f1": 0.31,
+                "ece": 0.16,
+                "brier_score": 0.09,
+            }
+        },
+    )
+    _write_index_json(
+        eval_dir / "overall_metrics.json",
+        {
+            "headline_metrics": {
+                "id_macro_f1": 0.8,
+                "ood_macro_f1": 0.74,
+                "robustness_gap_f1": 0.06,
+                "worst_group_f1": 0.31,
+                "ece": 0.16,
+                "brier_score": 0.09,
+            }
+        },
+    )
+    _write_index_json(
+        eval_dir / "metadata.json",
+        {
+            "eval_id": "logistic_eval_13",
+            "run_id": "logistic_eval_13",
+            "experiment_type": "shift_eval",
+            "experiment_group": "baselines_v1_2_logistic",
+            "model_name": "logistic_tfidf",
+            "dataset_name": "civilcomments",
+            "random_seed": 13,
+            "resolved_config": {
+                "seed": 13,
+                "experiment_group": "baselines_v1_2_logistic",
+                "tags": ["baseline", "official", "seed_13"],
+            },
+            "source_run_id": "logistic_seed_13",
+            "artifact_paths": {
+                "ui_summary_json": str(eval_dir / "ui_summary.json"),
+                "overall_metrics_json": str(eval_dir / "overall_metrics.json"),
+            },
+            "tags": ["baseline", "official", "seed_13", "shift_eval"],
+            "status": "completed",
+        },
+    )
+
+    report_dir = build_report_run_dir("phase20_stability", "phase20_report", create=True)
+    (report_dir / "report.md").write_text("# report\n", encoding="utf-8")
+    _write_index_json(
+        report_dir / "stability_summary.json",
+        {
+            "cohort_summaries": {
+                "logistic_baseline": {"label": "stable"},
+                "distilbert_baseline": {"label": "stable"},
+                "temperature_scaling": {"label": "stable"},
+                "reweighting": {"label": "mixed"},
+            },
+            "baseline_model_comparison": {"label": "mixed"},
+            "milestone_assessment": {
+                "dataset_expansion_recommendation": "defer",
+            },
+            "reference_reports": {},
+        },
+    )
+    _write_index_json(
+        report_dir / "metadata.json",
+        {
+            "report_id": "phase20_report",
+            "run_id": "phase20_report",
+            "experiment_type": "stability_report",
+            "experiment_group": "phase20_stability",
+            "report_scope": "phase20_stability",
+            "selection_mode": "explicit_cohorts",
+            "source_eval_ids": ["logistic_eval_13"],
+            "cohort_eval_ids": {"logistic": ["logistic_eval_13"]},
+            "artifact_paths": {
+                "report_markdown": str(report_dir / "report.md"),
+                "stability_summary_json": str(report_dir / "stability_summary.json"),
+            },
+            "tags": ["stability", "phase20", "stability_report"],
+            "status": "completed",
+        },
+    )
+
+
+def test_build_artifact_index_writes_completed_contract(temp_artifact_root):
+    _create_artifact_index_fixture(temp_artifact_root)
+
+    result = run_build_artifact_index_command(["--version", "v1"])
+    payload = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert result.status == "completed"
+    assert result.metadata_path == build_artifact_index_path(version="v1")
+    assert payload["schema_version"] == "artifact_index_v1"
+    assert payload["default_filters"]["official_only"] is True
+
+
+def test_validate_artifact_index_reports_success(temp_artifact_root):
+    _create_artifact_index_fixture(temp_artifact_root)
+    index_result = run_build_artifact_index_command(["--version", "v1"])
+
+    result = run_validate_artifact_index_command(
+        ["--index", str(index_result.metadata_path), "--strict"]
+    )
+
+    assert result.status == "completed"
+    assert result.extras["errors"] == []
+
+
 def test_download_data_bootstrap_writes_metadata(temp_artifact_root):
     result = run_download_data_command([], materialize_fn=_fake_materialize)
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
@@ -1596,6 +1739,8 @@ def test_direct_script_help_runs_without_manual_pythonpath():
         [sys.executable, "scripts/download_data.py", "--help"],
         [sys.executable, "scripts/run_baseline.py", "--help"],
         [sys.executable, "scripts/build_report.py", "--help"],
+        [sys.executable, "scripts/build_artifact_index.py", "--help"],
+        [sys.executable, "scripts/validate_artifact_index.py", "--help"],
         [sys.executable, "scripts/build_stability_report.py", "--help"],
     ]
     for command in commands:
