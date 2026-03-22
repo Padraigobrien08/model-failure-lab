@@ -3,8 +3,10 @@
 from .bundle import (
     build_perturbation_report_metadata,
     build_report_metadata,
+    build_stability_report_metadata,
     write_perturbation_report_bundle,
     write_report_bundle,
+    write_stability_report_bundle,
 )
 from .calibration import build_calibration_curve_figure, build_calibration_table
 from .discovery import (
@@ -28,7 +30,11 @@ from .figures import (
     build_worst_subgroups_figure,
     build_worst_subgroups_frame,
 )
-from .markdown import render_perturbation_report_markdown, render_report_markdown
+from .markdown import (
+    render_perturbation_report_markdown,
+    render_report_markdown,
+    render_stability_report_markdown,
+)
 from .mitigation import (
     build_mitigation_comparison_table,
     classify_mitigation_verdict,
@@ -40,6 +46,14 @@ from .perturbation import (
     validate_perturbation_report_candidates,
 )
 from .selection import report_label, select_report_candidates, validate_report_candidates
+from .stability import (
+    BASELINE_STABILITY_COLUMNS,
+    MITIGATION_STABILITY_COLUMNS,
+    build_baseline_stability_table,
+    build_default_reference_reports,
+    build_mitigation_stability_table,
+    build_stability_summary,
+)
 from .summary import build_perturbation_report_summary, build_report_summary
 from .tables import build_comparison_table, build_subgroup_table
 
@@ -54,15 +68,21 @@ __all__ = [
     "build_perturbation_report_summary",
     "build_perturbation_report_tables",
     "build_report_metadata",
+    "build_stability_report_metadata",
     "write_report_bundle",
     "write_perturbation_report_bundle",
+    "write_stability_report_bundle",
     "build_calibration_curve_figure",
     "build_calibration_table",
+    "build_baseline_stability_table",
     "build_comparison_table",
+    "build_default_reference_reports",
     "build_id_ood_comparison_frame",
     "build_id_ood_figure",
+    "build_mitigation_stability_table",
     "build_mitigation_comparison_table",
     "build_report_summary",
+    "build_stability_summary",
     "build_severity_ladder_figure",
     "build_subgroup_table",
     "build_worst_group_vs_average_figure",
@@ -79,7 +99,10 @@ __all__ = [
     "report_label",
     "render_perturbation_report_markdown",
     "render_report_markdown",
+    "render_stability_report_markdown",
     "select_report_candidates",
     "validate_perturbation_report_candidates",
     "validate_report_candidates",
+    "BASELINE_STABILITY_COLUMNS",
+    "MITIGATION_STABILITY_COLUMNS",
 ]

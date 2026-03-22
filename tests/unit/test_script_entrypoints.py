@@ -19,6 +19,7 @@ from model_failure_lab.config import load_experiment_config
 from model_failure_lab.config.loader import _load_yaml_file
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
 from model_failure_lab.models.export import build_prediction_records
+from model_failure_lab.reporting.discovery import ReportCandidate
 from model_failure_lab.tracking import build_run_metadata, write_metadata
 from model_failure_lab.utils.paths import (
     build_baseline_run_dir,
@@ -27,6 +28,7 @@ from model_failure_lab.utils.paths import (
 )
 from scripts.build_perturbation_report import run_command as run_build_perturbation_report_command
 from scripts.build_report import run_command as run_build_report_command
+from scripts.build_stability_report import run_command as run_build_stability_report_command
 from scripts.check_environment import run_command as run_check_environment_command
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
@@ -44,6 +46,77 @@ class _FakeDataset:
     version: str
     metadata_fields: list[str]
     source_records: list[dict[str, object]]
+
+
+def _stability_candidate(
+    *,
+    seed: int,
+    model_name: str,
+    source_run_id: str,
+    eval_id: str,
+    id_macro_f1: float,
+    ood_macro_f1: float,
+    robustness_gap_f1: float,
+    worst_group_f1: float,
+    ece: float,
+    brier_score: float,
+    experiment_group: str,
+    tags: list[str],
+    source_parent_run_id: str | None = None,
+    mitigation_method: str | None = None,
+) -> ReportCandidate:
+    metadata = {
+        "eval_id": eval_id,
+        "run_id": eval_id,
+        "source_run_id": source_run_id,
+        "source_parent_run_id": source_parent_run_id,
+        "parent_run_id": source_parent_run_id,
+        "model_name": model_name,
+        "dataset_name": "civilcomments",
+        "experiment_group": experiment_group,
+        "tags": tags,
+        "random_seed": seed,
+        "resolved_config": {
+            "seed": seed,
+            "tags": tags,
+            "experiment_group": experiment_group,
+            "data": {"dataset_name": "civilcomments"},
+            "eval": {
+                "primary_metric": "macro_f1",
+                "tracked_metrics": ["accuracy", "macro_f1", "auroc"],
+                "calibration_metric": "ece",
+            },
+        },
+        "mitigation_method": mitigation_method,
+        "min_group_support": 100,
+        "evaluated_splits": ["id_test", "ood_test"],
+        "evaluation_schema_version": "shift_eval_v1",
+    }
+    if mitigation_method is not None:
+        metadata["resolved_config"]["mitigation"] = {"method": mitigation_method}  # type: ignore[index]
+
+    return ReportCandidate(
+        eval_id=eval_id,
+        metadata_path=Path(f"/tmp/{eval_id}/metadata.json"),
+        metadata=metadata,
+        overall_metrics={
+            "id": {"macro_f1": id_macro_f1},
+            "ood": {"macro_f1": ood_macro_f1},
+            "overall": {"macro_f1": (id_macro_f1 + ood_macro_f1) / 2.0},
+            "headline_metrics": {
+                "robustness_gap_f1": robustness_gap_f1,
+                "worst_group_f1": worst_group_f1,
+            },
+        },
+        split_metrics=pd.DataFrame(),
+        id_ood_comparison=pd.DataFrame(),
+        subgroup_metrics=pd.DataFrame(),
+        worst_group_summary={},
+        calibration_summary=pd.DataFrame(
+            [{"slice_name": "overall", "ece": ece, "brier_score": brier_score}]
+        ),
+        calibration_bins=pd.DataFrame(),
+    )
 
 
 def _fake_materialize(config: dict[str, object], *, download: bool):
@@ -1247,6 +1320,262 @@ def test_build_perturbation_report_writes_completed_report_package(temp_artifact
     assert result.metrics_path.name == "report_summary.json"
 
 
+def test_build_stability_report_writes_completed_report_package(temp_artifact_root, monkeypatch):
+    logistic_candidates = [
+        _stability_candidate(
+            seed=13,
+            model_name="logistic_tfidf",
+            source_run_id="logistic_seed_13",
+            eval_id="logistic_eval_13",
+            id_macro_f1=0.80,
+            ood_macro_f1=0.74,
+            robustness_gap_f1=0.06,
+            worst_group_f1=0.30,
+            ece=0.11,
+            brier_score=0.16,
+            experiment_group="baselines_v1_2_logistic",
+            tags=["baseline", "official", "seed_13"],
+        ),
+        _stability_candidate(
+            seed=42,
+            model_name="logistic_tfidf",
+            source_run_id="logistic_seed_42",
+            eval_id="logistic_eval_42",
+            id_macro_f1=0.80,
+            ood_macro_f1=0.74,
+            robustness_gap_f1=0.06,
+            worst_group_f1=0.30,
+            ece=0.11,
+            brier_score=0.16,
+            experiment_group="baselines_v1_2_logistic",
+            tags=["baseline", "official", "seed_42"],
+        ),
+        _stability_candidate(
+            seed=87,
+            model_name="logistic_tfidf",
+            source_run_id="logistic_seed_87",
+            eval_id="logistic_eval_87",
+            id_macro_f1=0.80,
+            ood_macro_f1=0.74,
+            robustness_gap_f1=0.06,
+            worst_group_f1=0.30,
+            ece=0.11,
+            brier_score=0.16,
+            experiment_group="baselines_v1_2_logistic",
+            tags=["baseline", "official", "seed_87"],
+        ),
+    ]
+    distilbert_candidates = [
+        _stability_candidate(
+            seed=13,
+            model_name="distilbert",
+            source_run_id="distilbert_seed_13",
+            eval_id="parent_eval_13",
+            id_macro_f1=0.87,
+            ood_macro_f1=0.80,
+            robustness_gap_f1=0.07,
+            worst_group_f1=0.32,
+            ece=0.03,
+            brier_score=0.05,
+            experiment_group="baselines_v1_2_distilbert",
+            tags=["baseline", "official", "seed_13"],
+        ),
+        _stability_candidate(
+            seed=42,
+            model_name="distilbert",
+            source_run_id="distilbert_seed_42",
+            eval_id="parent_eval_42",
+            id_macro_f1=0.87,
+            ood_macro_f1=0.80,
+            robustness_gap_f1=0.07,
+            worst_group_f1=0.31,
+            ece=0.03,
+            brier_score=0.05,
+            experiment_group="baselines_v1_2_distilbert",
+            tags=["baseline", "official", "seed_42"],
+        ),
+        _stability_candidate(
+            seed=87,
+            model_name="distilbert",
+            source_run_id="distilbert_seed_87",
+            eval_id="parent_eval_87",
+            id_macro_f1=0.87,
+            ood_macro_f1=0.80,
+            robustness_gap_f1=0.07,
+            worst_group_f1=0.31,
+            ece=0.03,
+            brier_score=0.05,
+            experiment_group="baselines_v1_2_distilbert",
+            tags=["baseline", "official", "seed_87"],
+        ),
+    ]
+    temperature_candidates = [
+        _stability_candidate(
+            seed=13,
+            model_name="distilbert",
+            source_run_id="temp_seed_13",
+            eval_id="temp_eval_13",
+            id_macro_f1=0.87,
+            ood_macro_f1=0.80,
+            robustness_gap_f1=0.07,
+            worst_group_f1=0.32,
+            ece=0.019,
+            brier_score=0.048,
+            experiment_group="temperature_scaling_v1_2",
+            tags=["mitigation", "official", "seed_13"],
+            source_parent_run_id="distilbert_seed_13",
+            mitigation_method="temperature_scaling",
+        ),
+        _stability_candidate(
+            seed=42,
+            model_name="distilbert",
+            source_run_id="temp_seed_42",
+            eval_id="temp_eval_42",
+            id_macro_f1=0.87,
+            ood_macro_f1=0.80,
+            robustness_gap_f1=0.07,
+            worst_group_f1=0.31,
+            ece=0.018,
+            brier_score=0.047,
+            experiment_group="temperature_scaling_v1_2",
+            tags=["mitigation", "official", "seed_42"],
+            source_parent_run_id="distilbert_seed_42",
+            mitigation_method="temperature_scaling",
+        ),
+        _stability_candidate(
+            seed=87,
+            model_name="distilbert",
+            source_run_id="temp_seed_87",
+            eval_id="temp_eval_87",
+            id_macro_f1=0.87,
+            ood_macro_f1=0.80,
+            robustness_gap_f1=0.07,
+            worst_group_f1=0.31,
+            ece=0.020,
+            brier_score=0.048,
+            experiment_group="temperature_scaling_v1_2",
+            tags=["mitigation", "official", "seed_87"],
+            source_parent_run_id="distilbert_seed_87",
+            mitigation_method="temperature_scaling",
+        ),
+    ]
+    reweighting_candidates = [
+        _stability_candidate(
+            seed=13,
+            model_name="distilbert",
+            source_run_id="reweight_seed_13",
+            eval_id="reweight_eval_13",
+            id_macro_f1=0.856,
+            ood_macro_f1=0.7998,
+            robustness_gap_f1=0.083,
+            worst_group_f1=0.382,
+            ece=0.037,
+            brier_score=0.058,
+            experiment_group="reweighting_v1_2",
+            tags=["mitigation", "official", "seed_13"],
+            source_parent_run_id="distilbert_seed_13",
+            mitigation_method="reweighting",
+        ),
+        _stability_candidate(
+            seed=42,
+            model_name="distilbert",
+            source_run_id="reweight_seed_42",
+            eval_id="reweight_eval_42",
+            id_macro_f1=0.861,
+            ood_macro_f1=0.801,
+            robustness_gap_f1=0.080,
+            worst_group_f1=0.379,
+            ece=0.034,
+            brier_score=0.056,
+            experiment_group="reweighting_v1_2",
+            tags=["mitigation", "official", "seed_42"],
+            source_parent_run_id="distilbert_seed_42",
+            mitigation_method="reweighting",
+        ),
+        _stability_candidate(
+            seed=87,
+            model_name="distilbert",
+            source_run_id="reweight_seed_87",
+            eval_id="reweight_eval_87",
+            id_macro_f1=0.860,
+            ood_macro_f1=0.7995,
+            robustness_gap_f1=0.079,
+            worst_group_f1=0.359,
+            ece=0.036,
+            brier_score=0.056,
+            experiment_group="reweighting_v1_2",
+            tags=["mitigation", "official", "seed_87"],
+            source_parent_run_id="distilbert_seed_87",
+            mitigation_method="reweighting",
+        ),
+    ]
+
+    candidate_lookup = {
+        "logistic_eval_13": [logistic_candidates[0]],
+        "logistic_eval_42": [logistic_candidates[1]],
+        "logistic_eval_87": [logistic_candidates[2]],
+        "parent_eval_13": [distilbert_candidates[0]],
+        "parent_eval_42": [distilbert_candidates[1]],
+        "parent_eval_87": [distilbert_candidates[2]],
+        "temp_eval_13": [temperature_candidates[0]],
+        "temp_eval_42": [temperature_candidates[1]],
+        "temp_eval_87": [temperature_candidates[2]],
+        "reweight_eval_13": [reweighting_candidates[0]],
+        "reweight_eval_42": [reweighting_candidates[1]],
+        "reweight_eval_87": [reweighting_candidates[2]],
+    }
+
+    def _fake_load_report_inputs(*, eval_ids=None, experiment_group=None):
+        del experiment_group
+        if eval_ids is None:
+            return []
+        rows = []
+        for eval_id in eval_ids:
+            rows.extend(candidate_lookup[eval_id])
+        return rows
+
+    monkeypatch.setattr(
+        "scripts.build_stability_report.load_report_inputs",
+        _fake_load_report_inputs,
+    )
+    monkeypatch.setattr(
+        "scripts.build_stability_report.generate_run_id",
+        lambda _prefix: "phase20_run",
+    )
+
+    result = run_build_stability_report_command(
+        [
+            "--report-name",
+            "phase20_stability",
+            "--logistic-eval-ids",
+            "logistic_eval_13,logistic_eval_42,logistic_eval_87",
+            "--distilbert-eval-ids",
+            "parent_eval_13,parent_eval_42,parent_eval_87",
+            "--temperature-eval-ids",
+            "temp_eval_13,temp_eval_42,temp_eval_87",
+            "--reweighting-eval-ids",
+            "reweight_eval_13,reweight_eval_42,reweight_eval_87",
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+    summary = json.loads(result.metrics_path.read_text(encoding="utf-8"))
+
+    assert "artifacts/reports/comparisons/phase20_stability" in result.run_dir.as_posix()
+    assert metadata["experiment_type"] == "stability_report"
+    assert metadata["status"] == "completed"
+    assert metadata["selection_mode"] == "explicit_cohorts"
+    assert metadata["cohort_eval_ids"]["temperature_scaling"] == [
+        "temp_eval_13",
+        "temp_eval_42",
+        "temp_eval_87",
+    ]
+    assert (result.run_dir / "report.md").exists()
+    assert (result.run_dir / "tables" / "baseline_stability.csv").exists()
+    assert result.metrics_path.name == "stability_summary.json"
+    assert summary["cohort_summaries"]["temperature_scaling"]["label"] == "stable"
+    assert summary["cohort_summaries"]["reweighting"]["label"] == "mixed"
+
+
 def test_download_data_bootstrap_writes_metadata(temp_artifact_root):
     result = run_download_data_command([], materialize_fn=_fake_materialize)
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
@@ -1267,6 +1596,7 @@ def test_direct_script_help_runs_without_manual_pythonpath():
         [sys.executable, "scripts/download_data.py", "--help"],
         [sys.executable, "scripts/run_baseline.py", "--help"],
         [sys.executable, "scripts/build_report.py", "--help"],
+        [sys.executable, "scripts/build_stability_report.py", "--help"],
     ]
     for command in commands:
         result = subprocess.run(

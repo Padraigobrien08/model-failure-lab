@@ -15,14 +15,17 @@ from model_failure_lab.reporting import (
     build_id_ood_figure,
     build_report_metadata,
     build_report_summary,
+    build_stability_report_metadata,
     build_subgroup_table,
     build_worst_group_vs_average_figure,
     build_worst_group_vs_average_frame,
     build_worst_subgroups_figure,
     load_report_inputs,
     render_report_markdown,
+    render_stability_report_markdown,
     select_report_candidates,
     write_report_bundle,
+    write_stability_report_bundle,
 )
 from model_failure_lab.utils.paths import build_baseline_run_dir, build_prediction_artifact_path
 from scripts.run_shift_eval import run_command as run_shift_eval_command
@@ -577,3 +580,169 @@ def test_write_report_bundle_and_metadata(temp_artifact_root):
         },
     }
     assert len(report_data["comparison_table"]) == 2
+
+
+def test_write_stability_report_bundle_writes_required_files(temp_artifact_root):
+    report_run_dir = (
+        temp_artifact_root / "reports" / "comparisons" / "phase20_stability" / "report_run"
+    )
+    baseline_stability_table = pd.DataFrame(
+        [
+            {
+                "cohort": "logistic_baseline",
+                "row_type": "seed",
+                "seed": "13",
+                "model_name": "logistic_tfidf",
+                "source_run_id": "logistic_seed_13",
+                "eval_id": "logistic_eval_13",
+                "id_macro_f1": 0.80,
+                "ood_macro_f1": 0.74,
+                "robustness_gap_f1": 0.06,
+                "worst_group_f1": 0.30,
+                "ece": 0.11,
+                "brier_score": 0.16,
+            },
+            {
+                "cohort": "distilbert_baseline",
+                "row_type": "mean",
+                "seed": "mean",
+                "model_name": None,
+                "source_run_id": None,
+                "eval_id": None,
+                "id_macro_f1": 0.87,
+                "ood_macro_f1": 0.80,
+                "robustness_gap_f1": 0.07,
+                "worst_group_f1": 0.31,
+                "ece": 0.03,
+                "brier_score": 0.05,
+            },
+        ]
+    )
+    temperature_scaling_deltas = pd.DataFrame(
+        [
+            {
+                "mitigation_method": "temperature_scaling",
+                "row_type": "seed",
+                "seed": "13",
+                "parent_eval_id": "parent_eval_13",
+                "mitigation_eval_id": "temp_eval_13",
+                "parent_label": "distilbert:seed13_parent",
+                "mitigation_label": "temperature_scaling:seed13_child",
+                "id_macro_f1_delta": 0.0,
+                "ood_macro_f1_delta": 0.0,
+                "robustness_gap_delta": 0.0,
+                "worst_group_f1_delta": 0.0,
+                "ece_delta": -0.011,
+                "brier_score_delta": -0.002,
+                "verdict": "win",
+            }
+        ]
+    )
+    reweighting_deltas = pd.DataFrame(
+        [
+            {
+                "mitigation_method": "reweighting",
+                "row_type": "seed",
+                "seed": "13",
+                "parent_eval_id": "parent_eval_13",
+                "mitigation_eval_id": "reweight_eval_13",
+                "parent_label": "distilbert:seed13_parent",
+                "mitigation_label": "reweighting:seed13_child",
+                "id_macro_f1_delta": -0.010,
+                "ood_macro_f1_delta": 0.002,
+                "robustness_gap_delta": -0.012,
+                "worst_group_f1_delta": 0.021,
+                "ece_delta": 0.004,
+                "brier_score_delta": 0.001,
+                "verdict": "tradeoff",
+            }
+        ]
+    )
+    stability_summary = {
+        "report_title": "phase20_stability",
+        "headline_findings": [
+            "DistilBERT remains stable under shift across seeds.",
+            "Temperature scaling is stable across the seeded cohort.",
+            "Reweighting remains mixed across seeds.",
+        ],
+        "key_takeaway": "Temperature scaling is the cleanest seeded mitigation lane.",
+        "cohort_summaries": {
+            "distilbert_baseline": {"label": "stable"},
+            "temperature_scaling": {"label": "stable"},
+            "reweighting": {"label": "mixed"},
+        },
+        "baseline_model_comparison": {
+            "label": "stable",
+            "mean_deltas": {"ood_macro_f1_delta": 0.06, "worst_group_f1_delta": 0.01},
+        },
+        "milestone_assessment": {
+            "v1_1_findings_status": "stable",
+            "dataset_expansion_recommendation": "defer",
+            "recommendation_reason": "Reweighting still needs more stability evidence.",
+            "next_step": "Keep dataset expansion deferred.",
+        },
+        "reference_reports": {
+            "temperature_scaling_seeded": "phase18/report.md",
+            "reweighting_seeded": "phase19/report.md",
+        },
+    }
+    markdown = render_stability_report_markdown(
+        report_title="phase20_stability",
+        stability_summary=stability_summary,
+        table_paths={
+            "baseline_stability": "tables/baseline_stability.csv",
+            "temperature_scaling_deltas": "tables/temperature_scaling_deltas.csv",
+            "reweighting_deltas": "tables/reweighting_deltas.csv",
+        },
+    )
+
+    artifact_paths = write_stability_report_bundle(
+        report_run_dir,
+        markdown=markdown,
+        stability_summary=stability_summary,
+        baseline_stability_table=baseline_stability_table,
+        temperature_scaling_deltas=temperature_scaling_deltas,
+        reweighting_deltas=reweighting_deltas,
+    )
+    metadata = build_stability_report_metadata(
+        report_id="report_run",
+        report_scope="phase20_stability",
+        selection_mode="explicit_cohorts",
+        source_eval_ids=["logistic_eval_13", "parent_eval_13", "temp_eval_13", "reweight_eval_13"],
+        cohort_eval_ids={
+            "logistic": ["logistic_eval_13"],
+            "distilbert": ["parent_eval_13"],
+            "temperature_scaling": ["temp_eval_13"],
+            "reweighting": ["reweight_eval_13"],
+        },
+        resolved_config={
+            "seed": 13,
+            "notes": "",
+            "tags": ["stability", "phase20"],
+            "report": {"report_name": "phase20_stability"},
+        },
+        command="python scripts/build_stability_report.py --report-name phase20_stability",
+        run_dir=report_run_dir,
+        dataset_name="civilcomments",
+        split_details={
+            "train": "train",
+            "validation": "validation",
+            "id_test": "id_test",
+            "ood_test": "ood_test",
+        },
+        artifact_paths=artifact_paths,
+        status="completed",
+    )
+    report_data = json.loads(Path(artifact_paths["report_data_json"]).read_text(encoding="utf-8"))
+
+    assert Path(artifact_paths["report_markdown"]).exists()
+    assert Path(artifact_paths["stability_summary_json"]).exists()
+    assert Path(artifact_paths["report_data_json"]).exists()
+    assert Path(artifact_paths["baseline_stability_csv"]).exists()
+    assert Path(artifact_paths["temperature_scaling_deltas_csv"]).exists()
+    assert Path(artifact_paths["reweighting_deltas_csv"]).exists()
+    assert metadata["experiment_type"] == "stability_report"
+    assert metadata["selection_mode"] == "explicit_cohorts"
+    assert report_data["stability_summary"]["milestone_assessment"][
+        "dataset_expansion_recommendation"
+    ] == "defer"

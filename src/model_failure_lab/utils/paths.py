@@ -172,6 +172,21 @@ def build_perturbation_report_artifact_paths(report_dir: Path) -> dict[str, str]
     }
 
 
+def build_stability_report_artifact_paths(report_dir: Path) -> dict[str, str]:
+    """Return persisted artifact paths for a seeded stability report package."""
+    return {
+        "report_markdown": str(report_dir / "report.md"),
+        "stability_summary_json": str(report_dir / "stability_summary.json"),
+        "report_data_json": str(report_dir / "report_data.json"),
+        "tables_dir": str(report_dir / "tables"),
+        "baseline_stability_csv": str(report_dir / "tables" / "baseline_stability.csv"),
+        "temperature_scaling_deltas_csv": str(
+            report_dir / "tables" / "temperature_scaling_deltas.csv"
+        ),
+        "reweighting_deltas_csv": str(report_dir / "tables" / "reweighting_deltas.csv"),
+    }
+
+
 def build_data_dir(create: bool = False) -> Path:
     """Return the root directory for persisted data artifacts."""
     data_dir = artifact_root() / "data"

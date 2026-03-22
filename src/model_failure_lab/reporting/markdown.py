@@ -181,3 +181,135 @@ def render_perturbation_report_markdown(
         next_experiment,
     ]
     return "\n\n".join(section for section in sections if section.strip()) + "\n"
+
+
+def _render_stability_cohort_summaries(
+    stability_summary: dict[str, Any],
+) -> str:
+    cohort_summaries = stability_summary.get("cohort_summaries", {})
+    if not isinstance(cohort_summaries, dict):
+        return ""
+
+    ordered_keys = [
+        "logistic_baseline",
+        "distilbert_baseline",
+        "temperature_scaling",
+        "reweighting",
+    ]
+    lines: list[str] = []
+    for key in ordered_keys:
+        summary = cohort_summaries.get(key)
+        if not isinstance(summary, dict):
+            continue
+        label = str(summary.get("label", "n/a"))
+        seed_count = int(summary.get("seed_count", 0))
+        lines.append(f"- `{key}`: `{label}` across `n={seed_count}` seed rows.")
+        verdict_counts = summary.get("verdict_counts")
+        if isinstance(verdict_counts, dict):
+            lines.append(
+                (
+                    f"- `{key}` verdict counts: "
+                    f"`win={int(verdict_counts.get('win', 0))}`, "
+                    f"`tradeoff={int(verdict_counts.get('tradeoff', 0))}`, "
+                    f"`failure={int(verdict_counts.get('failure', 0))}`"
+                )
+            )
+    return "\n".join(lines)
+
+
+def _render_stability_model_comparison(stability_summary: dict[str, Any]) -> str:
+    model_comparison = stability_summary.get("baseline_model_comparison")
+    if not isinstance(model_comparison, dict):
+        return ""
+    label = str(model_comparison.get("label", "n/a"))
+    mean_deltas = model_comparison.get("mean_deltas", {})
+    ood_delta = mean_deltas.get("ood_macro_f1_delta")
+    worst_delta = mean_deltas.get("worst_group_f1_delta")
+    ood_text = "n/a" if ood_delta is None else f"{float(ood_delta):.3f}"
+    worst_text = "n/a" if worst_delta is None else f"{float(worst_delta):.3f}"
+    return "\n".join(
+        [
+            f"- Logistic vs DistilBERT comparison: `{label}`",
+            (
+                "- Mean DistilBERT-minus-Logistic deltas: "
+                f"`ood_macro_f1={ood_text}`, `worst_group_f1={worst_text}`"
+            ),
+        ]
+    )
+
+
+def _render_stability_references(stability_summary: dict[str, Any]) -> str:
+    references = stability_summary.get("reference_reports", {})
+    if not isinstance(references, dict):
+        return ""
+    lines: list[str] = []
+    for key in ("temperature_scaling_seeded", "reweighting_seeded"):
+        path = references.get(key)
+        if path:
+            lines.append(f"- `{key}`: `{path}`")
+    return "\n".join(lines)
+
+
+def render_stability_report_markdown(
+    *,
+    report_title: str,
+    stability_summary: dict[str, Any],
+    table_paths: dict[str, str],
+) -> str:
+    """Render the canonical seeded stability Markdown findings report."""
+    headline_findings = list(stability_summary.get("headline_findings", []))[:5]
+    key_takeaway = str(stability_summary.get("key_takeaway", "No key takeaway available."))
+    milestone_assessment = stability_summary.get("milestone_assessment", {})
+    if not isinstance(milestone_assessment, dict):
+        milestone_assessment = {}
+    findings_status = str(milestone_assessment.get("v1_1_findings_status", "n/a"))
+    dataset_expansion = str(
+        milestone_assessment.get("dataset_expansion_recommendation", "n/a")
+    )
+    recommendation_reason = str(
+        milestone_assessment.get("recommendation_reason", "No recommendation reason available.")
+    )
+    next_step = str(
+        milestone_assessment.get("next_step", "Choose the next milestone from saved evidence.")
+    )
+
+    sections = [
+        f"# {report_title}",
+        "## Overview",
+        (
+            "This report aggregates saved official evaluation bundles only. "
+            "No new runs are executed in Phase 20; all conclusions come from the locked seeded "
+            "baseline and mitigation cohorts."
+        ),
+        "## Headline findings",
+        _render_headline_findings(headline_findings),
+        "## Cohort stability labels",
+        _render_stability_cohort_summaries(stability_summary),
+        (
+            f"- Baseline stability table: `{table_paths['baseline_stability']}`"
+            if table_paths.get("baseline_stability")
+            else ""
+        ),
+        (
+            f"- Temperature-scaling deltas: `{table_paths['temperature_scaling_deltas']}`"
+            if table_paths.get("temperature_scaling_deltas")
+            else ""
+        ),
+        (
+            f"- Reweighting deltas: `{table_paths['reweighting_deltas']}`"
+            if table_paths.get("reweighting_deltas")
+            else ""
+        ),
+        "## Baseline model comparison",
+        _render_stability_model_comparison(stability_summary),
+        "## Existing seeded mitigation packages",
+        _render_stability_references(stability_summary),
+        "## Milestone recommendation",
+        f"- Original `v1.1` findings under seed variation: `{findings_status}`",
+        f"- Dataset expansion recommendation: `{dataset_expansion}`",
+        f"- Reason: {recommendation_reason}",
+        f"- Next step: {next_step}",
+        "## Key takeaway",
+        key_takeaway,
+    ]
+    return "\n\n".join(section for section in sections if section.strip()) + "\n"

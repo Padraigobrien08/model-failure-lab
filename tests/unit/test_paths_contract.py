@@ -12,6 +12,7 @@ from model_failure_lab.utils.paths import (
     build_report_artifact_paths,
     build_report_dir,
     build_report_run_dir,
+    build_stability_report_artifact_paths,
     config_root,
     find_run_metadata_path,
 )
@@ -115,6 +116,23 @@ def test_perturbation_report_run_dir_and_artifact_paths_use_expected_structure(t
     assert artifact_paths["clean_vs_perturbed_primary_metric_png"].endswith(
         "figures/clean_vs_perturbed_primary_metric.png"
     )
+
+
+def test_stability_report_artifact_paths_use_expected_structure(temp_artifact_root):
+    report_run_dir = build_report_run_dir("Phase20 Stability", "report_run", create=True)
+    artifact_paths = build_stability_report_artifact_paths(report_run_dir)
+
+    assert report_run_dir == (
+        temp_artifact_root / "reports" / "comparisons" / "phase20_stability" / "report_run"
+    )
+    assert artifact_paths["report_markdown"].endswith("report.md")
+    assert artifact_paths["stability_summary_json"].endswith("stability_summary.json")
+    assert artifact_paths["report_data_json"].endswith("report_data.json")
+    assert artifact_paths["baseline_stability_csv"].endswith("tables/baseline_stability.csv")
+    assert artifact_paths["temperature_scaling_deltas_csv"].endswith(
+        "tables/temperature_scaling_deltas.csv"
+    )
+    assert artifact_paths["reweighting_deltas_csv"].endswith("tables/reweighting_deltas.csv")
 
 
 def test_find_run_metadata_path_resolves_saved_baseline_run(temp_artifact_root):
