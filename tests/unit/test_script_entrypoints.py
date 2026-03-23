@@ -37,6 +37,7 @@ from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
 from scripts.run_mitigation import run_command as run_mitigation_command
 from scripts.run_perturbation_eval import run_command as run_perturbation_eval_command
+from scripts.run_results_ui import run_command as run_results_ui_command
 from scripts.run_shift_eval import run_command as run_shift_eval_command
 from scripts.validate_artifact_index import run_command as run_validate_artifact_index_command
 
@@ -1719,6 +1720,30 @@ def test_validate_artifact_index_reports_success(temp_artifact_root):
     assert result.extras["errors"] == []
 
 
+def test_run_results_ui_command_builds_streamlit_invocation(results_ui_manifest: Path):
+    captured: dict[str, object] = {}
+
+    def fake_runner(app_path: Path, app_args: list[str], server_args: list[str]) -> int:
+        captured["app_path"] = app_path
+        captured["app_args"] = app_args
+        captured["server_args"] = server_args
+        return 0
+
+    result = run_results_ui_command(
+        ["--index", str(results_ui_manifest), "--port", "9999", "--include-exploratory"],
+        runner=fake_runner,
+    )
+
+    assert result.status == "completed"
+    assert Path(captured["app_path"]).name == "app.py"
+    assert captured["app_args"] == [
+        "--index",
+        str(results_ui_manifest.resolve()),
+        "--include-exploratory",
+    ]
+    assert captured["server_args"] == ["--server.port", "9999"]
+
+
 def test_download_data_bootstrap_writes_metadata(temp_artifact_root):
     result = run_download_data_command([], materialize_fn=_fake_materialize)
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
@@ -1742,6 +1767,7 @@ def test_direct_script_help_runs_without_manual_pythonpath():
         [sys.executable, "scripts/build_artifact_index.py", "--help"],
         [sys.executable, "scripts/validate_artifact_index.py", "--help"],
         [sys.executable, "scripts/build_stability_report.py", "--help"],
+        [sys.executable, "scripts/run_results_ui.py", "--help"],
     ]
     for command in commands:
         result = subprocess.run(

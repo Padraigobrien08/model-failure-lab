@@ -24,6 +24,9 @@ dev = [
   "pytest",
   "ruff",
 ]
+ui = [
+  "streamlit",
+]
 
 [project.scripts]
 model-failure-lab = "model_failure_lab.cli:main"
