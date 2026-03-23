@@ -111,6 +111,12 @@ def _resolve_artifact_path(raw_path: str, *, metadata_path: Path) -> tuple[str, 
     candidates: list[Path] = []
     if raw_candidate.is_absolute():
         candidates.append(raw_candidate)
+        if "artifacts" in raw_candidate.parts:
+            relative_artifact = Path(
+                *raw_candidate.parts[raw_candidate.parts.index("artifacts") + 1 :]
+            )
+            candidates.append(artifact_root() / relative_artifact)
+            candidates.append(repository_root() / "artifacts" / relative_artifact)
         candidates.append(metadata_path.parent / raw_candidate.name)
     else:
         candidates.append(metadata_path.parent / raw_candidate)
@@ -122,7 +128,10 @@ def _resolve_artifact_path(raw_path: str, *, metadata_path: Path) -> tuple[str, 
             return _canonical_artifact_relative(candidate), True
 
     if "artifacts" in raw_candidate.parts:
-        return str(Path(*raw_candidate.parts[raw_candidate.parts.index("artifacts") :])), False
+        relative_artifact = Path(*raw_candidate.parts[raw_candidate.parts.index("artifacts") :])
+        return str(relative_artifact), (
+            artifact_root() / Path(*relative_artifact.parts[1:])
+        ).exists()
     return _canonical_artifact_relative(candidates[0]), False
 
 
@@ -609,6 +618,8 @@ def build_artifact_index_payload() -> dict[str, Any]:
     for metadata_path in _iter_report_metadata_paths():
         metadata = _read_json(metadata_path)
         if not _is_completed(metadata):
+            continue
+        if str(metadata.get("experiment_type", "")) not in {"report", "stability_report"}:
             continue
         report_entities.append(
             _build_report_entity(

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from model_failure_lab.artifact_index import build_artifact_index_payload
 from model_failure_lab.utils.paths import (
+    artifact_root,
     build_baseline_run_dir,
     build_evaluation_run_dir,
     build_mitigation_run_dir,
@@ -15,6 +16,11 @@ from model_failure_lab.utils.paths import (
 def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _workspace_path(path: Path) -> str:
+    relative = path.resolve().relative_to(artifact_root())
+    return f"/workspace/model-failure-lab/artifacts/{relative.as_posix()}"
 
 
 def _write_run(
@@ -34,9 +40,9 @@ def _write_run(
         run_dir = build_mitigation_run_dir(mitigation_method, model_name, run_id, create=True)
         experiment_type = "mitigation"
     artifact_paths = {
-        "checkpoint": str(run_dir / "checkpoint"),
-        "metrics_json": str(run_dir / "metrics.json"),
-        "plots": str(run_dir / "figures"),
+        "checkpoint": _workspace_path(run_dir / "checkpoint"),
+        "metrics_json": _workspace_path(run_dir / "metrics.json"),
+        "plots": _workspace_path(run_dir / "figures"),
     }
     (run_dir / "checkpoint").mkdir(parents=True, exist_ok=True)
     (run_dir / "figures").mkdir(parents=True, exist_ok=True)
@@ -113,8 +119,8 @@ def _write_eval(
             "source_parent_run_id": source_parent_run_id,
             "mitigation_method": mitigation_method,
             "artifact_paths": {
-                "ui_summary_json": str(ui_summary_path),
-                "overall_metrics_json": str(overall_metrics_path),
+                "ui_summary_json": _workspace_path(ui_summary_path),
+                "overall_metrics_json": _workspace_path(overall_metrics_path),
             },
             "tags": tags,
             "status": "completed",
@@ -130,18 +136,28 @@ def _write_report(
     report_data: dict[str, object] | None = None,
     report_summary: dict[str, object] | None = None,
     stability_summary: dict[str, object] | None = None,
+    experiment_type: str | None = None,
 ) -> None:
     report_dir = build_report_run_dir(report_scope, report_id, create=True)
-    artifact_paths: dict[str, str] = {"report_markdown": str(report_dir / "report.md")}
+    report_experiment_type = (
+        experiment_type
+        if experiment_type is not None
+        else "stability_report"
+        if stability_summary is not None
+        else "report"
+    )
+    artifact_paths: dict[str, str] = {"report_markdown": _workspace_path(report_dir / "report.md")}
     (report_dir / "report.md").write_text("# report\n", encoding="utf-8")
     if report_data is not None:
-        artifact_paths["report_data_json"] = str(report_dir / "report_data.json")
+        artifact_paths["report_data_json"] = _workspace_path(report_dir / "report_data.json")
         _write_json(report_dir / "report_data.json", report_data)
     if report_summary is not None:
-        artifact_paths["report_summary_json"] = str(report_dir / "report_summary.json")
+        artifact_paths["report_summary_json"] = _workspace_path(report_dir / "report_summary.json")
         _write_json(report_dir / "report_summary.json", report_summary)
     if stability_summary is not None:
-        artifact_paths["stability_summary_json"] = str(report_dir / "stability_summary.json")
+        artifact_paths["stability_summary_json"] = _workspace_path(
+            report_dir / "stability_summary.json"
+        )
         _write_json(report_dir / "stability_summary.json", stability_summary)
 
     _write_json(
@@ -149,7 +165,7 @@ def _write_report(
         {
             "report_id": report_id,
             "run_id": report_id,
-            "experiment_type": "stability_report" if stability_summary is not None else "report",
+            "experiment_type": report_experiment_type,
             "experiment_group": report_scope,
             "report_scope": report_scope,
             "selection_mode": "eval_ids",
@@ -422,14 +438,14 @@ def _build_minimal_artifact_world() -> None:
                     "dataset_expansion_recommendation": "defer",
                 },
                 "reference_reports": {
-                    "temperature_scaling_seeded": str(
+                    "temperature_scaling_seeded": _workspace_path(
                         build_report_run_dir(
                             "phase18_temperature_scaling_seeded",
                             "temp_seeded_report",
                         )
                         / "report.md"
                     ),
-                    "reweighting_seeded": str(
+                    "reweighting_seeded": _workspace_path(
                         build_report_run_dir(
                             "phase19_reweighting_seeded",
                             "reweight_seeded_report",
@@ -455,14 +471,14 @@ def _build_minimal_artifact_world() -> None:
                 "dataset_expansion_recommendation": "defer",
             },
             "reference_reports": {
-                "temperature_scaling_seeded": str(
+                "temperature_scaling_seeded": _workspace_path(
                     build_report_run_dir(
                         "phase18_temperature_scaling_seeded",
                         "temp_seeded_report",
                     )
                     / "report.md"
                 ),
-                "reweighting_seeded": str(
+                "reweighting_seeded": _workspace_path(
                     build_report_run_dir(
                         "phase19_reweighting_seeded",
                         "reweight_seeded_report",
@@ -471,6 +487,13 @@ def _build_minimal_artifact_world() -> None:
                 ),
             },
         },
+    )
+    _write_report(
+        report_scope="phase13_temperature_scaling_perturbations",
+        report_id="perturbation_report",
+        source_eval_ids=["perturb_eval_13"],
+        report_summary={"suite_status": "complete"},
+        experiment_type="perturbation_report",
     )
 
 
@@ -484,13 +507,17 @@ def test_build_artifact_index_emits_official_inventory_and_first_class_views(tem
 
     run_lookup = {row["run_id"]: row for row in payload["entities"]["runs"]}
     eval_lookup = {row["eval_id"]: row for row in payload["entities"]["evaluations"]}
+    report_lookup = {row["report_id"]: row for row in payload["entities"]["reports"]}
 
     assert run_lookup["distilbert_seed_13"]["is_official"] is True
     assert run_lookup["explore_seed_99"]["is_official"] is False
     assert run_lookup["explore_seed_99"]["default_visible"] is False
+    assert run_lookup["distilbert_seed_13"]["artifact_refs"]["metrics_json"]["exists"] is True
     assert eval_lookup["parent_eval_13"]["artifact_refs"]["ui_summary_json"]["path"].startswith(
         "artifacts/"
     )
+    assert eval_lookup["parent_eval_13"]["artifact_refs"]["ui_summary_json"]["exists"] is True
+    assert "perturbation_report" not in report_lookup
 
     cohort_ids = [row["cohort_id"] for row in payload["views"]["seeded_cohorts"]]
     assert cohort_ids == [
