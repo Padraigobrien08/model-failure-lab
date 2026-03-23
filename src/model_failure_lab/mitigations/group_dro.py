@@ -56,11 +56,13 @@ class GroupDroTokenizedTextDataset(Dataset):
         *,
         max_length: int,
         group_to_index: dict[str, int],
+        unknown_group_index: int | None = None,
     ) -> None:
         self.records = records
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.group_to_index = group_to_index
+        self.unknown_group_index = unknown_group_index
 
     def __len__(self) -> int:
         return len(self.records)
@@ -74,6 +76,11 @@ class GroupDroTokenizedTextDataset(Dataset):
             padding=False,
         )
         group_id = str(record["group_id"])
+        group_index = self.group_to_index.get(group_id)
+        if group_index is None:
+            if self.unknown_group_index is None:
+                raise KeyError(group_id)
+            group_index = self.unknown_group_index
         return {
             "input_ids": list(encoded["input_ids"]),
             "attention_mask": list(encoded["attention_mask"]),
@@ -81,7 +88,7 @@ class GroupDroTokenizedTextDataset(Dataset):
             "sample_id": str(record["sample_id"]),
             "split": str(record["split"]),
             "group_id": group_id,
-            "group_index": int(self.group_to_index[group_id]),
+            "group_index": int(group_index),
             "is_id": bool(
                 record["group_attributes"].get("is_id", record["split"] in {"train", "id_test"})
             ),
@@ -223,6 +230,10 @@ def train_distilbert_group_dro(
         tokenizer,
         max_length=max_length,
         group_to_index=group_to_index,
+        # Validation and blind-test splits can contain groups absent from the
+        # training split. Group DRO only needs explicit indices during
+        # adversarial training, so eval loaders carry a sentinel instead.
+        unknown_group_index=-1,
     )
     pad_token_id = int(getattr(tokenizer, "pad_token_id", 0) or 0)
 
@@ -263,6 +274,7 @@ def train_distilbert_group_dro(
             tokenizer,
             max_length=max_length,
             group_to_index=group_to_index,
+            unknown_group_index=-1,
         )
         id_test_loader = DataLoader(
             id_test_dataset,
@@ -282,6 +294,7 @@ def train_distilbert_group_dro(
             tokenizer,
             max_length=max_length,
             group_to_index=group_to_index,
+            unknown_group_index=-1,
         )
         ood_test_loader = DataLoader(
             ood_test_dataset,

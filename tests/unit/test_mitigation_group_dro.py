@@ -49,7 +49,8 @@ def _sample(
     )
 
 
-def _canonical_dataset() -> CanonicalDataset:
+def _canonical_dataset(*, include_unseen_eval_group: bool = False) -> CanonicalDataset:
+    eval_group_id = "group_eval_only" if include_unseen_eval_group else "group_b"
     return CanonicalDataset(
         dataset_name="civilcomments",
         samples=[
@@ -107,7 +108,7 @@ def _canonical_dataset() -> CanonicalDataset:
                 text="positive toxic validation_only",
                 label=1,
                 split="validation",
-                group_id="group_b",
+                group_id=eval_group_id,
             ),
             _sample(
                 sample_id="id_test_0",
@@ -121,7 +122,7 @@ def _canonical_dataset() -> CanonicalDataset:
                 text="positive toxic blind_id",
                 label=1,
                 split="id_test",
-                group_id="group_b",
+                group_id=eval_group_id,
             ),
             _sample(
                 sample_id="ood_test_0",
@@ -135,7 +136,7 @@ def _canonical_dataset() -> CanonicalDataset:
                 text="positive toxic blind_ood",
                 label=1,
                 split="ood_test",
-                group_id="group_b",
+                group_id=eval_group_id,
             ),
         ],
     )
@@ -329,6 +330,39 @@ def test_train_distilbert_group_dro_writes_group_state_and_predictions(temp_arti
     )
     assert set(id_test_frame["split"]) == {"id_test"}
     assert set(ood_test_frame["split"]) == {"ood_test"}
+    assert artifacts.metrics_payload["group_dro"]["group_count"] == 2
+
+
+def test_train_distilbert_group_dro_tolerates_unseen_eval_groups(temp_artifact_root):
+    config = load_experiment_config("configs/experiments/civilcomments_distilbert_group_dro.yaml")
+    config["run_id"] = "distilbert_group_dro_unseen_eval_group"
+    config["parent_run_id"] = "distilbert_parent"
+    config["parent_model_name"] = "distilbert"
+    config["mitigation_method"] = "group_dro"
+    run_dir = build_mitigation_run_dir(
+        "group_dro",
+        config["model_name"],
+        config["run_id"],
+        create=True,
+    )
+
+    artifacts = train_distilbert_group_dro(
+        config,
+        run_dir,
+        dataset_loader=lambda *_args, **_kwargs: _canonical_dataset(
+            include_unseen_eval_group=True
+        ),
+        tokenizer_factory=lambda _name: FakeTokenizer(),
+        model_factory=lambda _name, num_labels: TinyClassifier(num_labels=num_labels),
+    )
+
+    validation_frame = pd.read_parquet(artifacts.prediction_paths["validation"])
+    id_test_frame = pd.read_parquet(artifacts.prediction_paths["id_test"])
+    ood_test_frame = pd.read_parquet(artifacts.prediction_paths["ood_test"])
+
+    assert "group_eval_only" in set(validation_frame["group_id"])
+    assert "group_eval_only" in set(id_test_frame["group_id"])
+    assert "group_eval_only" in set(ood_test_frame["group_id"])
     assert artifacts.metrics_payload["group_dro"]["group_count"] == 2
 
 
