@@ -5,6 +5,7 @@ from .common import (
     load_parent_run_context,
     validate_distilbert_parent_run,
 )
+from .group_dro import train_distilbert_group_dro
 from .reweighting import build_group_weight_table, train_distilbert_reweighting
 from .temperature_scaling import (
     apply_temperature_scaling,
@@ -19,6 +20,7 @@ __all__ = [
     "fit_temperature_scaler",
     "load_parent_run_context",
     "run_temperature_scaling",
+    "train_distilbert_group_dro",
     "train_distilbert_reweighting",
     "validate_distilbert_parent_run",
 ]

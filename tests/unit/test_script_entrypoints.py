@@ -1132,6 +1132,132 @@ def test_run_mitigation_temperature_scaling_supports_official_seeded_metadata(
     }
 
 
+def test_run_mitigation_group_dro_writes_completed_artifacts(
+    temp_artifact_root,
+    monkeypatch,
+):
+    parent_run_id = "distilbert_parent_group_dro"
+    _write_distilbert_parent_run(parent_run_id)
+
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.group_dro.load_baseline_canonical_dataset",
+        lambda *_args, **_kwargs: _baseline_dataset(),
+    )
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.group_dro.build_tokenizer",
+        lambda _name: _FakeTokenizer(),
+    )
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.group_dro.build_sequence_classifier",
+        lambda _name, num_labels: _TinyClassifier(num_labels=num_labels),
+    )
+
+    result = run_mitigation_command(
+        [
+            "--run-id",
+            parent_run_id,
+            "--method",
+            "group_dro",
+            "--output-run-id",
+            "group_dro_runtime",
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert "artifacts/mitigations/group_dro" in result.run_dir.as_posix()
+    assert metadata["status"] == "completed"
+    assert metadata["parent_run_id"] == parent_run_id
+    assert metadata["mitigation_method"] == "group_dro"
+    assert metadata["artifact_paths"]["group_dro_weights_csv"].endswith("group_dro_weights.csv")
+    assert Path(metadata["artifact_paths"]["group_dro_weights_csv"]).exists()
+    assert metadata["artifact_paths"]["predictions"]["train"].endswith("predictions_train.parquet")
+    assert metadata["artifact_paths"]["predictions"]["validation"].endswith(
+        "predictions_val.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["id_test"].endswith(
+        "predictions_id_test.parquet"
+    )
+    assert metadata["artifact_paths"]["predictions"]["ood_test"].endswith(
+        "predictions_ood_test.parquet"
+    )
+
+
+def test_run_mitigation_group_dro_supports_seeded_scout_metadata(
+    temp_artifact_root,
+    monkeypatch,
+):
+    parent_run_id = "distilbert_parent_group_dro_seeded"
+    _write_distilbert_parent_run(
+        parent_run_id,
+        constrained=True,
+        tags=["baseline", "distilbert", "v1.2_baseline", "official", "seed_13"],
+    )
+
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.group_dro.load_baseline_canonical_dataset",
+        lambda *_args, **_kwargs: _baseline_dataset(),
+    )
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.group_dro.build_tokenizer",
+        lambda _name: _FakeTokenizer(),
+    )
+    monkeypatch.setattr(
+        "model_failure_lab.mitigations.group_dro.build_sequence_classifier",
+        lambda _name, num_labels: _TinyClassifier(num_labels=num_labels),
+    )
+
+    result = run_mitigation_command(
+        [
+            "--run-id",
+            parent_run_id,
+            "--method",
+            "group_dro",
+            "--seed",
+            "13",
+            "--experiment-group",
+            "group_dro_v1_3",
+            "--tag",
+            "mitigation",
+            "--tag",
+            "group_dro",
+            "--tag",
+            "v1.3_mitigation",
+            "--tag",
+            "scout",
+            "--tag",
+            "seed_13",
+            "--tag",
+            f"parent_{parent_run_id}",
+            "--output-run-id",
+            "group_dro_seeded_runtime",
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert metadata["experiment_group"] == "group_dro_v1_3"
+    assert metadata["resolved_config"]["experiment_group"] == "group_dro_v1_3"
+    assert metadata["parent_run_id"] == parent_run_id
+    assert metadata["resolved_config"]["parent_run_id"] == parent_run_id
+    assert metadata["resolved_config"]["parent_model_name"] == "distilbert"
+    assert metadata["resolved_config"]["seed"] == 13
+    assert metadata["resolved_config"]["model"]["execution_tier"] == "constrained"
+    assert metadata["resolved_config"]["train"]["batch_size"] == 8
+    assert metadata["resolved_config"]["train"]["eval_batch_size"] == 16
+    assert metadata["resolved_config"]["train"]["max_epochs"] == 2
+    assert metadata["resolved_config"]["train"]["num_workers"] == 0
+    assert "baseline" not in metadata["tags"]
+    assert "v1.2_baseline" not in metadata["tags"]
+    assert set(metadata["tags"]) >= {
+        "distilbert",
+        "mitigation",
+        "group_dro",
+        "v1.3_mitigation",
+        "scout",
+        "seed_13",
+        f"parent_{parent_run_id}",
+    }
+
+
 def test_run_perturbation_eval_materializes_suite_bundle(temp_artifact_root, monkeypatch):
     source_run_id = _create_saved_evaluation_source_run()
     monkeypatch.setattr(

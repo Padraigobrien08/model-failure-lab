@@ -15,6 +15,11 @@ REQUIRED_REWEIGHTING_FIELDS = {
     "max_weight",
     "normalize_mean",
 }
+REQUIRED_GROUP_DRO_FIELDS = {
+    "grouping_field",
+    "adversary_step_size",
+    "loss_ema",
+}
 REQUIRED_TEMPERATURE_SCALING_FIELDS = {
     "fitting_split",
     "objective",
@@ -34,7 +39,7 @@ REQUIRED_COMPARISON_TOLERANCE_FIELDS = {
     "overall_macro_f1_max_drop",
     "ece_neutral_tolerance",
 }
-SUPPORTED_MITIGATION_METHODS = {"reweighting", "temperature_scaling"}
+SUPPORTED_MITIGATION_METHODS = {"group_dro", "reweighting", "temperature_scaling"}
 SUPPORTED_PERTURBATION_FAMILIES = {
     "typo_noise",
     "format_degradation",
@@ -274,6 +279,31 @@ def _validate_reweighting_config(payload: object) -> dict[str, Any]:
     }
 
 
+def _validate_group_dro_config(payload: object) -> dict[str, Any]:
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("mitigation.group_dro must be a non-empty mapping")
+
+    missing_fields = sorted(REQUIRED_GROUP_DRO_FIELDS - set(map(str, payload.keys())))
+    if missing_fields:
+        missing_text = ", ".join(missing_fields)
+        raise ValueError(f"mitigation.group_dro is missing required fields: {missing_text}")
+
+    adversary_step_size = float(payload["adversary_step_size"])
+    if adversary_step_size <= 0:
+        raise ValueError("mitigation.group_dro.adversary_step_size must be positive")
+
+    loss_ema = float(payload["loss_ema"])
+    if not 0.0 < loss_ema <= 1.0:
+        raise ValueError("mitigation.group_dro.loss_ema must be in the interval (0, 1]")
+
+    return {
+        **dict(payload),
+        "grouping_field": str(payload["grouping_field"]),
+        "adversary_step_size": adversary_step_size,
+        "loss_ema": loss_ema,
+    }
+
+
 def _validate_temperature_scaling_config(payload: object) -> dict[str, Any]:
     if not isinstance(payload, dict) or not payload:
         raise ValueError("mitigation.temperature_scaling must be a non-empty mapping")
@@ -348,6 +378,11 @@ def _validate_mitigation_config(payload: object) -> dict[str, Any] | None:
         normalized["reweighting"] = _validate_reweighting_config(payload.get("reweighting"))
     elif payload.get("reweighting") is not None:
         normalized["reweighting"] = _validate_reweighting_config(payload.get("reweighting"))
+
+    if normalized["method"] == "group_dro":
+        normalized["group_dro"] = _validate_group_dro_config(payload.get("group_dro"))
+    elif payload.get("group_dro") is not None:
+        normalized["group_dro"] = _validate_group_dro_config(payload.get("group_dro"))
 
     if normalized["method"] == "temperature_scaling":
         normalized["temperature_scaling"] = _validate_temperature_scaling_config(
