@@ -114,6 +114,22 @@ def classify_mitigation_verdict(
             return "tradeoff"
         return "win"
 
+    if mitigation_method == "group_dro":
+        target_improved = any(
+            (value is not None and value > 0.0)
+            for value in (
+                deltas.get("ood_macro_f1_delta"),
+                deltas.get("worst_group_f1_delta"),
+            )
+        )
+        if not target_improved:
+            return "failure"
+
+        calibration_regression = (deltas.get("ece_delta") or 0.0) > ece_tolerance
+        if id_regression or overall_regression or calibration_regression:
+            return "tradeoff"
+        return "win"
+
     if mitigation_method == "temperature_scaling":
         ece_delta = deltas.get("ece_delta")
         brier_delta = deltas.get("brier_score_delta")

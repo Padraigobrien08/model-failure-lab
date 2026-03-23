@@ -14,6 +14,7 @@ MITIGATION_VERDICTS = ("win", "tradeoff", "failure")
 PREFERRED_MITIGATION_METHOD_ORDER = {
     "temperature_scaling": 0,
     "reweighting": 1,
+    "group_dro": 2,
 }
 
 
