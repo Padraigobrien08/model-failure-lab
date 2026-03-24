@@ -16,6 +16,7 @@ DEFAULT_VISIBLE_REPORT_SCOPES = {
     "phase18_temperature_scaling_seeded",
     "phase19_reweighting_seeded",
     "phase20_stability",
+    "phase26_robustness_final",
 }
 
 OFFICIAL_REPORT_SCOPE_PREFIXES = (
@@ -25,6 +26,7 @@ OFFICIAL_REPORT_SCOPE_PREFIXES = (
     "phase19_reweighting_seeded",
     "phase19_three_way_seed_",
     "phase20_stability",
+    "phase26_robustness_final",
 )
 
 PRIMARY_COHORT_DEFINITIONS = {

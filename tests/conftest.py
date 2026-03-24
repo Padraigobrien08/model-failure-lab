@@ -314,6 +314,45 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                         "status": "completed",
                     },
                     {
+                        "id": "phase26_report",
+                        "entity_type": "report",
+                        "report_id": "phase26_report",
+                        "report_scope": "phase26_robustness_final",
+                        "metadata_path": (
+                            "artifacts/reports/comparisons/phase26_robustness_final/"
+                            "phase26_report/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "report_markdown": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase26_robustness_final/"
+                                    "phase26_report/report.md"
+                                ),
+                            },
+                            "worst_group_summary_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase26_robustness_final/"
+                                    "phase26_report/tables/worst_group_summary.csv"
+                                ),
+                            },
+                        },
+                        "payload_refs": {
+                            "report_summary_json": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase26_robustness_final/"
+                                    "phase26_report/report_summary.json"
+                                ),
+                            }
+                        },
+                        "default_visible": True,
+                        "is_official": True,
+                        "experiment_group": "phase26_robustness_final",
+                        "status": "completed",
+                    },
+                    {
                         "id": "phase18_seed13_report",
                         "entity_type": "report",
                         "report_id": "phase18_seed13_report",

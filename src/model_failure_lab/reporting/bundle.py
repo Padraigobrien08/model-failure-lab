@@ -14,6 +14,7 @@ from model_failure_lab.tracking import build_run_metadata
 from model_failure_lab.utils.paths import (
     build_perturbation_report_artifact_paths,
     build_report_artifact_paths,
+    build_robustness_report_artifact_paths,
     build_stability_report_artifact_paths,
 )
 
@@ -89,6 +90,33 @@ def build_stability_report_data_payload(
         "baseline_stability_table": _frame_records(baseline_stability_table),
         "temperature_scaling_deltas": _frame_records(temperature_scaling_deltas),
         "reweighting_deltas": _frame_records(reweighting_deltas),
+    }
+
+
+def build_robustness_report_data_payload(
+    *,
+    report_summary: dict[str, Any],
+    official_method_summaries: list[dict[str, Any]],
+    exploratory_method_summaries: list[dict[str, Any]],
+    promotion_audit: dict[str, Any],
+    reference_reports: dict[str, Any],
+    worst_group_summary: pd.DataFrame,
+    ood_summary: pd.DataFrame,
+    id_summary: pd.DataFrame,
+    calibration_summary: pd.DataFrame,
+) -> dict[str, Any]:
+    """Build a structured robustness comparison payload for future UI consumers."""
+    return {
+        "report_summary": report_summary,
+        "final_robustness_verdict": report_summary.get("final_robustness_verdict"),
+        "official_method_summaries": official_method_summaries,
+        "exploratory_method_summaries": exploratory_method_summaries,
+        "promotion_audit": promotion_audit,
+        "reference_reports": reference_reports,
+        "worst_group_summary": _frame_records(worst_group_summary),
+        "ood_summary": _frame_records(ood_summary),
+        "id_summary": _frame_records(id_summary),
+        "calibration_summary": _frame_records(calibration_summary),
     }
 
 
@@ -252,6 +280,59 @@ def build_stability_report_metadata(
     return metadata
 
 
+def build_robustness_report_metadata(
+    *,
+    report_id: str,
+    report_scope: str,
+    selection_mode: str,
+    source_eval_ids: list[str],
+    resolved_config: dict[str, Any],
+    command: str,
+    run_dir: Path,
+    dataset_name: str,
+    split_details: dict[str, str],
+    artifact_paths: dict[str, str] | None = None,
+    git_commit_hash: str | None = None,
+    library_versions: dict[str, str | None] | None = None,
+    timestamp: str | None = None,
+    status: str | None = None,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+    duration_seconds: float | None = None,
+) -> dict[str, Any]:
+    """Build persisted metadata for a final robustness comparison package."""
+    metadata = build_run_metadata(
+        run_id=report_id,
+        experiment_type="robustness_report",
+        model_name="robustness_report",
+        dataset_name=dataset_name,
+        split_details=split_details,
+        random_seed=int(resolved_config["seed"]),
+        resolved_config=resolved_config,
+        command=command,
+        run_dir=run_dir,
+        git_commit_hash=git_commit_hash,
+        library_versions=library_versions,
+        artifact_paths=artifact_paths or build_robustness_report_artifact_paths(run_dir),
+        notes=str(resolved_config.get("notes", "")),
+        tags=[*resolved_config.get("tags", []), "robustness_report"],
+        timestamp=timestamp,
+        status=status,
+        started_at=started_at,
+        completed_at=completed_at,
+        duration_seconds=duration_seconds,
+    )
+    report_config = resolved_config.get("report", {})
+    metadata["report_id"] = report_id
+    metadata["report_scope"] = report_scope
+    metadata["selection_mode"] = selection_mode
+    metadata["source_eval_ids"] = list(source_eval_ids)
+    metadata["report_name"] = report_config.get("report_name")
+    metadata["output_format"] = report_config.get("output_format", "markdown")
+    metadata["promotion_audit_path"] = resolved_config.get("promotion_audit_path")
+    return metadata
+
+
 def write_report_bundle(
     run_dir: Path,
     *,
@@ -362,4 +443,51 @@ def write_stability_report_bundle(
         temperature_scaling_deltas,
     )
     _write_csv(Path(artifact_paths["reweighting_deltas_csv"]), reweighting_deltas)
+    return artifact_paths
+
+
+def write_robustness_report_bundle(
+    run_dir: Path,
+    *,
+    markdown: str,
+    report_summary: dict[str, Any],
+    official_method_summaries: list[dict[str, Any]],
+    exploratory_method_summaries: list[dict[str, Any]],
+    promotion_audit: dict[str, Any],
+    reference_reports: dict[str, Any],
+    worst_group_summary: pd.DataFrame,
+    ood_summary: pd.DataFrame,
+    id_summary: pd.DataFrame,
+    calibration_summary: pd.DataFrame,
+    promotion_audit_markdown: str,
+    promotion_audit_path: Path,
+) -> dict[str, str]:
+    """Persist the full final robustness comparison package."""
+    artifact_paths = build_robustness_report_artifact_paths(
+        run_dir,
+        promotion_audit_path=promotion_audit_path,
+    )
+    report_data = build_robustness_report_data_payload(
+        report_summary=report_summary,
+        official_method_summaries=official_method_summaries,
+        exploratory_method_summaries=exploratory_method_summaries,
+        promotion_audit=promotion_audit,
+        reference_reports=reference_reports,
+        worst_group_summary=worst_group_summary,
+        ood_summary=ood_summary,
+        id_summary=id_summary,
+        calibration_summary=calibration_summary,
+    )
+    _write_json(Path(artifact_paths["report_summary_json"]), report_summary)
+    _write_json(Path(artifact_paths["report_data_json"]), report_data)
+    Path(artifact_paths["tables_dir"]).mkdir(parents=True, exist_ok=True)
+    Path(artifact_paths["report_markdown"]).write_text(markdown, encoding="utf-8")
+    Path(artifact_paths["promotion_audit_markdown"]).write_text(
+        promotion_audit_markdown,
+        encoding="utf-8",
+    )
+    _write_csv(Path(artifact_paths["worst_group_summary_csv"]), worst_group_summary)
+    _write_csv(Path(artifact_paths["ood_summary_csv"]), ood_summary)
+    _write_csv(Path(artifact_paths["id_summary_csv"]), id_summary)
+    _write_csv(Path(artifact_paths["calibration_summary_csv"]), calibration_summary)
     return artifact_paths

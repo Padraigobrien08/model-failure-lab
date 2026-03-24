@@ -311,6 +311,34 @@ def _build_minimal_artifact_world() -> None:
         },
     )
 
+    sampling_scout_run = _write_run(
+        model_name="distilbert",
+        run_id="group_balanced_seed_13_scout",
+        experiment_group="group_balanced_sampling_v1_4",
+        seed=13,
+        tags=["mitigation", "official", "scout", "seed_13"],
+        mitigation_method="group_balanced_sampling",
+        parent_run_id="distilbert_seed_13",
+    )
+    _write_eval(
+        run_dir=sampling_scout_run,
+        eval_id="group_balanced_eval_13",
+        experiment_group="group_balanced_sampling_v1_4",
+        seed=13,
+        source_run_id="group_balanced_seed_13_scout",
+        source_parent_run_id="distilbert_seed_13",
+        tags=["mitigation", "official", "scout", "seed_13", "shift_eval"],
+        mitigation_method="group_balanced_sampling",
+        headline_metrics={
+            "id_macro_f1": 0.75,
+            "ood_macro_f1": 0.70,
+            "robustness_gap_f1": 0.05,
+            "worst_group_f1": 0.46,
+            "ece": 0.14,
+            "brier_score": 0.14,
+        },
+    )
+
     exploratory_run = _write_run(
         model_name="distilbert",
         run_id="explore_seed_99",
@@ -450,6 +478,12 @@ def _build_minimal_artifact_world() -> None:
         report_summary={"report_story": "group_dro scout remained exploratory"},
     )
     _write_report(
+        report_scope="phase25_group_balanced_sampling_scout_seed_13",
+        report_id="group_balanced_scout_report",
+        source_eval_ids=["parent_eval_13", "group_balanced_eval_13"],
+        report_summary={"report_story": "group balanced sampling stayed exploratory"},
+    )
+    _write_report(
         report_scope="phase20_stability",
         report_id="phase20_report",
         source_eval_ids=[
@@ -535,6 +569,25 @@ def _build_minimal_artifact_world() -> None:
         report_summary={"suite_status": "complete"},
         experiment_type="perturbation_report",
     )
+    _write_report(
+        report_scope="phase26_robustness_final",
+        report_id="phase26_report",
+        source_eval_ids=[
+            "logistic_eval_13",
+            "parent_eval_13",
+            "temp_eval_13",
+            "reweight_eval_13",
+        ],
+        report_data={
+            "report_summary": {
+                "final_robustness_verdict": "still_mixed",
+            },
+            "promotion_audit": {"decision": "do_not_promote"},
+        },
+        report_summary={
+            "final_robustness_verdict": "still_mixed",
+        },
+    )
 
 
 def test_build_artifact_index_emits_official_inventory_and_first_class_views(temp_artifact_root):
@@ -565,6 +618,12 @@ def test_build_artifact_index_emits_official_inventory_and_first_class_views(tem
     assert report_lookup["group_dro_scout_report"]["is_official"] is False
     assert report_lookup["group_dro_scout_report"]["default_visible"] is False
     assert report_lookup["group_dro_four_way_report"]["is_official"] is False
+    assert report_lookup["group_balanced_scout_report"]["is_official"] is False
+    assert report_lookup["phase26_report"]["is_official"] is True
+    assert report_lookup["phase26_report"]["default_visible"] is True
+    assert report_lookup["phase26_report"]["summary_snapshot"]["final_robustness_verdict"] == (
+        "still_mixed"
+    )
 
     cohort_ids = [row["cohort_id"] for row in payload["views"]["seeded_cohorts"]]
     assert cohort_ids == [

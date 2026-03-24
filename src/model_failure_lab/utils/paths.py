@@ -187,6 +187,35 @@ def build_stability_report_artifact_paths(report_dir: Path) -> dict[str, str]:
     }
 
 
+def build_robustness_promotion_audit_path(audit_name: str) -> Path:
+    """Return the canonical markdown path for a robustness promotion audit."""
+    return (
+        build_report_dir(category="robustness_promotion_audit", create=True)
+        / f"{_normalize_segment(audit_name)}.md"
+    )
+
+
+def build_robustness_report_artifact_paths(
+    report_dir: Path,
+    *,
+    promotion_audit_path: Path | None = None,
+) -> dict[str, str]:
+    """Return persisted artifact paths for a robustness comparison report package."""
+    artifact_paths = {
+        "report_markdown": str(report_dir / "report.md"),
+        "report_summary_json": str(report_dir / "report_summary.json"),
+        "report_data_json": str(report_dir / "report_data.json"),
+        "tables_dir": str(report_dir / "tables"),
+        "worst_group_summary_csv": str(report_dir / "tables" / "worst_group_summary.csv"),
+        "ood_summary_csv": str(report_dir / "tables" / "ood_summary.csv"),
+        "id_summary_csv": str(report_dir / "tables" / "id_summary.csv"),
+        "calibration_summary_csv": str(report_dir / "tables" / "calibration_summary.csv"),
+    }
+    if promotion_audit_path is not None:
+        artifact_paths["promotion_audit_markdown"] = str(promotion_audit_path)
+    return artifact_paths
+
+
 def build_artifact_contract_dir(
     contract_name: str,
     *,

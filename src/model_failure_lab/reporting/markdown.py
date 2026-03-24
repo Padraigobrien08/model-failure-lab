@@ -313,3 +313,86 @@ def render_stability_report_markdown(
         key_takeaway,
     ]
     return "\n\n".join(section for section in sections if section.strip()) + "\n"
+
+
+def _render_robustness_method_lines(method_summaries: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for summary in method_summaries:
+        display_name = str(summary.get("display_name", summary.get("method_name", "method")))
+        label = (
+            summary.get("stability_label")
+            or summary.get("seeded_interpretation")
+            or summary.get("primary_verdict", "n/a")
+        )
+        scope = str(summary.get("evidence_scope", "unknown"))
+        if summary.get("is_exploratory"):
+            scope = f"{scope}, exploratory"
+        lines.append(f"- `{display_name}`: `{label}` (`{scope}`)")
+        note = summary.get("story_note")
+        if note:
+            lines.append(f"- `{display_name}` note: {note}")
+    return "\n".join(lines)
+
+
+def render_robustness_report_markdown(
+    *,
+    report_title: str,
+    report_summary: dict[str, Any],
+    official_method_summaries: list[dict[str, Any]],
+    exploratory_method_summaries: list[dict[str, Any]],
+    promotion_audit: dict[str, Any],
+    reference_reports: dict[str, str],
+    table_paths: dict[str, str],
+) -> str:
+    """Render the canonical Phase 26 robustness comparison report."""
+    headline_findings = list(report_summary.get("headline_findings", []))[:5]
+    key_takeaway = str(report_summary.get("key_takeaway", "No key takeaway available."))
+    next_step = str(
+        report_summary.get("next_step", "Choose the next milestone from saved evidence.")
+    )
+    final_verdict = str(report_summary.get("final_robustness_verdict", "n/a"))
+    dataset_expansion = str(report_summary.get("dataset_expansion_recommendation", "n/a"))
+    promotion_decision = str(promotion_audit.get("decision", "n/a"))
+    promotion_reason = str(
+        promotion_audit.get("decision_reason", "No promotion rationale available.")
+    )
+
+    reference_lines = "\n".join(
+        f"- `{name}`: `{path}`" for name, path in reference_reports.items()
+    )
+
+    sections = [
+        f"# {report_title}",
+        "## Overview",
+        (
+            "This report consolidates the final robustness evidence from saved report artifacts "
+            "only. No new runs are executed in Phase 26; the official lane stays baseline, "
+            "`temperature_scaling`, and `reweighting`, while the rejected challengers remain "
+            "explicitly exploratory."
+        ),
+        "## Final verdict",
+        f"- Final robustness outcome: `{final_verdict}`",
+        f"- Dataset expansion recommendation: `{dataset_expansion}`",
+        "## Headline findings",
+        _render_headline_findings(headline_findings),
+        "## Official reference lanes",
+        _render_robustness_method_lines(official_method_summaries),
+        "## Exploratory challengers",
+        _render_robustness_method_lines(exploratory_method_summaries),
+        "## Promotion audit",
+        f"- Decision: `{promotion_decision}`",
+        f"- Reason: {promotion_reason}",
+        f"- Audit artifact: `{table_paths['promotion_audit_markdown']}`",
+        "## Summary tables",
+        f"- Worst-group summary: `{table_paths['worst_group_summary']}`",
+        f"- OOD summary: `{table_paths['ood_summary']}`",
+        f"- ID summary: `{table_paths['id_summary']}`",
+        f"- Calibration summary: `{table_paths['calibration_summary']}`",
+        "## Referenced saved reports",
+        reference_lines,
+        "## Key takeaway",
+        key_takeaway,
+        "## Next step",
+        next_step,
+    ]
+    return "\n\n".join(section for section in sections if section.strip()) + "\n"

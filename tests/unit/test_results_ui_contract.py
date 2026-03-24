@@ -34,9 +34,12 @@ def test_results_ui_selectors_default_to_official_visible_entities(results_ui_ma
 
     default_runs = get_default_visible_entities(payload, "runs")
     all_runs = get_default_visible_entities(payload, "runs", include_exploratory=True)
+    default_reports = get_default_visible_entities(payload, "reports")
 
     assert [run["id"] for run in default_runs] == ["run_official"]
     assert {run["id"] for run in all_runs} == {"run_official", "run_exploratory"}
+    assert "phase26_report" in {report["id"] for report in default_reports}
+    assert "phase23_scout_report" not in {report["id"] for report in default_reports}
 
 
 def test_results_ui_selectors_keep_cohort_and_mitigation_order(results_ui_manifest: Path):

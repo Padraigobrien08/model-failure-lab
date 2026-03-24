@@ -31,6 +31,7 @@ from model_failure_lab.utils.paths import (
 from scripts.build_artifact_index import run_command as run_build_artifact_index_command
 from scripts.build_perturbation_report import run_command as run_build_perturbation_report_command
 from scripts.build_report import run_command as run_build_report_command
+from scripts.build_robustness_report import run_command as run_build_robustness_report_command
 from scripts.build_stability_report import run_command as run_build_stability_report_command
 from scripts.check_environment import run_command as run_check_environment_command
 from scripts.download_data import run_command as run_download_data_command
@@ -1825,6 +1826,407 @@ def test_build_stability_report_writes_completed_report_package(temp_artifact_ro
     assert summary["cohort_summaries"]["reweighting"]["label"] == "mixed"
 
 
+def test_build_robustness_report_writes_completed_report_package(
+    temp_artifact_root,
+    monkeypatch,
+):
+    def _write_saved_json(path: Path, payload: dict[str, object]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    def _write_saved_report_bundle(
+        *,
+        report_scope: str,
+        report_id: str,
+        report_data: dict[str, object] | None = None,
+        report_summary: dict[str, object] | None = None,
+        stability_summary: dict[str, object] | None = None,
+        source_eval_ids: list[str],
+    ) -> Path:
+        report_dir = build_report_run_dir(report_scope, report_id, create=True)
+        (report_dir / "report.md").write_text("# saved report\n", encoding="utf-8")
+        artifact_paths: dict[str, str] = {"report_markdown": str(report_dir / "report.md")}
+        if report_data is not None:
+            artifact_paths["report_data_json"] = str(report_dir / "report_data.json")
+            _write_saved_json(report_dir / "report_data.json", report_data)
+        if report_summary is not None:
+            artifact_paths["report_summary_json"] = str(report_dir / "report_summary.json")
+            _write_saved_json(report_dir / "report_summary.json", report_summary)
+        if stability_summary is not None:
+            artifact_paths["stability_summary_json"] = str(report_dir / "stability_summary.json")
+            _write_saved_json(report_dir / "stability_summary.json", stability_summary)
+        _write_saved_json(
+            report_dir / "metadata.json",
+            {
+                "report_id": report_id,
+                "run_id": report_id,
+                "experiment_type": (
+                    "stability_report" if stability_summary is not None else "report"
+                ),
+                "experiment_group": report_scope,
+                "report_scope": report_scope,
+                "selection_mode": "saved_reports",
+                "source_eval_ids": source_eval_ids,
+                "artifact_paths": artifact_paths,
+                "tags": ["report"],
+                "status": "completed",
+            },
+        )
+        return report_dir
+
+    source_eval_ids = [
+        "logistic_eval_13",
+        "parent_eval_13",
+        "parent_eval_42",
+        "parent_eval_87",
+        "temp_eval_13",
+        "temp_eval_42",
+        "temp_eval_87",
+        "reweight_eval_13",
+        "reweight_eval_42",
+        "reweight_eval_87",
+    ]
+    _write_saved_report_bundle(
+        report_scope="phase18_temperature_scaling_seeded",
+        report_id="phase18_report",
+        source_eval_ids=source_eval_ids,
+        report_data={
+            "report_summary": {
+                "seeded_interpretation": "stable",
+                "mitigation_verdict_counts": {"win": 3, "tradeoff": 0, "failure": 0},
+            },
+            "mitigation_comparison_table": [],
+        },
+        report_summary={
+            "seeded_interpretation": "stable",
+            "mitigation_verdict_counts": {"win": 3, "tradeoff": 0, "failure": 0},
+        },
+    )
+    _write_saved_report_bundle(
+        report_scope="phase19_reweighting_seeded",
+        report_id="phase19_report",
+        source_eval_ids=source_eval_ids,
+        report_data={
+            "report_summary": {
+                "seeded_interpretation": "stable",
+                "mitigation_verdict_counts": {"win": 2, "tradeoff": 1, "failure": 0},
+            },
+            "mitigation_comparison_table": [],
+        },
+        report_summary={
+            "seeded_interpretation": "stable",
+            "mitigation_verdict_counts": {"win": 2, "tradeoff": 1, "failure": 0},
+        },
+    )
+    _write_saved_report_bundle(
+        report_scope="phase20_stability",
+        report_id="phase20_report",
+        source_eval_ids=source_eval_ids,
+        report_data={
+            "baseline_stability_table": [
+                {
+                    "cohort": "distilbert_baseline",
+                    "row_type": "seed",
+                    "seed": "13",
+                    "id_macro_f1": 0.87,
+                    "ood_macro_f1": 0.80,
+                    "robustness_gap_f1": 0.07,
+                    "worst_group_f1": 0.31,
+                    "ece": 0.03,
+                    "brier_score": 0.05,
+                },
+                {
+                    "cohort": "distilbert_baseline",
+                    "row_type": "seed",
+                    "seed": "42",
+                    "id_macro_f1": 0.87,
+                    "ood_macro_f1": 0.80,
+                    "robustness_gap_f1": 0.07,
+                    "worst_group_f1": 0.30,
+                    "ece": 0.03,
+                    "brier_score": 0.05,
+                },
+                {
+                    "cohort": "distilbert_baseline",
+                    "row_type": "seed",
+                    "seed": "87",
+                    "id_macro_f1": 0.87,
+                    "ood_macro_f1": 0.80,
+                    "robustness_gap_f1": 0.07,
+                    "worst_group_f1": 0.30,
+                    "ece": 0.03,
+                    "brier_score": 0.05,
+                },
+                {
+                    "cohort": "distilbert_baseline",
+                    "row_type": "aggregate",
+                    "seed": "mean",
+                    "id_macro_f1": 0.87,
+                    "ood_macro_f1": 0.80,
+                    "robustness_gap_f1": 0.07,
+                    "worst_group_f1": 0.303,
+                    "ece": 0.03,
+                    "brier_score": 0.05,
+                },
+                {
+                    "cohort": "distilbert_baseline",
+                    "row_type": "aggregate",
+                    "seed": "std",
+                    "id_macro_f1": 0.0,
+                    "ood_macro_f1": 0.0,
+                    "robustness_gap_f1": 0.0,
+                    "worst_group_f1": 0.005,
+                    "ece": 0.0,
+                    "brier_score": 0.0,
+                },
+            ],
+            "temperature_scaling_deltas": [
+                {
+                    "mitigation_method": "temperature_scaling",
+                    "row_type": "seed",
+                    "seed": "13",
+                    "id_macro_f1_delta": 0.0,
+                    "ood_macro_f1_delta": 0.0,
+                    "robustness_gap_delta": 0.0,
+                    "worst_group_f1_delta": 0.0,
+                    "ece_delta": -0.011,
+                    "brier_score_delta": -0.0014,
+                    "verdict": "win",
+                },
+                {
+                    "mitigation_method": "temperature_scaling",
+                    "row_type": "seed",
+                    "seed": "42",
+                    "id_macro_f1_delta": 0.0,
+                    "ood_macro_f1_delta": 0.0,
+                    "robustness_gap_delta": 0.0,
+                    "worst_group_f1_delta": 0.0,
+                    "ece_delta": -0.012,
+                    "brier_score_delta": -0.0015,
+                    "verdict": "win",
+                },
+                {
+                    "mitigation_method": "temperature_scaling",
+                    "row_type": "seed",
+                    "seed": "87",
+                    "id_macro_f1_delta": 0.0,
+                    "ood_macro_f1_delta": 0.0,
+                    "robustness_gap_delta": 0.0,
+                    "worst_group_f1_delta": 0.0,
+                    "ece_delta": -0.010,
+                    "brier_score_delta": -0.0016,
+                    "verdict": "win",
+                },
+                {
+                    "mitigation_method": "temperature_scaling",
+                    "row_type": "aggregate",
+                    "seed": "mean",
+                    "id_macro_f1_delta": 0.0,
+                    "ood_macro_f1_delta": 0.0,
+                    "robustness_gap_delta": 0.0,
+                    "worst_group_f1_delta": 0.0,
+                    "ece_delta": -0.011,
+                    "brier_score_delta": -0.0015,
+                },
+                {
+                    "mitigation_method": "temperature_scaling",
+                    "row_type": "aggregate",
+                    "seed": "std",
+                    "id_macro_f1_delta": 0.0,
+                    "ood_macro_f1_delta": 0.0,
+                    "robustness_gap_delta": 0.0,
+                    "worst_group_f1_delta": 0.0,
+                    "ece_delta": 0.001,
+                    "brier_score_delta": 0.0001,
+                },
+            ],
+            "reweighting_deltas": [
+                {
+                    "mitigation_method": "reweighting",
+                    "row_type": "seed",
+                    "seed": "13",
+                    "id_macro_f1_delta": -0.013,
+                    "ood_macro_f1_delta": 0.000,
+                    "robustness_gap_delta": -0.013,
+                    "worst_group_f1_delta": 0.062,
+                    "ece_delta": 0.007,
+                    "brier_score_delta": 0.008,
+                    "verdict": "tradeoff",
+                },
+                {
+                    "mitigation_method": "reweighting",
+                    "row_type": "seed",
+                    "seed": "42",
+                    "id_macro_f1_delta": -0.009,
+                    "ood_macro_f1_delta": 0.001,
+                    "robustness_gap_delta": -0.010,
+                    "worst_group_f1_delta": 0.069,
+                    "ece_delta": 0.004,
+                    "brier_score_delta": 0.006,
+                    "verdict": "win",
+                },
+                {
+                    "mitigation_method": "reweighting",
+                    "row_type": "seed",
+                    "seed": "87",
+                    "id_macro_f1_delta": -0.009,
+                    "ood_macro_f1_delta": -0.0005,
+                    "robustness_gap_delta": -0.009,
+                    "worst_group_f1_delta": 0.049,
+                    "ece_delta": 0.007,
+                    "brier_score_delta": 0.006,
+                    "verdict": "win",
+                },
+                {
+                    "mitigation_method": "reweighting",
+                    "row_type": "aggregate",
+                    "seed": "mean",
+                    "id_macro_f1_delta": -0.010,
+                    "ood_macro_f1_delta": 0.0002,
+                    "robustness_gap_delta": -0.011,
+                    "worst_group_f1_delta": 0.060,
+                    "ece_delta": 0.006,
+                    "brier_score_delta": 0.007,
+                },
+                {
+                    "mitigation_method": "reweighting",
+                    "row_type": "aggregate",
+                    "seed": "std",
+                    "id_macro_f1_delta": 0.002,
+                    "ood_macro_f1_delta": 0.001,
+                    "robustness_gap_delta": 0.002,
+                    "worst_group_f1_delta": 0.008,
+                    "ece_delta": 0.001,
+                    "brier_score_delta": 0.001,
+                },
+            ],
+        },
+        stability_summary={
+            "cohort_summaries": {
+                "distilbert_baseline": {"label": "stable"},
+                "temperature_scaling": {"label": "stable"},
+                "reweighting": {"label": "mixed"},
+            },
+            "milestone_assessment": {
+                "dataset_expansion_recommendation": "defer",
+            },
+        },
+    )
+    _write_saved_report_bundle(
+        report_scope="phase23_group_dro_scout_seed_13",
+        report_id="phase23_report",
+        source_eval_ids=["parent_eval_13"],
+        report_data={
+            "report_summary": {"seeded_interpretation": "unsupported"},
+            "mitigation_comparison_table": [
+                {
+                    "mitigation_method": "group_dro",
+                    "row_type": "seed",
+                    "seed": "13",
+                    "id_macro_f1_delta": -0.086,
+                    "ood_macro_f1_delta": -0.037,
+                    "robustness_gap_delta": 0.049,
+                    "worst_group_f1_delta": -0.215,
+                    "ece_delta": 0.033,
+                    "brier_score_delta": 0.026,
+                    "verdict": "failure",
+                }
+            ],
+        },
+        report_summary={"report_story": "group dro scout failed"},
+    )
+    _write_saved_report_bundle(
+        report_scope="phase25_group_balanced_sampling_scout_seed_13",
+        report_id="phase25_report",
+        source_eval_ids=["parent_eval_13"],
+        report_data={
+            "report_summary": {"seeded_interpretation": "unsupported"},
+            "mitigation_comparison_table": [
+                {
+                    "mitigation_method": "group_balanced_sampling",
+                    "row_type": "seed",
+                    "seed": "13",
+                    "id_macro_f1_delta": -0.118,
+                    "ood_macro_f1_delta": -0.096,
+                    "robustness_gap_delta": -0.022,
+                    "worst_group_f1_delta": 0.153,
+                    "ece_delta": 0.116,
+                    "brier_score_delta": 0.092,
+                    "verdict": "tradeoff",
+                }
+            ],
+        },
+        report_summary={"report_story": "group balanced sampling scout traded off"},
+    )
+
+    monkeypatch.setattr(
+        "scripts.build_robustness_report.generate_run_id",
+        lambda _prefix: "phase26_run",
+    )
+
+    result = run_build_robustness_report_command(
+        [
+            "--report-name",
+            "phase26_robustness_final",
+            "--temperature-report-data",
+            str(
+                build_report_run_dir(
+                    "phase18_temperature_scaling_seeded",
+                    "phase18_report",
+                )
+                / "report_data.json"
+            ),
+            "--reweighting-report-data",
+            str(
+                build_report_run_dir(
+                    "phase19_reweighting_seeded",
+                    "phase19_report",
+                )
+                / "report_data.json"
+            ),
+            "--stability-report-data",
+            str(build_report_run_dir("phase20_stability", "phase20_report") / "report_data.json"),
+            "--stability-summary",
+            str(
+                build_report_run_dir("phase20_stability", "phase20_report")
+                / "stability_summary.json"
+            ),
+            "--group-dro-report-data",
+            str(
+                build_report_run_dir(
+                    "phase23_group_dro_scout_seed_13",
+                    "phase23_report",
+                )
+                / "report_data.json"
+            ),
+            "--group-balanced-report-data",
+            str(
+                build_report_run_dir(
+                    "phase25_group_balanced_sampling_scout_seed_13",
+                    "phase25_report",
+                )
+                / "report_data.json"
+            ),
+        ]
+    )
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+    summary = json.loads(result.metrics_path.read_text(encoding="utf-8"))
+    report_data = json.loads((result.run_dir / "report_data.json").read_text(encoding="utf-8"))
+
+    assert "artifacts/reports/comparisons/phase26_robustness_final" in result.run_dir.as_posix()
+    assert metadata["experiment_type"] == "robustness_report"
+    assert metadata["status"] == "completed"
+    assert metadata["selection_mode"] == "saved_reports"
+    assert (result.run_dir / "report.md").exists()
+    assert (result.run_dir / "tables" / "worst_group_summary.csv").exists()
+    assert result.metrics_path.name == "report_summary.json"
+    assert summary["final_robustness_verdict"] == "still_mixed"
+    assert report_data["promotion_audit"]["decision"] == "do_not_promote"
+    assert Path(metadata["artifact_paths"]["promotion_audit_markdown"]).name == (
+        "phase25_group_balanced_sampling.md"
+    )
+
+
 def _write_index_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -2018,6 +2420,7 @@ def test_direct_script_help_runs_without_manual_pythonpath():
         [sys.executable, "scripts/download_data.py", "--help"],
         [sys.executable, "scripts/run_baseline.py", "--help"],
         [sys.executable, "scripts/build_report.py", "--help"],
+        [sys.executable, "scripts/build_robustness_report.py", "--help"],
         [sys.executable, "scripts/build_artifact_index.py", "--help"],
         [sys.executable, "scripts/validate_artifact_index.py", "--help"],
         [sys.executable, "scripts/build_stability_report.py", "--help"],

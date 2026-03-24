@@ -3,9 +3,11 @@
 from .bundle import (
     build_perturbation_report_metadata,
     build_report_metadata,
+    build_robustness_report_metadata,
     build_stability_report_metadata,
     write_perturbation_report_bundle,
     write_report_bundle,
+    write_robustness_report_bundle,
     write_stability_report_bundle,
 )
 from .calibration import build_calibration_curve_figure, build_calibration_table
@@ -33,6 +35,7 @@ from .figures import (
 from .markdown import (
     render_perturbation_report_markdown,
     render_report_markdown,
+    render_robustness_report_markdown,
     render_stability_report_markdown,
 )
 from .mitigation import (
@@ -44,6 +47,19 @@ from .perturbation import (
     build_perturbation_report_tables,
     load_perturbation_report_inputs,
     validate_perturbation_report_candidates,
+)
+from .robustness import (
+    build_exploratory_mitigation_summary,
+    build_final_robustness_summary,
+    build_official_mitigation_summary,
+    build_promotion_audit,
+    build_robustness_method_tables,
+    build_robustness_reference_reports,
+    build_robustness_story,
+    build_seeded_baseline_summary,
+    load_saved_report_metadata,
+    load_saved_report_payload,
+    render_promotion_audit_markdown,
 )
 from .selection import report_label, select_report_candidates, validate_report_candidates
 from .stability import (
@@ -67,6 +83,8 @@ __all__ = [
     "build_perturbation_report_metadata",
     "build_perturbation_report_summary",
     "build_perturbation_report_tables",
+    "build_robustness_report_metadata",
+    "write_robustness_report_bundle",
     "build_report_metadata",
     "build_stability_report_metadata",
     "write_report_bundle",
@@ -81,7 +99,15 @@ __all__ = [
     "build_id_ood_figure",
     "build_mitigation_stability_table",
     "build_mitigation_comparison_table",
+    "build_exploratory_mitigation_summary",
+    "build_final_robustness_summary",
+    "build_official_mitigation_summary",
+    "build_promotion_audit",
+    "build_robustness_method_tables",
+    "build_robustness_reference_reports",
+    "build_robustness_story",
     "build_report_summary",
+    "build_seeded_baseline_summary",
     "build_stability_summary",
     "build_severity_ladder_figure",
     "build_subgroup_table",
@@ -95,9 +121,13 @@ __all__ = [
     "load_perturbation_candidates",
     "load_perturbation_report_inputs",
     "load_report_inputs",
+    "load_saved_report_metadata",
+    "load_saved_report_payload",
     "pair_mitigation_candidates_with_parents",
     "report_label",
     "render_perturbation_report_markdown",
+    "render_promotion_audit_markdown",
+    "render_robustness_report_markdown",
     "render_report_markdown",
     "render_stability_report_markdown",
     "select_report_candidates",
