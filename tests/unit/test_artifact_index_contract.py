@@ -283,6 +283,34 @@ def _build_minimal_artifact_world() -> None:
         },
     )
 
+    scout_run = _write_run(
+        model_name="distilbert",
+        run_id="group_dro_seed_13_scout",
+        experiment_group="group_dro_v1_3",
+        seed=13,
+        tags=["mitigation", "official", "scout", "seed_13"],
+        mitigation_method="group_dro",
+        parent_run_id="distilbert_seed_13",
+    )
+    _write_eval(
+        run_dir=scout_run,
+        eval_id="group_dro_eval_13",
+        experiment_group="group_dro_v1_3",
+        seed=13,
+        source_run_id="group_dro_seed_13_scout",
+        source_parent_run_id="distilbert_seed_13",
+        tags=["mitigation", "official", "scout", "seed_13", "shift_eval"],
+        mitigation_method="group_dro",
+        headline_metrics={
+            "id_macro_f1": 0.84,
+            "ood_macro_f1": 0.76,
+            "robustness_gap_f1": 0.08,
+            "worst_group_f1": 0.12,
+            "ece": 0.06,
+            "brier_score": 0.08,
+        },
+    )
+
     exploratory_run = _write_run(
         model_name="distilbert",
         run_id="explore_seed_99",
@@ -410,6 +438,18 @@ def _build_minimal_artifact_world() -> None:
         report_summary={"seeded_interpretation": "stable"},
     )
     _write_report(
+        report_scope="phase23_group_dro_scout_seed_13",
+        report_id="group_dro_scout_report",
+        source_eval_ids=["parent_eval_13", "group_dro_eval_13"],
+        report_summary={"report_story": "group_dro scout failed"},
+    )
+    _write_report(
+        report_scope="phase23_four_way_scout_seed_13",
+        report_id="group_dro_four_way_report",
+        source_eval_ids=["parent_eval_13", "temp_eval_13", "reweight_eval_13", "group_dro_eval_13"],
+        report_summary={"report_story": "group_dro scout remained exploratory"},
+    )
+    _write_report(
         report_scope="phase20_stability",
         report_id="phase20_report",
         source_eval_ids=[
@@ -512,12 +552,19 @@ def test_build_artifact_index_emits_official_inventory_and_first_class_views(tem
     assert run_lookup["distilbert_seed_13"]["is_official"] is True
     assert run_lookup["explore_seed_99"]["is_official"] is False
     assert run_lookup["explore_seed_99"]["default_visible"] is False
+    assert run_lookup["group_dro_seed_13_scout"]["is_official"] is False
+    assert run_lookup["group_dro_seed_13_scout"]["default_visible"] is False
     assert run_lookup["distilbert_seed_13"]["artifact_refs"]["metrics_json"]["exists"] is True
     assert eval_lookup["parent_eval_13"]["artifact_refs"]["ui_summary_json"]["path"].startswith(
         "artifacts/"
     )
     assert eval_lookup["parent_eval_13"]["artifact_refs"]["ui_summary_json"]["exists"] is True
+    assert eval_lookup["group_dro_eval_13"]["is_official"] is False
+    assert eval_lookup["group_dro_eval_13"]["default_visible"] is False
     assert "perturbation_report" not in report_lookup
+    assert report_lookup["group_dro_scout_report"]["is_official"] is False
+    assert report_lookup["group_dro_scout_report"]["default_visible"] is False
+    assert report_lookup["group_dro_four_way_report"]["is_official"] is False
 
     cohort_ids = [row["cohort_id"] for row in payload["views"]["seeded_cohorts"]]
     assert cohort_ids == [
@@ -530,6 +577,7 @@ def test_build_artifact_index_emits_official_inventory_and_first_class_views(tem
     mitigation_views = {
         row["mitigation_method"]: row for row in payload["views"]["mitigation_comparisons"]
     }
+    assert set(mitigation_views) == {"temperature_scaling", "reweighting"}
     reweighting_view = mitigation_views["reweighting"]
     assert reweighting_view["comparison_summary"]["seeded_interpretation"] == "stable"
     assert reweighting_view["stability_assessment"]["label"] == "mixed"

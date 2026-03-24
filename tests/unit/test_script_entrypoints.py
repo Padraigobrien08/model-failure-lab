@@ -1247,6 +1247,7 @@ def test_run_mitigation_group_dro_supports_seeded_scout_metadata(
     assert metadata["resolved_config"]["train"]["num_workers"] == 0
     assert "baseline" not in metadata["tags"]
     assert "v1.2_baseline" not in metadata["tags"]
+    assert "official" not in metadata["tags"]
     assert set(metadata["tags"]) >= {
         "distilbert",
         "mitigation",

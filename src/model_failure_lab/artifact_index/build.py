@@ -178,7 +178,11 @@ def _load_json_payload(ref: dict[str, Any] | None) -> dict[str, Any] | None:
 def _build_run_entity(metadata_path: Path, metadata: dict[str, Any]) -> dict[str, Any]:
     experiment_group = str(metadata.get("experiment_group") or "")
     tags = [str(tag) for tag in metadata.get("tags", [])]
-    is_official = bool("official" in tags or experiment_group in OFFICIAL_RUN_GROUPS)
+    is_scout = "scout" in tags
+    is_official = bool(
+        not is_scout
+        and ("official" in tags or experiment_group in OFFICIAL_RUN_GROUPS)
+    )
     return {
         "id": str(metadata["run_id"]),
         "entity_type": "run",
@@ -232,7 +236,11 @@ def _build_evaluation_entity(metadata_path: Path, metadata: dict[str, Any]) -> d
         _load_json_payload(ui_summary_ref),
         _load_json_payload(overall_metrics_ref),
     )
-    is_official = bool("official" in tags or experiment_group in OFFICIAL_RUN_GROUPS)
+    is_scout = "scout" in tags
+    is_official = bool(
+        not is_scout
+        and ("official" in tags or experiment_group in OFFICIAL_RUN_GROUPS)
+    )
     return {
         "id": str(metadata["eval_id"]),
         "entity_type": "evaluation",

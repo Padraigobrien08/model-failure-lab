@@ -280,6 +280,7 @@ def test_build_inherited_group_dro_config_preserves_constrained_parent_runtime_a
     assert child_config["train"]["num_workers"] == 0
     assert "baseline" not in child_config["tags"]
     assert "v1.2_baseline" not in child_config["tags"]
+    assert "official" not in child_config["tags"]
     assert set(child_config["tags"]) >= {
         "distilbert",
         "mitigation",
@@ -426,6 +427,7 @@ def test_run_mitigation_group_dro_uses_inherited_parent_config(
     assert metadata["resolved_config"]["mitigation_method"] == "group_dro"
     assert metadata["resolved_config"]["parent_model_name"] == "distilbert"
     assert metadata["parent_run_id"] == parent_run_id
+    assert "official" not in metadata["tags"]
     assert set(metadata["tags"]) >= {
         "distilbert",
         "mitigation",

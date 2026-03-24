@@ -72,6 +72,8 @@ def _filter_parent_tags_for_child(parent_tags: list[Any]) -> list[str]:
         tag = str(raw_tag)
         if tag == "baseline" or tag.endswith("_baseline"):
             continue
+        if tag == "official":
+            continue
         if tag not in filtered:
             filtered.append(tag)
     return filtered
