@@ -355,6 +355,34 @@ def test_classify_mitigation_verdict_supports_group_dro():
     assert tradeoff == "tradeoff"
 
 
+def test_classify_mitigation_verdict_supports_group_balanced_sampling():
+    win = classify_mitigation_verdict(
+        mitigation_method="group_balanced_sampling",
+        deltas={
+            "id_macro_f1_delta": 0.0,
+            "overall_macro_f1_delta": 0.0,
+            "ood_macro_f1_delta": 0.02,
+            "worst_group_f1_delta": 0.01,
+            "ece_delta": 0.0,
+            "brier_score_delta": 0.0,
+        },
+    )
+    tradeoff = classify_mitigation_verdict(
+        mitigation_method="group_balanced_sampling",
+        deltas={
+            "id_macro_f1_delta": 0.0,
+            "overall_macro_f1_delta": -0.02,
+            "ood_macro_f1_delta": 0.02,
+            "worst_group_f1_delta": 0.01,
+            "ece_delta": 0.002,
+            "brier_score_delta": 0.01,
+        },
+    )
+
+    assert win == "win"
+    assert tradeoff == "tradeoff"
+
+
 def test_build_report_summary_computes_seeded_verdict_counts():
     mitigation_comparison_table = pd.DataFrame(
         [

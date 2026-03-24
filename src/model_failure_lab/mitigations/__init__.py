@@ -5,6 +5,10 @@ from .common import (
     load_parent_run_context,
     validate_distilbert_parent_run,
 )
+from .group_balanced_sampling import (
+    build_group_sampling_table,
+    train_distilbert_group_balanced_sampling,
+)
 from .group_dro import train_distilbert_group_dro
 from .reweighting import build_group_weight_table, train_distilbert_reweighting
 from .temperature_scaling import (
@@ -15,11 +19,13 @@ from .temperature_scaling import (
 
 __all__ = [
     "apply_temperature_scaling",
+    "build_group_sampling_table",
     "build_inherited_mitigation_config",
     "build_group_weight_table",
     "fit_temperature_scaler",
     "load_parent_run_context",
     "run_temperature_scaling",
+    "train_distilbert_group_balanced_sampling",
     "train_distilbert_group_dro",
     "train_distilbert_reweighting",
     "validate_distilbert_parent_run",

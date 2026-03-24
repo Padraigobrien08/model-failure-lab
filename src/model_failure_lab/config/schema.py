@@ -20,6 +20,12 @@ REQUIRED_GROUP_DRO_FIELDS = {
     "adversary_step_size",
     "loss_ema",
 }
+REQUIRED_GROUP_BALANCED_SAMPLING_FIELDS = {
+    "grouping_field",
+    "strategy",
+    "blend_alpha",
+    "max_sampling_multiplier",
+}
 REQUIRED_TEMPERATURE_SCALING_FIELDS = {
     "fitting_split",
     "objective",
@@ -39,7 +45,12 @@ REQUIRED_COMPARISON_TOLERANCE_FIELDS = {
     "overall_macro_f1_max_drop",
     "ece_neutral_tolerance",
 }
-SUPPORTED_MITIGATION_METHODS = {"group_dro", "reweighting", "temperature_scaling"}
+SUPPORTED_MITIGATION_METHODS = {
+    "group_balanced_sampling",
+    "group_dro",
+    "reweighting",
+    "temperature_scaling",
+}
 SUPPORTED_PERTURBATION_FAMILIES = {
     "typo_noise",
     "format_degradation",
@@ -304,6 +315,48 @@ def _validate_group_dro_config(payload: object) -> dict[str, Any]:
     }
 
 
+def _validate_group_balanced_sampling_config(payload: object) -> dict[str, Any]:
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("mitigation.group_balanced_sampling must be a non-empty mapping")
+
+    missing_fields = sorted(
+        REQUIRED_GROUP_BALANCED_SAMPLING_FIELDS - set(map(str, payload.keys()))
+    )
+    if missing_fields:
+        missing_text = ", ".join(missing_fields)
+        raise ValueError(
+            "mitigation.group_balanced_sampling is missing required fields: "
+            f"{missing_text}"
+        )
+
+    strategy = str(payload["strategy"])
+    if strategy != "inverse_sqrt_frequency":
+        raise ValueError(
+            "mitigation.group_balanced_sampling.strategy must be "
+            "'inverse_sqrt_frequency'"
+        )
+
+    blend_alpha = float(payload["blend_alpha"])
+    if not 0.0 <= blend_alpha <= 1.0:
+        raise ValueError(
+            "mitigation.group_balanced_sampling.blend_alpha must be in the interval [0, 1]"
+        )
+
+    max_sampling_multiplier = float(payload["max_sampling_multiplier"])
+    if max_sampling_multiplier < 1.0:
+        raise ValueError(
+            "mitigation.group_balanced_sampling.max_sampling_multiplier must be at least 1.0"
+        )
+
+    return {
+        **dict(payload),
+        "grouping_field": str(payload["grouping_field"]),
+        "strategy": strategy,
+        "blend_alpha": blend_alpha,
+        "max_sampling_multiplier": max_sampling_multiplier,
+    }
+
+
 def _validate_temperature_scaling_config(payload: object) -> dict[str, Any]:
     if not isinstance(payload, dict) or not payload:
         raise ValueError("mitigation.temperature_scaling must be a non-empty mapping")
@@ -383,6 +436,15 @@ def _validate_mitigation_config(payload: object) -> dict[str, Any] | None:
         normalized["group_dro"] = _validate_group_dro_config(payload.get("group_dro"))
     elif payload.get("group_dro") is not None:
         normalized["group_dro"] = _validate_group_dro_config(payload.get("group_dro"))
+
+    if normalized["method"] == "group_balanced_sampling":
+        normalized["group_balanced_sampling"] = _validate_group_balanced_sampling_config(
+            payload.get("group_balanced_sampling")
+        )
+    elif payload.get("group_balanced_sampling") is not None:
+        normalized["group_balanced_sampling"] = _validate_group_balanced_sampling_config(
+            payload.get("group_balanced_sampling")
+        )
 
     if normalized["method"] == "temperature_scaling":
         normalized["temperature_scaling"] = _validate_temperature_scaling_config(

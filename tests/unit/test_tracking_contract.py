@@ -208,3 +208,51 @@ def test_build_index_entry_preserves_group_dro_mitigation_metadata(temp_artifact
     assert index_entry["seed"] == 13
     assert index_entry["parent_run_id"] == "parent_13"
     assert index_entry["mitigation_method"] == "group_dro"
+
+
+def test_build_index_entry_preserves_group_balanced_sampling_mitigation_metadata(
+    temp_artifact_root,
+):
+    run_dir = build_baseline_run_dir(
+        model_name="distilbert",
+        run_id="20260324_120000_group_balanced_sampling_cd12",
+        create=True,
+    )
+    metadata_payload = build_run_metadata(
+        run_id="20260324_120000_group_balanced_sampling_cd12",
+        experiment_type="mitigation",
+        model_name="distilbert",
+        dataset_name="civilcomments",
+        split_details={
+            "train": "train",
+            "validation": "validation",
+            "id_test": "id_test",
+            "ood_test": "ood_test",
+        },
+        random_seed=13,
+        resolved_config={
+            "model_name": "distilbert",
+            "dataset_name": "civilcomments",
+            "seed": 13,
+        },
+        command="python scripts/run_mitigation.py --method group_balanced_sampling",
+        run_dir=run_dir,
+        parent_run_id="parent_13",
+        tags=[
+            "mitigation",
+            "group_balanced_sampling",
+            "v1.4_mitigation",
+            "scout",
+            "seed_13",
+        ],
+        status="completed",
+    )
+    metadata_payload["mitigation_method"] = "group_balanced_sampling"
+    metadata_path = write_metadata(run_dir, metadata_payload)
+
+    index_entry = build_index_entry(metadata_path, metadata_payload)
+
+    assert index_entry["experiment_type"] == "mitigation"
+    assert index_entry["seed"] == 13
+    assert index_entry["parent_run_id"] == "parent_13"
+    assert index_entry["mitigation_method"] == "group_balanced_sampling"

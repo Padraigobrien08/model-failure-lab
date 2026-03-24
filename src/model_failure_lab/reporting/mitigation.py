@@ -114,7 +114,7 @@ def classify_mitigation_verdict(
             return "tradeoff"
         return "win"
 
-    if mitigation_method == "group_dro":
+    if mitigation_method in {"group_dro", "group_balanced_sampling"}:
         target_improved = any(
             (value is not None and value > 0.0)
             for value in (
@@ -125,7 +125,9 @@ def classify_mitigation_verdict(
         if not target_improved:
             return "failure"
 
-        calibration_regression = (deltas.get("ece_delta") or 0.0) > ece_tolerance
+        calibration_regression = (deltas.get("ece_delta") or 0.0) > ece_tolerance or (
+            deltas.get("brier_score_delta") or 0.0
+        ) > 0.0
         if id_regression or overall_regression or calibration_regression:
             return "tradeoff"
         return "win"

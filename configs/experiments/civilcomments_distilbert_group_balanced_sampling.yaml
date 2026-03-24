@@ -1,0 +1,26 @@
+experiment_name: civilcomments_distilbert_group_balanced_sampling
+experiment_group: mitigations
+experiment_type: mitigation
+dataset_name: civilcomments
+model_name: distilbert
+data_config: configs/data/civilcomments.yaml
+model_config: configs/model/distilbert.yaml
+train_config: configs/train/default.yaml
+eval_config: configs/eval/default.yaml
+tags:
+  - mitigation
+  - distilbert
+  - group_balanced_sampling
+notes: CivilComments DistilBERT group-balanced sampling mitigation preset.
+mitigation:
+  method: group_balanced_sampling
+  parent_model_name: distilbert
+  comparison_tolerances:
+    id_macro_f1_max_drop: 0.01
+    overall_macro_f1_max_drop: 0.01
+    ece_neutral_tolerance: 0.005
+  group_balanced_sampling:
+    grouping_field: group_id
+    strategy: inverse_sqrt_frequency
+    blend_alpha: 0.35
+    max_sampling_multiplier: 3.0

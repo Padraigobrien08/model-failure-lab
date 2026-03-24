@@ -24,6 +24,7 @@ from model_failure_lab.evaluation.bundle import (
 )
 from model_failure_lab.mitigations import (
     run_temperature_scaling,
+    train_distilbert_group_balanced_sampling,
     train_distilbert_group_dro,
     train_distilbert_reweighting,
 )
@@ -264,6 +265,66 @@ def dispatch_mitigation(
     metrics_path: Path,
     preset_name: str,
 ) -> DispatchResult:
+    if method_name == "group_balanced_sampling":
+        if config["model_name"] != "distilbert":
+            raise ValueError(
+                "Group-balanced sampling only supports DistilBERT parent baselines."
+            )
+
+        artifacts = train_distilbert_group_balanced_sampling(config, run_dir)
+        metrics_path = write_metrics(run_dir, artifacts.metrics_payload)
+
+        existing_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        prediction_splits = resolve_prediction_splits(config)
+        artifact_paths = build_artifact_paths(run_dir, prediction_splits=prediction_splits)
+        artifact_paths["checkpoint"] = str(artifacts.checkpoint_dir)
+        reserved_prediction_paths = dict(artifact_paths["predictions"])
+        reserved_prediction_paths.update(
+            {split: str(path) for split, path in artifacts.prediction_paths.items()}
+        )
+        artifact_paths["predictions"] = reserved_prediction_paths
+        artifact_paths["selected_checkpoint"] = str(artifacts.checkpoint_path)
+        artifact_paths["training_history_json"] = str(artifacts.history_path)
+        artifact_paths["sampling_weights_csv"] = str(artifacts.sampling_weights_path)
+        metadata_payload = build_run_metadata(
+            run_id=str(config["run_id"]),
+            experiment_type="mitigation",
+            model_name=str(config["model_name"]),
+            dataset_name=str(config["dataset_name"]),
+            split_details=dict(config["split_details"]),
+            random_seed=int(config["seed"]),
+            resolved_config=config,
+            command=str(existing_metadata.get("command", "")),
+            run_dir=run_dir,
+            git_commit_hash=existing_metadata.get("git_commit_hash"),
+            library_versions=existing_metadata.get("library_versions"),
+            artifact_paths=artifact_paths,
+            parent_run_id=existing_metadata.get("parent_run_id", parent_run_id),
+            notes=str(config.get("notes", "")),
+            tags=list(config.get("tags", [])),
+            timestamp=existing_metadata.get("timestamp"),
+            status="completed",
+            **_completion_metadata_kwargs(
+                existing_metadata,
+                training_summary=artifacts.training_summary,
+            ),
+        )
+        metadata_payload = _apply_mitigation_metadata_fields(
+            metadata_payload,
+            config=config,
+            method_name=method_name,
+        )
+        metadata_path = write_metadata(run_dir, metadata_payload)
+        return DispatchResult(
+            status="completed",
+            message=f"Mitigation completed for {method_name} on {config['model_name']}",
+            run_dir=run_dir,
+            metadata_path=metadata_path,
+            metrics_path=metrics_path,
+            preset_name=preset_name,
+            extras={"method_name": method_name, "parent_run_id": parent_run_id},
+        )
+
     if method_name == "group_dro":
         if config["model_name"] != "distilbert":
             raise ValueError("Group DRO only supports DistilBERT parent baselines.")

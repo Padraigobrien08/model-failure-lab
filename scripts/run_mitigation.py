@@ -32,6 +32,7 @@ from model_failure_lab.tracking import (
 from model_failure_lab.utils.paths import build_mitigation_run_dir
 
 METHOD_PRESETS = {
+    "group_balanced_sampling": "civilcomments_distilbert_group_balanced_sampling",
     "group_dro": "civilcomments_distilbert_group_dro",
     "reweighting": "civilcomments_distilbert_reweighting",
     "temperature_scaling": "civilcomments_distilbert_temperature_scaling",
