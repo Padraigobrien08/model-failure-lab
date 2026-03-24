@@ -9,7 +9,7 @@ baseline, mitigation, evaluation, reporting, and UI surfaces reproducible from s
 The primary entrypoint is the read-only results explorer:
 
 ```bash
-python3 -m pip install -e .[ui]
+python3 -m pip install -e '.[ui]'
 python3 scripts/run_results_ui.py
 ```
 
@@ -18,9 +18,9 @@ The UI reads only from the generated manifest at
 
 For the written interpretation layer, read:
 
-- [v1.3 findings](docs/v1_3_findings.md)
+- [v1.4 closeout](docs/v1_4_closeout.md)
 
-## v1.3 Snapshot
+## v1.4 Snapshot
 
 - The seeded baseline story held: Logistic TF-IDF and DistilBERT baseline behavior remained stable
   across seeds, and DistilBERT still beat Logistic on OOD Macro F1.
@@ -28,29 +28,34 @@ For the written interpretation layer, read:
   improvement and no robustness gain.
 - `reweighting` is still the best current robustness lane, but it remains mixed: `2/3` wins,
   `1/3` tradeoff.
-- The `group_dro` challenger scout was run, evaluated, and rejected; it remains exploratory rather
-  than official milestone evidence.
-- Dataset expansion remains `defer` until the robustness story is more consistent and easier to
-  explain.
+- The final challenger scouts, `group_dro` and `group_balanced_sampling`, were both rejected and
+  remain exploratory rather than official evidence.
+- Dataset expansion is `defer_now_reopen_under_conditions`: keep scope fixed until robustness stops
+  being mixed and a mitigation shows stable seeded gains.
 
 ## Official Evidence
 
-The default-visible `v1.3` evidence package is anchored on these saved reports:
+The default-visible `v1.4` evidence package is anchored on these saved reports and closeout
+artifacts:
 
 - [Phase 18 seeded temperature-scaling package](artifacts/reports/comparisons/phase18_temperature_scaling_seeded/20260321_143714_report_0eea/report.md)
 - [Phase 19 seeded reweighting package](artifacts/reports/comparisons/phase19_reweighting_seeded/20260321_224830_report_12f3/report.md)
 - [Phase 20 seeded stability package](artifacts/reports/comparisons/phase20_stability/20260322_164903_report_d7d4/report.md)
+- [Phase 26 final robustness package](artifacts/reports/comparisons/phase26_robustness_final/20260324_221348_report_bfbb/report.md)
+- [Phase 27 final gate JSON](artifacts/reports/closeout/phase27_gate/final_gate.json)
 
 Exploratory but documented:
 
 - [Phase 23 `group_dro` scout report](artifacts/reports/comparisons/phase23_group_dro_scout_seed_13/20260324_130155_report_f6a8/report.md)
+- [Phase 25 `group_balanced_sampling` scout report](artifacts/reports/comparisons/phase25_group_balanced_sampling_scout_seed_13/20260324_212920_report_7c22/report.md)
+- [Phase 25 promotion audit](artifacts/reports/robustness_promotion_audit/phase25_group_balanced_sampling.md)
 
 ## Setup
 
 Use Python 3.11 or newer.
 
 ```bash
-python3 -m pip install -e .[dev]
+python3 -m pip install -e '.[dev]'
 python3 scripts/check_environment.py
 python3 scripts/download_data.py
 ```
@@ -61,6 +66,7 @@ If you only want the runtime setup details first, see:
 
 ## Docs
 
+- [v1.4 closeout](docs/v1_4_closeout.md)
 - [v1.3 findings](docs/v1_3_findings.md)
 - [v1.1 findings](docs/v1_1_findings.md)
 - [v1.1 reproducibility walkthrough](docs/v1_1_reproducibility.md)

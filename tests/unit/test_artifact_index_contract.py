@@ -10,8 +10,8 @@ from model_failure_lab.utils.paths import (
     build_evaluation_run_dir,
     build_final_gate_path,
     build_mitigation_run_dir,
-    build_robustness_promotion_audit_path,
     build_report_run_dir,
+    build_robustness_promotion_audit_path,
 )
 
 
@@ -605,7 +605,10 @@ def _build_minimal_artifact_world() -> None:
             "reopen_conditions": [
                 "Robustness lane achieves stable improvement instead of remaining mixed.",
                 "At least one mitigation shows consistent gains across seeds.",
-                "Robustness versus calibration tradeoffs are materially reduced or better understood.",
+                (
+                    "Robustness versus calibration tradeoffs are materially reduced "
+                    "or better understood."
+                ),
             ],
             "supporting_report_scopes": [
                 "phase20_stability",

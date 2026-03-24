@@ -779,9 +779,15 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                             "robustness win."
                         ),
                         "reopen_conditions": [
-                            "Robustness lane achieves stable improvement instead of remaining mixed.",
+                            (
+                                "Robustness lane achieves stable improvement instead "
+                                "of remaining mixed."
+                            ),
                             "At least one mitigation shows consistent gains across seeds.",
-                            "Robustness versus calibration tradeoffs are materially reduced or better understood.",
+                            (
+                                "Robustness versus calibration tradeoffs are materially "
+                                "reduced or better understood."
+                            ),
                         ],
                         "summary_bullets": [
                             "The baseline robustness gap remains real and stable.",
