@@ -1,67 +1,69 @@
 # Model Failure Lab
 
-Model Failure Lab is a reproducible machine learning research project for studying how text
-classification models fail under distribution shift. The benchmark workflow centers on CivilComments
-from WILDS, with explicit separation between baseline, mitigation, evaluation, reporting, and
-perturbation stress-test artifacts.
+Model Failure Lab is an artifact-driven research repo for measuring how text-classification models
+fail under distribution shift. The current benchmark centers on CivilComments from WILDS and keeps
+baseline, mitigation, evaluation, reporting, and UI surfaces reproducible from saved artifacts.
 
-## What Shipped In `v1.1`
+## Start Here
 
-- a clean-machine script-first workflow for CivilComments
-- real Logistic Regression and DistilBERT baseline runs
-- real mitigation validation for `temperature_scaling`
-- real synthetic perturbation validation against the official DistilBERT lineage
-- repository-ready report artifacts and findings docs
+The primary entrypoint is the read-only results explorer:
 
-## Start here
+```bash
+python3 -m pip install -e .[ui]
+python3 scripts/run_results_ui.py
+```
 
-For the full end-to-end workflow, read:
+The UI reads only from the generated manifest at
+`artifacts/contracts/artifact_index/v1/index.json`.
 
-- [v1.1 reproducibility walkthrough](docs/v1_1_reproducibility.md)
+For the written interpretation layer, read:
 
-That document is the canonical runbook for setup, baseline execution, evaluation, mitigation, and
-perturbation reporting.
+- [v1.3 findings](docs/v1_3_findings.md)
 
-## Quickstart
+## v1.3 Snapshot
+
+- The seeded baseline story held: Logistic TF-IDF and DistilBERT baseline behavior remained stable
+  across seeds, and DistilBERT still beat Logistic on OOD Macro F1.
+- `temperature_scaling` is the clean calibration lane: `3/3` seeded wins with stable ECE/Brier
+  improvement and no robustness gain.
+- `reweighting` is still the best current robustness lane, but it remains mixed: `2/3` wins,
+  `1/3` tradeoff.
+- The `group_dro` challenger scout was run, evaluated, and rejected; it remains exploratory rather
+  than official milestone evidence.
+- Dataset expansion remains `defer` until the robustness story is more consistent and easier to
+  explain.
+
+## Official Evidence
+
+The default-visible `v1.3` evidence package is anchored on these saved reports:
+
+- [Phase 18 seeded temperature-scaling package](artifacts/reports/comparisons/phase18_temperature_scaling_seeded/20260321_143714_report_0eea/report.md)
+- [Phase 19 seeded reweighting package](artifacts/reports/comparisons/phase19_reweighting_seeded/20260321_224830_report_12f3/report.md)
+- [Phase 20 seeded stability package](artifacts/reports/comparisons/phase20_stability/20260322_164903_report_d7d4/report.md)
+
+Exploratory but documented:
+
+- [Phase 23 `group_dro` scout report](artifacts/reports/comparisons/phase23_group_dro_scout_seed_13/20260324_130155_report_f6a8/report.md)
+
+## Setup
 
 Use Python 3.11 or newer.
 
 ```bash
-python -m pip install -e .[dev]
-python scripts/check_environment.py
-python scripts/download_data.py
+python3 -m pip install -e .[dev]
+python3 scripts/check_environment.py
+python3 scripts/download_data.py
 ```
 
-If you only want the detailed setup guidance first, see:
+If you only want the runtime setup details first, see:
 
 - [Runtime setup reference](docs/runtime-setup.md)
 
-## Key results
+## Docs
 
-- DistilBERT is the stronger real baseline on CivilComments, with OOD Macro F1 `0.800` versus
-  `0.747` for Logistic Regression, but it still shows a measurable robustness gap of `0.071`.
-- Temperature scaling is a calibration win, not a robustness win: ECE improves by `0.011` and
-  Brier score by `0.0015`, while ID/OOD and worst-group metrics stay unchanged.
-- Under the synthetic perturbation suite, average Macro F1 drops by `0.063`, with `typo_noise`
-  the worst family and `high` the harshest severity. Calibration does not materially change that
-  brittleness.
-
-The full findings layer is here:
-
+- [v1.3 findings](docs/v1_3_findings.md)
 - [v1.1 findings](docs/v1_1_findings.md)
-
-## Official evidence
-
-The curated `v1.1` evidence package is the three-report set below:
-
-- [Baseline comparison report](artifacts/reports/comparisons/baselines_v1_1/20260320_161852_report_34b3/report.md)
-- [Mitigation comparison report](artifacts/reports/comparisons/phase13_temperature_scaling/20260320_171418_report_b3fb/report.md)
-- [Perturbation comparison report](artifacts/reports/perturbations/phase13_temperature_scaling_perturbations/20260320_172934_perturbation_report_cbd4/report.md)
-
-## Deep dive docs
-
 - [v1.1 reproducibility walkthrough](docs/v1_1_reproducibility.md)
-- [v1.1 findings](docs/v1_1_findings.md)
 - [Runtime setup reference](docs/runtime-setup.md)
 - [Cloud GPU run guide](docs/cloud-gpu-run.md)
 - [Troubleshooting](docs/troubleshooting.md)
