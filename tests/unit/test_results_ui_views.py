@@ -96,12 +96,15 @@ def test_results_ui_app_shell_defaults_to_overview(results_ui_manifest: Path):
     radio_calls = [call for call in fake_st.calls if call.name == "radio"]
     title_calls = [call.value for call in fake_st.calls if call.name == "title"]
     markdown_calls = [call.value for call in fake_st.calls if call.name == "markdown"]
+    link_buttons = [call.value for call in fake_st.calls if call.name == "link_button"]
 
     assert radio_calls
     assert NAVIGATION_VIEWS == radio_calls[0].value[1]
     assert "Model Failure Lab" in title_calls
     assert any("temperature scaling" in text.lower() for text in markdown_calls)
     assert any("dataset expansion" in text.lower() for text in markdown_calls)
+    assert any(label == "Read v1.3 findings" for label, _ in link_buttons)
+    assert any(label == "View supporting report" for label, _ in link_buttons)
 
 
 @pytest.mark.usefixtures("results_ui_manifest")
@@ -112,10 +115,13 @@ def test_results_ui_cohort_view_renders_aggregate_first_sections(results_ui_mani
 
     subheaders = [call.value for call in fake_st.calls if call.name == "subheader"]
     expanders = [call.value[0] for call in fake_st.calls if call.name == "expander"]
+    link_buttons = [call.value for call in fake_st.calls if call.name == "link_button"]
 
     assert "Logistic TF-IDF Baseline" in subheaders
     assert "DistilBERT Baseline" in subheaders
     assert "Show per-seed breakdown" in expanders
+    assert any(label == "Open eval bundle" for label, _ in link_buttons)
+    assert any(label == "View raw metrics table" for label, _ in link_buttons)
 
 
 @pytest.mark.usefixtures("results_ui_manifest")
@@ -126,10 +132,16 @@ def test_results_ui_mitigation_view_shows_seeded_and_milestone_labels(results_ui
 
     markdown_calls = [call.value for call in fake_st.calls if call.name == "markdown"]
     subheaders = [call.value for call in fake_st.calls if call.name == "subheader"]
+    expanders = [call.value[0] for call in fake_st.calls if call.name == "expander"]
+    link_buttons = [call.value for call in fake_st.calls if call.name == "link_button"]
 
     assert any("seeded comparison summary" in text.lower() for text in markdown_calls)
     assert any("phase 20 milestone label" in text.lower() for text in markdown_calls)
     assert "Reweighting" in subheaders
+    assert "Group Dro" not in subheaders
+    assert "Seed 13 evidence" in expanders
+    assert any(label == "View supporting report" for label, _ in link_buttons)
+    assert any(label == "Open eval bundle" for label, _ in link_buttons)
 
 
 @pytest.mark.usefixtures("results_ui_manifest")
@@ -139,8 +151,12 @@ def test_results_ui_stability_view_shows_defer_recommendation(results_ui_manifes
     render_app(index_path=results_ui_manifest, streamlit_module=fake_st)
 
     markdown_calls = [call.value for call in fake_st.calls if call.name == "markdown"]
+    link_buttons = [call.value for call in fake_st.calls if call.name == "link_button"]
     assert any("dataset expansion recommendation" in text.lower() for text in markdown_calls)
     assert any("defer" in text.lower() for text in markdown_calls)
+    assert any("original v1.1 findings" in text.lower() for text in markdown_calls)
+    assert any(label == "View baseline stability table" for label, _ in link_buttons)
+    assert any(label == "View stability summary" for label, _ in link_buttons)
 
 
 @pytest.mark.usefixtures("results_ui_manifest")

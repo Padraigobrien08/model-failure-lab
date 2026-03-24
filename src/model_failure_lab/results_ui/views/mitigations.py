@@ -6,16 +6,14 @@ from typing import Any
 
 from model_failure_lab.results_ui.components import (
     build_delta_rows,
+    render_actions,
     render_dataframe,
     render_delta_summary,
-    render_entity_actions,
-    render_related_report_actions,
 )
 from model_failure_lab.results_ui.formatters import format_label
 from model_failure_lab.results_ui.selectors import (
     get_mitigation_comparison_views,
     get_primary_stability_package,
-    get_report_by_id,
 )
 
 
@@ -59,9 +57,7 @@ def render_mitigations_view(
                 "worst_group_f1_delta",
             ),
         )
-        report_entity = get_report_by_id(index, view.get("aggregate_report_id", ""))
-        if report_entity is not None:
-            render_entity_actions(st, report_entity)
+        render_actions(st, view.get("summary_actions", []))
 
         st.caption(
             f"Verdicts: {view.get('stability_assessment', {}).get('verdict_counts', {})}"
@@ -70,17 +66,9 @@ def render_mitigations_view(
         render_dataframe(expander, build_delta_rows(view.get("per_seed_comparisons", [])))
 
         for comparison in view.get("per_seed_comparisons", []):
-            related_report_entities = []
-            for report_id in comparison.get("related_report_ids", []):
-                report_entity = get_report_by_id(index, report_id)
-                if report_entity is not None:
-                    related_report_entities.append(report_entity)
-            if related_report_entities:
+            if comparison.get("support_actions"):
                 seed_expander = st.expander(
-                    f"Seed {comparison.get('seed')} report links",
+                    f"Seed {comparison.get('seed')} evidence",
                     expanded=False,
                 )
-                render_related_report_actions(
-                    seed_expander,
-                    report_entities=related_report_entities,
-                )
+                render_actions(seed_expander, comparison.get("support_actions", []))

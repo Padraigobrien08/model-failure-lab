@@ -55,6 +55,9 @@ def test_results_ui_selectors_keep_cohort_and_mitigation_order(results_ui_manife
         "temperature_scaling",
         "reweighting",
     ]
+    assert all(cohort["summary_actions"] for cohort in cohorts)
+    assert all(view["summary_actions"] for view in mitigation_views)
+    assert all("group_dro" not in view["mitigation_method"] for view in mitigation_views)
 
 
 def test_overview_snapshot_surfaces_phase20_story(results_ui_manifest: Path):
@@ -67,3 +70,10 @@ def test_overview_snapshot_surfaces_phase20_story(results_ui_manifest: Path):
     assert snapshot["mitigation_labels"]["reweighting"] == "mixed"
     assert snapshot["dataset_expansion_recommendation"] == "defer"
     assert stability["milestone_assessment"]["v1_1_findings_status"] == "stable"
+    assert (
+        snapshot["headline_actions"]["temperature_scaling"][0]["label"]
+        == "View supporting report"
+    )
+    assert snapshot["headline_actions"]["findings_doc"][0]["path"] == "docs/v1_3_findings.md"
+    assert stability["summary_actions"][0]["label"] == "View supporting report"
+    assert stability["reference_actions"]

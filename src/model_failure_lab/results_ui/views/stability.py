@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from model_failure_lab.results_ui.components import render_dataframe, render_entity_actions
+from model_failure_lab.results_ui.components import render_actions, render_dataframe
 from model_failure_lab.results_ui.formatters import format_label
-from model_failure_lab.results_ui.selectors import get_primary_stability_package, get_report_by_id
+from model_failure_lab.results_ui.selectors import get_primary_stability_package
 
 
 def render_stability_view(
@@ -37,6 +37,10 @@ def render_stability_view(
         f"{format_label(package.get('baseline_model_comparison', {}).get('label'))}"
     )
     st.markdown(
+        f"**Original v1.1 findings:** "
+        f"{format_label(milestone_assessment.get('v1_1_findings_status'))}"
+    )
+    st.markdown(
         f"**Dataset expansion recommendation:** "
         f"{format_label(milestone_assessment.get('dataset_expansion_recommendation'))}"
     )
@@ -44,20 +48,18 @@ def render_stability_view(
         st.caption(milestone_assessment["recommendation_reason"])
     if milestone_assessment.get("next_step"):
         st.markdown(f"**Next step:** {milestone_assessment['next_step']}")
-
-    report_entity = get_report_by_id(index, package.get("report_id", ""))
-    if report_entity is not None:
-        render_entity_actions(st, report_entity)
+    render_actions(st, package.get("summary_actions", []))
 
     reference_rows = []
     for scope, reference in package.get("reference_reports", {}).items():
         reference_rows.append(
             {
                 "Scope": format_label(scope),
-                "Report": reference.get("report_scope"),
-                "Path": reference.get("report_markdown", {}).get("path"),
+                "Report": reference.get("report_scope", format_label(scope)),
+                "Path": reference.get("path"),
             }
         )
     if reference_rows:
         expander = st.expander("Show reference reports", expanded=False)
+        render_actions(expander, package.get("reference_actions", []))
         render_dataframe(expander, reference_rows)

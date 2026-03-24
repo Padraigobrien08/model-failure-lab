@@ -6,11 +6,11 @@ from typing import Any
 
 from model_failure_lab.results_ui.components import (
     build_seed_rows,
+    render_actions,
     render_dataframe,
-    render_entity_actions,
     render_metric_summary,
 )
-from model_failure_lab.results_ui.selectors import get_report_by_id, get_seeded_cohorts
+from model_failure_lab.results_ui.selectors import get_seeded_cohorts
 
 
 def render_cohorts_view(
@@ -23,10 +23,6 @@ def render_cohorts_view(
     st.title("Cohort Analysis")
     st.caption("Aggregate-first seeded cohort summaries with optional per-seed breakdown.")
 
-    report_lookup = {
-        report["id"]: report
-        for report in index.get("entities", {}).get("reports", [])
-    }
     cohorts = get_seeded_cohorts(index, include_exploratory=include_exploratory)
     for cohort in cohorts:
         st.subheader(cohort.get("display_name", cohort.get("cohort_id", "Unknown Cohort")))
@@ -39,15 +35,7 @@ def render_cohorts_view(
             f"Seeds: {', '.join(cohort.get('seed_ids', []))} • "
             f"Experiment group: {cohort.get('experiment_group', 'n/a')}"
         )
-
-        linked_report_id = cohort.get("linked_report_id")
-        if linked_report_id:
-            linked_report = report_lookup.get(linked_report_id) or get_report_by_id(
-                index,
-                linked_report_id,
-            )
-            if linked_report is not None:
-                render_entity_actions(st, linked_report)
+        render_actions(st, cohort.get("summary_actions", []))
 
         expander = st.expander("Show per-seed breakdown", expanded=False)
         render_dataframe(expander, build_seed_rows(cohort.get("per_seed_metrics", [])))

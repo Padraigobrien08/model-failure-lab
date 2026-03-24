@@ -5,16 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from model_failure_lab.results_ui.components import (
+    render_actions,
     render_badge,
-    render_entity_actions,
     render_metric_summary,
     render_overview_charts,
 )
 from model_failure_lab.results_ui.formatters import format_label
-from model_failure_lab.results_ui.selectors import (
-    build_overview_snapshot,
-    get_report_by_id,
-)
+from model_failure_lab.results_ui.selectors import build_overview_snapshot
 
 
 def render_overview_view(
@@ -25,7 +22,6 @@ def render_overview_view(
 ) -> None:
     """Render the milestone-story-first overview view."""
     snapshot = build_overview_snapshot(index, include_exploratory=include_exploratory)
-    stability_package = snapshot["stability_package"]
     mitigation_labels = snapshot["mitigation_labels"]
     inventory_counts = snapshot["inventory_counts"]
     seeded_cohorts = snapshot["seeded_cohorts"]
@@ -38,6 +34,7 @@ def render_overview_view(
         "lane, and that **reweighting** remains promising but mixed. Dataset "
         "expansion stays deferred until the robustness lane is clearer."
     )
+    render_actions(st, snapshot.get("headline_actions", {}).get("findings_doc", []))
 
     badge_columns = st.columns(3)
     render_badge(
@@ -45,15 +42,27 @@ def render_overview_view(
         label="Temperature Scaling",
         value=mitigation_labels.get("temperature_scaling", "unknown"),
     )
+    render_actions(
+        badge_columns[0],
+        snapshot.get("headline_actions", {}).get("temperature_scaling", []),
+    )
     render_badge(
         badge_columns[1],
         label="Reweighting",
         value=mitigation_labels.get("reweighting", "unknown"),
     )
+    render_actions(
+        badge_columns[1],
+        snapshot.get("headline_actions", {}).get("reweighting", []),
+    )
     render_badge(
         badge_columns[2],
         label="Dataset Expansion",
         value=snapshot.get("dataset_expansion_recommendation", "unknown"),
+    )
+    render_actions(
+        badge_columns[2],
+        snapshot.get("headline_actions", {}).get("dataset_expansion", []),
     )
 
     st.subheader("Inventory")
@@ -69,6 +78,10 @@ def render_overview_view(
             seeded_cohorts[1].get("aggregate_metrics", {}).get("mean", {}),
             metric_keys=("id_macro_f1", "robustness_gap_f1", "worst_group_f1"),
         )
+        render_actions(
+            st,
+            snapshot.get("headline_actions", {}).get("distilbert_baseline", []),
+        )
 
     render_overview_charts(st, seeded_cohorts)
 
@@ -79,8 +92,3 @@ def render_overview_view(
     )
     if snapshot.get("next_step"):
         st.caption(snapshot["next_step"])
-
-    primary_report = get_report_by_id(index, stability_package.get("report_id"))
-    if primary_report is not None:
-        st.subheader("Audit Trail")
-        render_entity_actions(st, primary_report)

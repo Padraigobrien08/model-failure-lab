@@ -77,18 +77,122 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                 ],
                 "evaluations": [
                     {
-                        "id": "eval_official",
+                        "id": "log_eval_a",
                         "entity_type": "evaluation",
-                        "eval_id": "eval_official",
+                        "eval_id": "log_eval_a",
                         "metadata_path": (
-                            "artifacts/baselines/distilbert/run_official/evaluations/"
-                            "eval_official/metadata.json"
+                            "artifacts/baselines/logistic_tfidf/log_a/evaluations/"
+                            "log_eval_a/metadata.json"
                         ),
-                        "artifact_refs": {},
+                        "artifact_refs": {
+                            "split_metrics_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/baselines/logistic_tfidf/log_a/evaluations/"
+                                    "log_eval_a/split_metrics.csv"
+                                ),
+                            }
+                        },
+                        "payload_refs": {},
+                        "default_visible": True,
+                        "is_official": True,
+                        "experiment_group": "baselines_v1_2_logistic",
+                        "status": "completed",
+                        "seed": 13,
+                    },
+                    {
+                        "id": "dist_eval_a",
+                        "entity_type": "evaluation",
+                        "eval_id": "dist_eval_a",
+                        "metadata_path": (
+                            "artifacts/baselines/distilbert/dist_a/evaluations/"
+                            "dist_eval_a/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "split_metrics_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/baselines/distilbert/dist_a/evaluations/"
+                                    "dist_eval_a/split_metrics.csv"
+                                ),
+                            }
+                        },
                         "payload_refs": {},
                         "default_visible": True,
                         "is_official": True,
                         "experiment_group": "baselines_v1_2_distilbert",
+                        "status": "completed",
+                        "seed": 13,
+                    },
+                    {
+                        "id": "temp_eval_a",
+                        "entity_type": "evaluation",
+                        "eval_id": "temp_eval_a",
+                        "metadata_path": (
+                            "artifacts/mitigations/temperature_scaling/distilbert/temp_a/"
+                            "evaluations/temp_eval_a/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "split_metrics_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/mitigations/temperature_scaling/distilbert/temp_a/"
+                                    "evaluations/temp_eval_a/split_metrics.csv"
+                                ),
+                            }
+                        },
+                        "payload_refs": {},
+                        "default_visible": True,
+                        "is_official": True,
+                        "experiment_group": "temperature_scaling_v1_2",
+                        "status": "completed",
+                        "seed": 13,
+                    },
+                    {
+                        "id": "rew_eval_a",
+                        "entity_type": "evaluation",
+                        "eval_id": "rew_eval_a",
+                        "metadata_path": (
+                            "artifacts/mitigations/reweighting/distilbert/rew_a/"
+                            "evaluations/rew_eval_a/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "split_metrics_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/mitigations/reweighting/distilbert/rew_a/"
+                                    "evaluations/rew_eval_a/split_metrics.csv"
+                                ),
+                            }
+                        },
+                        "payload_refs": {},
+                        "default_visible": True,
+                        "is_official": True,
+                        "experiment_group": "reweighting_v1_2",
+                        "status": "completed",
+                        "seed": 13,
+                    },
+                    {
+                        "id": "group_dro_eval_a",
+                        "entity_type": "evaluation",
+                        "eval_id": "group_dro_eval_a",
+                        "metadata_path": (
+                            "artifacts/mitigations/group_dro/distilbert/gdro_a/"
+                            "evaluations/group_dro_eval_a/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "split_metrics_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/mitigations/group_dro/distilbert/gdro_a/"
+                                    "evaluations/group_dro_eval_a/split_metrics.csv"
+                                ),
+                            }
+                        },
+                        "payload_refs": {},
+                        "default_visible": False,
+                        "is_official": False,
+                        "experiment_group": "group_dro_v1_3",
                         "status": "completed",
                         "seed": 13,
                     }
@@ -104,20 +208,183 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                             "phase20_report/metadata.json"
                         ),
                         "artifact_refs": {
+                            "baseline_stability_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase20_stability/"
+                                    "phase20_report/tables/baseline_stability.csv"
+                                ),
+                            },
                             "report_markdown": {
                                 "exists": True,
                                 "path": (
                                     "artifacts/reports/comparisons/phase20_stability/"
                                     "phase20_report/report.md"
                                 ),
+                            },
+                            "reweighting_deltas_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase20_stability/"
+                                    "phase20_report/tables/reweighting_deltas.csv"
+                                ),
+                            },
+                            "temperature_scaling_deltas_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase20_stability/"
+                                    "phase20_report/tables/temperature_scaling_deltas.csv"
+                                ),
+                            },
+                        },
+                        "payload_refs": {
+                            "stability_summary_json": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase20_stability/"
+                                    "phase20_report/stability_summary.json"
+                                ),
+                            }
+                        },
+                        "default_visible": True,
+                        "is_official": True,
+                        "experiment_group": "phase20_stability",
+                        "status": "completed",
+                    },
+                    {
+                        "id": "phase18_report",
+                        "entity_type": "report",
+                        "report_id": "phase18_report",
+                        "report_scope": "phase18_temperature_scaling_seeded",
+                        "metadata_path": (
+                            "artifacts/reports/comparisons/phase18_temperature_scaling_seeded/"
+                            "phase18_report/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "mitigation_comparison_table_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase18_temperature_scaling_seeded/"
+                                    "phase18_report/tables/mitigation_comparison_table.csv"
+                                ),
+                            },
+                            "report_markdown": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase18_temperature_scaling_seeded/"
+                                    "phase18_report/report.md"
+                                ),
+                            },
+                        },
+                        "payload_refs": {},
+                        "default_visible": True,
+                        "is_official": True,
+                        "experiment_group": "phase18_temperature_scaling_seeded",
+                        "status": "completed",
+                    },
+                    {
+                        "id": "phase19_report",
+                        "entity_type": "report",
+                        "report_id": "phase19_report",
+                        "report_scope": "phase19_reweighting_seeded",
+                        "metadata_path": (
+                            "artifacts/reports/comparisons/phase19_reweighting_seeded/"
+                            "phase19_report/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "mitigation_comparison_table_csv": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase19_reweighting_seeded/"
+                                    "phase19_report/tables/mitigation_comparison_table.csv"
+                                ),
+                            },
+                            "report_markdown": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase19_reweighting_seeded/"
+                                    "phase19_report/report.md"
+                                ),
+                            },
+                        },
+                        "payload_refs": {},
+                        "default_visible": True,
+                        "is_official": True,
+                        "experiment_group": "phase19_reweighting_seeded",
+                        "status": "completed",
+                    },
+                    {
+                        "id": "phase18_seed13_report",
+                        "entity_type": "report",
+                        "report_id": "phase18_seed13_report",
+                        "report_scope": "phase18_temperature_scaling_seed_13",
+                        "metadata_path": (
+                            "artifacts/reports/comparisons/phase18_temperature_scaling_seed_13/"
+                            "phase18_seed13_report/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "report_markdown": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase18_temperature_scaling_seed_13/"
+                                    "phase18_seed13_report/report.md"
+                                ),
                             }
                         },
                         "payload_refs": {},
                         "default_visible": True,
                         "is_official": True,
-                        "experiment_group": "phase20_stability",
+                        "experiment_group": "phase18_temperature_scaling_seed_13",
                         "status": "completed",
-                    }
+                    },
+                    {
+                        "id": "phase19_seed13_report",
+                        "entity_type": "report",
+                        "report_id": "phase19_seed13_report",
+                        "report_scope": "phase19_reweighting_seed_13",
+                        "metadata_path": (
+                            "artifacts/reports/comparisons/phase19_reweighting_seed_13/"
+                            "phase19_seed13_report/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "report_markdown": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase19_reweighting_seed_13/"
+                                    "phase19_seed13_report/report.md"
+                                ),
+                            }
+                        },
+                        "payload_refs": {},
+                        "default_visible": True,
+                        "is_official": True,
+                        "experiment_group": "phase19_reweighting_seed_13",
+                        "status": "completed",
+                    },
+                    {
+                        "id": "phase23_scout_report",
+                        "entity_type": "report",
+                        "report_id": "phase23_scout_report",
+                        "report_scope": "phase23_group_dro_scout_seed_13",
+                        "metadata_path": (
+                            "artifacts/reports/comparisons/phase23_group_dro_scout_seed_13/"
+                            "phase23_scout_report/metadata.json"
+                        ),
+                        "artifact_refs": {
+                            "report_markdown": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase23_group_dro_scout_seed_13/"
+                                    "phase23_scout_report/report.md"
+                                ),
+                            }
+                        },
+                        "payload_refs": {},
+                        "default_visible": False,
+                        "is_official": False,
+                        "experiment_group": "phase23_group_dro_scout_seed_13",
+                        "status": "completed",
+                    },
                 ],
             },
             "views": {
@@ -285,12 +552,38 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                             "seeded_interpretation": "stable",
                             "verdict_counts": {"win": 3, "tradeoff": 0, "failure": 0},
                         },
-                        "per_seed_comparisons": [],
+                        "per_seed_comparisons": [
+                            {
+                                "seed": "13",
+                                "parent_run_id": "dist_a",
+                                "parent_eval_id": "dist_eval_a",
+                                "child_run_id": "temp_a",
+                                "child_eval_id": "temp_eval_a",
+                                "related_report_ids": ["phase18_seed13_report"],
+                                "verdict": "win",
+                                "deltas": {
+                                    "id_macro_f1_delta": 0.0,
+                                    "ood_macro_f1_delta": 0.0,
+                                    "robustness_gap_delta": 0.0,
+                                    "worst_group_f1_delta": 0.0,
+                                    "ece_delta": -0.011,
+                                    "brier_score_delta": -0.001,
+                                },
+                            }
+                        ],
                         "stability_assessment": {
                             "label": "stable",
                             "verdict_counts": {"win": 3, "tradeoff": 0, "failure": 0},
-                            "mean_deltas": {"robustness_gap_delta": 0.0},
-                            "std_deltas": {"robustness_gap_delta": 0.0},
+                            "mean_deltas": {
+                                "id_macro_f1_delta": 0.0,
+                                "robustness_gap_delta": 0.0,
+                                "worst_group_f1_delta": 0.0,
+                            },
+                            "std_deltas": {
+                                "id_macro_f1_delta": 0.0,
+                                "robustness_gap_delta": 0.0,
+                                "worst_group_f1_delta": 0.0,
+                            },
                         },
                     },
                     {
@@ -304,12 +597,83 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                             "seeded_interpretation": "stable",
                             "verdict_counts": {"win": 2, "tradeoff": 1, "failure": 0},
                         },
-                        "per_seed_comparisons": [],
+                        "per_seed_comparisons": [
+                            {
+                                "seed": "13",
+                                "parent_run_id": "dist_a",
+                                "parent_eval_id": "dist_eval_a",
+                                "child_run_id": "rew_a",
+                                "child_eval_id": "rew_eval_a",
+                                "related_report_ids": ["phase19_seed13_report"],
+                                "verdict": "tradeoff",
+                                "deltas": {
+                                    "id_macro_f1_delta": -0.010,
+                                    "ood_macro_f1_delta": 0.000,
+                                    "robustness_gap_delta": -0.011,
+                                    "worst_group_f1_delta": 0.060,
+                                    "ece_delta": 0.006,
+                                    "brier_score_delta": 0.007,
+                                },
+                            }
+                        ],
                         "stability_assessment": {
                             "label": "mixed",
                             "verdict_counts": {"win": 2, "tradeoff": 1, "failure": 0},
-                            "mean_deltas": {"robustness_gap_delta": -0.011},
-                            "std_deltas": {"robustness_gap_delta": 0.002},
+                            "mean_deltas": {
+                                "id_macro_f1_delta": -0.010,
+                                "robustness_gap_delta": -0.011,
+                                "worst_group_f1_delta": 0.060,
+                            },
+                            "std_deltas": {
+                                "id_macro_f1_delta": 0.002,
+                                "robustness_gap_delta": 0.002,
+                                "worst_group_f1_delta": 0.008,
+                            },
+                        },
+                    },
+                    {
+                        "view_id": "group_dro",
+                        "mitigation_method": "group_dro",
+                        "default_visible": False,
+                        "is_official": False,
+                        "aggregate_report_id": "phase23_scout_report",
+                        "aggregate_report_scope": "phase23_group_dro_scout_seed_13",
+                        "comparison_summary": {
+                            "seeded_interpretation": "failure",
+                            "verdict_counts": {"win": 0, "tradeoff": 0, "failure": 1},
+                        },
+                        "per_seed_comparisons": [
+                            {
+                                "seed": "13",
+                                "parent_run_id": "dist_a",
+                                "parent_eval_id": "dist_eval_a",
+                                "child_run_id": "gdro_a",
+                                "child_eval_id": "group_dro_eval_a",
+                                "related_report_ids": ["phase23_scout_report"],
+                                "verdict": "failure",
+                                "deltas": {
+                                    "id_macro_f1_delta": -0.020,
+                                    "ood_macro_f1_delta": -0.037,
+                                    "robustness_gap_delta": 0.017,
+                                    "worst_group_f1_delta": -0.215,
+                                    "ece_delta": 0.033,
+                                    "brier_score_delta": 0.010,
+                                },
+                            }
+                        ],
+                        "stability_assessment": {
+                            "label": "failure",
+                            "verdict_counts": {"win": 0, "tradeoff": 0, "failure": 1},
+                            "mean_deltas": {
+                                "id_macro_f1_delta": -0.020,
+                                "robustness_gap_delta": 0.017,
+                                "worst_group_f1_delta": -0.215,
+                            },
+                            "std_deltas": {
+                                "id_macro_f1_delta": 0.0,
+                                "robustness_gap_delta": 0.0,
+                                "worst_group_f1_delta": 0.0,
+                            },
                         },
                     },
                 ],
@@ -339,7 +703,22 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                             ),
                             "v1_1_findings_status": "stable",
                         },
-                        "reference_reports": {},
+                        "reference_reports": {
+                            "temperature_scaling_seeded": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase18_temperature_scaling_seeded/"
+                                    "phase18_report/report.md"
+                                ),
+                            },
+                            "reweighting_seeded": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase19_reweighting_seeded/"
+                                    "phase19_report/report.md"
+                                ),
+                            },
+                        },
                     }
                 ],
             },

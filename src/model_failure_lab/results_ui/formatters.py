@@ -100,6 +100,32 @@ def build_action(
     }
 
 
+def build_bundle_action(
+    entity: dict[str, Any],
+    *,
+    label: str,
+) -> dict[str, str] | None:
+    """Build one action that opens an entity bundle directory."""
+    metadata_path = entity.get("metadata_path")
+    if not isinstance(metadata_path, str):
+        return None
+    return build_action(label=label, path=str(Path(metadata_path).parent))
+
+
+def build_artifact_ref_action(
+    entity: dict[str, Any],
+    *,
+    label: str,
+    ref_key: str,
+    source: str = "artifact_refs",
+) -> dict[str, str] | None:
+    """Build one action from an entity artifact or payload ref key."""
+    refs = entity.get(source, {})
+    if not isinstance(refs, dict):
+        return None
+    return build_action(label=label, path=extract_ref_path(refs.get(ref_key)))
+
+
 def build_metadata_actions(entity: dict[str, Any]) -> list[dict[str, str]]:
     """Build the standard raw-artifact actions for one entity."""
     actions: list[dict[str, str]] = []
@@ -114,8 +140,7 @@ def build_metadata_actions(entity: dict[str, Any]) -> list[dict[str, str]]:
         elif entity_type == "report":
             bundle_label = "Open Report Bundle"
 
-        bundle_path = str(Path(metadata_path).parent)
-        bundle_action = build_action(label=bundle_label, path=bundle_path)
+        bundle_action = build_bundle_action(entity, label=bundle_label)
         metadata_action = build_action(label="View Metadata", path=metadata_path)
         if bundle_action is not None:
             actions.append(bundle_action)
