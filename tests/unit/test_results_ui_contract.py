@@ -9,6 +9,7 @@ from model_failure_lab.results_ui import (
     build_overview_snapshot,
     get_default_visible_entities,
     get_mitigation_comparison_views,
+    get_primary_research_closeout,
     get_primary_stability_package,
     get_seeded_cohorts,
     load_results_ui_index,
@@ -63,20 +64,25 @@ def test_results_ui_selectors_keep_cohort_and_mitigation_order(results_ui_manife
     assert all("group_dro" not in view["mitigation_method"] for view in mitigation_views)
 
 
-def test_overview_snapshot_surfaces_phase20_story(results_ui_manifest: Path):
+def test_overview_snapshot_surfaces_phase27_closeout_story(results_ui_manifest: Path):
     payload = load_results_ui_index(results_ui_manifest)
 
     snapshot = build_overview_snapshot(payload)
     stability = get_primary_stability_package(payload)
+    closeout = get_primary_research_closeout(payload)
 
     assert snapshot["mitigation_labels"]["temperature_scaling"] == "stable"
     assert snapshot["mitigation_labels"]["reweighting"] == "mixed"
-    assert snapshot["dataset_expansion_recommendation"] == "defer"
+    assert snapshot["final_robustness_verdict"] == "still_mixed"
+    assert snapshot["dataset_expansion_recommendation"] == "defer_now_reopen_under_conditions"
     assert stability["milestone_assessment"]["v1_1_findings_status"] == "stable"
+    assert closeout is not None
+    assert closeout["summary_actions"]
     assert (
         snapshot["headline_actions"]["temperature_scaling"][0]["label"]
         == "View supporting report"
     )
-    assert snapshot["headline_actions"]["findings_doc"][0]["path"] == "docs/v1_3_findings.md"
+    assert snapshot["headline_actions"]["findings_doc"][0]["path"] == "docs/v1_4_closeout.md"
+    assert snapshot["headline_actions"]["research_closeout"][0]["label"] == "View final gate JSON"
     assert stability["summary_actions"][0]["label"] == "View supporting report"
     assert stability["reference_actions"]

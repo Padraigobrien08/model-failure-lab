@@ -8,7 +8,9 @@ from model_failure_lab.utils.paths import (
     artifact_root,
     build_baseline_run_dir,
     build_evaluation_run_dir,
+    build_final_gate_path,
     build_mitigation_run_dir,
+    build_robustness_promotion_audit_path,
     build_report_run_dir,
 )
 
@@ -589,6 +591,40 @@ def _build_minimal_artifact_world() -> None:
         },
         experiment_type="robustness_report",
     )
+    promotion_audit_path = build_robustness_promotion_audit_path(
+        "phase25_group_balanced_sampling"
+    )
+    promotion_audit_path.write_text("# promotion audit\n", encoding="utf-8")
+    _write_json(
+        build_final_gate_path(create=True),
+        {
+            "gate_id": "phase27_gate",
+            "final_robustness_verdict": "still_mixed",
+            "dataset_expansion_decision": "defer_now_reopen_under_conditions",
+            "recommendation_reason": "Hold expansion until robustness stops being mixed.",
+            "reopen_conditions": [
+                "Robustness lane achieves stable improvement instead of remaining mixed.",
+                "At least one mitigation shows consistent gains across seeds.",
+                "Robustness versus calibration tradeoffs are materially reduced or better understood.",
+            ],
+            "supporting_report_scopes": [
+                "phase20_stability",
+                "phase26_robustness_final",
+            ],
+            "supporting_artifact_refs": {
+                "final_gate_json": "artifacts/reports/closeout/phase27_gate/final_gate.json",
+                "promotion_audit_markdown": _workspace_path(promotion_audit_path),
+            },
+            "promotion_audit": {
+                "candidate_method": "group_balanced_sampling",
+                "decision": "do_not_promote",
+            },
+            "findings_doc_path": "docs/v1_4_closeout.md",
+            "ui_entrypoint_path": "scripts/run_results_ui.py",
+            "is_official": True,
+            "default_visible": True,
+        },
+    )
 
 
 def test_build_artifact_index_emits_official_inventory_and_first_class_views(temp_artifact_root):
@@ -651,3 +687,10 @@ def test_build_artifact_index_emits_official_inventory_and_first_class_views(tem
     assert stability_package["reference_reports"]["reweighting_seeded"]["path"].startswith(
         "artifacts/"
     )
+    research_closeout = payload["views"]["research_closeout"][0]
+    assert research_closeout["final_robustness_verdict"] == "still_mixed"
+    assert (
+        research_closeout["dataset_expansion_decision"]
+        == "defer_now_reopen_under_conditions"
+    )
+    assert research_closeout["supporting_report_ids"] == ["phase20_report", "phase26_report"]

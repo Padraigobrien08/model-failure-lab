@@ -103,7 +103,8 @@ def test_results_ui_app_shell_defaults_to_overview(results_ui_manifest: Path):
     assert "Model Failure Lab" in title_calls
     assert any("temperature scaling" in text.lower() for text in markdown_calls)
     assert any("dataset expansion" in text.lower() for text in markdown_calls)
-    assert any(label == "Read v1.3 findings" for label, _ in link_buttons)
+    assert any(label == "Read v1.4 closeout" for label, _ in link_buttons)
+    assert any(label == "View final gate JSON" for label, _ in link_buttons)
     assert any(label == "View supporting report" for label, _ in link_buttons)
 
 

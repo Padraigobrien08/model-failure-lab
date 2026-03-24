@@ -69,6 +69,10 @@ def _iter_report_metadata_paths() -> list[Path]:
     return _iter_metadata_paths(["reports/*/*/*/metadata.json"])
 
 
+def _iter_final_gate_paths() -> list[Path]:
+    return _iter_metadata_paths(["reports/closeout/*/final_gate.json"])
+
+
 def _extract_seed(metadata: dict[str, Any]) -> str | None:
     for tag_source in (
         metadata.get("tags", []),
@@ -603,6 +607,58 @@ def _build_stability_package_views(reports: list[dict[str, Any]]) -> list[dict[s
     return views
 
 
+def _build_research_closeout_views(reports: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    report_ids_by_scope = {
+        str(report.get("report_scope")): str(report.get("report_id"))
+        for report in reports
+        if report.get("is_official") and report.get("report_scope")
+    }
+    views: list[dict[str, Any]] = []
+    for final_gate_path in _iter_final_gate_paths():
+        payload = _read_json(final_gate_path)
+        supporting_scopes = [
+            str(scope)
+            for scope in payload.get("supporting_report_scopes", [])
+            if str(scope).strip()
+        ]
+        supporting_report_ids = [
+            report_ids_by_scope[scope]
+            for scope in supporting_scopes
+            if scope in report_ids_by_scope
+        ]
+        artifact_refs_payload = dict(payload.get("supporting_artifact_refs", {}))
+        artifact_refs_payload.setdefault(
+            "final_gate_json",
+            _canonical_artifact_relative(final_gate_path),
+        )
+        views.append(
+            {
+                "view_id": str(payload.get("gate_id") or final_gate_path.parent.name),
+                "final_robustness_verdict": payload.get("final_robustness_verdict"),
+                "dataset_expansion_decision": payload.get("dataset_expansion_decision"),
+                "recommendation_reason": payload.get("recommendation_reason"),
+                "reopen_conditions": list(payload.get("reopen_conditions", [])),
+                "summary_bullets": list(payload.get("summary_bullets", [])),
+                "next_step": payload.get("next_step"),
+                "supporting_report_scopes": supporting_scopes,
+                "supporting_report_ids": supporting_report_ids,
+                "artifact_refs": _normalize_artifact_refs(
+                    artifact_refs_payload,
+                    metadata_path=final_gate_path,
+                ),
+                "promotion_audit": dict(payload.get("promotion_audit", {})),
+                "official_methods": list(payload.get("official_methods", [])),
+                "exploratory_methods": list(payload.get("exploratory_methods", [])),
+                "findings_doc_path": payload.get("findings_doc_path"),
+                "ui_entrypoint_path": payload.get("ui_entrypoint_path"),
+                "metadata_path": _canonical_artifact_relative(final_gate_path),
+                "is_official": bool(payload.get("is_official", False)),
+                "default_visible": bool(payload.get("default_visible", False)),
+            }
+        )
+    return views
+
+
 def build_artifact_index_payload() -> dict[str, Any]:
     """Build the full artifact-index payload from saved artifacts."""
     run_entities = []
@@ -658,6 +714,7 @@ def build_artifact_index_payload() -> dict[str, Any]:
                 report_entities,
             ),
             "stability_packages": _build_stability_package_views(report_entities),
+            "research_closeout": _build_research_closeout_views(report_entities),
         },
     }
 

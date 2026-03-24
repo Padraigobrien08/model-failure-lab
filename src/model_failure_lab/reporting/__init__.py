@@ -11,6 +11,12 @@ from .bundle import (
     write_stability_report_bundle,
 )
 from .calibration import build_calibration_curve_figure, build_calibration_table
+from .closeout import (
+    DEFAULT_REOPEN_CONDITIONS,
+    build_final_gate_payload,
+    load_saved_json,
+    write_final_gate,
+)
 from .discovery import (
     PerturbationReportCandidate,
     ReportCandidate,
@@ -76,6 +82,7 @@ from .tables import build_comparison_table, build_subgroup_table
 __all__ = [
     "PRIMARY_METRIC",
     "PRIMARY_METRIC_LABEL",
+    "DEFAULT_REOPEN_CONDITIONS",
     "PerturbationReportCandidate",
     "ReportCandidate",
     "build_clean_vs_perturbed_figure",
@@ -100,6 +107,7 @@ __all__ = [
     "build_mitigation_stability_table",
     "build_mitigation_comparison_table",
     "build_exploratory_mitigation_summary",
+    "build_final_gate_payload",
     "build_final_robustness_summary",
     "build_official_mitigation_summary",
     "build_promotion_audit",
@@ -121,6 +129,7 @@ __all__ = [
     "load_perturbation_candidates",
     "load_perturbation_report_inputs",
     "load_report_inputs",
+    "load_saved_json",
     "load_saved_report_metadata",
     "load_saved_report_payload",
     "pair_mitigation_candidates_with_parents",
@@ -133,6 +142,7 @@ __all__ = [
     "select_report_candidates",
     "validate_perturbation_report_candidates",
     "validate_report_candidates",
+    "write_final_gate",
     "BASELINE_STABILITY_COLUMNS",
     "MITIGATION_STABILITY_COLUMNS",
 ]

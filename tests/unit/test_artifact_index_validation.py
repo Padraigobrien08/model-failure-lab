@@ -129,6 +129,26 @@ def _base_payload() -> dict[str, object]:
                         }
                     },
                 },
+                {
+                    "report_id": "phase26_report",
+                    "source_eval_ids": ["parent_eval", "child_eval"],
+                    "is_official": True,
+                    "default_visible": True,
+                    "report_scope": "phase26_robustness_final",
+                    "metadata_path": (
+                        "artifacts/reports/comparisons/phase26_robustness_final/"
+                        "phase26_report/metadata.json"
+                    ),
+                    "artifact_refs": {
+                        "report_data_json": {
+                            "path": (
+                                "artifacts/reports/comparisons/phase26_robustness_final/"
+                                "phase26_report/report_data.json"
+                            ),
+                            "exists": True,
+                        }
+                    },
+                },
             ],
         },
         "views": {
@@ -167,6 +187,23 @@ def _base_payload() -> dict[str, object]:
                             "exists": True,
                         }
                     },
+                }
+            ],
+            "research_closeout": [
+                {
+                    "view_id": "phase27_gate",
+                    "final_robustness_verdict": "still_mixed",
+                    "dataset_expansion_decision": "defer_now_reopen_under_conditions",
+                    "supporting_report_ids": ["phase20_report", "phase26_report"],
+                    "artifact_refs": {
+                        "final_gate_json": {
+                            "path": "artifacts/reports/closeout/phase27_gate/final_gate.json",
+                            "exists": True,
+                        }
+                    },
+                    "metadata_path": "artifacts/reports/closeout/phase27_gate/final_gate.json",
+                    "is_official": True,
+                    "default_visible": True,
                 }
             ],
         },

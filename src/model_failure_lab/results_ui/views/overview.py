@@ -27,14 +27,15 @@ def render_overview_view(
     seeded_cohorts = snapshot["seeded_cohorts"]
 
     st.title("Model Failure Lab")
-    st.caption("Artifact-driven benchmark story over the official seeded evidence package.")
+    st.caption("Artifact-driven benchmark story over the final official evidence package.")
     st.markdown(
-        "The current milestone confirms that the original shift findings remain "
+        "The final closeout confirms that the original shift findings remain "
         "stable under seeds, that **temperature scaling** is the clean calibration "
-        "lane, and that **reweighting** remains promising but mixed. Dataset "
-        "expansion stays deferred until the robustness lane is clearer."
+        "lane, and that **reweighting** remains the best current robustness lane "
+        "without resolving robustness cleanly enough for dataset expansion."
     )
     render_actions(st, snapshot.get("headline_actions", {}).get("findings_doc", []))
+    render_actions(st, snapshot.get("headline_actions", {}).get("research_closeout", []))
 
     badge_columns = st.columns(3)
     render_badge(
@@ -64,6 +65,21 @@ def render_overview_view(
         badge_columns[2],
         snapshot.get("headline_actions", {}).get("dataset_expansion", []),
     )
+
+    if snapshot.get("final_robustness_verdict"):
+        st.subheader("Final Closeout")
+        st.markdown(
+            f"**Final robustness verdict:** "
+            f"{format_label(snapshot.get('final_robustness_verdict'))}"
+        )
+        st.markdown(
+            f"**Expansion gate:** "
+            f"{format_label(snapshot.get('dataset_expansion_recommendation'))}"
+        )
+        reopen_conditions = snapshot.get("reopen_conditions", [])
+        if reopen_conditions:
+            st.markdown("**Reopen conditions**")
+            st.markdown("\n".join(f"- {condition}" for condition in reopen_conditions))
 
     st.subheader("Inventory")
     inventory_columns = st.columns(3)

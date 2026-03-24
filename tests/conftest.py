@@ -337,6 +337,13 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                                     "phase26_report/tables/worst_group_summary.csv"
                                 ),
                             },
+                            "report_data_json": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/comparisons/phase26_robustness_final/"
+                                    "phase26_report/report_data.json"
+                                ),
+                            },
                         },
                         "payload_refs": {
                             "report_summary_json": {
@@ -758,6 +765,57 @@ def results_ui_manifest(tmp_path: Path) -> Path:
                                 ),
                             },
                         },
+                    }
+                ],
+                "research_closeout": [
+                    {
+                        "view_id": "phase27_gate",
+                        "final_robustness_verdict": "still_mixed",
+                        "dataset_expansion_decision": "defer_now_reopen_under_conditions",
+                        "recommendation_reason": (
+                            "Calibration is solved more cleanly than robustness: "
+                            "temperature scaling remains stable, reweighting remains mixed, "
+                            "and the exploratory challengers did not produce a clearer "
+                            "robustness win."
+                        ),
+                        "reopen_conditions": [
+                            "Robustness lane achieves stable improvement instead of remaining mixed.",
+                            "At least one mitigation shows consistent gains across seeds.",
+                            "Robustness versus calibration tradeoffs are materially reduced or better understood.",
+                        ],
+                        "summary_bullets": [
+                            "The baseline robustness gap remains real and stable.",
+                            "Temperature scaling remains the stable calibration lane.",
+                        ],
+                        "supporting_report_scopes": [
+                            "phase20_stability",
+                            "phase26_robustness_final",
+                        ],
+                        "supporting_report_ids": ["phase20_report", "phase26_report"],
+                        "artifact_refs": {
+                            "final_gate_json": {
+                                "exists": True,
+                                "path": "artifacts/reports/closeout/phase27_gate/final_gate.json",
+                            },
+                            "promotion_audit_markdown": {
+                                "exists": True,
+                                "path": (
+                                    "artifacts/reports/robustness_promotion_audit/"
+                                    "phase25_group_balanced_sampling.md"
+                                ),
+                            },
+                        },
+                        "promotion_audit": {
+                            "candidate_method": "group_balanced_sampling",
+                            "decision": "do_not_promote",
+                        },
+                        "official_methods": ["temperature_scaling", "reweighting"],
+                        "exploratory_methods": ["group_dro", "group_balanced_sampling"],
+                        "findings_doc_path": "docs/v1_4_closeout.md",
+                        "ui_entrypoint_path": "scripts/run_results_ui.py",
+                        "metadata_path": "artifacts/reports/closeout/phase27_gate/final_gate.json",
+                        "default_visible": True,
+                        "is_official": True,
                     }
                 ],
             },

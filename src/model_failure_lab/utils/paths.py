@@ -195,6 +195,22 @@ def build_robustness_promotion_audit_path(audit_name: str) -> Path:
     )
 
 
+def build_final_gate_path(
+    gate_name: str = "phase27_gate",
+    *,
+    create: bool = False,
+) -> Path:
+    """Return the canonical JSON path for the final expansion-gate artifact."""
+    gate_dir = build_report_dir(
+        experiment_group=gate_name,
+        category="closeout",
+        create=create,
+    )
+    if create:
+        gate_dir.mkdir(parents=True, exist_ok=True)
+    return gate_dir / "final_gate.json"
+
+
 def build_robustness_report_artifact_paths(
     report_dir: Path,
     *,

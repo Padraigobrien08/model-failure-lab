@@ -9,6 +9,7 @@ from model_failure_lab.results_ui.formatters import (
     build_action,
     build_artifact_ref_action,
     build_bundle_action,
+    extract_ref_path,
 )
 
 _MITIGATION_ORDER = {
@@ -54,6 +55,20 @@ def _get_primary_stability_package_data(
     )
     if not packages:
         raise ValueError("No stability package is available in the artifact index.")
+    return packages[0]
+
+
+def _get_primary_research_closeout_data(
+    index: dict[str, Any],
+    *,
+    include_exploratory: bool,
+) -> dict[str, Any] | None:
+    packages = _filter_default_visible(
+        index.get("views", {}).get("research_closeout", []),
+        include_exploratory=include_exploratory,
+    )
+    if not packages:
+        return None
     return packages[0]
 
 
@@ -145,6 +160,24 @@ def get_primary_stability_package(
     }
 
 
+def get_primary_research_closeout(
+    index: dict[str, Any],
+    *,
+    include_exploratory: bool = False,
+) -> dict[str, Any] | None:
+    """Return the default-visible final closeout package when available."""
+    package = _get_primary_research_closeout_data(
+        index,
+        include_exploratory=include_exploratory,
+    )
+    if package is None:
+        return None
+    return {
+        **package,
+        "summary_actions": _build_research_closeout_actions(index, package),
+    }
+
+
 def build_overview_snapshot(
     index: dict[str, Any],
     *,
@@ -157,6 +190,10 @@ def build_overview_snapshot(
         include_exploratory=include_exploratory,
     )
     stability_package = get_primary_stability_package(
+        index,
+        include_exploratory=include_exploratory,
+    )
+    research_closeout = get_primary_research_closeout(
         index,
         include_exploratory=include_exploratory,
     )
@@ -188,7 +225,14 @@ def build_overview_snapshot(
             )
         ),
     }
-    findings_doc_action = build_action(label="Read v1.3 findings", path="docs/v1_3_findings.md")
+    findings_doc_action = build_action(
+        label="Read v1.4 closeout",
+        path=(
+            str(research_closeout.get("findings_doc_path"))
+            if research_closeout is not None and research_closeout.get("findings_doc_path")
+            else "docs/v1_4_closeout.md"
+        ),
+    )
     mitigation_actions = {
         view["mitigation_method"]: view.get("summary_actions", [])
         for view in mitigation_views
@@ -201,25 +245,48 @@ def build_overview_snapshot(
         ),
         [],
     )
+    dataset_expansion_recommendation = stability_package.get(
+        "milestone_assessment",
+        {},
+    ).get("dataset_expansion_recommendation")
+    recommendation_reason = stability_package.get("milestone_assessment", {}).get(
+        "recommendation_reason"
+    )
+    next_step = stability_package.get("milestone_assessment", {}).get("next_step")
+    final_robustness_verdict = None
+    reopen_conditions: list[str] = []
+    research_closeout_actions: list[dict[str, str]] = []
+    if research_closeout is not None:
+        dataset_expansion_recommendation = research_closeout.get(
+            "dataset_expansion_decision"
+        ) or dataset_expansion_recommendation
+        recommendation_reason = research_closeout.get("recommendation_reason") or (
+            recommendation_reason
+        )
+        next_step = research_closeout.get("next_step") or next_step
+        final_robustness_verdict = research_closeout.get("final_robustness_verdict")
+        reopen_conditions = list(research_closeout.get("reopen_conditions", []))
+        research_closeout_actions = list(research_closeout.get("summary_actions", []))
     return {
         "seeded_cohorts": seeded_cohorts,
         "mitigation_views": mitigation_views,
         "stability_package": stability_package,
+        "research_closeout": research_closeout,
         "mitigation_labels": mitigation_labels,
-        "dataset_expansion_recommendation": stability_package.get(
-            "milestone_assessment",
-            {},
-        ).get("dataset_expansion_recommendation"),
-        "recommendation_reason": stability_package.get("milestone_assessment", {}).get(
-            "recommendation_reason"
-        ),
-        "next_step": stability_package.get("milestone_assessment", {}).get("next_step"),
+        "final_robustness_verdict": final_robustness_verdict,
+        "dataset_expansion_recommendation": dataset_expansion_recommendation,
+        "recommendation_reason": recommendation_reason,
+        "reopen_conditions": reopen_conditions,
+        "next_step": next_step,
         "cohort_labels": cohort_summaries,
         "inventory_counts": inventory_counts,
         "headline_actions": {
             "temperature_scaling": mitigation_actions.get("temperature_scaling", []),
             "reweighting": mitigation_actions.get("reweighting", []),
-            "dataset_expansion": stability_package.get("summary_actions", []),
+            "dataset_expansion": (
+                research_closeout_actions or stability_package.get("summary_actions", [])
+            ),
+            "research_closeout": research_closeout_actions,
             "distilbert_baseline": distilbert_baseline_actions,
             "findings_doc": [findings_doc_action] if findings_doc_action is not None else [],
         },
@@ -426,4 +493,25 @@ def _build_stability_reference_actions(
                 ref_key="report_markdown",
             )
         )
+    return _dedupe_actions(actions)
+
+
+def _build_research_closeout_actions(
+    index: dict[str, Any],
+    package: dict[str, Any],
+) -> list[dict[str, str]]:
+    artifact_refs = package.get("artifact_refs", {})
+    actions: list[dict[str, str] | None] = [
+        build_action(
+            label="View final gate JSON",
+            path=extract_ref_path(artifact_refs.get("final_gate_json")),
+        ),
+        build_action(
+            label="View promotion audit",
+            path=extract_ref_path(artifact_refs.get("promotion_audit_markdown")),
+        ),
+    ]
+    for report_id in package.get("supporting_report_ids", []):
+        report_entity = get_report_by_id(index, str(report_id))
+        actions.extend(_build_report_support_actions(report_entity))
     return _dedupe_actions(actions)

@@ -11,6 +11,7 @@ from model_failure_lab.results_ui.selectors import (
     build_overview_snapshot,
     get_default_visible_entities,
     get_mitigation_comparison_views,
+    get_primary_research_closeout,
     get_primary_stability_package,
     get_seeded_cohorts,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "default_results_ui_index_path",
     "get_default_visible_entities",
     "get_mitigation_comparison_views",
+    "get_primary_research_closeout",
     "get_primary_stability_package",
     "get_seeded_cohorts",
     "load_results_ui_index",

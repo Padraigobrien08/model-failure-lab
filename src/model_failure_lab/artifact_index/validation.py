@@ -41,7 +41,12 @@ def validate_artifact_index_payload(payload: dict[str, Any]) -> list[str]:
     for key in ("runs", "evaluations", "reports"):
         if not isinstance(entities.get(key), list):
             errors.append(f"entities.{key} must be a list")
-    for key in ("seeded_cohorts", "mitigation_comparisons", "stability_packages"):
+    for key in (
+        "seeded_cohorts",
+        "mitigation_comparisons",
+        "stability_packages",
+        "research_closeout",
+    ):
         if not isinstance(views.get(key), list):
             errors.append(f"views.{key} must be a list")
 
@@ -190,6 +195,38 @@ def validate_artifact_index_payload(payload: dict[str, Any]) -> list[str]:
             if not exists:
                 errors.append(
                     f"stability package {package_id} references missing report path: {path}"
+                )
+
+    for view in views.get("research_closeout", []):
+        view_id = str(view.get("view_id"))
+        if view.get("default_visible") and not view.get("is_official"):
+            errors.append(f"research closeout {view_id} is default_visible without is_official")
+        if view.get("final_robustness_verdict") is None:
+            errors.append(f"research closeout {view_id} missing final_robustness_verdict")
+        if view.get("dataset_expansion_decision") is None:
+            errors.append(f"research closeout {view_id} missing dataset_expansion_decision")
+        for report_id in view.get("supporting_report_ids", []):
+            report_id_text = str(report_id)
+            if report_id_text not in report_ids:
+                errors.append(
+                    f"research closeout {view_id} references unknown supporting_report_id: "
+                    f"{report_id_text}"
+                )
+        metadata_path = view.get("metadata_path")
+        if isinstance(metadata_path, str) and (
+            metadata_path.startswith("/Users/") or metadata_path.startswith("/workspace/")
+        ):
+            errors.append(
+                f"research closeout {view_id} has absolute metadata_path: {metadata_path}"
+            )
+        for path, exists in _iter_ref_paths(view.get("artifact_refs", {})):
+            if path.startswith("/Users/") or path.startswith("/workspace/"):
+                errors.append(
+                    f"research closeout {view_id} contains absolute artifact path: {path}"
+                )
+            if view.get("is_official") and not exists:
+                errors.append(
+                    f"research closeout {view_id} references missing artifact path: {path}"
                 )
 
     return errors

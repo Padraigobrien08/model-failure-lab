@@ -24,11 +24,13 @@ from model_failure_lab.tracking import build_run_metadata, write_metadata
 from model_failure_lab.utils.paths import (
     build_artifact_index_path,
     build_baseline_run_dir,
+    build_final_gate_path,
     build_prediction_artifact_path,
     build_report_run_dir,
     config_root,
 )
 from scripts.build_artifact_index import run_command as run_build_artifact_index_command
+from scripts.build_final_gate import run_command as run_build_final_gate_command
 from scripts.build_perturbation_report import run_command as run_build_perturbation_report_command
 from scripts.build_report import run_command as run_build_report_command
 from scripts.build_robustness_report import run_command as run_build_robustness_report_command
@@ -2376,6 +2378,80 @@ def test_validate_artifact_index_reports_success(temp_artifact_root):
     assert result.extras["errors"] == []
 
 
+def test_build_final_gate_writes_completed_closeout_payload(temp_artifact_root):
+    stability_dir = build_report_run_dir("phase20_stability", "phase20_report", create=True)
+    robustness_dir = build_report_run_dir(
+        "phase26_robustness_final",
+        "phase26_report",
+        create=True,
+    )
+    promotion_audit_path = (
+        temp_artifact_root
+        / "reports"
+        / "robustness_promotion_audit"
+        / "phase25_group_balanced_sampling.md"
+    )
+    promotion_audit_path.parent.mkdir(parents=True, exist_ok=True)
+    promotion_audit_path.write_text("# audit\n", encoding="utf-8")
+
+    stability_summary_path = stability_dir / "stability_summary.json"
+    robustness_summary_path = robustness_dir / "report_summary.json"
+    robustness_report_path = robustness_dir / "report_data.json"
+    _write_index_json(
+        stability_summary_path,
+        {
+            "milestone_assessment": {
+                "dataset_expansion_recommendation": "defer",
+            }
+        },
+    )
+    _write_index_json(
+        robustness_summary_path,
+        {
+            "final_robustness_verdict": "still_mixed",
+        },
+    )
+    _write_index_json(
+        robustness_report_path,
+        {
+            "promotion_audit": {
+                "candidate_method": "group_balanced_sampling",
+                "decision": "do_not_promote",
+                "decision_reason": "Scout regressed ID and calibration reliability.",
+            },
+            "official_method_summaries": [
+                {"method_name": "temperature_scaling"},
+                {"method_name": "reweighting"},
+            ],
+            "exploratory_method_summaries": [
+                {"method_name": "group_dro"},
+                {"method_name": "group_balanced_sampling"},
+            ],
+        },
+    )
+
+    result = run_build_final_gate_command(
+        [
+            "--stability-summary",
+            str(stability_summary_path),
+            "--robustness-summary",
+            str(robustness_summary_path),
+            "--robustness-report",
+            str(robustness_report_path),
+            "--promotion-audit",
+            str(promotion_audit_path),
+        ]
+    )
+    payload = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert result.status == "completed"
+    assert result.metadata_path == build_final_gate_path()
+    assert payload["final_robustness_verdict"] == "still_mixed"
+    assert payload["dataset_expansion_decision"] == "defer_now_reopen_under_conditions"
+    assert payload["promotion_audit"]["decision"] == "do_not_promote"
+    assert payload["findings_doc_path"] == "docs/v1_4_closeout.md"
+
+
 def test_run_results_ui_command_builds_streamlit_invocation(results_ui_manifest: Path):
     captured: dict[str, object] = {}
 
@@ -2421,6 +2497,7 @@ def test_direct_script_help_runs_without_manual_pythonpath():
         [sys.executable, "scripts/run_baseline.py", "--help"],
         [sys.executable, "scripts/build_report.py", "--help"],
         [sys.executable, "scripts/build_robustness_report.py", "--help"],
+        [sys.executable, "scripts/build_final_gate.py", "--help"],
         [sys.executable, "scripts/build_artifact_index.py", "--help"],
         [sys.executable, "scripts/validate_artifact_index.py", "--help"],
         [sys.executable, "scripts/build_stability_report.py", "--help"],
