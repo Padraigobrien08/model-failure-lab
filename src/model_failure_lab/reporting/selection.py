@@ -21,10 +21,6 @@ def _task_signature(metadata: dict[str, Any]) -> str:
 
 
 def _schema_version(metadata: dict[str, Any]) -> str:
-    explicit_schema_version = metadata.get("evaluation_schema_version")
-    if explicit_schema_version is not None:
-        return str(explicit_schema_version)
-
     resolved_config = metadata.get("resolved_config", {})
     eval_config = resolved_config.get("eval", {}) if isinstance(resolved_config, dict) else {}
     schema_payload = {
@@ -41,6 +37,10 @@ def _schema_version(metadata: dict[str, Any]) -> str:
     }
     if any(value not in (None, [], {}) for value in schema_payload.values()):
         return json.dumps(schema_payload, sort_keys=True)
+
+    explicit_schema_version = metadata.get("evaluation_schema_version")
+    if explicit_schema_version is not None:
+        return str(explicit_schema_version)
 
     return str(
         metadata.get("evaluator_version")
