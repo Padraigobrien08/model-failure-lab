@@ -587,6 +587,7 @@ def _build_minimal_artifact_world() -> None:
         report_summary={
             "final_robustness_verdict": "still_mixed",
         },
+        experiment_type="robustness_report",
     )
 
 

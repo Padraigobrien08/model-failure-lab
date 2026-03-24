@@ -627,7 +627,11 @@ def build_artifact_index_payload() -> dict[str, Any]:
         metadata = _read_json(metadata_path)
         if not _is_completed(metadata):
             continue
-        if str(metadata.get("experiment_type", "")) not in {"report", "stability_report"}:
+        if str(metadata.get("experiment_type", "")) not in {
+            "report",
+            "stability_report",
+            "robustness_report",
+        }:
             continue
         report_entities.append(
             _build_report_entity(
