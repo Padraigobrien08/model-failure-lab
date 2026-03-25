@@ -1,6 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScopeStateBanner } from "@/components/layout/ScopeStateBanner";
+import { WorkbenchHeader } from "@/components/layout/WorkbenchHeader";
+import { WorkbenchSection } from "@/components/layout/WorkbenchSection";
 import { RunDetailPanel } from "@/components/runs/RunDetailPanel";
 import { RunGroupSection } from "@/components/runs/RunGroupSection";
 import { useAppRouteContext } from "@/app/router";
@@ -55,38 +57,58 @@ export function RunsPage() {
 
   return (
     <section className="space-y-8">
-      <header className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone="accent">Runs</Badge>
-          {activeRunId ? <Badge tone="default">Focused run: {activeRunId}</Badge> : null}
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-[2.75rem] font-semibold tracking-[-0.06em] text-foreground">
-            Grouped runs by method lane, then by seed.
-          </h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-            Start with method families, move into individual saved runs, then read the selected
-            lineage, summary, and artifact stack without losing the official-versus-exploratory
-            boundary.
-          </p>
-        </div>
-      </header>
+      <WorkbenchHeader
+        meta={
+          <>
+            <Badge tone="accent">Runs</Badge>
+            {activeRunId ? <Badge tone="default">Focused run: {activeRunId}</Badge> : null}
+          </>
+        }
+        title="Grouped runs by method lane, then by seed."
+        description="Start with method families, move into individual saved runs, then read the selected lineage, summary, and artifact stack without losing the official-versus-exploratory boundary."
+        aside={
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Active run
+              </p>
+              <p className="mt-1 break-all text-foreground">
+                {activeRunId ?? "No selected run"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Scope
+              </p>
+              <p className="mt-1 text-foreground">
+                {includeExploratory ? "Official + exploratory" : "Official only"}
+              </p>
+            </div>
+          </div>
+        }
+      />
 
       <ScopeStateBanner
         includeExploratory={includeExploratory}
         onChange={setIncludeExploratory}
       />
 
-      <div className="space-y-6">
-        {lanes.map((lane) => (
-          <RunGroupSection
-            key={lane.laneKey}
-            lane={lane}
-            activeRunId={activeRunId}
-            onSelectRun={setSelectedRunId}
-          />
-        ))}
-      </div>
+      <WorkbenchSection
+        eyebrow="Run workspace"
+        title="Lane inventory"
+        description="Scan the saved run families first, then open the balanced lineage → summary → artifacts panel for the currently selected run."
+      >
+        <div className="space-y-6">
+          {lanes.map((lane) => (
+            <RunGroupSection
+              key={lane.laneKey}
+              lane={lane}
+              activeRunId={activeRunId}
+              onSelectRun={setSelectedRunId}
+            />
+          ))}
+        </div>
+      </WorkbenchSection>
 
       {detail ? (
         <RunDetailPanel

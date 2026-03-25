@@ -39,7 +39,7 @@ export function EvidenceDrawer({
         <Badge tone="muted">{model.run.verdict}</Badge>
       </div>
 
-      <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
+      <div className="rounded-[16px] border border-border/80 bg-background/55 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Run
         </p>
@@ -55,7 +55,7 @@ export function EvidenceDrawer({
           {model.detail.lineage.map((item) => (
             <div
               key={`${model.run.runId}-${item.label}`}
-              className="rounded-[20px] border border-border/70 bg-background/55 px-4 py-3"
+              className="rounded-[16px] border border-border/70 bg-background/55 px-4 py-3"
             >
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {item.label}
@@ -74,7 +74,7 @@ export function EvidenceDrawer({
           {model.detail.metrics.map((metric) => (
             <div
               key={`${model.run.runId}-${metric.label}`}
-              className="rounded-[20px] border border-border/70 bg-background/55 px-4 py-3"
+              className="rounded-[16px] border border-border/70 bg-background/55 px-4 py-3"
             >
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {metric.label}
@@ -96,7 +96,7 @@ export function EvidenceDrawer({
           {model.detail.actionGroups.map((group) => (
             <div
               key={`${model.run.runId}-${group.title}`}
-              className="rounded-[20px] border border-border/70 bg-background/55 p-4"
+              className="rounded-[16px] border border-border/70 bg-background/55 p-4"
             >
               <p className="text-sm font-semibold text-foreground">{group.title}</p>
               <div className="mt-3 flex flex-wrap gap-2">

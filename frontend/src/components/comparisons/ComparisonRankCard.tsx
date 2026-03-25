@@ -46,12 +46,12 @@ export function ComparisonRankCard({
   return (
     <Card
       className={cn(
-        "bg-background/65 transition-shadow",
+        "rounded-[18px] bg-background/55 transition-shadow",
         isSelected ? "border-primary/40 shadow-rail" : "border-border/70",
         item.isExploratory ? "border-dashed" : "",
       )}
     >
-      <CardHeader className="gap-4">
+      <CardHeader className="gap-4 pb-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="muted">#{rank}</Badge>
           <Badge tone={verdictTone}>{item.verdict}</Badge>
@@ -79,7 +79,7 @@ export function ComparisonRankCard({
           {Object.values(item.metrics).map((metric) => (
             <div
               key={metric.label}
-              className="rounded-[22px] border border-border/70 bg-card/75 px-4 py-4"
+              className="rounded-[16px] border border-border/70 bg-card/45 px-4 py-4"
             >
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {metric.label}

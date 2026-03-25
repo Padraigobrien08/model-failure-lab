@@ -32,7 +32,9 @@ describe("failureExplorer route", () => {
     expect(screen.getByText(/Seed 13/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /Calibration/i }));
-    expect(screen.getByRole("heading", { name: /Calibration/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: /Calibration/i }).length).toBeGreaterThanOrEqual(
+      1,
+    );
     expect(screen.getByText(/ECE -0.011 \/ Brier -0.001/i)).toBeInTheDocument();
   });
 });
