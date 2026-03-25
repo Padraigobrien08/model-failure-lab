@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatLabel } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { OverviewSnapshot } from "@/lib/manifest/types";
@@ -39,66 +38,83 @@ export function OverviewCanvas({ snapshot }: OverviewCanvasProps) {
   ];
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
-      <Card className="bg-background/65">
-        <CardHeader className="space-y-4">
-          <Badge tone="accent">Overview Launchpad</Badge>
-          <div className="space-y-4">
-            <CardTitle className="max-w-3xl text-[2.25rem] leading-[1.05] tracking-[-0.05em]">
-              Trace the failure story from final verdicts down into the evidence routes without
-              leaving the manifest-backed contract.
-            </CardTitle>
-            <CardDescription className="max-w-2xl text-base leading-7">
-              This React shell turns the final benchmark closeout into a debugging workbench. The
-              official story remains stable calibration, still-mixed robustness, and deferred
-              expansion under explicit reopen conditions.
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {snapshot.summaryBullets.map((bullet) => (
-              <div
-                key={bullet}
-                className="rounded-[22px] border border-border/80 bg-card/70 p-4 text-sm leading-6 text-foreground"
-              >
-                {bullet}
+    <div className="grid gap-4 xl:grid-cols-[1.2fr_0.92fr]">
+      <section className="rounded-[20px] border border-border/70 bg-background/55 p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="accent">Verdict Trace</Badge>
+          <Badge tone="muted">Manifest-backed</Badge>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          {snapshot.summaryBullets.map((bullet, index) => (
+            <div
+              key={bullet}
+              className="grid gap-3 rounded-[16px] border border-border/70 bg-card/45 px-4 py-4 sm:grid-cols-[40px_minmax(0,1fr)]"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-sm font-semibold text-primary">
+                {index + 1}
               </div>
-            ))}
-          </div>
+              <p className="text-sm leading-6 text-foreground">{bullet}</p>
+            </div>
+          ))}
+        </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link to="/comparisons" className={cn(buttonVariants({ variant: "default" }))}>
-              Inspect Failure Traces
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-            <Link to="/evidence" className={cn(buttonVariants({ variant: "outline" }))}>
-              Review Evidence Paths
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+        <div className="mt-4 rounded-[16px] border border-border/70 bg-card/45 px-4 py-4 text-sm leading-6 text-muted-foreground">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+            Next inspection path
+          </p>
+          <p className="mt-2">
+            Start with the ranking story in Comparisons, then move into Failure Explorer when you
+            need to separate robustness tradeoffs from calibration behavior.
+          </p>
+        </div>
 
-      <div className="grid gap-4">
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link to="/comparisons" className={cn(buttonVariants({ variant: "default" }))}>
+            Inspect Failure Traces
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+          <Link to="/evidence" className={cn(buttonVariants({ variant: "outline" }))}>
+            Review Evidence Paths
+          </Link>
+        </div>
+      </section>
+
+      <div className="grid gap-3">
         {highlightCards.map((card) => {
           const Icon = card.icon;
           return (
-            <Card key={card.title} className="bg-background/55">
-              <CardHeader className="flex flex-row items-start justify-between pb-3">
-                <div className="space-y-2">
-                  <CardDescription>{card.title}</CardDescription>
-                  <CardTitle className="text-2xl">{card.value}</CardTitle>
+            <section
+              key={card.title}
+              className="rounded-[18px] border border-border/70 bg-background/55 px-4 py-4"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {card.title}
+                  </p>
+                  <p className="text-[1.55rem] font-semibold tracking-[-0.04em] text-foreground">
+                    {card.value}
+                  </p>
                 </div>
                 <div className="rounded-full border border-primary/20 bg-primary/10 p-3 text-primary">
                   <Icon className="h-5 w-5" />
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm leading-6 text-muted-foreground">
-                {card.body}
-              </CardContent>
-            </Card>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{card.body}</p>
+            </section>
           );
         })}
+
+        <section className="rounded-[18px] border border-border/70 bg-background/55 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Scope reminder
+          </p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Official evidence stays default. Exploratory methods stay behind an explicit scope
+            change so the final verdict remains readable.
+          </p>
+        </section>
       </div>
     </div>
   );

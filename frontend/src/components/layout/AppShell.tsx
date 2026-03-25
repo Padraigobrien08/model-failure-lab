@@ -3,13 +3,14 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import type { AppRouteContext } from "@/app/router";
 import { EvidenceDrawer } from "@/components/evidence/EvidenceDrawer";
+import { PersistentStateStrip } from "@/components/layout/PersistentStateStrip";
 import { ScopeChip } from "@/components/layout/ScopeChip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NAVIGATION_ITEMS } from "@/app/router";
 import { formatComparisonMode, formatLabel } from "@/lib/formatters";
 import { artifactPathToPublicUrl } from "@/lib/manifest/load";
-import { buildEvidenceDrawerModel } from "@/lib/manifest/selectors";
+import { buildEvidenceDrawerModel, buildOverviewSnapshot } from "@/lib/manifest/selectors";
 import { cn } from "@/lib/utils";
 
 type AppShellProps = {
@@ -44,6 +45,9 @@ export function AppShell({
   const finalReport = routeContext.finalRobustnessBundle?.report;
   const reportMarkdownPath = getDirectRefPath(finalReport?.artifact_refs?.report_markdown);
   const reportPayloadPath = getDirectRefPath(finalReport?.artifact_refs?.report_data_json);
+  const overviewSnapshot = routeContext.index
+    ? buildOverviewSnapshot(routeContext.index, includeExploratory)
+    : null;
   const evidenceDrawerModel =
     routeContext.index && routeContext.finalRobustnessBundle
       ? buildEvidenceDrawerModel(
@@ -60,25 +64,25 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1600px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)_320px]">
-        <aside className="rounded-[32px] border border-border/70 bg-card/85 p-5 shadow-rail backdrop-blur-sm">
+    <div className="min-h-screen px-3 py-3 sm:px-4 lg:px-6">
+      <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1680px] gap-3 lg:grid-cols-[240px_minmax(0,1fr)_308px]">
+        <aside className="rounded-[24px] border border-border/70 bg-card/78 p-4 shadow-rail backdrop-blur-sm">
           <div className="space-y-6">
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary">
                 Model Failure Lab
               </p>
-              <div>
-                <h1 className="text-[2rem] font-semibold tracking-[-0.05em] text-foreground">
+              <div className="space-y-2">
+                <h1 className="text-[1.85rem] font-semibold tracking-[-0.05em] text-foreground">
                   Failure Debugger
                 </h1>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  React workbench over the saved benchmark artifact contract.
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Dense manifest-backed workbench for verdicts, lanes, runs, and evidence.
                 </p>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 rounded-[18px] border border-border/70 bg-background/45 p-3">
               <ScopeChip includeExploratory={includeExploratory} />
               <Button
                 variant={includeExploratory ? "outline" : "default"}
@@ -87,6 +91,10 @@ export function AppShell({
               >
                 {includeExploratory ? "Hide exploratory evidence" : "Show exploratory evidence"}
               </Button>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Default scope stays official. Expand only when you intentionally want the scout
+                lanes in the same workspace.
+              </p>
             </div>
 
             <nav className="space-y-2" aria-label="Primary">
@@ -99,7 +107,7 @@ export function AppShell({
                     to={item.path}
                     className={({ isActive }) =>
                       cn(
-                        "flex items-start gap-3 rounded-[22px] border border-transparent px-4 py-3 transition-colors",
+                        "flex items-start gap-3 rounded-[18px] border border-transparent px-3 py-3 transition-colors",
                         isActive
                           ? "border-primary/20 bg-primary/10 text-foreground"
                           : "text-muted-foreground hover:border-border/80 hover:bg-card hover:text-foreground",
@@ -120,18 +128,56 @@ export function AppShell({
           </div>
         </aside>
 
-        <main className="rounded-[32px] border border-border/70 bg-card/70 px-6 py-6 shadow-panel backdrop-blur-sm lg:px-8">
-          <Outlet context={routeContext} />
+        <main className="overflow-hidden rounded-[24px] border border-border/70 bg-card/72 shadow-panel backdrop-blur-sm">
+          <div className="border-b border-border/70 px-4 py-4 lg:px-6">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary">
+                  Analytical Workbench
+                </p>
+                <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                  Trace the current failure story from official verdicts into comparisons, runs,
+                  and artifact paths without switching truth models.
+                </p>
+              </div>
+              <div className="rounded-[16px] border border-border/70 bg-background/55 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                  Current route
+                </p>
+                <p className="mt-1 font-medium text-foreground">
+                  {NAVIGATION_ITEMS.find((item) => item.path === location.pathname)?.label ??
+                    "Overview"}
+                </p>
+                <p className="mt-1">
+                  {NAVIGATION_ITEMS.find((item) => item.path === location.pathname)?.description ??
+                    "Final verdicts and official evidence launchpad"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <PersistentStateStrip
+            includeExploratory={includeExploratory}
+            finalRobustnessVerdict={overviewSnapshot?.finalRobustnessVerdict}
+            datasetExpansionRecommendation={overviewSnapshot?.datasetExpansionRecommendation}
+            selectedMethod={routeContext.selectedMethod}
+            selectedDomain={routeContext.selectedDomain}
+            selectedRunId={routeContext.selectedRunId}
+          />
+
+          <div className="px-4 py-5 lg:px-6">
+            <Outlet context={routeContext} />
+          </div>
         </main>
 
-        <aside className="hidden rounded-[32px] border border-border/70 bg-card/85 p-5 shadow-rail backdrop-blur-sm lg:block">
+        <aside className="hidden rounded-[24px] border border-border/70 bg-card/78 p-4 shadow-rail backdrop-blur-sm lg:block">
           <Card className="border-none bg-transparent shadow-none">
-            <CardHeader className="px-0 pt-0">
-              <CardDescription>Evidence Dock</CardDescription>
+            <CardHeader className="px-0 pb-4 pt-0">
+              <CardDescription>Inspector Dock</CardDescription>
               <CardTitle>
                 {routeContext.isEvidenceDrawerOpen && evidenceDrawerModel
                   ? "Quick drillthrough"
-                  : "Manifest provenance"}
+                  : "Provenance and route state"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 px-0 pb-0">
@@ -143,7 +189,7 @@ export function AppShell({
                 />
               ) : (
                 <>
-                  <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
+                  <div className="rounded-[18px] border border-border/80 bg-background/55 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       Contract path
                     </p>
@@ -152,18 +198,18 @@ export function AppShell({
                     </p>
                   </div>
 
-                  <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
+                  <div className="rounded-[18px] border border-border/80 bg-background/55 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Route shell status
+                      Workbench posture
                     </p>
                     <p className="mt-2 text-sm leading-6 text-foreground">
-                      Overview, Comparisons, Failure Explorer, Runs, and Evidence are live on the
-                      same manifest-backed shell. Use the drawer for fast inspection and the Runs
-                      route for deeper lineage.
+                      The left rail sets mode, the center pane carries the active analysis, and the
+                      dock stays reserved for provenance and drillthrough. Keep route-local reading
+                      inside that frame.
                     </p>
                   </div>
 
-                  <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
+                  <div className="rounded-[18px] border border-border/80 bg-background/55 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       Active focus
                     </p>
@@ -176,7 +222,7 @@ export function AppShell({
                   </div>
 
                   {finalReport ? (
-                    <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
+                    <div className="rounded-[18px] border border-border/80 bg-background/55 p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         Comparison package
                       </p>
@@ -208,7 +254,7 @@ export function AppShell({
                     </div>
                   ) : null}
 
-                  <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
+                  <div className="rounded-[18px] border border-border/80 bg-background/55 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       Scope rule
                     </p>

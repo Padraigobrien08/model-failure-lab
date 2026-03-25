@@ -20,6 +20,7 @@ describe("App shell", () => {
     const primaryNavigation = screen.getByRole("navigation", { name: /Primary/i });
 
     expect(screen.getByRole("heading", { name: /Failure Debugger/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Workbench state/i)).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
         name: /Overview Final verdicts and official evidence launchpad/i,
@@ -59,7 +60,8 @@ describe("App shell", () => {
 
     await user.click(screen.getByRole("button", { name: /Show exploratory evidence/i }));
 
-    expect(screen.getByText(/Exploratory Evidence On/i)).toBeInTheDocument();
+    expect(screen.getByText(/Scope: Official \+ Exploratory/i)).toBeInTheDocument();
     expect(screen.getByText(/exploratory scope active/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Official \+ Exploratory/i).length).toBeGreaterThanOrEqual(1);
   });
 });
