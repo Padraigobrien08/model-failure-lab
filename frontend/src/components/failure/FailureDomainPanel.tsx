@@ -18,6 +18,7 @@ type FailureDomainPanelProps = {
   item: FailureDomainItemModel;
   isSelected: boolean;
   onSelectMethod: (methodName: string) => void;
+  onInspectMethod: (methodName: string) => void;
   actions: Array<{ label: string; path: string }>;
 };
 
@@ -47,6 +48,7 @@ export function FailureDomainPanel({
   item,
   isSelected,
   onSelectMethod,
+  onInspectMethod,
   actions,
 }: FailureDomainPanelProps) {
   const [expanded, setExpanded] = useState(false);
@@ -95,6 +97,15 @@ export function FailureDomainPanel({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={`Inspect ${item.displayName} evidence`}
+            onClick={() => onInspectMethod(item.methodName)}
+            disabled={!item.representativeRunId}
+          >
+            Inspect evidence
+          </Button>
           {actions.map((action) => (
             <a
               key={`${item.methodName}-${action.label}`}

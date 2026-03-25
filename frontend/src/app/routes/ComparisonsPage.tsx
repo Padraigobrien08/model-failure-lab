@@ -1,7 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { RankedComparisonCanvas } from "@/components/comparisons/RankedComparisonCanvas";
-import { buildComparisonCards, buildFailureDomainModels } from "@/lib/manifest/selectors";
+import {
+  buildComparisonCards,
+  buildFailureDomainModels,
+  getRepresentativeRunIdForMethod,
+} from "@/lib/manifest/selectors";
 import { useAppRouteContext } from "@/app/router";
 
 export function ComparisonsPage() {
@@ -17,6 +21,7 @@ export function ComparisonsPage() {
     selectedDomain,
     setSelectedMethod,
     setSelectedDomain,
+    openEvidenceDrawer,
   } = useAppRouteContext();
 
   if (isLoading || isFinalRobustnessBundleLoading) {
@@ -49,6 +54,15 @@ export function ComparisonsPage() {
   const comparisonCards = buildComparisonCards(index, finalRobustnessBundle, includeExploratory);
   const failureDomains = buildFailureDomainModels(index, finalRobustnessBundle, includeExploratory);
 
+  function handleInspectMethod(methodName: string) {
+    setSelectedMethod(methodName);
+
+    const runId = getRepresentativeRunIdForMethod(index!, methodName, true);
+    if (runId) {
+      openEvidenceDrawer(runId);
+    }
+  }
+
   return (
     <section className="space-y-8">
       <header className="space-y-4">
@@ -79,6 +93,7 @@ export function ComparisonsPage() {
         selectedDomain={selectedDomain}
         onSelectMethod={setSelectedMethod}
         onSelectDomain={setSelectedDomain}
+        onInspectMethod={handleInspectMethod}
       />
     </section>
   );

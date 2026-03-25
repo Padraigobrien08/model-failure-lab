@@ -54,6 +54,11 @@ export type AppRouteContext = {
   setSelectedMethod: (value: string | null) => void;
   selectedDomain: FailureDomainKey | null;
   setSelectedDomain: (value: FailureDomainKey | null) => void;
+  selectedRunId: string | null;
+  setSelectedRunId: (value: string | null) => void;
+  isEvidenceDrawerOpen: boolean;
+  openEvidenceDrawer: (runId: string) => void;
+  closeEvidenceDrawer: () => void;
 };
 
 export function useAppRouteContext() {

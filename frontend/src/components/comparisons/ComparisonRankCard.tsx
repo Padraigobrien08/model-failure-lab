@@ -18,6 +18,7 @@ type ComparisonRankCardProps = {
   rank: number;
   isSelected: boolean;
   onSelectMethod: (methodName: string) => void;
+  onInspectMethod: (methodName: string) => void;
 };
 
 function renderMetric(metric: ComparisonCardMetric) {
@@ -33,6 +34,7 @@ export function ComparisonRankCard({
   rank,
   isSelected,
   onSelectMethod,
+  onInspectMethod,
 }: ComparisonRankCardProps) {
   const [expanded, setExpanded] = useState(false);
   const verdictTone = item.isExploratory
@@ -109,6 +111,15 @@ export function ComparisonRankCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={`Inspect ${item.displayName} evidence`}
+            onClick={() => onInspectMethod(item.methodName)}
+            disabled={!item.representativeRunId}
+          >
+            Inspect evidence
+          </Button>
           {item.actions.map((action) => (
             <a
               key={`${item.methodName}-${action.label}`}

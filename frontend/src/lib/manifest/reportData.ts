@@ -65,7 +65,12 @@ function validateFinalRobustnessReportSummary(payload: unknown): FinalRobustness
 
 function requireRefPath(report: ReportEntity, key: "report_data_json" | "report_summary_json") {
   const ref = report.payload_refs?.[key] ?? report.artifact_refs?.[key];
-  if (!ref?.path) {
+  if (
+    typeof ref !== "object" ||
+    ref === null ||
+    !("path" in ref) ||
+    typeof ref.path !== "string"
+  ) {
     throw new Error(`Report ${report.id} is missing ${key}.`);
   }
 

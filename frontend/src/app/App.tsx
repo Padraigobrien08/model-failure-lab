@@ -3,7 +3,9 @@ import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 
 import type { AppRouteContext } from "@/app/router";
 import { ComparisonsPage } from "@/app/routes/ComparisonsPage";
+import { EvidencePage } from "@/app/routes/EvidencePage";
 import { FailureExplorerPage } from "@/app/routes/FailureExplorerPage";
+import { RunsPage } from "@/app/routes/RunsPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { loadArtifactIndex, DEFAULT_MANIFEST_PATH } from "@/lib/manifest/load";
 import { loadFinalRobustnessBundle } from "@/lib/manifest/reportData";
@@ -11,8 +13,8 @@ import type {
   ArtifactIndex,
   FailureDomainKey,
   FinalRobustnessBundle,
+  RunEntity,
 } from "@/lib/manifest/types";
-import { PlaceholderPage } from "@/app/routes/PlaceholderPage";
 import { OverviewPage } from "@/app/routes/OverviewPage";
 
 type AppProps = {
@@ -49,6 +51,8 @@ function AppFrame({
   const [finalRobustnessBundleError, setFinalRobustnessBundleError] = useState<string | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [selectedDomain, setSelectedDomain] = useState<FailureDomainKey | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (initialIndex !== null) {
@@ -117,6 +121,29 @@ function AppFrame({
     };
   }, [index, initialFinalRobustnessBundle]);
 
+  useEffect(() => {
+    if (index === null || includeExploratory || selectedRunId === null) {
+      return;
+    }
+
+    const selectedRun = (index.entities.runs as RunEntity[]).find(
+      (run) => run.id === selectedRunId || run.run_id === selectedRunId,
+    );
+    if (selectedRun?.default_visible === false) {
+      setSelectedRunId(null);
+      setIsEvidenceDrawerOpen(false);
+    }
+  }, [includeExploratory, index, selectedRunId]);
+
+  function openEvidenceDrawer(runId: string) {
+    setSelectedRunId(runId);
+    setIsEvidenceDrawerOpen(true);
+  }
+
+  function closeEvidenceDrawer() {
+    setIsEvidenceDrawerOpen(false);
+  }
+
   const routeContext: AppRouteContext = {
     index,
     isLoading,
@@ -131,6 +158,11 @@ function AppFrame({
     setSelectedMethod,
     selectedDomain,
     setSelectedDomain,
+    selectedRunId,
+    setSelectedRunId,
+    isEvidenceDrawerOpen,
+    openEvidenceDrawer,
+    closeEvidenceDrawer,
   };
 
   return (
@@ -149,24 +181,8 @@ function AppFrame({
         <Route index element={<OverviewPage />} />
         <Route path="comparisons" element={<ComparisonsPage />} />
         <Route path="failure-explorer" element={<FailureExplorerPage />} />
-        <Route
-          path="runs"
-          element={
-            <PlaceholderPage
-              title="Runs"
-              description="Phase 30 adds run-level drillthrough, lineage context, and route-preserving debug transitions."
-            />
-          }
-        />
-        <Route
-          path="evidence"
-          element={
-            <PlaceholderPage
-              title="Evidence"
-              description="Phase 30 adds artifact drillthrough and explicit evidence-scope controls here."
-            />
-          }
-        />
+        <Route path="runs" element={<RunsPage />} />
+        <Route path="evidence" element={<EvidencePage />} />
       </Route>
     </Routes>
   );

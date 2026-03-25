@@ -3,10 +3,25 @@ export function formatLabel(value: string | null | undefined) {
     return "Unknown";
   }
 
+  const acronyms: Record<string, string> = {
+    ece: "ECE",
+    id: "ID",
+    ood: "OOD",
+    tfidf: "TF-IDF",
+    dro: "DRO",
+  };
+
   return value
     .split(/[_-\s]+/)
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => {
+      const normalized = part.toLowerCase();
+      if (acronyms[normalized]) {
+        return acronyms[normalized];
+      }
+
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
     .join(" ");
 }
 

@@ -8,6 +8,7 @@ type FailureExplorerTabsProps = {
   selectedMethod: string | null;
   onSelectDomain: (domain: FailureDomainKey) => void;
   onSelectMethod: (methodName: string) => void;
+  onInspectMethod: (methodName: string) => void;
 };
 
 export function FailureExplorerTabs({
@@ -16,6 +17,7 @@ export function FailureExplorerTabs({
   selectedMethod,
   onSelectDomain,
   onSelectMethod,
+  onInspectMethod,
 }: FailureExplorerTabsProps) {
   return (
     <Tabs value={selectedDomain} onValueChange={(value) => onSelectDomain(value as FailureDomainKey)}>
@@ -47,6 +49,7 @@ export function FailureExplorerTabs({
                   item={item}
                   isSelected={selectedMethod === item.methodName}
                   onSelectMethod={onSelectMethod}
+                  onInspectMethod={onInspectMethod}
                   actions={domain.actions}
                 />
               ))}

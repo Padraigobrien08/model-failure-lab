@@ -3,7 +3,11 @@ export type ArtifactRef = {
   path: string;
 };
 
-export type ArtifactRefMap = Record<string, ArtifactRef>;
+export type ArtifactRefValue = ArtifactRef | ArtifactRefMap | null;
+
+export interface ArtifactRefMap {
+  [key: string]: ArtifactRefValue;
+}
 
 export type ArtifactEntity = {
   id: string;
@@ -15,6 +19,48 @@ export type ArtifactEntity = {
   status?: string;
   seed?: number | string | null;
   artifact_refs?: ArtifactRefMap;
+};
+
+export type RunEntity = ArtifactEntity & {
+  completed_at?: string | null;
+  dataset_name?: string;
+  duration_seconds?: number | null;
+  experiment_group?: string;
+  experiment_type?: string | null;
+  mitigation_method?: string | null;
+  model_name?: string;
+  notes?: string | null;
+  parent_run_id?: string | null;
+  run_id: string;
+  seed?: number | string | null;
+  started_at?: string | null;
+  status?: string;
+  tags?: string[];
+  timestamp?: string | null;
+  training_summary?: {
+    best_epoch?: number;
+    best_validation_metric_name?: string;
+    best_validation_metric_value?: number;
+    completed_epochs?: number;
+    selected_checkpoint_path?: string;
+    train_sample_count?: number;
+    validation_sample_count?: number;
+  } | null;
+};
+
+export type EvaluationEntity = ArtifactEntity & {
+  dataset_name?: string;
+  eval_id?: string;
+  experiment_group?: string;
+  headline_metrics?: AggregateMetrics;
+  mitigation_method?: string | null;
+  model_name?: string;
+  payload_refs?: ArtifactRefMap;
+  seed?: number | string | null;
+  source_parent_run_id?: string | null;
+  source_run_id?: string | null;
+  status?: string;
+  tags?: string[];
 };
 
 export type AggregateMetrics = Record<string, number | null | undefined>;
@@ -177,6 +223,8 @@ export type EvidenceAction = {
   path: string;
 };
 
+export type EvidenceScope = "official" | "exploratory";
+
 export type SeedBreakdownRow = {
   seed: string;
   runId?: string;
@@ -204,6 +252,7 @@ export type ComparisonCardModel = {
   seedCount: number;
   seededInterpretation?: string | null;
   isExploratory: boolean;
+  representativeRunId?: string | null;
   metrics: {
     worstGroup: ComparisonCardMetric;
     ood: ComparisonCardMetric;
@@ -221,6 +270,7 @@ export type FailureDomainItemModel = {
   verdict: string;
   comparisonMode: MetricComparisonMode;
   isExploratory: boolean;
+  representativeRunId?: string | null;
   storyNote?: string;
   seedCount: number;
   mean?: number | null;
@@ -258,6 +308,89 @@ export type ArtifactIndex = {
     stability_packages: StabilityPackage[];
     research_closeout: ResearchCloseout[];
   };
+};
+
+export type RunCardModel = {
+  runId: string;
+  displayName: string;
+  methodName: string;
+  laneKey: string;
+  laneLabel: string;
+  seedLabel: string;
+  verdict: string;
+  summaryLabel: string;
+  isOfficial: boolean;
+  isExploratory: boolean;
+  timestamp?: string | null;
+};
+
+export type RunSeedGroupModel = {
+  seedLabel: string;
+  runs: RunCardModel[];
+};
+
+export type RunLaneModel = {
+  laneKey: string;
+  laneLabel: string;
+  description: string;
+  isExploratoryLane: boolean;
+  seedGroups: RunSeedGroupModel[];
+};
+
+export type RunDetailMetricModel = {
+  label: string;
+  value: string;
+  note?: string;
+  invertPolarity?: boolean;
+  comparisonMode?: MetricComparisonMode;
+};
+
+export type RunLineageItemModel = {
+  label: string;
+  value: string;
+  path?: string;
+};
+
+export type EvidenceActionGroup = {
+  title: string;
+  actions: EvidenceAction[];
+};
+
+export type RunDetailModel = {
+  runId: string;
+  displayName: string;
+  methodLabel: string;
+  seedLabel: string;
+  verdict: string;
+  summaryLabel: string;
+  storyNote?: string;
+  isOfficial: boolean;
+  isExploratory: boolean;
+  lineage: RunLineageItemModel[];
+  metrics: RunDetailMetricModel[];
+  actionGroups: EvidenceActionGroup[];
+};
+
+export type EvidenceDrawerModel = {
+  run: RunCardModel;
+  detail: RunDetailModel;
+};
+
+export type EvidenceEntityCardModel = {
+  id: string;
+  title: string;
+  subtitle: string;
+  scope: EvidenceScope;
+  badgeLabel: string;
+  description?: string;
+  actions: EvidenceAction[];
+};
+
+export type EvidenceSectionModel = {
+  key: "reports" | "evaluations" | "runs";
+  title: string;
+  description: string;
+  items: EvidenceEntityCardModel[];
 };
 
 export type OverviewSnapshot = {

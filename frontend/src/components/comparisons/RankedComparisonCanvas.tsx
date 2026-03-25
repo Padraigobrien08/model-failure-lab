@@ -15,6 +15,7 @@ type RankedComparisonCanvasProps = {
   selectedDomain: FailureDomainKey | null;
   onSelectMethod: (methodName: string) => void;
   onSelectDomain: (domain: FailureDomainKey) => void;
+  onInspectMethod: (methodName: string) => void;
 };
 
 function renderDomainMetric(
@@ -45,6 +46,7 @@ export function RankedComparisonCanvas({
   selectedDomain,
   onSelectMethod,
   onSelectDomain,
+  onInspectMethod,
 }: RankedComparisonCanvasProps) {
   return (
     <div className="space-y-6">
@@ -56,6 +58,7 @@ export function RankedComparisonCanvas({
             rank={index + 1}
             isSelected={selectedMethod === item.methodName}
             onSelectMethod={onSelectMethod}
+            onInspectMethod={onInspectMethod}
           />
         ))}
       </section>

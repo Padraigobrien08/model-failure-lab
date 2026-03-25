@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { FailureExplorerTabs } from "@/components/failure/FailureExplorerTabs";
 import { useAppRouteContext } from "@/app/router";
-import { buildFailureDomainModels } from "@/lib/manifest/selectors";
+import { buildFailureDomainModels, getRepresentativeRunIdForMethod } from "@/lib/manifest/selectors";
 
 export function FailureExplorerPage() {
   const {
@@ -17,6 +17,7 @@ export function FailureExplorerPage() {
     selectedDomain,
     setSelectedMethod,
     setSelectedDomain,
+    openEvidenceDrawer,
   } = useAppRouteContext();
 
   if (isLoading || isFinalRobustnessBundleLoading) {
@@ -49,6 +50,15 @@ export function FailureExplorerPage() {
   const domains = buildFailureDomainModels(index, finalRobustnessBundle, includeExploratory);
   const activeDomain = selectedDomain ?? "worst_group";
 
+  function handleInspectMethod(methodName: string) {
+    setSelectedMethod(methodName);
+
+    const runId = getRepresentativeRunIdForMethod(index!, methodName, true);
+    if (runId) {
+      openEvidenceDrawer(runId);
+    }
+  }
+
   return (
     <section className="space-y-8">
       <header className="space-y-4">
@@ -75,6 +85,7 @@ export function FailureExplorerPage() {
         selectedMethod={selectedMethod}
         onSelectDomain={setSelectedDomain}
         onSelectMethod={setSelectedMethod}
+        onInspectMethod={handleInspectMethod}
       />
     </section>
   );
