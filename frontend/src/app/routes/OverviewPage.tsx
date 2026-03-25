@@ -69,6 +69,9 @@ export function OverviewPage() {
             more cleanly than robustness, the best robustness lane remains mixed, and dataset
             expansion stays deferred under explicit reopen conditions.
           </p>
+          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+            This is the primary UI. Streamlit remains available as a fallback.
+          </p>
         </div>
       </header>
 

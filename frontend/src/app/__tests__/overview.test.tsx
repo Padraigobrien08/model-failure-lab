@@ -28,5 +28,8 @@ describe("Overview route", () => {
       "/comparisons",
     );
     expect(screen.getByText(/Temperature scaling remains the stable calibration lane/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/This is the primary UI\. Streamlit remains available as a fallback\./i),
+    ).toBeInTheDocument();
   });
 });

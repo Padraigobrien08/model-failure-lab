@@ -4,21 +4,46 @@ Model Failure Lab is an artifact-driven research repo for measuring how text-cla
 fail under distribution shift. The current benchmark centers on CivilComments from WILDS and keeps
 baseline, mitigation, evaluation, reporting, and UI surfaces reproducible from saved artifacts.
 
-## Start Here
+## Start Here (React UI)
 
-The primary entrypoint is the read-only results explorer:
+The primary entrypoint is now the React failure debugger:
+
+```bash
+npm install --prefix frontend
+python3 scripts/run_react_ui.py
+```
+
+Direct frontend command, if you want it:
+
+```bash
+npm --prefix frontend run dev
+```
+
+The React UI stays manifest-driven and reads the same saved artifact contract:
+`artifacts/contracts/artifact_index/v1/index.json`.
+
+Alternative fallback:
 
 ```bash
 python3 -m pip install -e '.[ui]'
 python3 scripts/run_results_ui.py
 ```
 
-The UI reads only from the generated manifest at
-`artifacts/contracts/artifact_index/v1/index.json`.
-
 For the written interpretation layer, read:
 
 - [v1.4 closeout](docs/v1_4_closeout.md)
+- [UI parity guide](docs/ui_parity.md)
+
+## UI Parity Checklist
+
+Use this during transition to confirm the React UI and Streamlit fallback are telling the same story:
+
+- Overview shows the same final findings: stable calibration, mixed robustness, deferred expansion.
+- Comparisons keep `temperature_scaling` ahead of `reweighting`, with baseline as reference.
+- Failure-oriented views preserve the same worst-group, OOD, ID, and calibration emphasis.
+
+For side-by-side expectations, known differences, and troubleshooting, see
+[docs/ui_parity.md](docs/ui_parity.md).
 
 ## v1.4 Snapshot
 
@@ -58,6 +83,7 @@ Use Python 3.11 or newer.
 python3 -m pip install -e '.[dev]'
 python3 scripts/check_environment.py
 python3 scripts/download_data.py
+npm install --prefix frontend
 ```
 
 If you only want the runtime setup details first, see:
