@@ -1,11 +1,13 @@
 import { FileSearch, FlaskConical, Layers3, Radar, Rows3 } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import type { AppRouteContext } from "@/app/router";
 import { ScopeChip } from "@/components/layout/ScopeChip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NAVIGATION_ITEMS } from "@/app/router";
+import { formatComparisonMode, formatLabel } from "@/lib/formatters";
+import { artifactPathToPublicUrl } from "@/lib/manifest/load";
 import { cn } from "@/lib/utils";
 
 type AppShellProps = {
@@ -23,6 +25,15 @@ export function AppShell({
   manifestPath,
   routeContext,
 }: AppShellProps) {
+  const location = useLocation();
+  const focusMethod = routeContext.selectedMethod
+    ? formatLabel(routeContext.selectedMethod)
+    : "No focused lane";
+  const focusDomain = routeContext.selectedDomain
+    ? formatLabel(routeContext.selectedDomain)
+    : "No domain focus";
+  const finalReport = routeContext.finalRobustnessBundle?.report;
+
   return (
     <div className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1600px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)_320px]">
@@ -109,10 +120,55 @@ export function AppShell({
                   Route shell status
                 </p>
                 <p className="mt-2 text-sm leading-6 text-foreground">
-                  Overview is live in Phase 28. Comparisons, Failure Explorer, Runs, and Evidence
-                  are route-stable and deepen in the next phases.
+                  Overview, Comparisons, and Failure Explorer are live. Runs and Evidence stay
+                  route-stable while deeper drillthrough lands in Phase 30.
                 </p>
               </div>
+
+              <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Active focus
+                </p>
+                <p className="mt-2 text-sm leading-6 text-foreground">{focusMethod}</p>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {location.pathname === "/failure-explorer"
+                    ? `${focusDomain} tab`
+                    : focusDomain}
+                </p>
+              </div>
+
+              {finalReport ? (
+                <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Comparison package
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-foreground">
+                    {formatComparisonMode(routeContext.finalRobustnessBundle?.summary.official_methods[0]?.comparison_mode)}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    {finalReport.artifact_refs?.report_markdown?.path ? (
+                      <a
+                        className="rounded-full border border-border px-3 py-1.5 text-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                        href={artifactPathToPublicUrl(finalReport.artifact_refs.report_markdown.path)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View report
+                      </a>
+                    ) : null}
+                    {finalReport.artifact_refs?.report_data_json?.path ? (
+                      <a
+                        className="rounded-full border border-border px-3 py-1.5 text-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                        href={artifactPathToPublicUrl(finalReport.artifact_refs.report_data_json.path)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open payload
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="rounded-[22px] border border-border/80 bg-background/55 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">

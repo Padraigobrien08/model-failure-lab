@@ -2,15 +2,23 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 
 import type { AppRouteContext } from "@/app/router";
+import { ComparisonsPage } from "@/app/routes/ComparisonsPage";
+import { FailureExplorerPage } from "@/app/routes/FailureExplorerPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { loadArtifactIndex, DEFAULT_MANIFEST_PATH } from "@/lib/manifest/load";
-import type { ArtifactIndex } from "@/lib/manifest/types";
+import { loadFinalRobustnessBundle } from "@/lib/manifest/reportData";
+import type {
+  ArtifactIndex,
+  FailureDomainKey,
+  FinalRobustnessBundle,
+} from "@/lib/manifest/types";
 import { PlaceholderPage } from "@/app/routes/PlaceholderPage";
 import { OverviewPage } from "@/app/routes/OverviewPage";
 
 type AppProps = {
   manifestPath?: string;
   initialIndex?: ArtifactIndex | null;
+  initialFinalRobustnessBundle?: FinalRobustnessBundle | null;
   initialIncludeExploratory?: boolean;
   useMemoryRouter?: boolean;
   initialEntries?: string[];
@@ -19,18 +27,28 @@ type AppProps = {
 type AppFrameProps = {
   manifestPath: string;
   initialIndex?: ArtifactIndex | null;
+  initialFinalRobustnessBundle?: FinalRobustnessBundle | null;
   initialIncludeExploratory: boolean;
 };
 
 function AppFrame({
   manifestPath,
   initialIndex = null,
+  initialFinalRobustnessBundle = null,
   initialIncludeExploratory,
 }: AppFrameProps) {
   const [index, setIndex] = useState<ArtifactIndex | null>(initialIndex);
   const [isLoading, setIsLoading] = useState<boolean>(initialIndex === null);
   const [error, setError] = useState<string | null>(null);
   const [includeExploratory, setIncludeExploratory] = useState(initialIncludeExploratory);
+  const [finalRobustnessBundle, setFinalRobustnessBundle] =
+    useState<FinalRobustnessBundle | null>(initialFinalRobustnessBundle);
+  const [isFinalRobustnessBundleLoading, setIsFinalRobustnessBundleLoading] = useState(
+    initialFinalRobustnessBundle === null,
+  );
+  const [finalRobustnessBundleError, setFinalRobustnessBundleError] = useState<string | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<FailureDomainKey | null>(null);
 
   useEffect(() => {
     if (initialIndex !== null) {
@@ -62,6 +80,43 @@ function AppFrame({
     };
   }, [initialIndex, manifestPath]);
 
+  useEffect(() => {
+    if (index === null) {
+      return;
+    }
+
+    if (initialFinalRobustnessBundle !== null) {
+      setFinalRobustnessBundle(initialFinalRobustnessBundle);
+      setIsFinalRobustnessBundleLoading(false);
+      setFinalRobustnessBundleError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsFinalRobustnessBundleLoading(true);
+    loadFinalRobustnessBundle(index)
+      .then((bundle) => {
+        if (!cancelled) {
+          setFinalRobustnessBundle(bundle);
+          setFinalRobustnessBundleError(null);
+        }
+      })
+      .catch((loadError: Error) => {
+        if (!cancelled) {
+          setFinalRobustnessBundleError(loadError.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsFinalRobustnessBundleLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [index, initialFinalRobustnessBundle]);
+
   const routeContext: AppRouteContext = {
     index,
     isLoading,
@@ -69,6 +124,13 @@ function AppFrame({
     includeExploratory,
     setIncludeExploratory,
     manifestPath,
+    finalRobustnessBundle,
+    finalRobustnessBundleError,
+    isFinalRobustnessBundleLoading,
+    selectedMethod,
+    setSelectedMethod,
+    selectedDomain,
+    setSelectedDomain,
   };
 
   return (
@@ -85,24 +147,8 @@ function AppFrame({
         }
       >
         <Route index element={<OverviewPage />} />
-        <Route
-          path="comparisons"
-          element={
-            <PlaceholderPage
-              title="Comparisons"
-              description="Phase 29 turns the saved baseline and mitigation evidence into side-by-side comparison flows."
-            />
-          }
-        />
-        <Route
-          path="failure-explorer"
-          element={
-            <PlaceholderPage
-              title="Failure Explorer"
-              description="Phase 29 brings subgroup, ID/OOD, and calibration failure surfaces into this route."
-            />
-          }
-        />
+        <Route path="comparisons" element={<ComparisonsPage />} />
+        <Route path="failure-explorer" element={<FailureExplorerPage />} />
         <Route
           path="runs"
           element={
@@ -129,6 +175,7 @@ function AppFrame({
 export function App({
   manifestPath = DEFAULT_MANIFEST_PATH,
   initialIndex = null,
+  initialFinalRobustnessBundle = null,
   initialIncludeExploratory = false,
   useMemoryRouter = false,
   initialEntries = ["/"],
@@ -137,6 +184,7 @@ export function App({
     <AppFrame
       manifestPath={manifestPath}
       initialIndex={initialIndex}
+      initialFinalRobustnessBundle={initialFinalRobustnessBundle}
       initialIncludeExploratory={initialIncludeExploratory}
     />
   );

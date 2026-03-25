@@ -1,6 +1,10 @@
 import { useOutletContext } from "react-router-dom";
 
-import type { ArtifactIndex } from "@/lib/manifest/types";
+import type {
+  ArtifactIndex,
+  FailureDomainKey,
+  FinalRobustnessBundle,
+} from "@/lib/manifest/types";
 
 export type NavigationItem = {
   label: string;
@@ -43,6 +47,13 @@ export type AppRouteContext = {
   includeExploratory: boolean;
   setIncludeExploratory: (value: boolean) => void;
   manifestPath: string;
+  finalRobustnessBundle: FinalRobustnessBundle | null;
+  finalRobustnessBundleError: string | null;
+  isFinalRobustnessBundleLoading: boolean;
+  selectedMethod: string | null;
+  setSelectedMethod: (value: string | null) => void;
+  selectedDomain: FailureDomainKey | null;
+  setSelectedDomain: (value: FailureDomainKey | null) => void;
 };
 
 export function useAppRouteContext() {

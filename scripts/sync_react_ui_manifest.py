@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import filecmp
 import shutil
+import json
 from pathlib import Path
 from typing import Sequence
 
@@ -29,6 +30,65 @@ def _default_target_root() -> Path:
 
 def _target_manifest_path(target_root: Path, version: str) -> Path:
     return target_root / "artifacts" / "contracts" / "artifact_index" / version / "index.json"
+
+
+def _source_root_for_manifest(source_path: Path, version: str) -> Path:
+    expected_suffix = ("artifacts", "contracts", "artifact_index", version, "index.json")
+    if source_path.parts[-5:] == expected_suffix:
+        return source_path.parents[4]
+    return repository_root()
+
+
+def _collect_sync_paths(payload: object) -> set[str]:
+    collected: set[str] = set()
+
+    def visit(value: object) -> None:
+        if isinstance(value, dict):
+            metadata_path = value.get("metadata_path")
+            if isinstance(metadata_path, str):
+                collected.add(metadata_path)
+
+            for ref_group_name in ("artifact_refs", "payload_refs"):
+                ref_group = value.get(ref_group_name)
+                if isinstance(ref_group, dict):
+                    for ref in ref_group.values():
+                        if isinstance(ref, dict):
+                            ref_path = ref.get("path")
+                            if isinstance(ref_path, str) and ref.get("exists", True) is not False:
+                                collected.add(ref_path)
+
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    visit(payload)
+    return collected
+
+
+def _sync_payload_artifacts(source_path: Path, target_root: Path, version: str, check: bool) -> None:
+    manifest_payload = json.loads(source_path.read_text(encoding="utf-8"))
+    source_root = _source_root_for_manifest(source_path, version)
+
+    for relative_path in sorted(_collect_sync_paths(manifest_payload)):
+        source_artifact = source_root / relative_path
+        if not source_artifact.exists() or source_artifact.is_dir():
+            continue
+
+        target_artifact = target_root / relative_path
+        if check:
+            if not target_artifact.exists():
+                raise FileNotFoundError(f"React UI artifact has not been synced yet: {target_artifact}")
+            if not filecmp.cmp(source_artifact, target_artifact, shallow=False):
+                raise ValueError(
+                    f"React UI artifact is out of date for {relative_path}. "
+                    "Re-run scripts/sync_react_ui_manifest.py."
+                )
+            continue
+
+        target_artifact.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_artifact, target_artifact)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -79,6 +139,7 @@ def run_command(argv: Sequence[str] | None = None) -> DispatchResult:
             raise ValueError(
                 "React UI manifest is out of date. Re-run scripts/sync_react_ui_manifest.py."
             )
+        _sync_payload_artifacts(source_path, target_root, args.version, check=True)
         return DispatchResult(
             status="completed",
             message=f"React UI manifest is in sync at {target_path}",
@@ -89,6 +150,7 @@ def run_command(argv: Sequence[str] | None = None) -> DispatchResult:
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_path, target_path)
+    _sync_payload_artifacts(source_path, target_root, args.version, check=False)
 
     return DispatchResult(
         status="completed",

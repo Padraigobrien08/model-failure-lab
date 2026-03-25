@@ -7,6 +7,7 @@ export type ArtifactRefMap = Record<string, ArtifactRef>;
 
 export type ArtifactEntity = {
   id: string;
+  entity_type?: string;
   default_visible?: boolean;
   is_official?: boolean;
   metadata_path?: string;
@@ -17,6 +18,10 @@ export type ArtifactEntity = {
 };
 
 export type AggregateMetrics = Record<string, number | null | undefined>;
+
+export type FailureDomainKey = "worst_group" | "ood" | "id" | "calibration";
+
+export type MetricComparisonMode = "baseline_metric" | "delta_vs_baseline" | string;
 
 export type SeededCohort = {
   cohort_id: string;
@@ -78,6 +83,161 @@ export type ResearchCloseout = {
   official_methods?: string[];
   exploratory_methods?: string[];
   artifact_refs?: ArtifactRefMap;
+};
+
+export type ReportEntity = ArtifactEntity & {
+  report_id?: string;
+  report_scope?: string;
+  payload_refs?: ArtifactRefMap;
+  artifact_refs?: ArtifactRefMap;
+  summary_snapshot?: Record<string, unknown>;
+};
+
+export type FinalRobustnessMethodSummary = {
+  comparison_mode: MetricComparisonMode;
+  display_name: string;
+  evidence_scope: string;
+  is_exploratory: boolean;
+  method_name: string;
+  metrics: {
+    mean: AggregateMetrics;
+    std: AggregateMetrics;
+  };
+  primary_verdict?: string;
+  promotion_decision?: string | null;
+  seed_count?: number;
+  seeded_interpretation?: string | null;
+  stability_label?: string | null;
+  story_note?: string;
+  verdict_counts?: Record<string, number> | null;
+};
+
+export type FailureDomainSummaryItem = {
+  comparison_mode: MetricComparisonMode;
+  display_name: string;
+  evidence_scope: string;
+  is_exploratory: boolean;
+  method_name: string;
+  metric_key?: string;
+  mean?: number | null;
+  std?: number | null;
+  ece_mean?: number | null;
+  ece_std?: number | null;
+  brier_score_mean?: number | null;
+  brier_score_std?: number | null;
+  primary_verdict?: string;
+  promotion_decision?: string | null;
+  seed_count?: number;
+  seeded_interpretation?: string | null;
+  stability_label?: string | null;
+  story_note?: string;
+};
+
+export type PromotionAudit = {
+  audit_name?: string;
+  candidate_display_name?: string;
+  candidate_method?: string;
+  candidate_metrics?: AggregateMetrics;
+  candidate_verdict?: string;
+  dataset_expansion_recommendation?: string;
+  decision?: string;
+  decision_reason?: string;
+  reference_method?: string;
+  reference_stability_label?: string;
+};
+
+export type FinalRobustnessReportData = {
+  official_method_summaries: FinalRobustnessMethodSummary[];
+  exploratory_method_summaries: FinalRobustnessMethodSummary[];
+  worst_group_summary: FailureDomainSummaryItem[];
+  ood_summary: FailureDomainSummaryItem[];
+  id_summary: FailureDomainSummaryItem[];
+  calibration_summary: FailureDomainSummaryItem[];
+  final_robustness_verdict?: string;
+  promotion_audit?: PromotionAudit;
+};
+
+export type FinalRobustnessReportSummary = {
+  final_robustness_verdict?: string;
+  headline_findings: string[];
+  key_takeaway?: string;
+  next_step?: string;
+  official_methods: FinalRobustnessMethodSummary[];
+  exploratory_methods: FinalRobustnessMethodSummary[];
+};
+
+export type FinalRobustnessBundle = {
+  report: ReportEntity;
+  data: FinalRobustnessReportData;
+  summary: FinalRobustnessReportSummary;
+};
+
+export type EvidenceAction = {
+  label: string;
+  path: string;
+};
+
+export type SeedBreakdownRow = {
+  seed: string;
+  runId?: string;
+  evalId?: string;
+  verdict?: string;
+  metrics: AggregateMetrics;
+  deltas: AggregateMetrics;
+  note?: string;
+};
+
+export type ComparisonCardMetric = {
+  label: string;
+  value: number | null | undefined;
+  std: number | null | undefined;
+  comparisonMode: MetricComparisonMode;
+  invertPolarity?: boolean;
+};
+
+export type ComparisonCardModel = {
+  methodName: string;
+  displayName: string;
+  verdict: string;
+  comparisonMode: MetricComparisonMode;
+  storyNote?: string;
+  seedCount: number;
+  seededInterpretation?: string | null;
+  isExploratory: boolean;
+  metrics: {
+    worstGroup: ComparisonCardMetric;
+    ood: ComparisonCardMetric;
+    id: ComparisonCardMetric;
+    ece: ComparisonCardMetric;
+    brier: ComparisonCardMetric;
+  };
+  seedBreakdown: SeedBreakdownRow[];
+  actions: EvidenceAction[];
+};
+
+export type FailureDomainItemModel = {
+  methodName: string;
+  displayName: string;
+  verdict: string;
+  comparisonMode: MetricComparisonMode;
+  isExploratory: boolean;
+  storyNote?: string;
+  seedCount: number;
+  mean?: number | null;
+  std?: number | null;
+  eceMean?: number | null;
+  eceStd?: number | null;
+  brierMean?: number | null;
+  brierStd?: number | null;
+  seedBreakdown: SeedBreakdownRow[];
+};
+
+export type FailureDomainModel = {
+  domain: FailureDomainKey;
+  label: string;
+  description: string;
+  actions: EvidenceAction[];
+  items: FailureDomainItemModel[];
 };
 
 export type ArtifactIndex = {
