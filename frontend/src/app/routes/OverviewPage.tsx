@@ -1,5 +1,6 @@
 import { OverviewCanvas } from "@/components/overview/OverviewCanvas";
 import { StatusStrip } from "@/components/overview/StatusStrip";
+import { WorkbenchHeader } from "@/components/layout/WorkbenchHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatLabel, formatMetric } from "@/lib/formatters";
@@ -55,32 +56,53 @@ export function OverviewPage() {
 
   return (
     <section className="space-y-8">
-      <header className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone="accent">Overview</Badge>
-          {includeExploratory ? <Badge tone="exploratory">Exploratory scope active</Badge> : null}
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-[2.75rem] font-semibold tracking-[-0.06em] text-foreground">
-            Final evidence, turned into an explorable debugging surface.
-          </h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-            The official evidence package still points to the same closeout: calibration is solved
-            more cleanly than robustness, the best robustness lane remains mixed, and dataset
-            expansion stays deferred under explicit reopen conditions.
-          </p>
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            This is the primary UI. Streamlit remains available as a fallback.
-          </p>
-        </div>
-      </header>
+      <WorkbenchHeader
+        meta={
+          <>
+            <Badge tone="accent">Overview</Badge>
+            {includeExploratory ? (
+              <Badge tone="exploratory">Exploratory scope active</Badge>
+            ) : null}
+            <Badge tone="muted">Primary UI</Badge>
+          </>
+        }
+        title="Final verdicts, evidence scope, and next inspection paths."
+        description={
+          <>
+            The official evidence package still resolves to the same closeout: calibration is
+            solved more cleanly than robustness, the best robustness lane remains mixed, and
+            dataset expansion stays deferred under explicit reopen conditions.
+          </>
+        }
+        supportingText="This is the primary UI. Streamlit remains available as a fallback."
+        aside={
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Final verdict
+              </p>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {formatLabel(snapshot.finalRobustnessVerdict)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Expansion gate
+              </p>
+              <p className="mt-2 text-lg font-semibold text-foreground">
+                {formatLabel(snapshot.datasetExpansionRecommendation)}
+              </p>
+            </div>
+          </div>
+        }
+      />
 
       <StatusStrip snapshot={snapshot} />
       <OverviewCanvas snapshot={snapshot} />
 
       <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-        <Card className="bg-background/55">
-          <CardHeader>
+        <Card className="rounded-[20px] bg-background/55">
+          <CardHeader className="pb-4">
             <CardDescription>Primary baseline checkpoint</CardDescription>
             <CardTitle>
               {distilbertBaseline?.display_name ?? "DistilBERT Baseline"}
@@ -114,12 +136,28 @@ export function OverviewPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-background/55">
-          <CardHeader>
-            <CardDescription>Evidence scope</CardDescription>
-            <CardTitle>{formatLabel(snapshot.datasetExpansionRecommendation)}</CardTitle>
+        <Card className="rounded-[20px] bg-background/55">
+          <CardHeader className="pb-4">
+            <CardDescription>Reopen conditions</CardDescription>
+            <CardTitle>
+              {snapshot.reopenConditions.length > 0
+                ? `${snapshot.reopenConditions.length} tracked conditions`
+                : "No reopen conditions saved"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
+            {snapshot.reopenConditions.length > 0 ? (
+              <ul className="space-y-2">
+                {snapshot.reopenConditions.map((condition) => (
+                  <li
+                    key={condition}
+                    className="rounded-[14px] border border-border/70 bg-card/45 px-3 py-3 text-foreground"
+                  >
+                    {condition}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <p>{snapshot.recommendationReason}</p>
             {snapshot.nextStep ? <p className="text-foreground">{snapshot.nextStep}</p> : null}
           </CardContent>

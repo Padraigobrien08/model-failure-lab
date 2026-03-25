@@ -6,8 +6,8 @@ type ScopeChipProps = {
 
 export function ScopeChip({ includeExploratory }: ScopeChipProps) {
   if (includeExploratory) {
-    return <Badge tone="exploratory">Exploratory Evidence On</Badge>;
+    return <Badge tone="exploratory">Scope: Official + Exploratory</Badge>;
   }
 
-  return <Badge tone="accent">Official Evidence Only</Badge>;
+  return <Badge tone="accent">Scope: Official Only</Badge>;
 }
