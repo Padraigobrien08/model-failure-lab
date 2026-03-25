@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 
 import { ComparisonRankCard } from "@/components/comparisons/ComparisonRankCard";
+import { WorkbenchSection } from "@/components/layout/WorkbenchSection";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatComparisonMode, formatMetric, formatSignedMetric } from "@/lib/formatters";
 import type { ComparisonCardModel, FailureDomainKey, FailureDomainModel } from "@/lib/manifest/types";
 import { cn } from "@/lib/utils";
@@ -50,40 +50,41 @@ export function RankedComparisonCanvas({
 }: RankedComparisonCanvasProps) {
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 xl:grid-cols-3">
-        {items.map((item, index) => (
-          <ComparisonRankCard
-            key={item.methodName}
-            item={item}
-            rank={index + 1}
-            isSelected={selectedMethod === item.methodName}
-            onSelectMethod={onSelectMethod}
-            onInspectMethod={onInspectMethod}
-          />
-        ))}
-      </section>
+      <WorkbenchSection
+        eyebrow="Ranking"
+        title="Ranked comparison canvas"
+        description="Read the official lane ordering first, then expand into per-seed breakdown or evidence links once you know which lane you want to inspect."
+      >
+        <div className="grid gap-4 xl:grid-cols-3">
+          {items.map((item, index) => (
+            <ComparisonRankCard
+              key={item.methodName}
+              item={item}
+              rank={index + 1}
+              isSelected={selectedMethod === item.methodName}
+              onSelectMethod={onSelectMethod}
+              onInspectMethod={onInspectMethod}
+            />
+          ))}
+        </div>
+      </WorkbenchSection>
 
-      <Card className="bg-background/60">
-        <CardHeader className="space-y-3">
+      <WorkbenchSection
+        eyebrow={
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="accent">Domain drillthrough</Badge>
             {selectedDomain ? <Badge tone="default">{selectedDomain}</Badge> : null}
           </div>
-          <CardTitle className="text-[2rem] tracking-[-0.05em]">
-            Why the ranking lands this way
-          </CardTitle>
-          <CardDescription className="max-w-3xl text-base leading-7">
-            Each domain panel keeps the baseline reference visible, then shows how the official
-            methods move relative to that anchor. Drill into any panel to carry the same focus into
-            the Failure Explorer.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 xl:grid-cols-2">
+        }
+        title="Why the ranking lands this way"
+        description="Each domain panel keeps the baseline reference visible, then shows how the official methods move relative to that anchor. Carry any panel focus into Failure Explorer when you need the deeper domain workspace."
+      >
+        <div className="grid gap-4 xl:grid-cols-2">
           {domains.map((domain) => (
             <div
               key={domain.domain}
               className={cn(
-                "rounded-[24px] border border-border/70 bg-card/70 p-5",
+                "rounded-[18px] border border-border/70 bg-card/55 p-4",
                 selectedDomain === domain.domain ? "border-primary/35 shadow-panel" : "",
               )}
             >
@@ -111,7 +112,7 @@ export function RankedComparisonCanvas({
                     key={`${domain.domain}-${item.methodName}`}
                     type="button"
                     className={cn(
-                      "flex w-full items-center justify-between rounded-[20px] border border-border/70 bg-background/55 px-4 py-3 text-left transition-colors",
+                      "flex w-full items-center justify-between rounded-[16px] border border-border/70 bg-background/55 px-4 py-3 text-left transition-colors",
                       selectedMethod === item.methodName ? "border-primary/35 bg-primary/5" : "",
                       item.isExploratory ? "border-dashed" : "",
                     )}
@@ -138,8 +139,8 @@ export function RankedComparisonCanvas({
               </div>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </WorkbenchSection>
     </div>
   );
 }

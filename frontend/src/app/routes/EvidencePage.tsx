@@ -2,6 +2,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EvidenceEntitySection } from "@/components/evidence/EvidenceEntitySection";
 import { ScopeStateBanner } from "@/components/layout/ScopeStateBanner";
+import { WorkbenchHeader } from "@/components/layout/WorkbenchHeader";
+import { WorkbenchSection } from "@/components/layout/WorkbenchSection";
 import { useAppRouteContext } from "@/app/router";
 import { buildEvidenceSections } from "@/lib/manifest/selectors";
 
@@ -48,32 +50,51 @@ export function EvidencePage() {
 
   return (
     <section className="space-y-8">
-      <header className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone="accent">Evidence</Badge>
-          {includeExploratory ? <Badge tone="exploratory">Exploratory scope active</Badge> : null}
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-[2.75rem] font-semibold tracking-[-0.06em] text-foreground">
-            Official-first artifact browser.
-          </h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-            Reports, evaluations, and runs stay grouped by evidence type so you can jump directly
-            to the saved artifact that backs a claim without losing scope boundaries.
-          </p>
-        </div>
-      </header>
+      <WorkbenchHeader
+        meta={
+          <>
+            <Badge tone="accent">Evidence</Badge>
+            {includeExploratory ? <Badge tone="exploratory">Exploratory scope active</Badge> : null}
+          </>
+        }
+        title="Official-first artifact browser."
+        description="Reports, evaluations, and runs stay grouped by evidence type so you can jump directly to the saved artifact that backs a claim without losing scope boundaries."
+        aside={
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Active scope
+              </p>
+              <p className="mt-1 text-foreground">
+                {includeExploratory ? "Official + exploratory" : "Official only"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Entity groups
+              </p>
+              <p className="mt-1 text-foreground">{sections.length} sections</p>
+            </div>
+          </div>
+        }
+      />
 
       <ScopeStateBanner
         includeExploratory={includeExploratory}
         onChange={setIncludeExploratory}
       />
 
-      <div className="space-y-8">
-        {sections.map((section) => (
-          <EvidenceEntitySection key={section.key} section={section} />
-        ))}
-      </div>
+      <WorkbenchSection
+        eyebrow="Artifact groups"
+        title="Manifest-backed entity groups"
+        description="Each section keeps the claim-backed artifact families together so you can trace from summary surfaces into report, eval, and run files without losing scope context."
+      >
+        <div className="space-y-8">
+          {sections.map((section) => (
+            <EvidenceEntitySection key={section.key} section={section} />
+          ))}
+        </div>
+      </WorkbenchSection>
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FailureDomainPanel } from "@/components/failure/FailureDomainPanel";
+import { WorkbenchSection } from "@/components/layout/WorkbenchSection";
 import type { FailureDomainKey, FailureDomainModel } from "@/lib/manifest/types";
 
 type FailureExplorerTabsProps = {
@@ -31,16 +32,11 @@ export function FailureExplorerTabs({
 
       {domains.map((domain) => (
         <TabsContent key={domain.domain} value={domain.domain} className="mt-6">
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <h3 className="text-[2rem] font-semibold tracking-[-0.05em] text-foreground">
-                {domain.label}
-              </h3>
-              <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-                {domain.description}
-              </p>
-            </div>
-
+          <WorkbenchSection
+            eyebrow="Domain view"
+            title={domain.label}
+            description={domain.description}
+          >
             <div className="grid gap-4 xl:grid-cols-2">
               {domain.items.map((item) => (
                 <FailureDomainPanel
@@ -54,7 +50,7 @@ export function FailureExplorerTabs({
                 />
               ))}
             </div>
-          </div>
+          </WorkbenchSection>
         </TabsContent>
       ))}
     </Tabs>

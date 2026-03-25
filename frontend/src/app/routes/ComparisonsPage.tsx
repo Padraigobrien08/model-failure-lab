@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { WorkbenchHeader } from "@/components/layout/WorkbenchHeader";
 import { RankedComparisonCanvas } from "@/components/comparisons/RankedComparisonCanvas";
 import {
   buildComparisonCards,
@@ -65,26 +66,38 @@ export function ComparisonsPage() {
 
   return (
     <section className="space-y-8">
-      <header className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone="accent">Comparisons</Badge>
-          {includeExploratory ? <Badge tone="exploratory">Exploratory scope active</Badge> : null}
-          {selectedMethod ? <Badge tone="default">Focused lane: {selectedMethod}</Badge> : null}
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-[2.75rem] font-semibold tracking-[-0.06em] text-foreground">
-            Ranked comparison canvas
-          </h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-            Start with the ordered method story, then move into the exact failure domain that
-            explains the ranking. The canvas stays official-first and reads straight from the saved
-            report payloads.
-          </p>
-          <p className="max-w-3xl text-sm leading-6 text-foreground">
-            {finalRobustnessBundle.summary.key_takeaway}
-          </p>
-        </div>
-      </header>
+      <WorkbenchHeader
+        meta={
+          <>
+            <Badge tone="accent">Comparisons</Badge>
+            {includeExploratory ? <Badge tone="exploratory">Exploratory scope active</Badge> : null}
+            {selectedMethod ? <Badge tone="default">Focused lane: {selectedMethod}</Badge> : null}
+          </>
+        }
+        title="Compare official lanes, then trace the domain that explains the ranking."
+        description="Start with the ordered method story, then move into the exact failure domain that explains the ranking. The comparison route stays official-first and keeps the saved report package as the reference frame."
+        supportingText={finalRobustnessBundle.summary.key_takeaway}
+        aside={
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Active lane
+              </p>
+              <p className="mt-1 text-foreground">
+                {selectedMethod ? selectedMethod : "No focused lane"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Active domain
+              </p>
+              <p className="mt-1 text-foreground">
+                {selectedDomain ? selectedDomain : "No domain focus"}
+              </p>
+            </div>
+          </div>
+        }
+      />
 
       <RankedComparisonCanvas
         items={comparisonCards}

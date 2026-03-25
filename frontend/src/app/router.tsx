@@ -16,27 +16,27 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
     label: "Overview",
     path: "/",
-    description: "Final verdicts and official evidence launchpad",
+    description: "System index for the final verdict and active scope",
   },
   {
     label: "Comparisons",
     path: "/comparisons",
-    description: "Method-to-method debugging",
+    description: "Rank lanes and inspect why the order holds",
   },
   {
     label: "Failure Explorer",
     path: "/failure-explorer",
-    description: "Subgroup, ID/OOD, and calibration entrypoints",
+    description: "Separate subgroup, OOD, ID, and calibration stories",
   },
   {
     label: "Runs",
     path: "/runs",
-    description: "Run-level lineage and seed context",
+    description: "Seeded run lineage and detailed inspection",
   },
   {
     label: "Evidence",
     path: "/evidence",
-    description: "Raw reports, eval bundles, and metadata paths",
+    description: "Reports, eval bundles, and manifest-backed paths",
   },
 ];
 

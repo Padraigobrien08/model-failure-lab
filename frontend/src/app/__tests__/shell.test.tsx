@@ -23,27 +23,27 @@ describe("App shell", () => {
     expect(screen.getByLabelText(/Workbench state/i)).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Overview Final verdicts and official evidence launchpad/i,
+        name: /Overview System index for the final verdict and active scope/i,
       }),
     ).toHaveAttribute("aria-current", "page");
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Comparisons Method-to-method debugging/i,
+        name: /Comparisons Rank lanes and inspect why the order holds/i,
       }),
     ).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Failure Explorer Subgroup, ID\/OOD, and calibration entrypoints/i,
+        name: /Failure Explorer Separate subgroup, OOD, ID, and calibration stories/i,
       }),
     ).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Runs Run-level lineage and seed context/i,
+        name: /Runs Seeded run lineage and detailed inspection/i,
       }),
     ).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Evidence Raw reports, eval bundles, and metadata paths/i,
+        name: /Evidence Reports, eval bundles, and manifest-backed paths/i,
       }),
     ).toBeInTheDocument();
   });
