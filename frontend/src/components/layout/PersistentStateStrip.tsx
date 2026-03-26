@@ -3,11 +3,11 @@ import { formatLabel } from "@/lib/formatters";
 
 type PersistentStateStripProps = {
   includeExploratory: boolean;
-  finalRobustnessVerdict?: string;
-  datasetExpansionRecommendation?: string;
+  selectedVerdict?: string | null;
+  selectedLane?: string | null;
   selectedMethod?: string | null;
-  selectedDomain?: string | null;
   selectedRunId?: string | null;
+  manifestStatus?: string | null;
 };
 
 type StateItem = {
@@ -29,11 +29,11 @@ function StateCell({ label, value, tone = "muted" }: StateItem) {
 
 export function PersistentStateStrip({
   includeExploratory,
-  finalRobustnessVerdict,
-  datasetExpansionRecommendation,
+  selectedVerdict,
+  selectedLane,
   selectedMethod,
-  selectedDomain,
   selectedRunId,
+  manifestStatus,
 }: PersistentStateStripProps) {
   const items: StateItem[] = [
     {
@@ -43,26 +43,24 @@ export function PersistentStateStrip({
     },
     {
       label: "Verdict",
-      value: finalRobustnessVerdict ? formatLabel(finalRobustnessVerdict) : "Not loaded",
+      value: selectedVerdict ? formatLabel(selectedVerdict) : "Not loaded",
       tone: "accent",
     },
     {
-      label: "Gate",
-      value: datasetExpansionRecommendation
-        ? formatLabel(datasetExpansionRecommendation)
-        : "Not loaded",
-    },
-    {
       label: "Lane",
-      value: selectedMethod ? formatLabel(selectedMethod) : "No focused lane",
+      value: selectedLane ? formatLabel(selectedLane) : "No active lane",
     },
     {
-      label: "Domain",
-      value: selectedDomain ? formatLabel(selectedDomain) : "No domain focus",
+      label: "Method",
+      value: selectedMethod ? formatLabel(selectedMethod) : "No active method",
     },
     {
       label: "Run",
       value: selectedRunId ?? "No selected run",
+    },
+    {
+      label: "Manifest",
+      value: manifestStatus ?? "Manifest unavailable",
     },
   ];
 

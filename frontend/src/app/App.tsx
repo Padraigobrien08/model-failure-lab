@@ -1,10 +1,19 @@
-import { useEffect, useState } from "react";
-import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  BrowserRouter,
+  MemoryRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 
 import type { AppRouteContext } from "@/app/router";
 import { ComparisonsPage } from "@/app/routes/ComparisonsPage";
 import { EvidencePage } from "@/app/routes/EvidencePage";
 import { FailureExplorerPage } from "@/app/routes/FailureExplorerPage";
+import { ManifestPage } from "@/app/routes/ManifestPage";
 import { RunsPage } from "@/app/routes/RunsPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { loadArtifactIndex, DEFAULT_MANIFEST_PATH } from "@/lib/manifest/load";
@@ -14,8 +23,10 @@ import type {
   FailureDomainKey,
   FinalRobustnessBundle,
   RunEntity,
+  WorkbenchSelection,
 } from "@/lib/manifest/types";
 import { OverviewPage } from "@/app/routes/OverviewPage";
+import { buildVerdictWorkspaceModel, getMethodLaneKey } from "@/lib/manifest/selectors";
 
 type AppProps = {
   manifestPath?: string;
@@ -33,26 +44,79 @@ type AppFrameProps = {
   initialIncludeExploratory: boolean;
 };
 
+const FAILURE_DOMAIN_KEYS: FailureDomainKey[] = ["worst_group", "ood", "id", "calibration"];
+
+function isFailureDomainKey(value: string | null): value is FailureDomainKey {
+  return value !== null && FAILURE_DOMAIN_KEYS.includes(value as FailureDomainKey);
+}
+
+function buildSelectionFromSearchParams(
+  searchParams: URLSearchParams,
+  initialIncludeExploratory: boolean,
+): WorkbenchSelection {
+  const scopeParam = searchParams.get("scope");
+  const scope =
+    scopeParam === "exploratory" || (!scopeParam && initialIncludeExploratory)
+      ? "exploratory"
+      : "official";
+  const domainParam = searchParams.get("domain");
+
+  return {
+    scope,
+    verdict: searchParams.get("verdict"),
+    lane: searchParams.get("lane"),
+    method: searchParams.get("method"),
+    run: searchParams.get("run"),
+    artifact: searchParams.get("artifact"),
+    domain: isFailureDomainKey(domainParam) ? domainParam : null,
+  };
+}
+
+function LegacyRouteRedirect({ to }: { to: string }) {
+  const location = useLocation();
+
+  return <Navigate replace to={`${to}${location.search}`} />;
+}
+
 function AppFrame({
   manifestPath,
   initialIndex = null,
   initialFinalRobustnessBundle = null,
   initialIncludeExploratory,
 }: AppFrameProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [index, setIndex] = useState<ArtifactIndex | null>(initialIndex);
   const [isLoading, setIsLoading] = useState<boolean>(initialIndex === null);
   const [error, setError] = useState<string | null>(null);
-  const [includeExploratory, setIncludeExploratory] = useState(initialIncludeExploratory);
   const [finalRobustnessBundle, setFinalRobustnessBundle] =
     useState<FinalRobustnessBundle | null>(initialFinalRobustnessBundle);
   const [isFinalRobustnessBundleLoading, setIsFinalRobustnessBundleLoading] = useState(
     initialFinalRobustnessBundle === null,
   );
   const [finalRobustnessBundleError, setFinalRobustnessBundleError] = useState<string | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
-  const [selectedDomain, setSelectedDomain] = useState<FailureDomainKey | null>(null);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
+  const selection = useMemo(
+    () => buildSelectionFromSearchParams(searchParams, initialIncludeExploratory),
+    [initialIncludeExploratory, searchParams],
+  );
+  const includeExploratory = selection.scope === "exploratory";
+
+  function setSelection(patch: Partial<WorkbenchSelection>) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === null || value === "" || value === undefined) {
+          next.delete(key);
+          continue;
+        }
+
+        next.set(key, String(value));
+      }
+
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (initialIndex !== null) {
@@ -122,21 +186,48 @@ function AppFrame({
   }, [index, initialFinalRobustnessBundle]);
 
   useEffect(() => {
-    if (index === null || includeExploratory || selectedRunId === null) {
+    if (index === null || includeExploratory || selection.run === null) {
       return;
     }
 
     const selectedRun = (index.entities.runs as RunEntity[]).find(
-      (run) => run.id === selectedRunId || run.run_id === selectedRunId,
+      (run) => run.id === selection.run || run.run_id === selection.run,
     );
     if (selectedRun?.default_visible === false) {
-      setSelectedRunId(null);
+      setSelection({ run: null, artifact: null });
       setIsEvidenceDrawerOpen(false);
     }
-  }, [includeExploratory, index, selectedRunId]);
+  }, [includeExploratory, index, selection.run]);
+
+  useEffect(() => {
+    if (index === null || finalRobustnessBundle === null) {
+      return;
+    }
+
+    const defaults = buildVerdictWorkspaceModel(index, finalRobustnessBundle, includeExploratory);
+    const patch: Partial<WorkbenchSelection> = {};
+
+    if (!selection.verdict) {
+      patch.verdict = defaults.finalVerdict;
+    }
+
+    if (!selection.lane) {
+      patch.lane = defaults.dominantLaneKey;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      setSelection(patch);
+    }
+  }, [
+    finalRobustnessBundle,
+    includeExploratory,
+    index,
+    selection.lane,
+    selection.verdict,
+  ]);
 
   function openEvidenceDrawer(runId: string) {
-    setSelectedRunId(runId);
+    setSelection({ run: runId });
     setIsEvidenceDrawerOpen(true);
   }
 
@@ -149,17 +240,48 @@ function AppFrame({
     isLoading,
     error,
     includeExploratory,
-    setIncludeExploratory,
+    setIncludeExploratory: (value: boolean) =>
+      setSelection({ scope: value ? "exploratory" : "official" }),
     manifestPath,
     finalRobustnessBundle,
     finalRobustnessBundleError,
     isFinalRobustnessBundleLoading,
-    selectedMethod,
-    setSelectedMethod,
-    selectedDomain,
-    setSelectedDomain,
-    selectedRunId,
-    setSelectedRunId,
+    selection,
+    setSelection,
+    selectedVerdict: selection.verdict,
+    setSelectedVerdict: (value: string | null) => setSelection({ verdict: value }),
+    selectedLane: selection.lane,
+    setSelectedLane: (value: string | null) =>
+      setSelection({
+        lane: value,
+        domain:
+          value === "calibration"
+            ? "calibration"
+            : value === "robustness" && selection.domain === "calibration"
+              ? "worst_group"
+              : selection.domain,
+      }),
+    selectedMethod: selection.method,
+    setSelectedMethod: (value: string | null) =>
+      setSelection({
+        method: value,
+        lane: value ? getMethodLaneKey(value) : selection.lane,
+      }),
+    selectedDomain: selection.domain,
+    setSelectedDomain: (value: FailureDomainKey | null) =>
+      setSelection({
+        domain: value,
+        lane:
+          value === "calibration"
+            ? "calibration"
+            : value === null
+              ? selection.lane
+              : "robustness",
+      }),
+    selectedRunId: selection.run,
+    setSelectedRunId: (value: string | null) => setSelection({ run: value }),
+    selectedArtifact: selection.artifact,
+    setSelectedArtifact: (value: string | null) => setSelection({ artifact: value }),
     isEvidenceDrawerOpen,
     openEvidenceDrawer,
     closeEvidenceDrawer,
@@ -172,17 +294,22 @@ function AppFrame({
         element={
           <AppShell
             includeExploratory={includeExploratory}
-            onToggleExploratory={setIncludeExploratory}
+            onToggleExploratory={(next) =>
+              setSelection({ scope: next ? "exploratory" : "official" })
+            }
             manifestPath={manifestPath}
             routeContext={routeContext}
           />
         }
       >
         <Route index element={<OverviewPage />} />
-        <Route path="comparisons" element={<ComparisonsPage />} />
-        <Route path="failure-explorer" element={<FailureExplorerPage />} />
+        <Route path="overview" element={<LegacyRouteRedirect to="/" />} />
+        <Route path="lanes" element={<ComparisonsPage />} />
         <Route path="runs" element={<RunsPage />} />
         <Route path="evidence" element={<EvidencePage />} />
+        <Route path="manifest" element={<ManifestPage />} />
+        <Route path="comparisons" element={<LegacyRouteRedirect to="/lanes" />} />
+        <Route path="failure-explorer" element={<FailureExplorerPage />} />
       </Route>
     </Routes>
   );
