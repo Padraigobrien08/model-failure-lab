@@ -50,7 +50,7 @@ export type SummaryRouteSnapshot = {
   lanes: Record<SummaryRouteLaneId, SummaryRouteLanePanel>;
 };
 
-export const summaryRouteSnapshot: SummaryRouteSnapshot = {
+const summaryRouteBaseSnapshot: SummaryRouteSnapshot = {
   verdict: {
     status: "mixed",
     implication:
@@ -177,3 +177,39 @@ export const summaryRouteSnapshot: SummaryRouteSnapshot = {
     },
   },
 };
+
+function buildPreviewRows(
+  rows: SummaryRouteMethodPreviewRow[],
+  scope: "official" | "all",
+): SummaryRouteMethodPreviewRow[] {
+  const filteredRows =
+    scope === "all" ? rows : rows.filter((row) => row.scope === "official");
+
+  const baselineRow = filteredRows.find((row) => row.methodId === "baseline");
+  const remainingRows = filteredRows.filter((row) => row.methodId !== "baseline");
+
+  return [baselineRow, ...remainingRows].filter(Boolean).slice(0, 3) as SummaryRouteMethodPreviewRow[];
+}
+
+export function buildSummaryRouteModel(scope: "official" | "all"): SummaryRouteSnapshot {
+  return {
+    verdict: summaryRouteBaseSnapshot.verdict,
+    laneOrder: summaryRouteBaseSnapshot.laneOrder,
+    lanes: {
+      robustness: {
+        ...summaryRouteBaseSnapshot.lanes.robustness,
+        methodPreviewRows: buildPreviewRows(
+          summaryRouteBaseSnapshot.lanes.robustness.methodPreviewRows,
+          scope,
+        ),
+      },
+      calibration: {
+        ...summaryRouteBaseSnapshot.lanes.calibration,
+        methodPreviewRows: buildPreviewRows(
+          summaryRouteBaseSnapshot.lanes.calibration.methodPreviewRows,
+          scope,
+        ),
+      },
+    },
+  };
+}

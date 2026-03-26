@@ -1,3 +1,6 @@
+import type { KeyboardEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+
 import type { TraceScope } from "@/app/scope";
 import { Badge } from "@/components/ui/badge";
 import { formatLabel, formatMetric, formatSignedMetric, getMetricTextTone } from "@/lib/formatters";
@@ -8,6 +11,10 @@ type LaneSummaryPanelProps = {
   lane: SummaryRouteLanePanel;
   scope: TraceScope;
 };
+
+function withScope(path: string, scope: TraceScope) {
+  return `${path}?scope=${scope}`;
+}
 
 function getStatusBadgeProps(status: SummaryRouteMethodStatus | SummaryRouteLanePanel["status"]) {
   if (status === "stable") {
@@ -25,12 +32,31 @@ function getStatusBadgeProps(status: SummaryRouteMethodStatus | SummaryRouteLane
 }
 
 export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
-  const previewRows = lane.methodPreviewRows
-    .filter((row) => scope === "all" || row.scope === "official")
-    .slice(0, 3);
+  const navigate = useNavigate();
+
+  function openLane() {
+    navigate(withScope(`/lane/${lane.laneId}`, scope));
+  }
+
+  function handlePanelKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    openLane();
+  }
 
   return (
-    <section className="grid gap-4 rounded-[20px] border border-border/70 bg-card/45 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.9fr)]">
+    <section
+      aria-label={`${lane.label} lane`}
+      className="grid cursor-pointer gap-4 rounded-[20px] border border-border/70 bg-card/45 p-4 transition-colors hover:border-foreground/30 sm:p-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.9fr)]"
+      data-testid={`${lane.laneId}-lane-panel`}
+      onClick={openLane}
+      onKeyDown={handlePanelKeyDown}
+      role="link"
+      tabIndex={0}
+    >
       <div className="space-y-4">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -78,14 +104,22 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
         </div>
 
         <div className="mt-3 space-y-3">
-          {previewRows.map((row) => {
+          {lane.methodPreviewRows.map((row) => {
             const statusBadgeProps = getStatusBadgeProps(row.status);
 
             return (
               <div key={`${lane.laneId}-${row.methodId}`} className="rounded-[14px] border border-border/70 px-3 py-3">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge tone="default">{row.label}</Badge>
+                    <Link
+                      className="text-sm font-semibold text-foreground underline decoration-border underline-offset-4 hover:text-primary"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                      }}
+                      to={withScope(`/lane/${lane.laneId}/${row.methodId}`, scope)}
+                    >
+                      {row.label}
+                    </Link>
                     <Badge {...statusBadgeProps}>{formatLabel(row.status)}</Badge>
                     {row.scope === "exploratory" ? <Badge tone="exploratory">Exploratory</Badge> : null}
                   </div>
