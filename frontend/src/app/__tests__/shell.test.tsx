@@ -22,10 +22,18 @@ describe("App shell", () => {
     expect(within(screen.getByLabelText("Trace chain")).getByText("Artifact")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Official" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("heading", { name: "Method" })).toBeInTheDocument();
-    expect(screen.getByText("/lane/robustness/reweighting")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Why is this method judged this way?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("/lane/:laneId/:methodId")).toBeInTheDocument();
     expect(screen.getByText("methodId")).toBeInTheDocument();
     expect(screen.getByText("reweighting")).toBeInTheDocument();
+    expect(
+      screen.getByText((_, element) => element?.textContent === "Current scope: All"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Previous step")).toBeInTheDocument();
+    expect(screen.getByText("Next step")).toBeInTheDocument();
+    expect(container.querySelector("main")).not.toBeNull();
     expect(container.querySelector("aside")).toBeNull();
   });
 
@@ -34,11 +42,16 @@ describe("App shell", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Run" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "What happened in this run?" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Official" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    expect(
+      screen.getByText((_, element) => element?.textContent === "Current scope: Official"),
+    ).toBeInTheDocument();
     await waitFor(() => {
       expect(window.location.search).toBe("?scope=official");
     });
