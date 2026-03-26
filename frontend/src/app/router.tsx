@@ -15,29 +15,29 @@ export type NavigationItem = {
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
-    label: "Verdicts",
+    label: "Verdict",
     path: "/",
-    description: "Final verdict, supporting lanes, and first evidence path",
+    description: "Starting point for the trace-first scaffold",
   },
   {
-    label: "Lanes",
-    path: "/lanes",
-    description: "Calibration-versus-robustness workspace and method ordering",
+    label: "Lane",
+    path: "/lane/:laneId",
+    description: "Focused lane route for one trace branch",
   },
   {
-    label: "Runs",
-    path: "/runs",
-    description: "Run lineage, seeded detail, and artifact handoff",
+    label: "Method",
+    path: "/lane/:laneId/:methodId",
+    description: "Method drilldown inside a selected lane",
   },
   {
-    label: "Evidence",
-    path: "/evidence",
-    description: "Reports, eval bundles, and manifest-backed artifact paths",
+    label: "Run",
+    path: "/run/:runId",
+    description: "Single-run trace route",
   },
   {
-    label: "Manifest",
-    path: "/manifest",
-    description: "Contract provenance, visibility flags, and entity relationships",
+    label: "Artifact",
+    path: "/debug/raw/:entityId",
+    description: "Raw debug route for a trace entity",
   },
 ];
 
