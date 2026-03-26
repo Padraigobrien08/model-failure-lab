@@ -11,11 +11,6 @@ type RouteCase = {
 
 const ROUTE_CASES: RouteCase[] = [
   {
-    entry: "/",
-    question: "Where should I look?",
-    params: [],
-  },
-  {
     entry: "/lane/robustness",
     question: "Why is this lane in focus?",
     params: [["laneId", "robustness"]],
@@ -46,15 +41,20 @@ describe("Trace scaffold routes", () => {
     window.history.replaceState({}, "", "/");
   });
 
+  it("renders / with the summary verdict strip and compact lane panels", () => {
+    render(<App useMemoryRouter initialEntries={["/"]} />);
+
+    expect(screen.getByRole("heading", { name: "Where should I look?" })).toBeInTheDocument();
+    expect(screen.getByText("Calibration is stable, but robustness still needs scrutiny before widening the default story.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Robustness" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Calibration" })).toBeInTheDocument();
+    expect(screen.queryByText("No dynamic params for this route.")).not.toBeInTheDocument();
+  });
+
   it.each(ROUTE_CASES)("renders $entry with its dedicated placeholder content", ({ entry, question, params }) => {
     render(<App useMemoryRouter initialEntries={[entry]} />);
 
     expect(screen.getByRole("heading", { name: question })).toBeInTheDocument();
-
-    if (params.length === 0) {
-      expect(screen.getByText("No dynamic params for this route.")).toBeInTheDocument();
-      return;
-    }
 
     for (const [name, value] of params) {
       expect(screen.getByText(name)).toBeInTheDocument();
