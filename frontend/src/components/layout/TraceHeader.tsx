@@ -4,6 +4,12 @@ import { Link, matchPath, useLocation, useParams } from "react-router-dom";
 import { NAVIGATION_ITEMS } from "@/app/router";
 import { useTraceScope } from "@/app/scope";
 import { Button } from "@/components/ui/button";
+import {
+  buildLaneRouteModel,
+  type LaneRouteLaneId,
+  type LaneRouteMethodId,
+} from "@/lib/laneRoute";
+import { buildSummaryRouteModel } from "@/lib/summaryRoute";
 import { cn } from "@/lib/utils";
 
 function getActiveRouteLabel(pathname: string) {
@@ -18,26 +24,102 @@ function buildScopedPath(path: string, scope: "official" | "all") {
   return `${path}?scope=${scope}`;
 }
 
+function inferMethodIdFromRunId(runId: string | undefined): LaneRouteMethodId | null {
+  if (!runId) {
+    return null;
+  }
+
+  const candidates: LaneRouteMethodId[] = [
+    "temperature_scaling",
+    "reweighting",
+    "group_dro",
+    "baseline",
+  ];
+
+  return candidates.find((candidate) => runId.includes(candidate)) ?? null;
+}
+
+function inferLaneIdFromMethodId(methodId: LaneRouteMethodId | null): LaneRouteLaneId {
+  if (methodId === "temperature_scaling") {
+    return "calibration";
+  }
+
+  return "robustness";
+}
+
+function pickPreferredMethodId(
+  laneId: LaneRouteLaneId,
+  scope: "official" | "all",
+  preferredMethodId?: string,
+) {
+  const laneModel = buildLaneRouteModel(laneId, scope);
+  const explicitMethod =
+    preferredMethodId &&
+    laneModel.rows.find((row) => row.methodId === preferredMethodId);
+
+  if (explicitMethod) {
+    return explicitMethod.methodId;
+  }
+
+  return (
+    laneModel.rows.find((row) => row.methodId !== "baseline")?.methodId ??
+    laneModel.rows[0]?.methodId ??
+    "baseline"
+  );
+}
+
+function pickPreferredRunId(
+  laneId: LaneRouteLaneId,
+  methodId: LaneRouteMethodId,
+  scope: "official" | "all",
+  explicitRunId?: string,
+) {
+  if (explicitRunId) {
+    return explicitRunId;
+  }
+
+  const laneModel = buildLaneRouteModel(laneId, scope);
+  const methodRow = laneModel.rows.find((row) => row.methodId === methodId) ?? laneModel.rows[0];
+  const preferredRun =
+    methodRow?.runs.find((run) => run.scope === "official") ?? methodRow?.runs[0];
+
+  return preferredRun?.runId ?? "distilbert_reweighting_seed_13";
+}
+
+function resolveTraceTargets(
+  params: Readonly<Record<string, string | undefined>>,
+  scope: "official" | "all",
+) {
+  const summaryModel = buildSummaryRouteModel(scope);
+  const inferredMethodId = inferMethodIdFromRunId(params.runId);
+  const laneId = (params.laneId as LaneRouteLaneId | undefined) ??
+    inferLaneIdFromMethodId(inferredMethodId) ??
+    summaryModel.laneOrder[0];
+  const methodId = pickPreferredMethodId(laneId, scope, params.methodId ?? inferredMethodId ?? undefined);
+  const runId = pickPreferredRunId(laneId, methodId, scope, params.runId);
+  const entityId = params.entityId ?? `run_${runId}`;
+
+  return { laneId, methodId, runId, entityId };
+}
+
 function getTraceHref(
   label: string,
   params: Readonly<Record<string, string | undefined>>,
   scope: "official" | "all",
 ) {
+  const targets = resolveTraceTargets(params, scope);
+
   switch (label) {
     case "Verdict":
       return buildScopedPath("/", scope);
     case "Lane":
-      return params.laneId ? buildScopedPath(`/lane/${params.laneId}`, scope) : null;
+      return buildScopedPath(`/lane/${targets.laneId}`, scope);
     case "Method":
-      return params.laneId && params.methodId
-        ? buildScopedPath(`/lane/${params.laneId}/${params.methodId}`, scope)
-        : null;
+      return buildScopedPath(`/lane/${targets.laneId}/${targets.methodId}`, scope);
     case "Run":
-      return params.runId ? buildScopedPath(`/run/${params.runId}`, scope) : null;
+      return buildScopedPath(`/run/${targets.runId}`, scope);
     case "Artifact":
-      return params.entityId
-        ? buildScopedPath(`/debug/raw/${params.entityId}`, scope)
-        : null;
+      return buildScopedPath(`/debug/raw/${targets.entityId}`, scope);
     default:
       return null;
   }
@@ -49,7 +131,6 @@ export function TraceHeader() {
   const { scope, setScope } = useTraceScope();
   const activeRouteLabel = getActiveRouteLabel(location.pathname);
   const homeHref = `/?scope=${scope}`;
-  const activeRouteIndex = NAVIGATION_ITEMS.findIndex((item) => item.label === activeRouteLabel);
 
   return (
     <header className="border-b border-border/70 bg-background/95">
@@ -77,7 +158,7 @@ export function TraceHeader() {
                 {(() => {
                   const href = getTraceHref(item.label, params, scope);
                   const isActive = item.label === activeRouteLabel;
-                  const isAvailable = href !== null && index <= activeRouteIndex;
+                  const isAvailable = href !== null;
                   const pillClassName = cn(
                     "rounded-full border border-border/70 px-2.5 py-1 transition-colors",
                     isActive && "border-foreground text-foreground",
