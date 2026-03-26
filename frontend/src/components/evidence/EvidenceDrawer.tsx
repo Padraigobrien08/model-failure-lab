@@ -1,125 +1,70 @@
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { CardDescription, CardTitle } from "@/components/ui/card";
-import type { EvidenceDrawerModel } from "@/lib/manifest/types";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import type { InspectorModel } from "@/lib/manifest/types";
+import { ArtifactPreviewPanel } from "@/components/evidence/ArtifactPreviewPanel";
+import { InspectorEvidenceActions } from "@/components/evidence/InspectorEvidenceActions";
+import { InspectorProvenanceStack } from "@/components/evidence/InspectorProvenanceStack";
 
 type EvidenceDrawerProps = {
-  model: EvidenceDrawerModel;
-  onClose: () => void;
-  onOpenRunsView: (runId: string) => void;
+  model: InspectorModel;
+  onClose?: () => void;
 };
 
-export function EvidenceDrawer({
-  model,
-  onClose,
-  onOpenRunsView,
-}: EvidenceDrawerProps) {
+export function EvidenceDrawer({ model, onClose }: EvidenceDrawerProps) {
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
-          <CardDescription>Evidence drawer</CardDescription>
-          <CardTitle>{model.detail.displayName}</CardTitle>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Quick drillthrough keeps current-page context intact. Move to the full Runs route only
-            when you need the larger lineage panel.
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Live inspector
           </p>
+          <h3 className="text-[1.6rem] font-semibold tracking-[-0.04em] text-foreground">
+            {model.title}
+          </h3>
+          <p className="font-mono text-xs leading-6 text-muted-foreground">{model.subtitle}</p>
+          {model.description ? (
+            <p className="text-sm leading-6 text-muted-foreground">{model.description}</p>
+          ) : null}
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          Close
-        </Button>
+        {onClose ? (
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Clear focus
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={model.run.isExploratory ? "exploratory" : "accent"}>
-          {model.run.isOfficial ? "Official" : "Exploratory"}
-        </Badge>
-        <Badge tone="default">{model.run.seedLabel}</Badge>
-        <Badge tone="muted">{model.run.verdict}</Badge>
+        {model.badges.map((badge) => (
+          <Badge key={`${badge.label}-${badge.tone}`} tone={badge.tone}>
+            {badge.label}
+          </Badge>
+        ))}
       </div>
 
-      <div className="rounded-[16px] border border-border/80 bg-background/55 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Run
-        </p>
-        <p className="mt-2 font-mono text-xs leading-6 text-foreground">{model.run.runId}</p>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{model.detail.storyNote}</p>
-      </div>
-
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Lineage
-        </p>
-        <div className="space-y-2">
-          {model.detail.lineage.map((item) => (
-            <div
-              key={`${model.run.runId}-${item.label}`}
-              className="rounded-[16px] border border-border/70 bg-background/55 px-4 py-3"
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                {item.label}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-foreground">{item.value}</p>
-            </div>
-          ))}
+      {model.warning ? (
+        <div className="rounded-[16px] border border-dashed border-amber-700/35 bg-amber-950/20 px-4 py-3 text-sm leading-6 text-amber-100">
+          {model.warning}
         </div>
-      </div>
+      ) : null}
 
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Summary
-        </p>
-        <div className="grid gap-3">
-          {model.detail.metrics.map((metric) => (
-            <div
-              key={`${model.run.runId}-${metric.label}`}
-              className="rounded-[16px] border border-border/70 bg-background/55 px-4 py-3"
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                {metric.label}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{metric.value}</p>
-              {metric.note ? (
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">{metric.note}</p>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
+      <InspectorProvenanceStack
+        title="Lineage"
+        description="What produced the currently selected object and where to climb back up the chain."
+        items={model.lineage}
+      />
 
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Artifacts
-        </p>
-        <div className="space-y-4">
-          {model.detail.actionGroups.map((group) => (
-            <div
-              key={`${model.run.runId}-${group.title}`}
-              className="rounded-[16px] border border-border/70 bg-background/55 p-4"
-            >
-              <p className="text-sm font-semibold text-foreground">{group.title}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {group.actions.map((action) => (
-                  <a
-                    key={`${model.run.runId}-${group.title}-${action.label}-${action.path}`}
-                    href={action.path}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                  >
-                    {action.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <InspectorProvenanceStack
+        title="Provenance"
+        description="Manifest truth for scope, visibility, and source-path state."
+        items={model.provenance}
+      />
 
-      <Button className="w-full" onClick={() => onOpenRunsView(model.run.runId)}>
-        Open in Runs view
-      </Button>
+      <InspectorEvidenceActions
+        routeActions={model.routeActions}
+        actionGroups={model.actionGroups}
+      />
+
+      <ArtifactPreviewPanel preview={model.preview} />
     </div>
   );
 }

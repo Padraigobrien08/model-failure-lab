@@ -20,11 +20,11 @@ describe("evidence drawer flow", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Inspect Reweighting evidence/i }));
+    await user.click(screen.getAllByRole("button", { name: /Inspect Reweighting evidence/i })[0]);
 
-    expect(screen.getByRole("heading", { name: /Quick drillthrough/i })).toBeInTheDocument();
-    expect(screen.getByText(/Evidence drawer/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Open in Runs view/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: /Reweighting/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Live inspector/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /Open Run Lineage/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Ranked comparison canvas/i })).toBeInTheDocument();
   });
 });

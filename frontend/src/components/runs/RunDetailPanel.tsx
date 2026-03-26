@@ -45,7 +45,7 @@ export function RunDetailPanel({ detail, onOpenDrawer }: RunDetailPanelProps) {
             </div>
             {onOpenDrawer ? (
               <Button variant="outline" size="sm" onClick={onOpenDrawer}>
-                Open evidence drawer
+                Pin in inspector
               </Button>
             ) : null}
           </div>

@@ -20,13 +20,13 @@ describe("run drillthrough handoff", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Inspect Reweighting evidence/i }));
-    await user.click(screen.getByRole("button", { name: /Open in Runs view/i }));
+    await user.click(screen.getAllByRole("button", { name: /Inspect Reweighting evidence/i })[0]);
+    await user.click(screen.getByRole("link", { name: /Open Run Lineage/i }));
 
     expect(
       screen.getByRole("heading", { name: /Grouped runs by method lane, then by seed/i }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Focused run: reweighting_seed_13/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Open evidence drawer/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Pin in inspector/i })).toBeInTheDocument();
   });
 });
