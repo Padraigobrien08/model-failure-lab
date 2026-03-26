@@ -8,7 +8,7 @@ import {
 } from "@/test/fixtures";
 
 describe("App shell", () => {
-  it("renders the locked top-level navigation and defaults to overview", () => {
+  it("renders the locked top-level navigation and defaults to verdicts", () => {
     render(
       <App
         useMemoryRouter
@@ -23,27 +23,27 @@ describe("App shell", () => {
     expect(screen.getByLabelText(/Workbench state/i)).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Overview System index for the final verdict and active scope/i,
+        name: /Verdicts Final verdict, supporting lanes, and first evidence path/i,
       }),
     ).toHaveAttribute("aria-current", "page");
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Comparisons Rank lanes and inspect why the order holds/i,
+        name: /Lanes Calibration-versus-robustness workspace and method ordering/i,
       }),
     ).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Failure Explorer Separate subgroup, OOD, ID, and calibration stories/i,
+        name: /Runs Run lineage, seeded detail, and artifact handoff/i,
       }),
     ).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Runs Seeded run lineage and detailed inspection/i,
+        name: /Evidence Reports, eval bundles, and manifest-backed artifact paths/i,
       }),
     ).toBeInTheDocument();
     expect(
       within(primaryNavigation).getByRole("link", {
-        name: /Evidence Reports, eval bundles, and manifest-backed paths/i,
+        name: /Manifest Contract provenance, visibility flags, and entity relationships/i,
       }),
     ).toBeInTheDocument();
   });
@@ -58,7 +58,7 @@ describe("App shell", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Show exploratory evidence/i }));
+    await user.click(screen.getByRole("button", { name: /Include exploratory/i }));
 
     expect(screen.getByText(/Scope: Official \+ Exploratory/i)).toBeInTheDocument();
     expect(screen.getByText(/exploratory scope active/i)).toBeInTheDocument();

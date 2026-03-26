@@ -21,6 +21,8 @@ import type {
   OverviewSnapshot,
   ReportEntity,
   ResearchCloseout,
+  VerdictLaneModel,
+  VerdictWorkspaceModel,
   RunCardModel,
   RunDetailMetricModel,
   RunDetailModel,
@@ -305,6 +307,10 @@ export function buildOverviewSnapshot(
     officialMethods: closeout?.official_methods ?? [],
     exploratoryMethods: closeout?.exploratory_methods ?? [],
   };
+}
+
+export function getMethodLaneKey(methodName: string) {
+  return methodName === "temperature_scaling" ? "calibration" : "robustness";
 }
 
 function getMethodOrder(methodName: string) {
@@ -1138,4 +1144,139 @@ export function buildFailureDomainModels(
       items,
     };
   });
+}
+
+function buildVerdictLaneItems(
+  index: ArtifactIndex,
+  bundle: FinalRobustnessBundle,
+  domain: FailureDomainKey,
+  includeExploratory = false,
+) {
+  return getFailureDomainSource(bundle, domain)
+    .filter((entry) => includeExploratory || entry.is_exploratory !== true)
+    .sort((left, right) => getMethodOrder(left.method_name) - getMethodOrder(right.method_name))
+    .map((entry) => ({
+      methodName: entry.method_name,
+      displayName: entry.display_name,
+      verdict: entry.primary_verdict ?? entry.stability_label ?? "unknown",
+      comparisonMode: entry.comparison_mode,
+      isExploratory: entry.is_exploratory,
+      representativeRunId: getRepresentativeRunIdForMethod(index, entry.method_name, true),
+      storyNote: entry.story_note,
+      seedCount: entry.seed_count ?? 0,
+      mean: entry.mean,
+      std: entry.std,
+      eceMean: entry.ece_mean,
+      eceStd: entry.ece_std,
+      brierMean: entry.brier_score_mean,
+      brierStd: entry.brier_score_std,
+      seedBreakdown: buildSeedBreakdown(index, entry.method_name),
+    }));
+}
+
+function buildVerdictLane(
+  index: ArtifactIndex,
+  bundle: FinalRobustnessBundle,
+  closeout: ResearchCloseout | null,
+  includeExploratory: boolean,
+  key: "robustness" | "calibration",
+): VerdictLaneModel {
+  if (key === "calibration") {
+    const items = buildVerdictLaneItems(index, bundle, "calibration", includeExploratory);
+    const temperatureScaling = buildMethodSummaryLookup(bundle).get("temperature_scaling");
+
+    return {
+      key,
+      label: "Calibration",
+      verdict:
+        temperatureScaling?.primary_verdict ??
+        temperatureScaling?.stability_label ??
+        "stable",
+      description: "Why reliability moved more cleanly than robustness in the official package.",
+      summary:
+        temperatureScaling?.story_note ??
+        "Temperature scaling remains the cleanest official calibration win.",
+      sourceDomain: "calibration",
+      dominant: false,
+      actions: uniqueActions([
+        toEvidenceAction(bundle.report.artifact_refs, "report_markdown", "View report"),
+        toEvidenceAction(
+          bundle.report.payload_refs ?? bundle.report.artifact_refs,
+          "report_data_json",
+          "Open report payload",
+        ),
+        toEvidenceAction(
+          bundle.report.artifact_refs,
+          FAILURE_DOMAIN_CONFIG.calibration.tableRefKey,
+          "View raw metrics table",
+        ),
+      ]),
+      items,
+    };
+  }
+
+  return {
+    key,
+    label: "Robustness",
+    verdict: closeout?.final_robustness_verdict ?? bundle.summary.final_robustness_verdict ?? "still_mixed",
+    description: "Why the final verdict still turns on worst-group and OOD tradeoffs under shift.",
+    summary:
+      closeout?.summary_bullets?.[0] ??
+      closeout?.recommendation_reason ??
+      "Robustness remains mixed because no official lane produces a clean, stable win.",
+    sourceDomain: "worst_group",
+    dominant: true,
+    actions: uniqueActions([
+      toEvidenceAction(bundle.report.artifact_refs, "report_markdown", "View report"),
+      toEvidenceAction(
+        bundle.report.payload_refs ?? bundle.report.artifact_refs,
+        "report_data_json",
+        "Open report payload",
+      ),
+      toEvidenceAction(
+        bundle.report.artifact_refs,
+        FAILURE_DOMAIN_CONFIG.worst_group.tableRefKey,
+        "View raw metrics table",
+      ),
+    ]),
+    items: buildVerdictLaneItems(index, bundle, "worst_group", includeExploratory),
+  };
+}
+
+export function buildVerdictWorkspaceModel(
+  index: ArtifactIndex,
+  bundle: FinalRobustnessBundle,
+  includeExploratory = false,
+): VerdictWorkspaceModel {
+  const closeout = getPrimaryResearchCloseout(index, includeExploratory);
+  const lanes = [
+    buildVerdictLane(index, bundle, closeout, includeExploratory, "robustness"),
+    buildVerdictLane(index, bundle, closeout, includeExploratory, "calibration"),
+  ];
+
+  return {
+    finalVerdict:
+      closeout?.final_robustness_verdict ??
+      bundle.summary.final_robustness_verdict ??
+      "unknown",
+    dominantLaneKey: "robustness",
+    supportingReportScope: bundle.report.report_scope ?? bundle.report.id,
+    primaryActions: uniqueActions([
+      toEvidenceAction(bundle.report.artifact_refs, "report_markdown", "View report"),
+      toEvidenceAction(
+        bundle.report.payload_refs ?? bundle.report.artifact_refs,
+        "report_data_json",
+        "Open report payload",
+      ),
+      toEvidenceAction(
+        bundle.report.artifact_refs,
+        FAILURE_DOMAIN_CONFIG.worst_group.tableRefKey,
+        "View raw metrics table",
+      ),
+    ]),
+    summaryBullets: closeout?.summary_bullets ?? [],
+    recommendationReason: closeout?.recommendation_reason,
+    nextStep: closeout?.next_step,
+    lanes,
+  };
 }

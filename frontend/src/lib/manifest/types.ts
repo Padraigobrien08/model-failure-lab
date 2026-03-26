@@ -225,6 +225,23 @@ export type EvidenceAction = {
 
 export type EvidenceScope = "official" | "exploratory";
 
+export type WorkbenchSelection = {
+  scope: EvidenceScope;
+  verdict: string | null;
+  lane: string | null;
+  method: string | null;
+  run: string | null;
+  artifact: string | null;
+  domain: FailureDomainKey | null;
+};
+
+export type BreadcrumbItemModel = {
+  label: string;
+  value: string;
+  href: string;
+  isActive: boolean;
+};
+
 export type SeedBreakdownRow = {
   seed: string;
   runId?: string;
@@ -409,4 +426,27 @@ export type OverviewSnapshot = {
   };
   officialMethods: string[];
   exploratoryMethods: string[];
+};
+
+export type VerdictLaneModel = {
+  key: string;
+  label: string;
+  verdict: string;
+  description: string;
+  summary: string;
+  sourceDomain: FailureDomainKey;
+  dominant: boolean;
+  actions: EvidenceAction[];
+  items: FailureDomainItemModel[];
+};
+
+export type VerdictWorkspaceModel = {
+  finalVerdict: string;
+  dominantLaneKey: string;
+  supportingReportScope: string;
+  primaryActions: EvidenceAction[];
+  summaryBullets: string[];
+  recommendationReason?: string;
+  nextStep?: string;
+  lanes: VerdictLaneModel[];
 };

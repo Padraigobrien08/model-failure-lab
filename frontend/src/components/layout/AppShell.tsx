@@ -1,8 +1,9 @@
-import { FileSearch, FlaskConical, Layers3, Radar, Rows3 } from "lucide-react";
+import { FileSearch, GitBranch, Radar, Scale, ScrollText } from "lucide-react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import type { AppRouteContext } from "@/app/router";
 import { EvidenceDrawer } from "@/components/evidence/EvidenceDrawer";
+import { LineageBreadcrumb } from "@/components/layout/LineageBreadcrumb";
 import { PersistentStateStrip } from "@/components/layout/PersistentStateStrip";
 import { ScopeChip } from "@/components/layout/ScopeChip";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { NAVIGATION_ITEMS } from "@/app/router";
 import { formatComparisonMode, formatLabel } from "@/lib/formatters";
 import { artifactPathToPublicUrl } from "@/lib/manifest/load";
-import { buildEvidenceDrawerModel, buildOverviewSnapshot } from "@/lib/manifest/selectors";
+import {
+  buildEvidenceDrawerModel,
+  buildOverviewSnapshot,
+  buildVerdictWorkspaceModel,
+} from "@/lib/manifest/selectors";
 import { cn } from "@/lib/utils";
 
 type AppShellProps = {
@@ -20,7 +25,7 @@ type AppShellProps = {
   routeContext: AppRouteContext;
 };
 
-const ICONS = [Rows3, Layers3, FlaskConical, Radar, FileSearch];
+const ICONS = [Scale, Radar, GitBranch, FileSearch, ScrollText];
 
 function getDirectRefPath(value: unknown) {
   return typeof value === "object" && value !== null && "path" in value
@@ -36,12 +41,6 @@ export function AppShell({
 }: AppShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const focusMethod = routeContext.selectedMethod
-    ? formatLabel(routeContext.selectedMethod)
-    : "No focused lane";
-  const focusDomain = routeContext.selectedDomain
-    ? formatLabel(routeContext.selectedDomain)
-    : "No domain focus";
   const finalReport = routeContext.finalRobustnessBundle?.report;
   const reportMarkdownPath = getDirectRefPath(finalReport?.artifact_refs?.report_markdown);
   const reportPayloadPath = getDirectRefPath(finalReport?.artifact_refs?.report_data_json);
@@ -56,6 +55,19 @@ export function AppShell({
           routeContext.selectedRunId,
         )
       : null;
+  const verdictWorkspace =
+    routeContext.index && routeContext.finalRobustnessBundle
+      ? buildVerdictWorkspaceModel(
+          routeContext.index,
+          routeContext.finalRobustnessBundle,
+          includeExploratory,
+        )
+      : null;
+  const currentRoute =
+    NAVIGATION_ITEMS.find((item) => item.path === location.pathname) ?? NAVIGATION_ITEMS[0];
+  const manifestStatus = routeContext.index
+    ? `${routeContext.index.schema_version}${routeContext.index.generated_at ? ` · ${routeContext.index.generated_at.slice(0, 10)}` : ""}`
+    : "Loading manifest";
 
   function handleOpenRunsView(runId: string) {
     routeContext.setSelectedRunId(runId);
@@ -89,12 +101,18 @@ export function AppShell({
                 className="w-full justify-center"
                 onClick={() => onToggleExploratory(!includeExploratory)}
               >
-                {includeExploratory ? "Hide exploratory evidence" : "Show exploratory evidence"}
+                {includeExploratory ? "Official only" : "Include exploratory"}
               </Button>
               <p className="text-xs leading-5 text-muted-foreground">
-                Default scope stays official. Expand only when you intentionally want the scout
-                lanes in the same workspace.
+                Official evidence stays canonical. Broaden scope only when you intentionally want
+                exploratory scouts in the same lineage view.
               </p>
+              {includeExploratory ? (
+                <div className="rounded-[14px] border border-dashed border-amber-700/40 bg-amber-950/20 px-3 py-3 text-xs leading-5 text-amber-100">
+                  Exploratory evidence is enabled because you explicitly broadened scope. Keep it
+                  distinct from the official verdict path.
+                </div>
+              ) : null}
             </div>
 
             <nav className="space-y-2" aria-label="Primary">
@@ -136,8 +154,8 @@ export function AppShell({
                   Analytical Workbench
                 </p>
                 <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                  Trace the current failure story from official verdicts into comparisons, runs,
-                  and artifact paths without switching truth models.
+                  Trace the current failure story from verdicts into lanes, runs, artifacts, and
+                  manifest provenance without switching truth models.
                 </p>
               </div>
               <div className="rounded-[16px] border border-border/70 bg-background/55 px-4 py-3 text-sm leading-6 text-muted-foreground">
@@ -145,24 +163,25 @@ export function AppShell({
                   Current route
                 </p>
                 <p className="mt-1 font-medium text-foreground">
-                  {NAVIGATION_ITEMS.find((item) => item.path === location.pathname)?.label ??
-                    "Overview"}
+                  {currentRoute.label}
                 </p>
-                <p className="mt-1">
-                  {NAVIGATION_ITEMS.find((item) => item.path === location.pathname)?.description ??
-                    "Final verdicts and official evidence launchpad"}
-                </p>
+                <p className="mt-1">{currentRoute.description}</p>
               </div>
             </div>
           </div>
 
+          <LineageBreadcrumb
+            selection={routeContext.selection}
+            fallbackVerdict={verdictWorkspace?.finalVerdict ?? overviewSnapshot?.finalRobustnessVerdict}
+          />
+
           <PersistentStateStrip
             includeExploratory={includeExploratory}
-            finalRobustnessVerdict={overviewSnapshot?.finalRobustnessVerdict}
-            datasetExpansionRecommendation={overviewSnapshot?.datasetExpansionRecommendation}
+            selectedVerdict={routeContext.selectedVerdict ?? verdictWorkspace?.finalVerdict}
+            selectedLane={routeContext.selectedLane}
             selectedMethod={routeContext.selectedMethod}
-            selectedDomain={routeContext.selectedDomain}
             selectedRunId={routeContext.selectedRunId}
+            manifestStatus={manifestStatus}
           />
 
           <div className="px-4 py-5 lg:px-6">
@@ -200,25 +219,22 @@ export function AppShell({
 
                   <div className="rounded-[18px] border border-border/80 bg-background/55 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Workbench posture
+                      Selected lineage
                     </p>
-                    <p className="mt-2 text-sm leading-6 text-foreground">
-                      The left rail sets mode, the center pane carries the active analysis, and the
-                      dock stays reserved for provenance and drillthrough. Keep route-local reading
-                      inside that frame.
-                    </p>
-                  </div>
-
-                  <div className="rounded-[18px] border border-border/80 bg-background/55 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Active focus
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-foreground">{focusMethod}</p>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {location.pathname === "/failure-explorer"
-                        ? `${focusDomain} tab`
-                        : focusDomain}
-                    </p>
+                    <div className="mt-3 space-y-2 text-sm leading-6">
+                      <p className="text-foreground">
+                        Verdict: {formatLabel(routeContext.selectedVerdict ?? verdictWorkspace?.finalVerdict)}
+                      </p>
+                      <p className="text-foreground">
+                        Lane: {formatLabel(routeContext.selectedLane ?? verdictWorkspace?.dominantLaneKey)}
+                      </p>
+                      <p className="text-foreground">
+                        Method: {routeContext.selectedMethod ? formatLabel(routeContext.selectedMethod) : "No active method"}
+                      </p>
+                      <p className="text-muted-foreground">
+                        Run: {routeContext.selectedRunId ?? "No selected run"}
+                      </p>
+                    </div>
                   </div>
 
                   {finalReport ? (
@@ -259,8 +275,8 @@ export function AppShell({
                       Scope rule
                     </p>
                     <p className="mt-2 text-sm leading-6 text-foreground">
-                      Official evidence stays default. Exploratory methods only appear when the user
-                      explicitly broadens scope.
+                      Official evidence stays default. Exploratory entities appear only because the
+                      global scope state says they should be visible.
                     </p>
                   </div>
                 </>
