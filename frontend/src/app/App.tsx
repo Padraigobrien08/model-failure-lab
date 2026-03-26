@@ -1,7 +1,6 @@
 import {
   BrowserRouter,
   MemoryRouter,
-  Outlet,
   Route,
   Routes,
   useLocation,
@@ -9,6 +8,7 @@ import {
 } from "react-router-dom";
 
 import { TraceScopeProvider, useTraceScope } from "@/app/scope";
+import { TraceShell } from "@/components/layout/TraceShell";
 import type { ArtifactIndex, FinalRobustnessBundle } from "@/lib/manifest/types";
 
 type AppProps = {
@@ -24,18 +24,6 @@ type TraceScaffoldPageProps = {
   title: string;
   description: string;
 };
-
-function TraceRouteFrame() {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 py-10 sm:px-6">
-        <div className="w-full">
-          <Outlet />
-        </div>
-      </main>
-    </div>
-  );
-}
 
 function TraceScaffoldPage({ title, description }: TraceScaffoldPageProps) {
   const location = useLocation();
@@ -97,7 +85,7 @@ function AppFrame() {
       <Route
         element={
           <TraceScopeProvider>
-            <TraceRouteFrame />
+            <TraceShell />
           </TraceScopeProvider>
         }
       >
