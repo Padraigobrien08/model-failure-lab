@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Trace-First Failure Debugger Rebuild
-current_phase: 36
-current_plan: 2
-status: ready_for_verification
-stopped_at: Completed 36-02-PLAN.md
-last_updated: "2026-03-26T11:07:28.914Z"
+current_phase: 37
+current_plan: Not started
+status: planned
+stopped_at: Phase 37 planned in two waves; next step is Phase 37 execution
+last_updated: "2026-03-26T12:10:00.000Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 2
+  total_plans: 4
   completed_plans: 2
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -23,18 +23,18 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-03-26)
 
 **Core value:** Make failure under distribution shift measurable, reproducible, and easy to compare so robustness tradeoffs are explicit instead of hidden behind aggregate accuracy.
-**Current focus:** Phase 36 complete — ready for the Phase 37 summary route build
+**Current focus:** Phase 37 — Summary Entry Route
 
 ## Current Position
 
-Phase: 36 (trace-shell-and-route-scaffold) — COMPLETE
-Plan: 2 of 2
-Current Phase: 36
-Current Plan: 2
+Phase: 37 (Summary Entry Route) — READY FOR EXECUTION
+Plan: 0 of 2
+Current Phase: 37
+Current Plan: Not started
 Total Plans in Phase: 2
-Status: Completed 36-02-PLAN.md; ready for Phase 37 planning or verification
+Status: Phase 37 planned in two waves; ready for execution
 Last Activity: 2026-03-26
-**Progress:** [██████████] 100%
+**Progress:** [░░░░░░░░░░] 0%
 
 ## Snapshot
 
@@ -97,7 +97,16 @@ Last Activity: 2026-03-26
   - every required path renders a dedicated placeholder surface
   - placeholder links preserve `?scope=official|all`
   - route-level regression tests cover direct navigation and scope persistence
-- The next workflow step is Phase 37 planning or execution for the real summary entry route at `/`.
+- Phase 37 discussion is now complete and the summary-route contract is locked:
+  - compact verdict strip with status plus one-sentence implication
+  - split lane panels with summary/metrics left and method preview right
+  - baseline-first method preview, then ranked methods
+  - row-level exploratory badges when scope is `all`
+  - whole lane panel clickable, with method names as inline links
+- Phase 37 is now planned in two execution waves:
+  - `37-01` defines the mocked summary route contract and replaces the `/` placeholder with the first real verdict strip plus split lane panels.
+  - `37-02` hardens whole-panel and method-link drilldowns, scope-aware exploratory rows, and focused summary-route regression coverage.
+- The next workflow step is Phase 37 execution for the real summary entry route at `/`.
 
 ## Accumulated Context
 
@@ -334,10 +343,10 @@ Last Activity: 2026-03-26
 
 ## Session Continuity
 
-Last session: 2026-03-26T11:07:28.911Z
-Stopped at: Completed 36-02-PLAN.md
+Last session: 2026-03-26T12:10:00.000Z
+Stopped at: Planned Phase 37 in two waves
 Resume file: None
 
 ## Next Step
 
-Execute the trace-shell-and-route scaffold with `$gsd-execute-phase 36`
+Execute the summary-entry-route phase with `$gsd-execute-phase 37`

@@ -49,6 +49,10 @@ Plans:
 1. User lands on `/` and sees the final verdict immediately.
 2. User can scan compact `Robustness` and `Calibration` panels with short summaries, status, method previews, and key metrics.
 3. User can drill from a lane panel or method row into the next route without wading through overview/dashboard filler.
+**Plans**: 2 plans
+Plans:
+- [ ] `37-01-PLAN.md` - Define the mocked summary route contract and replace the `/` placeholder with the first real verdict plus lane surface.
+- [ ] `37-02-PLAN.md` - Harden lane drilldown behavior, scope-aware preview rows, and focused summary-route regression coverage.
 
 ### Phase 38: Lane Table Workspace
 **Goal**: Make one lane readable as a comparison workspace instead of a summary page.
@@ -108,8 +112,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 36. Trace Shell And Route Scaffold | 2/2 | Complete   | 2026-03-26 |
-| 37. Summary Entry Route | 0/0 | Not started | - |
+| 36. Trace Shell And Route Scaffold | 2/2 | Complete    | 2026-03-26 |
+| 37. Summary Entry Route | 0/2 | Planned | - |
 | 38. Lane Table Workspace | 0/0 | Not started | - |
 | 39. Method Drilldown Route | 0/0 | Not started | - |
 | 40. Run Detail Route | 0/0 | Not started | - |
@@ -118,4 +122,4 @@ Plans:
 | 43. Interaction Audit And Tightening | 0/0 | Not started | - |
 
 ---
-*Last updated: 2026-03-26 after completing 36-02*
+*Last updated: 2026-03-26 after planning Phase 37*
