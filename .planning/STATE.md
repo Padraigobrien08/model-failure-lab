@@ -2,18 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Trace-First Failure Debugger Rebuild
-current_phase: 37
-current_plan: Not started
-status: planned
-stopped_at: Phase 37 planned in two waves; next step is Phase 37 execution
-last_updated: "2026-03-26T12:10:00.000Z"
-last_activity: 2026-03-26
+status: Planned Phase 39
+stopped_at: Completed quick task 260326-o2w; next up execute phase 39
+last_updated: "2026-03-26T19:01:18Z"
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_phases: 3
+  total_plans: 8
+  completed_plans: 6
 ---
 
 # Project State
@@ -23,18 +19,12 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-03-26)
 
 **Core value:** Make failure under distribution shift measurable, reproducible, and easy to compare so robustness tradeoffs are explicit instead of hidden behind aggregate accuracy.
-**Current focus:** Phase 37 — Summary Entry Route
+**Current focus:** Phase 39 — method-drilldown-route
 
 ## Current Position
 
-Phase: 37 (Summary Entry Route) — READY FOR EXECUTION
+Phase: 39 (method-drilldown-route) — PLANNED
 Plan: 0 of 2
-Current Phase: 37
-Current Plan: Not started
-Total Plans in Phase: 2
-Status: Phase 37 planned in two waves; ready for execution
-Last Activity: 2026-03-26
-**Progress:** [░░░░░░░░░░] 0%
 
 ## Snapshot
 
@@ -103,10 +93,41 @@ Last Activity: 2026-03-26
   - baseline-first method preview, then ranked methods
   - row-level exploratory badges when scope is `all`
   - whole lane panel clickable, with method names as inline links
-- Phase 37 is now planned in two execution waves:
-  - `37-01` defines the mocked summary route contract and replaces the `/` placeholder with the first real verdict strip plus split lane panels.
-  - `37-02` hardens whole-panel and method-link drilldowns, scope-aware exploratory rows, and focused summary-route regression coverage.
-- The next workflow step is Phase 37 execution for the real summary entry route at `/`.
+- `37-01` is complete and recorded in `.planning/phases/37-summary-entry-route/37-01-SUMMARY.md`.
+- `37-02` is complete and recorded in `.planning/phases/37-summary-entry-route/37-02-SUMMARY.md`.
+- Phase 37 now satisfies the summary-entry requirement:
+  - `/` immediately shows the final verdict
+  - `Robustness` and `Calibration` are compact, scan-first lane panels
+  - the whole lane panel drills into `/lane/:laneId`
+  - inline method names drill directly into `/lane/:laneId/:methodId`
+  - `?scope=official|all` is preserved through those drilldowns
+- Phase 38 discussion is now complete and the lane-workspace contract is locked:
+  - baseline first, then ranked methods
+  - grouped runs as an expandable subtable beneath each method row
+  - click selects row and updates inspector, while a separate control expands runs
+  - minimal header only: breadcrumb, lane name, status, one-line summary
+- `38-01` is complete and recorded in `.planning/phases/38-lane-table-workspace/38-01-SUMMARY.md`.
+- `38-02` is complete and recorded in `.planning/phases/38-lane-table-workspace/38-02-SUMMARY.md`.
+- Phase 38 now satisfies the lane-workspace requirement:
+  - `/lane/:laneId` is a real table-first route
+  - baseline remains pinned while lane-specific columns switch correctly
+  - grouped runs appear as subordinate subtables beneath each method row
+  - row selection drives a route-local inspector with evidence links and provenance preview
+- Phase 39 discussion is now complete and the method-route contract is locked:
+  - compact metric strip with method values and baseline deltas
+  - seed-first run order with the first official run selected by default
+  - three fixed explanation sections:
+    - what improved
+    - what regressed
+    - reason for status
+  - compact lineage chain:
+    - parent method/run
+    - current method
+    - child runs
+- Phase 39 is now planned in two execution waves:
+  - `39-01` adds the dedicated mocked method-route contract and replaces `/lane/:laneId/:methodId` with a real compact method page over metrics plus seed-first runs
+  - `39-02` adds the fixed explanation blocks, compact lineage chain, selected-run inspector, and focused verification/build closure
+- The next workflow step is Phase 39 execution for the method-drilldown route.
 
 ## Accumulated Context
 
@@ -334,6 +355,12 @@ Last Activity: 2026-03-26
 - New datasets remain intentionally deferred until the robustness-oriented mitigation story is stronger.
 - This machine still lacks CUDA and MPS, so later repeated DistilBERT training or mitigation runs may continue to need cloud GPU support.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260326-o2w | I need a way to move from verdict to lane and further etc, make the pills clickable and maybe add arrows | 2026-03-26 | 9824b09 | [260326-o2w-i-need-a-way-to-move-from-verdict-to-lan](./quick/260326-o2w-i-need-a-way-to-move-from-verdict-to-lan/) |
+
 ## Performance Metrics
 
 | Phase | Duration | Tasks | Files |
@@ -342,6 +369,8 @@ Last Activity: 2026-03-26
 | Phase 36 P02 | 13min | 2 tasks | 9 files |
 
 ## Session Continuity
+
+Last activity: 2026-03-26 - Completed quick task 260326-o2w: I need a way to move from verdict to lane and further etc, make the pills clickable and maybe add arrows
 
 Last session: 2026-03-26T12:10:00.000Z
 Stopped at: Planned Phase 37 in two waves
