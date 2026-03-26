@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { App } from "@/app/App";
@@ -75,10 +75,11 @@ describe("Trace scaffold routes", () => {
       screen.getByText((_, element) => element?.textContent === "Current scope: All"),
     ).toBeInTheDocument();
 
-    const previousLink = screen.getByRole("link", { name: "Lane" });
+    const scaffoldNav = screen.getByLabelText("Method scaffold navigation");
+    const previousLink = within(scaffoldNav).getByRole("link", { name: "Lane" });
     expect(previousLink).toHaveAttribute("href", "/lane/robustness?scope=all");
 
-    const nextLink = screen.getByRole("link", { name: "Run sample" });
+    const nextLink = within(scaffoldNav).getByRole("link", { name: "Run sample" });
     expect(nextLink).toHaveAttribute("href", "/run/distilbert_reweighting_seed_13?scope=all");
 
     await user.click(nextLink);
@@ -90,7 +91,11 @@ describe("Trace scaffold routes", () => {
     expect(
       screen.getByText((_, element) => element?.textContent === "Current scope: All"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Artifact sample" })).toHaveAttribute(
+    expect(
+      within(screen.getByLabelText("Run scaffold navigation")).getByRole("link", {
+        name: "Artifact sample",
+      }),
+    ).toHaveAttribute(
       "href",
       "/debug/raw/run_distilbert_reweighting_seed_13?scope=all",
     );
