@@ -27,8 +27,14 @@ describe("App shell", () => {
       "/lane/robustness?scope=all",
     );
     expect(within(traceChain).getByText("Method")).toHaveAttribute("aria-current", "page");
-    expect(within(traceChain).getByText("Run")).toHaveAttribute("aria-disabled", "true");
-    expect(within(traceChain).getByText("Artifact")).toHaveAttribute("aria-disabled", "true");
+    expect(within(traceChain).getByRole("link", { name: "Run" })).toHaveAttribute(
+      "href",
+      "/run/distilbert_reweighting_seed_13?scope=all",
+    );
+    expect(within(traceChain).getByRole("link", { name: "Artifact" })).toHaveAttribute(
+      "href",
+      "/debug/raw/run_distilbert_reweighting_seed_13?scope=all",
+    );
     expect(screen.getByRole("button", { name: "Official" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     expect(
@@ -62,6 +68,40 @@ describe("App shell", () => {
     await user.click(within(screen.getByLabelText("Trace chain")).getByRole("link", { name: "Verdict" }));
 
     expect(await screen.findByRole("heading", { name: "Where should I look?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("lets users move forward from verdict to lane and method through the trace chain", async () => {
+    const user = userEvent.setup();
+
+    render(<App useMemoryRouter initialEntries={["/?scope=all"]} />);
+
+    const traceChain = screen.getByLabelText("Trace chain");
+
+    expect(within(traceChain).getByText("Verdict")).toHaveAttribute("aria-current", "page");
+    expect(within(traceChain).getByRole("link", { name: "Lane" })).toHaveAttribute(
+      "href",
+      "/lane/robustness?scope=all",
+    );
+    expect(within(traceChain).getByRole("link", { name: "Method" })).toHaveAttribute(
+      "href",
+      "/lane/robustness/reweighting?scope=all",
+    );
+    expect(within(traceChain).getByRole("link", { name: "Run" })).toHaveAttribute(
+      "href",
+      "/run/distilbert_reweighting_seed_13?scope=all",
+    );
+
+    await user.click(within(traceChain).getByRole("link", { name: "Lane" }));
+
+    expect(await screen.findByRole("heading", { name: "Robustness" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(screen.getByLabelText("Trace chain")).getByRole("link", { name: "Method" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Why is this method judged this way?" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
   });
 
