@@ -1,10 +1,11 @@
 import { useTraceScope } from "@/app/scope";
 import { LaneSummaryPanel } from "@/components/summary/LaneSummaryPanel";
 import { VerdictStrip } from "@/components/summary/VerdictStrip";
-import { summaryRouteSnapshot } from "@/lib/summaryRoute";
+import { buildSummaryRouteModel } from "@/lib/summaryRoute";
 
 export function SummaryPage() {
   const { scope } = useTraceScope();
+  const summaryRoute = buildSummaryRouteModel(scope);
 
   return (
     <section className="space-y-5">
@@ -16,11 +17,11 @@ export function SummaryPage() {
         </p>
       </header>
 
-      <VerdictStrip verdict={summaryRouteSnapshot.verdict} />
+      <VerdictStrip verdict={summaryRoute.verdict} />
 
       <div className="space-y-4">
-        {summaryRouteSnapshot.laneOrder.map((laneId) => (
-          <LaneSummaryPanel key={laneId} lane={summaryRouteSnapshot.lanes[laneId]} scope={scope} />
+        {summaryRoute.laneOrder.map((laneId) => (
+          <LaneSummaryPanel key={laneId} lane={summaryRoute.lanes[laneId]} scope={scope} />
         ))}
       </div>
     </section>
