@@ -48,9 +48,7 @@ describe("Summary route", () => {
 
     await user.click(robustnessPanel);
 
-    expect(
-      await screen.findByRole("heading", { name: "Why is this lane in focus?" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Robustness" })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(`${window.location.pathname}${window.location.search}`).toBe(ROBUSTNESS_LANE_PATH);

@@ -1,6 +1,6 @@
 import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 
-import { LanePlaceholderPage } from "@/app/routes/LanePlaceholderPage";
+import { LanePage } from "@/app/routes/LanePage";
 import { MethodPlaceholderPage } from "@/app/routes/MethodPlaceholderPage";
 import { RawDebugPlaceholderPage } from "@/app/routes/RawDebugPlaceholderPage";
 import { RunPlaceholderPage } from "@/app/routes/RunPlaceholderPage";
@@ -29,7 +29,7 @@ function AppFrame() {
         }
       >
         <Route path="/" element={<SummaryPage />} />
-        <Route path="/lane/:laneId" element={<LanePlaceholderPage />} />
+        <Route path="/lane/:laneId" element={<LanePage />} />
         <Route path="/lane/:laneId/:methodId" element={<MethodPlaceholderPage />} />
         <Route path="/run/:runId" element={<RunPlaceholderPage />} />
         <Route path="/debug/raw/:entityId" element={<RawDebugPlaceholderPage />} />
