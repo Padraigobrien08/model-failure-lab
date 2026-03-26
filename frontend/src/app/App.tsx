@@ -4,7 +4,7 @@ import { LanePlaceholderPage } from "@/app/routes/LanePlaceholderPage";
 import { MethodPlaceholderPage } from "@/app/routes/MethodPlaceholderPage";
 import { RawDebugPlaceholderPage } from "@/app/routes/RawDebugPlaceholderPage";
 import { RunPlaceholderPage } from "@/app/routes/RunPlaceholderPage";
-import { VerdictPlaceholderPage } from "@/app/routes/VerdictPlaceholderPage";
+import { SummaryPage } from "@/app/routes/SummaryPage";
 import { TraceScopeProvider } from "@/app/scope";
 import { TraceShell } from "@/components/layout/TraceShell";
 import type { ArtifactIndex, FinalRobustnessBundle } from "@/lib/manifest/types";
@@ -28,7 +28,7 @@ function AppFrame() {
           </TraceScopeProvider>
         }
       >
-        <Route path="/" element={<VerdictPlaceholderPage />} />
+        <Route path="/" element={<SummaryPage />} />
         <Route path="/lane/:laneId" element={<LanePlaceholderPage />} />
         <Route path="/lane/:laneId/:methodId" element={<MethodPlaceholderPage />} />
         <Route path="/run/:runId" element={<RunPlaceholderPage />} />
