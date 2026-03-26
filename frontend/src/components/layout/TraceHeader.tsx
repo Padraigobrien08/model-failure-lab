@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { Link, matchPath, useLocation } from "react-router-dom";
+import { Link, matchPath, useLocation, useParams } from "react-router-dom";
 
 import { NAVIGATION_ITEMS } from "@/app/router";
 import { useTraceScope } from "@/app/scope";
@@ -14,11 +14,42 @@ function getActiveRouteLabel(pathname: string) {
   return activeRoute.label;
 }
 
+function buildScopedPath(path: string, scope: "official" | "all") {
+  return `${path}?scope=${scope}`;
+}
+
+function getTraceHref(
+  label: string,
+  params: Readonly<Record<string, string | undefined>>,
+  scope: "official" | "all",
+) {
+  switch (label) {
+    case "Verdict":
+      return buildScopedPath("/", scope);
+    case "Lane":
+      return params.laneId ? buildScopedPath(`/lane/${params.laneId}`, scope) : null;
+    case "Method":
+      return params.laneId && params.methodId
+        ? buildScopedPath(`/lane/${params.laneId}/${params.methodId}`, scope)
+        : null;
+    case "Run":
+      return params.runId ? buildScopedPath(`/run/${params.runId}`, scope) : null;
+    case "Artifact":
+      return params.entityId
+        ? buildScopedPath(`/debug/raw/${params.entityId}`, scope)
+        : null;
+    default:
+      return null;
+  }
+}
+
 export function TraceHeader() {
   const location = useLocation();
+  const params = useParams();
   const { scope, setScope } = useTraceScope();
   const activeRouteLabel = getActiveRouteLabel(location.pathname);
   const homeHref = `/?scope=${scope}`;
+  const activeRouteIndex = NAVIGATION_ITEMS.findIndex((item) => item.label === activeRouteLabel);
 
   return (
     <header className="border-b border-border/70 bg-background/95">
@@ -38,15 +69,40 @@ export function TraceHeader() {
           >
             {NAVIGATION_ITEMS.map((item, index) => (
               <Fragment key={item.path}>
-                {index > 0 ? <span aria-hidden="true">-&gt;</span> : null}
-                <span
-                  className={cn(
-                    "rounded-full border border-border/70 px-2.5 py-1",
-                    item.label === activeRouteLabel && "border-foreground text-foreground",
-                  )}
-                >
-                  {item.label}
-                </span>
+                {index > 0 ? (
+                  <span aria-hidden="true" className="text-muted-foreground/70">
+                    →
+                  </span>
+                ) : null}
+                {(() => {
+                  const href = getTraceHref(item.label, params, scope);
+                  const isActive = item.label === activeRouteLabel;
+                  const isAvailable = href !== null && index <= activeRouteIndex;
+                  const pillClassName = cn(
+                    "rounded-full border border-border/70 px-2.5 py-1 transition-colors",
+                    isActive && "border-foreground text-foreground",
+                    isAvailable && !isActive && "hover:border-foreground/60 hover:text-foreground",
+                    !isAvailable && "opacity-50",
+                  );
+
+                  if (isActive || href === null || !isAvailable) {
+                    return (
+                      <span
+                        aria-current={isActive ? "page" : undefined}
+                        aria-disabled={!isAvailable}
+                        className={pillClassName}
+                      >
+                        {item.label}
+                      </span>
+                    );
+                  }
+
+                  return (
+                    <Link className={pillClassName} to={href}>
+                      {item.label}
+                    </Link>
+                  );
+                })()}
               </Fragment>
             ))}
           </div>
