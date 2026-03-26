@@ -16,6 +16,7 @@ type RankedComparisonCanvasProps = {
   onSelectMethod: (methodName: string) => void;
   onSelectDomain: (domain: FailureDomainKey) => void;
   onInspectMethod: (methodName: string) => void;
+  buildDomainTracePath: (domain: FailureDomainKey) => string;
 };
 
 function renderDomainMetric(
@@ -47,6 +48,7 @@ export function RankedComparisonCanvas({
   onSelectMethod,
   onSelectDomain,
   onInspectMethod,
+  buildDomainTracePath,
 }: RankedComparisonCanvasProps) {
   return (
     <div className="space-y-6">
@@ -98,7 +100,7 @@ export function RankedComparisonCanvas({
                   </h3>
                 </div>
                 <Link
-                  to="/failure-explorer"
+                  to={buildDomainTracePath(domain.domain)}
                   className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                   onClick={() => onSelectDomain(domain.domain)}
                 >

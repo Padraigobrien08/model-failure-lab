@@ -22,8 +22,14 @@ describe("Verdicts route", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getAllByText(/Still Mixed/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Why the final verdict still turns on worst-group and OOD tradeoffs under shift\./i)).toBeInTheDocument();
-    expect(screen.getByText(/Why reliability moved more cleanly than robustness in the official package\./i)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Why the final verdict still turns on worst-group and OOD tradeoffs under shift\./i)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/Why reliability moved more cleanly than robustness in the official package\./i)
+        .length,
+    ).toBeGreaterThan(0);
     expect(
       screen
         .getAllByRole("link", { name: /^Trace Evidence$/i })

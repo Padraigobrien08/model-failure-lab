@@ -12,7 +12,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   buildComparisonCards,
   buildFailureDomainModels,
-  getMethodLaneKey,
   getRepresentativeRunIdForMethod,
 } from "@/lib/manifest/selectors";
 
@@ -39,6 +38,7 @@ export function ComparisonsPage() {
     finalRobustnessBundle,
     finalRobustnessBundleError,
     isFinalRobustnessBundleLoading,
+    selection,
     selectedLane,
     setSelectedLane,
     selectedMethod,
@@ -75,11 +75,37 @@ export function ComparisonsPage() {
     );
   }
 
+  const manifestIndex = index;
   const comparisonCards = buildComparisonCards(index, finalRobustnessBundle, includeExploratory);
   const failureDomains = buildFailureDomainModels(index, finalRobustnessBundle, includeExploratory);
   const activeLane = selectedLane ?? "robustness";
   const activeDomain =
     selectedDomain ?? (activeLane === "calibration" ? "calibration" : "worst_group");
+
+  function buildDomainTracePath(domain: "worst_group" | "ood" | "id" | "calibration") {
+    const searchParams = new URLSearchParams();
+
+    if (selection.scope === "exploratory") {
+      searchParams.set("scope", "exploratory");
+    }
+    if (selection.verdict) {
+      searchParams.set("verdict", selection.verdict);
+    }
+    if (selection.method) {
+      searchParams.set("method", selection.method);
+    }
+    if (selection.run) {
+      searchParams.set("run", selection.run);
+    }
+    if (selection.artifact) {
+      searchParams.set("artifact", selection.artifact);
+    }
+
+    searchParams.set("lane", domain === "calibration" ? "calibration" : "robustness");
+    searchParams.set("domain", domain);
+
+    return `/failure-explorer?${searchParams.toString()}`;
+  }
 
   const orderedDomains = useMemo(() => {
     if (activeLane === "calibration") {
@@ -102,13 +128,12 @@ export function ComparisonsPage() {
 
   function handleSelectMethod(methodName: string) {
     setSelectedMethod(methodName);
-    setSelectedLane(getMethodLaneKey(methodName));
   }
 
   function handleInspectMethod(methodName: string) {
     handleSelectMethod(methodName);
 
-    const runId = getRepresentativeRunIdForMethod(index, methodName, true);
+    const runId = getRepresentativeRunIdForMethod(manifestIndex, methodName, true);
     if (runId) {
       openEvidenceDrawer(runId);
     }
@@ -179,6 +204,7 @@ export function ComparisonsPage() {
         onSelectMethod={handleSelectMethod}
         onSelectDomain={setSelectedDomain}
         onInspectMethod={handleInspectMethod}
+        buildDomainTracePath={buildDomainTracePath}
       />
 
       <FailureExplorerTabs

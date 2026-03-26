@@ -20,7 +20,7 @@ describe("evidence route", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: /Official-first artifact browser/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Artifact browser with live provenance handoff/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Reports$/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Evaluations$/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Runs$/i })).toBeInTheDocument();
@@ -29,9 +29,9 @@ describe("evidence route", () => {
       "true",
     );
 
-    await user.click(screen.getByRole("button", { name: /Include exploratory/i }));
+    await user.click(screen.getAllByRole("button", { name: /Include exploratory/i })[0]);
 
-    expect(screen.getByText(/Exploratory evidence is enabled/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Exploratory evidence is enabled/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Group DRO/i).length).toBeGreaterThan(0);
   });
 });

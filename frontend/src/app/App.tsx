@@ -186,18 +186,30 @@ function AppFrame({
   }, [index, initialFinalRobustnessBundle]);
 
   useEffect(() => {
-    if (index === null || includeExploratory || selection.run === null) {
+    if (index === null || includeExploratory) {
       return;
     }
 
-    const selectedRun = (index.entities.runs as RunEntity[]).find(
-      (run) => run.id === selection.run || run.run_id === selection.run,
-    );
-    if (selectedRun?.default_visible === false) {
+    const selectedRun =
+      selection.run === null
+        ? null
+        : (index.entities.runs as RunEntity[]).find(
+            (run) => run.id === selection.run || run.run_id === selection.run,
+          ) ?? null;
+    const selectedArtifact =
+      selection.artifact === null
+        ? null
+        : [
+            ...index.entities.reports,
+            ...index.entities.evaluations,
+            ...index.entities.runs,
+          ].find((entity) => entity.id === selection.artifact) ?? null;
+
+    if (selectedRun?.default_visible === false || selectedArtifact?.default_visible === false) {
       setSelection({ run: null, artifact: null });
       setIsEvidenceDrawerOpen(false);
     }
-  }, [includeExploratory, index, selection.run]);
+  }, [includeExploratory, index, selection.artifact, selection.run]);
 
   useEffect(() => {
     if (index === null || finalRobustnessBundle === null) {
@@ -227,12 +239,13 @@ function AppFrame({
   ]);
 
   function openEvidenceDrawer(runId: string) {
-    setSelection({ run: runId });
+    setSelection({ run: runId, artifact: null });
     setIsEvidenceDrawerOpen(true);
   }
 
   function closeEvidenceDrawer() {
     setIsEvidenceDrawerOpen(false);
+    setSelection({ run: null, artifact: null });
   }
 
   const routeContext: AppRouteContext = {
@@ -249,11 +262,15 @@ function AppFrame({
     selection,
     setSelection,
     selectedVerdict: selection.verdict,
-    setSelectedVerdict: (value: string | null) => setSelection({ verdict: value }),
+    setSelectedVerdict: (value: string | null) =>
+      setSelection({ verdict: value, lane: null, method: null, run: null, artifact: null }),
     selectedLane: selection.lane,
     setSelectedLane: (value: string | null) =>
       setSelection({
         lane: value,
+        method: null,
+        run: null,
+        artifact: null,
         domain:
           value === "calibration"
             ? "calibration"
@@ -266,6 +283,8 @@ function AppFrame({
       setSelection({
         method: value,
         lane: value ? getMethodLaneKey(value) : selection.lane,
+        run: null,
+        artifact: null,
       }),
     selectedDomain: selection.domain,
     setSelectedDomain: (value: FailureDomainKey | null) =>
@@ -279,7 +298,7 @@ function AppFrame({
               : "robustness",
       }),
     selectedRunId: selection.run,
-    setSelectedRunId: (value: string | null) => setSelection({ run: value }),
+    setSelectedRunId: (value: string | null) => setSelection({ run: value, artifact: null }),
     selectedArtifact: selection.artifact,
     setSelectedArtifact: (value: string | null) => setSelection({ artifact: value }),
     isEvidenceDrawerOpen,
