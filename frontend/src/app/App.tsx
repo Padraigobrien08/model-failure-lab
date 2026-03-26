@@ -1,32 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
 import {
   BrowserRouter,
   MemoryRouter,
-  Navigate,
+  Outlet,
   Route,
   Routes,
   useLocation,
-  useSearchParams,
+  useParams,
 } from "react-router-dom";
 
-import type { AppRouteContext } from "@/app/router";
-import { ComparisonsPage } from "@/app/routes/ComparisonsPage";
-import { EvidencePage } from "@/app/routes/EvidencePage";
-import { FailureExplorerPage } from "@/app/routes/FailureExplorerPage";
-import { ManifestPage } from "@/app/routes/ManifestPage";
-import { RunsPage } from "@/app/routes/RunsPage";
-import { AppShell } from "@/components/layout/AppShell";
-import { loadArtifactIndex, DEFAULT_MANIFEST_PATH } from "@/lib/manifest/load";
-import { loadFinalRobustnessBundle } from "@/lib/manifest/reportData";
-import type {
-  ArtifactIndex,
-  FailureDomainKey,
-  FinalRobustnessBundle,
-  RunEntity,
-  WorkbenchSelection,
-} from "@/lib/manifest/types";
-import { OverviewPage } from "@/app/routes/OverviewPage";
-import { buildVerdictWorkspaceModel, getMethodLaneKey } from "@/lib/manifest/selectors";
+import { TraceScopeProvider, useTraceScope } from "@/app/scope";
+import type { ArtifactIndex, FinalRobustnessBundle } from "@/lib/manifest/types";
 
 type AppProps = {
   manifestPath?: string;
@@ -37,319 +20,142 @@ type AppProps = {
   initialEntries?: string[];
 };
 
-type AppFrameProps = {
-  manifestPath: string;
-  initialIndex?: ArtifactIndex | null;
-  initialFinalRobustnessBundle?: FinalRobustnessBundle | null;
-  initialIncludeExploratory: boolean;
+type TraceScaffoldPageProps = {
+  title: string;
+  description: string;
 };
 
-const FAILURE_DOMAIN_KEYS: FailureDomainKey[] = ["worst_group", "ood", "id", "calibration"];
-
-function isFailureDomainKey(value: string | null): value is FailureDomainKey {
-  return value !== null && FAILURE_DOMAIN_KEYS.includes(value as FailureDomainKey);
+function TraceRouteFrame() {
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-4 py-10 sm:px-6">
+        <div className="w-full">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
 }
 
-function buildSelectionFromSearchParams(
-  searchParams: URLSearchParams,
-  initialIncludeExploratory: boolean,
-): WorkbenchSelection {
-  const scopeParam = searchParams.get("scope");
-  const scope =
-    scopeParam === "exploratory" || (!scopeParam && initialIncludeExploratory)
-      ? "exploratory"
-      : "official";
-  const domainParam = searchParams.get("domain");
-
-  return {
-    scope,
-    verdict: searchParams.get("verdict"),
-    lane: searchParams.get("lane"),
-    method: searchParams.get("method"),
-    run: searchParams.get("run"),
-    artifact: searchParams.get("artifact"),
-    domain: isFailureDomainKey(domainParam) ? domainParam : null,
-  };
-}
-
-function LegacyRouteRedirect({ to }: { to: string }) {
+function TraceScaffoldPage({ title, description }: TraceScaffoldPageProps) {
   const location = useLocation();
+  const params = useParams();
+  const { scope } = useTraceScope();
+  const routeParams = Object.entries(params).filter(([, value]) => value !== undefined);
 
-  return <Navigate replace to={`${to}${location.search}`} />;
+  return (
+    <section className="space-y-6 rounded-[24px] border border-border/70 bg-card/70 p-6 shadow-sm">
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          Phase 36 scaffold
+        </p>
+        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">{title}</h1>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+      </div>
+
+      <dl className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-[18px] border border-border/70 bg-background/60 p-4">
+          <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Active scope
+          </dt>
+          <dd className="mt-2 text-sm font-medium text-foreground">
+            {scope === "all" ? "All" : "Official"}
+          </dd>
+        </div>
+        <div className="rounded-[18px] border border-border/70 bg-background/60 p-4">
+          <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Current path
+          </dt>
+          <dd className="mt-2 font-mono text-sm text-foreground">{location.pathname}</dd>
+        </div>
+      </dl>
+
+      <div className="rounded-[18px] border border-border/70 bg-background/60 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Route params
+        </p>
+        {routeParams.length > 0 ? (
+          <dl className="mt-3 space-y-2">
+            {routeParams.map(([key, value]) => (
+              <div key={key} className="flex items-center justify-between gap-3 text-sm">
+                <dt className="font-medium text-foreground">{key}</dt>
+                <dd className="font-mono text-muted-foreground">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">No dynamic params for this route.</p>
+        )}
+      </div>
+    </section>
+  );
 }
 
-function AppFrame({
-  manifestPath,
-  initialIndex = null,
-  initialFinalRobustnessBundle = null,
-  initialIncludeExploratory,
-}: AppFrameProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [index, setIndex] = useState<ArtifactIndex | null>(initialIndex);
-  const [isLoading, setIsLoading] = useState<boolean>(initialIndex === null);
-  const [error, setError] = useState<string | null>(null);
-  const [finalRobustnessBundle, setFinalRobustnessBundle] =
-    useState<FinalRobustnessBundle | null>(initialFinalRobustnessBundle);
-  const [isFinalRobustnessBundleLoading, setIsFinalRobustnessBundleLoading] = useState(
-    initialFinalRobustnessBundle === null,
-  );
-  const [finalRobustnessBundleError, setFinalRobustnessBundleError] = useState<string | null>(null);
-  const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
-  const selection = useMemo(
-    () => buildSelectionFromSearchParams(searchParams, initialIncludeExploratory),
-    [initialIncludeExploratory, searchParams],
-  );
-  const includeExploratory = selection.scope === "exploratory";
-
-  function setSelection(patch: Partial<WorkbenchSelection>) {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-
-      for (const [key, value] of Object.entries(patch)) {
-        if (value === null || value === "" || value === undefined) {
-          next.delete(key);
-          continue;
-        }
-
-        next.set(key, String(value));
-      }
-
-      return next;
-    });
-  }
-
-  useEffect(() => {
-    if (initialIndex !== null) {
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoading(true);
-    loadArtifactIndex(manifestPath)
-      .then((payload) => {
-        if (!cancelled) {
-          setIndex(payload);
-          setError(null);
-        }
-      })
-      .catch((loadError: Error) => {
-        if (!cancelled) {
-          setError(loadError.message);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialIndex, manifestPath]);
-
-  useEffect(() => {
-    if (index === null) {
-      return;
-    }
-
-    if (initialFinalRobustnessBundle !== null) {
-      setFinalRobustnessBundle(initialFinalRobustnessBundle);
-      setIsFinalRobustnessBundleLoading(false);
-      setFinalRobustnessBundleError(null);
-      return;
-    }
-
-    let cancelled = false;
-    setIsFinalRobustnessBundleLoading(true);
-    loadFinalRobustnessBundle(index)
-      .then((bundle) => {
-        if (!cancelled) {
-          setFinalRobustnessBundle(bundle);
-          setFinalRobustnessBundleError(null);
-        }
-      })
-      .catch((loadError: Error) => {
-        if (!cancelled) {
-          setFinalRobustnessBundleError(loadError.message);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsFinalRobustnessBundleLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [index, initialFinalRobustnessBundle]);
-
-  useEffect(() => {
-    if (index === null || includeExploratory) {
-      return;
-    }
-
-    const selectedRun =
-      selection.run === null
-        ? null
-        : (index.entities.runs as RunEntity[]).find(
-            (run) => run.id === selection.run || run.run_id === selection.run,
-          ) ?? null;
-    const selectedArtifact =
-      selection.artifact === null
-        ? null
-        : [
-            ...index.entities.reports,
-            ...index.entities.evaluations,
-            ...index.entities.runs,
-          ].find((entity) => entity.id === selection.artifact) ?? null;
-
-    if (selectedRun?.default_visible === false || selectedArtifact?.default_visible === false) {
-      setSelection({ run: null, artifact: null });
-      setIsEvidenceDrawerOpen(false);
-    }
-  }, [includeExploratory, index, selection.artifact, selection.run]);
-
-  useEffect(() => {
-    if (index === null || finalRobustnessBundle === null) {
-      return;
-    }
-
-    const defaults = buildVerdictWorkspaceModel(index, finalRobustnessBundle, includeExploratory);
-    const patch: Partial<WorkbenchSelection> = {};
-
-    if (!selection.verdict) {
-      patch.verdict = defaults.finalVerdict;
-    }
-
-    if (!selection.lane) {
-      patch.lane = defaults.dominantLaneKey;
-    }
-
-    if (Object.keys(patch).length > 0) {
-      setSelection(patch);
-    }
-  }, [
-    finalRobustnessBundle,
-    includeExploratory,
-    index,
-    selection.lane,
-    selection.verdict,
-  ]);
-
-  function openEvidenceDrawer(runId: string) {
-    setSelection({ run: runId, artifact: null });
-    setIsEvidenceDrawerOpen(true);
-  }
-
-  function closeEvidenceDrawer() {
-    setIsEvidenceDrawerOpen(false);
-    setSelection({ run: null, artifact: null });
-  }
-
-  const routeContext: AppRouteContext = {
-    index,
-    isLoading,
-    error,
-    includeExploratory,
-    setIncludeExploratory: (value: boolean) =>
-      setSelection({ scope: value ? "exploratory" : "official" }),
-    manifestPath,
-    finalRobustnessBundle,
-    finalRobustnessBundleError,
-    isFinalRobustnessBundleLoading,
-    selection,
-    setSelection,
-    selectedVerdict: selection.verdict,
-    setSelectedVerdict: (value: string | null) =>
-      setSelection({ verdict: value, lane: null, method: null, run: null, artifact: null }),
-    selectedLane: selection.lane,
-    setSelectedLane: (value: string | null) =>
-      setSelection({
-        lane: value,
-        method: null,
-        run: null,
-        artifact: null,
-        domain:
-          value === "calibration"
-            ? "calibration"
-            : value === "robustness" && selection.domain === "calibration"
-              ? "worst_group"
-              : selection.domain,
-      }),
-    selectedMethod: selection.method,
-    setSelectedMethod: (value: string | null) =>
-      setSelection({
-        method: value,
-        lane: value ? getMethodLaneKey(value) : selection.lane,
-        run: null,
-        artifact: null,
-      }),
-    selectedDomain: selection.domain,
-    setSelectedDomain: (value: FailureDomainKey | null) =>
-      setSelection({
-        domain: value,
-        lane:
-          value === "calibration"
-            ? "calibration"
-            : value === null
-              ? selection.lane
-              : "robustness",
-      }),
-    selectedRunId: selection.run,
-    setSelectedRunId: (value: string | null) => setSelection({ run: value, artifact: null }),
-    selectedArtifact: selection.artifact,
-    setSelectedArtifact: (value: string | null) => setSelection({ artifact: value }),
-    isEvidenceDrawerOpen,
-    openEvidenceDrawer,
-    closeEvidenceDrawer,
-  };
-
+function AppFrame() {
   return (
     <Routes>
       <Route
-        path="/"
         element={
-          <AppShell
-            includeExploratory={includeExploratory}
-            onToggleExploratory={(next) =>
-              setSelection({ scope: next ? "exploratory" : "official" })
-            }
-            manifestPath={manifestPath}
-            routeContext={routeContext}
-          />
+          <TraceScopeProvider>
+            <TraceRouteFrame />
+          </TraceScopeProvider>
         }
       >
-        <Route index element={<OverviewPage />} />
-        <Route path="overview" element={<LegacyRouteRedirect to="/" />} />
-        <Route path="lanes" element={<ComparisonsPage />} />
-        <Route path="runs" element={<RunsPage />} />
-        <Route path="evidence" element={<EvidencePage />} />
-        <Route path="manifest" element={<ManifestPage />} />
-        <Route path="comparisons" element={<LegacyRouteRedirect to="/lanes" />} />
-        <Route path="failure-explorer" element={<FailureExplorerPage />} />
+        <Route
+          path="/"
+          element={
+            <TraceScaffoldPage
+              title="Verdict"
+              description="This route becomes the trace entry point before the dedicated summary content lands in the next plan."
+            />
+          }
+        />
+        <Route
+          path="/lane/:laneId"
+          element={
+            <TraceScaffoldPage
+              title="Lane"
+              description="This scaffold route holds one lane branch in the Phase 36 trace chain."
+            />
+          }
+        />
+        <Route
+          path="/lane/:laneId/:methodId"
+          element={
+            <TraceScaffoldPage
+              title="Method"
+              description="This scaffold route narrows the selected lane to one method."
+            />
+          }
+        />
+        <Route
+          path="/run/:runId"
+          element={
+            <TraceScaffoldPage
+              title="Run"
+              description="This scaffold route will host the focused run trace."
+            />
+          }
+        />
+        <Route
+          path="/debug/raw/:entityId"
+          element={
+            <TraceScaffoldPage
+              title="Artifact"
+              description="This scaffold route reserves the raw debug surface for a single entity."
+            />
+          }
+        />
       </Route>
     </Routes>
   );
 }
 
 export function App({
-  manifestPath = DEFAULT_MANIFEST_PATH,
-  initialIndex = null,
-  initialFinalRobustnessBundle = null,
-  initialIncludeExploratory = false,
   useMemoryRouter = false,
   initialEntries = ["/"],
 }: AppProps) {
-  const appFrame = (
-    <AppFrame
-      manifestPath={manifestPath}
-      initialIndex={initialIndex}
-      initialFinalRobustnessBundle={initialFinalRobustnessBundle}
-      initialIncludeExploratory={initialIncludeExploratory}
-    />
-  );
+  const appFrame = <AppFrame />;
 
   if (useMemoryRouter) {
     return <MemoryRouter initialEntries={initialEntries}>{appFrame}</MemoryRouter>;

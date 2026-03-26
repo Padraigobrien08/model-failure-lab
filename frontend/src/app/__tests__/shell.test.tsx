@@ -1,67 +1,33 @@
-import userEvent from "@testing-library/user-event";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
 import { App } from "@/app/App";
-import {
-  buildFinalRobustnessBundleFixture,
-  buildManifestFixture,
-} from "@/test/fixtures";
 
 describe("App shell", () => {
-  it("renders the locked top-level navigation and defaults to verdicts", () => {
-    render(
-      <App
-        useMemoryRouter
-        initialIndex={buildManifestFixture()}
-        initialFinalRobustnessBundle={buildFinalRobustnessBundleFixture()}
-      />,
-    );
-
-    const primaryNavigation = screen.getByRole("navigation", { name: /Primary/i });
-
-    expect(screen.getByRole("heading", { name: /Failure Debugger/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Workbench state/i)).toBeInTheDocument();
-    expect(
-      within(primaryNavigation).getByRole("link", {
-        name: /Verdicts Final verdict, supporting lanes, and first evidence path/i,
-      }),
-    ).toHaveAttribute("aria-current", "page");
-    expect(
-      within(primaryNavigation).getByRole("link", {
-        name: /Lanes Calibration-versus-robustness workspace and method ordering/i,
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(primaryNavigation).getByRole("link", {
-        name: /Runs Run lineage, seeded detail, and artifact handoff/i,
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(primaryNavigation).getByRole("link", {
-        name: /Evidence Reports, eval bundles, and manifest-backed artifact paths/i,
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(primaryNavigation).getByRole("link", {
-        name: /Manifest Contract provenance, visibility flags, and entity relationships/i,
-      }),
-    ).toBeInTheDocument();
+  afterEach(() => {
+    cleanup();
+    window.history.replaceState({}, "", "/");
   });
 
-  it("makes exploratory scope explicit when toggled on", async () => {
-    const user = userEvent.setup();
-    render(
-      <App
-        useMemoryRouter
-        initialIndex={buildManifestFixture()}
-        initialFinalRobustnessBundle={buildFinalRobustnessBundleFixture()}
-      />,
-    );
+  it("mounts the scaffold route contract in a memory router", () => {
+    render(<App useMemoryRouter initialEntries={["/lane/robustness/reweighting?scope=all"]} />);
 
-    await user.click(screen.getByRole("button", { name: /Include exploratory/i }));
+    expect(screen.getByRole("heading", { name: "Method" })).toBeInTheDocument();
+    expect(screen.getByText("/lane/robustness/reweighting")).toBeInTheDocument();
+    expect(screen.getByText("methodId")).toBeInTheDocument();
+    expect(screen.getByText("reweighting")).toBeInTheDocument();
+    expect(screen.getByText("Active scope")).toBeInTheDocument();
+    expect(screen.getByText("All")).toBeInTheDocument();
+  });
 
-    expect(screen.getByText(/Scope: Official \+ Exploratory/i)).toBeInTheDocument();
-    expect(screen.getByText(/exploratory scope active/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Official \+ Exploratory/i).length).toBeGreaterThanOrEqual(1);
+  it("normalizes invalid browser scope params back to official", async () => {
+    window.history.replaceState({}, "", "/run/demo-run?scope=exploratory");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Run" })).toBeInTheDocument();
+    expect(screen.getByText("Official")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.location.search).toBe("?scope=official");
+    });
   });
 });
