@@ -1,9 +1,18 @@
+import { Fragment } from "react";
 import { Link } from "react-router-dom";
 
 import type { TraceScope } from "@/app/scope";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatLabel, formatMetric, formatSignedMetric, getMetricTextTone } from "@/lib/formatters";
-import type { LaneRouteLaneId, LaneRouteMethodRow, LaneRouteTableColumn } from "@/lib/laneRoute";
+import { MethodRunsSubtable } from "@/components/lane/MethodRunsSubtable";
+import type {
+  LaneRouteLaneId,
+  LaneRouteMethodId,
+  LaneRouteMethodRow,
+  LaneRouteSelection,
+  LaneRouteTableColumn,
+} from "@/lib/laneRoute";
 import { cn } from "@/lib/utils";
 
 type MethodComparisonTableProps = {
@@ -11,6 +20,11 @@ type MethodComparisonTableProps = {
   columns: LaneRouteTableColumn[];
   rows: LaneRouteMethodRow[];
   scope: TraceScope;
+  selected: LaneRouteSelection;
+  expandedMethodIds: LaneRouteMethodId[];
+  onSelectMethod: (entityId: string) => void;
+  onSelectRun: (entityId: string) => void;
+  onToggleRuns: (methodId: LaneRouteMethodId) => void;
 };
 
 function withScope(path: string, scope: TraceScope) {
@@ -79,6 +93,11 @@ export function MethodComparisonTable({
   columns,
   rows,
   scope,
+  selected,
+  expandedMethodIds,
+  onSelectMethod,
+  onSelectRun,
+  onToggleRuns,
 }: MethodComparisonTableProps) {
   return (
     <div className="overflow-x-auto rounded-[16px] border border-border/70">
@@ -100,36 +119,82 @@ export function MethodComparisonTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.entityId} className="border-b border-border/60 last:border-b-0">
-              {columns.map((column, index) => (
-                <td
-                  key={`${row.entityId}-${column.key}`}
+          {rows.map((row) => {
+            const isExpanded = expandedMethodIds.includes(row.methodId);
+            const isSelected =
+              selected.entityType === "method" && selected.entityId === row.entityId;
+
+            return (
+              <Fragment key={row.entityId}>
+                <tr
+                  aria-selected={isSelected}
                   className={cn(
-                    "px-4 py-3 align-top text-foreground",
-                    column.align === "right" ? "text-right" : "text-left",
+                    "border-b border-border/60 last:border-b-0 cursor-pointer transition-colors",
+                    isSelected ? "bg-muted/35" : "hover:bg-muted/15",
                   )}
+                  data-testid={`method-row-${row.methodId}`}
+                  onClick={() => onSelectMethod(row.entityId)}
                 >
-                  {index === 0 ? (
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          className="font-semibold underline decoration-border underline-offset-4 hover:text-primary"
-                          to={withScope(`/lane/${laneId}/${row.methodId}`, scope)}
-                        >
-                          {row.label}
-                        </Link>
-                        {row.methodId === "baseline" ? <Badge tone="muted">Baseline</Badge> : null}
-                      </div>
-                      <p className="max-w-sm text-xs leading-5 text-muted-foreground">{row.summary}</p>
-                    </div>
-                  ) : (
-                    renderMetricCell(row, column.key)
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))}
+                  {columns.map((column, index) => (
+                    <td
+                      key={`${row.entityId}-${column.key}`}
+                      className={cn(
+                        "px-4 py-3 align-top text-foreground",
+                        column.align === "right" ? "text-right" : "text-left",
+                      )}
+                    >
+                      {index === 0 ? (
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              aria-label={`${isExpanded ? "Hide" : "Show"} runs for ${row.label}`}
+                              aria-expanded={isExpanded}
+                              className="h-7 rounded-md px-2 text-[10px]"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onToggleRuns(row.methodId);
+                              }}
+                              size="sm"
+                              variant="outline"
+                            >
+                              {isExpanded ? "Hide runs" : "Show runs"}
+                            </Button>
+                            <Link
+                              className="font-semibold underline decoration-border underline-offset-4 hover:text-primary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                              }}
+                              to={withScope(`/lane/${laneId}/${row.methodId}`, scope)}
+                            >
+                              {row.label}
+                            </Link>
+                            {row.methodId === "baseline" ? <Badge tone="muted">Baseline</Badge> : null}
+                          </div>
+                          <p className="max-w-sm text-xs leading-5 text-muted-foreground">{row.summary}</p>
+                        </div>
+                      ) : (
+                        renderMetricCell(row, column.key)
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                {isExpanded ? (
+                  <tr className="border-b border-border/60">
+                    <td className="bg-muted/10 px-0 py-0" colSpan={columns.length}>
+                      <MethodRunsSubtable
+                        laneId={laneId}
+                        methodLabel={row.label}
+                        runs={row.runs}
+                        scope={scope}
+                        selectedEntityId={selected.entityId}
+                        onSelectRun={onSelectRun}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
