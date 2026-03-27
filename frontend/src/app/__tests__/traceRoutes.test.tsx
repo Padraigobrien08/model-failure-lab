@@ -9,13 +9,7 @@ type RouteCase = {
   params: Array<[name: string, value: string]>;
 };
 
-const ROUTE_CASES: RouteCase[] = [
-  {
-    entry: "/debug/raw/run_distilbert_reweighting_seed_13",
-    question: "What artifact backs this entity?",
-    params: [["entityId", "run_distilbert_reweighting_seed_13"]],
-  },
-];
+const ROUTE_CASES: RouteCase[] = [];
 
 describe("Trace scaffold routes", () => {
   afterEach(() => {
@@ -68,15 +62,18 @@ describe("Trace scaffold routes", () => {
     expect(screen.queryByText("Current params")).not.toBeInTheDocument();
   });
 
-  it.each(ROUTE_CASES)("renders $entry with its dedicated placeholder content", ({ entry, question, params }) => {
-    render(<App useMemoryRouter initialEntries={[entry]} />);
+  it("renders /debug/raw/:entityId as a real raw workspace instead of placeholder content", () => {
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/debug/raw/run_distilbert_reweighting_seed_13?scope=all"]}
+      />,
+    );
 
-    expect(screen.getByRole("heading", { name: question })).toBeInTheDocument();
-
-    for (const [name, value] of params) {
-      expect(screen.getByText(name)).toBeInTheDocument();
-      expect(screen.getByText(value)).toBeInTheDocument();
-    }
+    expect(screen.getByText("What artifact backs this entity?")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Raw JSON" })).toBeInTheDocument();
+    expect(screen.getByText("Related entities")).toBeInTheDocument();
+    expect(screen.queryByText("Current params")).not.toBeInTheDocument();
   });
 
   it("preserves scope=all across method route links", async () => {
