@@ -97,6 +97,40 @@ describe("App shell", () => {
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("keeps the same inspector contract visible through lane to method to run traversal", async () => {
+    const user = userEvent.setup();
+
+    render(<App useMemoryRouter initialEntries={["/lane/robustness?scope=all"]} />);
+
+    const laneInspector = screen.getByTestId("lane-inspector");
+    expect(within(laneInspector).getByText("Evidence")).toBeInTheDocument();
+    expect(within(laneInspector).getByText("Provenance preview")).toBeInTheDocument();
+    expect(within(laneInspector).getByRole("link", { name: "Open raw" })).toHaveAttribute(
+      "href",
+      "/debug/raw/method_baseline_robustness?scope=all",
+    );
+
+    await user.click(screen.getByRole("link", { name: "Reweighting" }));
+
+    const methodInspector = await screen.findByTestId("method-inspector");
+    expect(within(methodInspector).getByText("Evidence")).toBeInTheDocument();
+    expect(within(methodInspector).getByText("Provenance preview")).toBeInTheDocument();
+    expect(within(methodInspector).getByRole("link", { name: "Open raw" })).toHaveAttribute(
+      "href",
+      "/debug/raw/run_distilbert_reweighting_seed_13?scope=all",
+    );
+
+    await user.click(screen.getByRole("link", { name: "distilbert_reweighting_seed_13" }));
+
+    const runInspector = await screen.findByTestId("run-inspector");
+    expect(within(runInspector).getByText("Evidence")).toBeInTheDocument();
+    expect(within(runInspector).getByText("Provenance preview")).toBeInTheDocument();
+    expect(within(runInspector).getByRole("link", { name: "Open raw" })).toHaveAttribute(
+      "href",
+      "/debug/raw/run_distilbert_reweighting_seed_13?scope=all",
+    );
+  });
+
   it("normalizes invalid browser scope params back to official", async () => {
     window.history.replaceState({}, "", "/run/demo-run?scope=exploratory");
 

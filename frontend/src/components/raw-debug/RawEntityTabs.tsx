@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { RawDebugPayloadTab } from "@/lib/rawDebugRoute";
+import type { RawDebugPayloadTab, RawDebugTabKey } from "@/lib/rawDebugRoute";
 
 type RawEntityTabsProps = {
   tabs: RawDebugPayloadTab[];
@@ -10,7 +10,7 @@ type RawEntityTabsProps = {
 
 export function RawEntityTabs({ tabs }: RawEntityTabsProps) {
   const defaultTab = tabs[0]?.key ?? "raw_json";
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [activeTab, setActiveTab] = useState<RawDebugTabKey>(defaultTab);
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +35,11 @@ export function RawEntityTabs({ tabs }: RawEntityTabsProps) {
 
   return (
     <section className="space-y-4" aria-label="Raw entity tabs">
-      <Tabs className="space-y-4" value={activeTab} onValueChange={setActiveTab}>
+      <Tabs
+        className="space-y-4"
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as RawDebugTabKey)}
+      >
         <TabsList>
           {tabs.map((tab) => (
             <TabsTrigger key={tab.key} value={tab.key}>

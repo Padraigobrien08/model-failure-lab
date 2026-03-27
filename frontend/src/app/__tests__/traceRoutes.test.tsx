@@ -3,14 +3,6 @@ import userEvent from "@testing-library/user-event";
 
 import { App } from "@/app/App";
 
-type RouteCase = {
-  entry: string;
-  question: string;
-  params: Array<[name: string, value: string]>;
-};
-
-const ROUTE_CASES: RouteCase[] = [];
-
 describe("Trace scaffold routes", () => {
   afterEach(() => {
     cleanup();
