@@ -17,6 +17,7 @@ export function VerdictStrip({ verdict }: VerdictStripProps) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">Final verdict</Badge>
           <Badge tone={getVerdictTone(verdict.status)}>{formatLabel(verdict.status)}</Badge>
+          {verdict.modifier ? <Badge tone="exploratory">{verdict.modifier}</Badge> : null}
         </div>
         <p className="max-w-3xl text-sm leading-6 text-foreground">{verdict.implication}</p>
       </div>

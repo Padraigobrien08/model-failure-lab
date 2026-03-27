@@ -8,6 +8,7 @@ import type { LaneRouteStatus } from "@/lib/laneRoute";
 type LaneHeaderProps = {
   laneLabel: string;
   status: LaneRouteStatus;
+  statusModifier?: string;
   summary: string;
   scope: TraceScope;
 };
@@ -27,7 +28,7 @@ function getStatusBadgeProps(status: LaneRouteStatus) {
   return { tone: "default" as const };
 }
 
-export function LaneHeader({ laneLabel, status, summary, scope }: LaneHeaderProps) {
+export function LaneHeader({ laneLabel, status, statusModifier, summary, scope }: LaneHeaderProps) {
   return (
     <header className="space-y-3 border-b border-border/70 pb-4">
       <nav aria-label="Lane breadcrumb" className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -45,6 +46,7 @@ export function LaneHeader({ laneLabel, status, summary, scope }: LaneHeaderProp
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">{laneLabel}</h1>
           <Badge {...getStatusBadgeProps(status)}>{formatLabel(status)}</Badge>
+          {statusModifier ? <Badge tone="exploratory">{statusModifier}</Badge> : null}
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{summary}</p>
       </div>

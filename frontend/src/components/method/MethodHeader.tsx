@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type { TraceScope } from "@/app/scope";
 import { Badge } from "@/components/ui/badge";
 import { formatLabel } from "@/lib/formatters";
-import type { LaneRouteStatus } from "@/lib/laneRoute";
+import type { LaneRouteRowScope, LaneRouteStatus } from "@/lib/laneRoute";
 
 type MethodHeaderProps = {
   laneId: string;
@@ -11,7 +11,9 @@ type MethodHeaderProps = {
   methodLabel: string;
   question: string;
   status: LaneRouteStatus;
+  statusModifier?: string;
   summary: string;
+  methodScope: LaneRouteRowScope;
   scope: TraceScope;
 };
 
@@ -40,7 +42,9 @@ export function MethodHeader({
   methodLabel,
   question,
   status,
+  statusModifier,
   summary,
+  methodScope,
   scope,
 }: MethodHeaderProps) {
   return (
@@ -65,6 +69,8 @@ export function MethodHeader({
           <h1 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">{methodLabel}</h1>
           <Badge tone="muted">{laneLabel}</Badge>
           <Badge {...getStatusBadgeProps(status)}>{formatLabel(status)}</Badge>
+          {methodScope === "exploratory" ? <Badge tone="exploratory">Exploratory</Badge> : null}
+          {statusModifier ? <Badge tone="exploratory">{statusModifier}</Badge> : null}
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{summary}</p>
       </div>

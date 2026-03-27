@@ -66,9 +66,8 @@ describe("Summary route", () => {
 
     await user.click(reweightingLink);
 
-    expect(
-      await screen.findByRole("heading", { name: "Why is this method judged this way?" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Reweighting" })).toBeInTheDocument();
+    expect(screen.getByText("Why is this method judged this way?")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(`${window.location.pathname}${window.location.search}`).toBe(REWEIGHTING_METHOD_PATH);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { useTraceScope } from "@/app/scope";
+import { ScopeRouteNote } from "@/components/layout/ScopeRouteNote";
 import { InspectorPanel } from "@/components/lane/InspectorPanel";
 import { LaneHeader } from "@/components/lane/LaneHeader";
 import { MethodComparisonTable } from "@/components/lane/MethodComparisonTable";
@@ -64,13 +65,16 @@ export function LanePage() {
         laneLabel={lane.label}
         scope={scope}
         status={lane.status}
+        statusModifier={lane.statusModifier}
         summary={lane.summary}
       />
+      {lane.scopeNote ? <ScopeRouteNote message={lane.scopeNote} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <MethodComparisonTable
           columns={lane.columns}
           expandedMethodIds={expandedMethodIds}
+          exploratoryRows={lane.exploratoryRows}
           laneId={lane.laneId}
           onSelectMethod={(entityId) => {
             setSelection({ entityType: "method", entityId });
@@ -79,7 +83,7 @@ export function LanePage() {
             setSelection({ entityType: "run", entityId });
           }}
           onToggleRuns={handleToggleRuns}
-          rows={lane.rows}
+          officialRows={lane.officialRows}
           scope={scope}
           selected={activeSelection}
         />

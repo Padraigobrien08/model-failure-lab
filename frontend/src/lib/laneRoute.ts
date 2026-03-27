@@ -100,7 +100,11 @@ export type LaneRouteModel = {
   label: string;
   status: LaneRouteStatus;
   summary: string;
+  statusModifier?: string;
+  scopeNote?: string;
   columns: LaneRouteTableColumn[];
+  officialRows: LaneRouteMethodRow[];
+  exploratoryRows: LaneRouteMethodRow[];
   rows: LaneRouteMethodRow[];
 };
 
@@ -438,10 +442,19 @@ export function buildLaneRouteModel(
 ): LaneRouteModel {
   const normalizedLaneId = normalizeLaneRouteLaneId(laneId);
   const lane = laneRouteBaseSnapshot[normalizedLaneId];
-  const rows = lane.rows.filter((row) => scope === "all" || row.scope === "official");
+  const officialRows = lane.rows.filter((row) => row.scope === "official");
+  const exploratoryRows = scope === "all" ? lane.rows.filter((row) => row.scope === "exploratory") : [];
+  const rows = [...officialRows, ...exploratoryRows];
 
   return {
     ...lane,
+    statusModifier: exploratoryRows.length > 0 ? "Exploratory in view" : undefined,
+    scopeNote:
+      exploratoryRows.length > 0
+        ? "Exploratory methods are visible below. Official lane status remains canonical."
+        : undefined,
+    officialRows,
+    exploratoryRows,
     rows,
   };
 }

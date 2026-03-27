@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { useTraceScope } from "@/app/scope";
+import { ScopeRouteNote } from "@/components/layout/ScopeRouteNote";
 import { MethodHeader } from "@/components/method/MethodHeader";
 import { MethodExplanation } from "@/components/method/MethodExplanation";
 import { InspectorPanel } from "@/components/method/InspectorPanel";
@@ -35,11 +36,14 @@ export function MethodPage() {
         laneId={methodRoute.laneId}
         laneLabel={methodRoute.laneLabel}
         methodLabel={methodRoute.methodLabel}
+        methodScope={methodRoute.scope}
         question="Why is this method judged this way?"
         scope={scope}
         status={methodRoute.status}
+        statusModifier={methodRoute.statusModifier}
         summary={methodRoute.summary}
       />
+      {methodRoute.scopeNote ? <ScopeRouteNote message={methodRoute.scopeNote} /> : null}
       <MethodMetricStrip metrics={methodRoute.metricStrip} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="space-y-6">
@@ -48,7 +52,8 @@ export function MethodPage() {
             methodId={methodRoute.methodId}
             methodLabel={methodRoute.methodLabel}
             onSelectRun={setSelectedRunEntityId}
-            runs={methodRoute.runs}
+            officialRuns={methodRoute.officialRuns}
+            exploratoryRuns={methodRoute.exploratoryRuns}
             scope={scope}
             selectedEntityId={selectedRunEntityId}
           />

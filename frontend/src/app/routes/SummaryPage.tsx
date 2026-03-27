@@ -1,4 +1,5 @@
 import { useTraceScope } from "@/app/scope";
+import { ScopeRouteNote } from "@/components/layout/ScopeRouteNote";
 import { LaneSummaryPanel } from "@/components/summary/LaneSummaryPanel";
 import { VerdictStrip } from "@/components/summary/VerdictStrip";
 import { buildSummaryRouteModel } from "@/lib/summaryRoute";
@@ -18,6 +19,7 @@ export function SummaryPage() {
       </header>
 
       <VerdictStrip verdict={summaryRoute.verdict} />
+      {summaryRoute.scopeNote ? <ScopeRouteNote message={summaryRoute.scopeNote} /> : null}
 
       <div className="space-y-4">
         {summaryRoute.laneOrder.map((laneId) => (

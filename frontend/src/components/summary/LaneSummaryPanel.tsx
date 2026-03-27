@@ -104,7 +104,7 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
         </div>
 
         <div className="mt-3 space-y-3">
-          {lane.methodPreviewRows.map((row) => {
+          {lane.officialMethodPreviewRows.map((row) => {
             const statusBadgeProps = getStatusBadgeProps(row.status);
 
             return (
@@ -122,6 +122,59 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
                     </Link>
                     <Badge {...statusBadgeProps}>{formatLabel(row.status)}</Badge>
                     {row.scope === "exploratory" ? <Badge tone="exploratory">Exploratory</Badge> : null}
+                  </div>
+                  <p className="text-sm leading-6 text-muted-foreground">{row.summary}</p>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-semibold text-foreground">{row.headlineMetric.label}</span>
+                  <span className="text-foreground">{formatMetric(row.headlineMetric.value)}</span>
+                  <span
+                    className={cn(
+                      "text-muted-foreground",
+                      getMetricTextTone(
+                        row.headlineMetric.deltaVsBaseline,
+                        Boolean(row.headlineMetric.lowerIsBetter),
+                      ),
+                    )}
+                  >
+                    {row.headlineMetric.deltaVsBaseline === undefined ||
+                    row.headlineMetric.deltaVsBaseline === null
+                      ? "baseline reference"
+                      : `${formatSignedMetric(row.headlineMetric.deltaVsBaseline)} vs baseline`}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+          {lane.exploratoryMethodPreviewRows.length > 0 ? (
+            <div className="rounded-[14px] border border-dashed border-border/80 px-3 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="exploratory">Exploratory methods</Badge>
+                <p className="text-xs text-muted-foreground">
+                  Shown because scope includes exploratory evidence.
+                </p>
+              </div>
+            </div>
+          ) : null}
+          {lane.exploratoryMethodPreviewRows.map((row) => {
+            const statusBadgeProps = getStatusBadgeProps(row.status);
+
+            return (
+              <div key={`${lane.laneId}-${row.methodId}`} className="rounded-[14px] border border-dashed border-border/70 px-3 py-3">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      className="text-sm font-semibold text-foreground underline decoration-border underline-offset-4 hover:text-primary"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                      }}
+                      to={withScope(`/lane/${lane.laneId}/${row.methodId}`, scope)}
+                    >
+                      {row.label}
+                    </Link>
+                    <Badge {...statusBadgeProps}>{formatLabel(row.status)}</Badge>
+                    <Badge tone="exploratory">Exploratory</Badge>
                   </div>
                   <p className="text-sm leading-6 text-muted-foreground">{row.summary}</p>
                 </div>

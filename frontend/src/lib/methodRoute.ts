@@ -77,7 +77,12 @@ export type MethodRouteModel = {
   methodLabel: string;
   status: LaneRouteStatus;
   summary: string;
+  scope: LaneRouteRowScope;
+  statusModifier?: string;
+  scopeNote?: string;
   metricStrip: MethodRouteMetric[];
+  officialRuns: MethodRouteRunRow[];
+  exploratoryRuns: MethodRouteRunRow[];
   runs: MethodRouteRunRow[];
   defaultRunEntityId: string;
   explanation: MethodRouteExplanationSection[];
@@ -511,9 +516,12 @@ export function buildMethodRouteModel(
   const lane = METHOD_ROUTE_SNAPSHOT[normalizedLaneId];
   const visibleMethods = lane.methods.filter((candidate) => scope === "all" || candidate.scope === "official");
   const method = normalizeMethodRouteMethodId(visibleMethods, methodId);
-  const visibleRuns = method.runs.filter((candidate) => scope === "all" || candidate.scope === "official");
+  const officialRuns = method.runs.filter((candidate) => candidate.scope === "official");
+  const exploratoryRuns = scope === "all" ? method.runs.filter((candidate) => candidate.scope === "exploratory") : [];
+  const visibleRuns = [...officialRuns, ...exploratoryRuns];
   const defaultRunEntityId =
-    visibleRuns.find((candidate) => candidate.scope === "official")?.entityId ?? visibleRuns[0]?.entityId ?? "run_missing";
+    officialRuns[0]?.entityId ?? exploratoryRuns[0]?.entityId ?? "run_missing";
+  const hasExploratoryInView = method.scope === "exploratory" || exploratoryRuns.length > 0;
 
   return {
     question: "Why is this method judged this way?",
@@ -523,7 +531,16 @@ export function buildMethodRouteModel(
     methodLabel: method.methodLabel,
     status: method.status,
     summary: method.summary,
+    scope: method.scope,
+    statusModifier: hasExploratoryInView ? "Exploratory in view" : undefined,
+    scopeNote: hasExploratoryInView
+      ? method.scope === "exploratory"
+        ? "Exploratory method is in view. Official lane status remains canonical."
+        : "Exploratory runs are visible below. Official method status remains canonical."
+      : undefined,
     metricStrip: method.metricStrip,
+    officialRuns,
+    exploratoryRuns,
     runs: visibleRuns,
     defaultRunEntityId,
     explanation: method.explanation,

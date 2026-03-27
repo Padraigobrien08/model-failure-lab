@@ -36,21 +36,35 @@ export type SummaryRouteLanePanel = {
   status: SummaryRouteLaneStatus;
   summary: string;
   metrics: SummaryRouteMetric[];
-  methodPreviewRows: SummaryRouteMethodPreviewRow[];
+  officialMethodPreviewRows: SummaryRouteMethodPreviewRow[];
+  exploratoryMethodPreviewRows: SummaryRouteMethodPreviewRow[];
 };
 
 export type SummaryRouteVerdictStrip = {
   status: SummaryRouteVerdictStatus;
   implication: string;
+  modifier?: string;
 };
 
 export type SummaryRouteSnapshot = {
   verdict: SummaryRouteVerdictStrip;
   laneOrder: SummaryRouteLaneId[];
+  scopeNote?: string;
   lanes: Record<SummaryRouteLaneId, SummaryRouteLanePanel>;
 };
 
-const summaryRouteBaseSnapshot: SummaryRouteSnapshot = {
+type SummaryRouteLaneSnapshot = Omit<
+  SummaryRouteLanePanel,
+  "officialMethodPreviewRows" | "exploratoryMethodPreviewRows"
+> & {
+  methodPreviewRows: SummaryRouteMethodPreviewRow[];
+};
+
+const summaryRouteBaseSnapshot: {
+  verdict: SummaryRouteVerdictStrip;
+  laneOrder: SummaryRouteLaneId[];
+  lanes: Record<SummaryRouteLaneId, SummaryRouteLaneSnapshot>;
+} = {
   verdict: {
     status: "mixed",
     implication:
@@ -178,37 +192,56 @@ const summaryRouteBaseSnapshot: SummaryRouteSnapshot = {
   },
 };
 
-function buildPreviewRows(
+function buildOfficialPreviewRows(
   rows: SummaryRouteMethodPreviewRow[],
-  scope: "official" | "all",
 ): SummaryRouteMethodPreviewRow[] {
-  const filteredRows =
-    scope === "all" ? rows : rows.filter((row) => row.scope === "official");
-
-  const baselineRow = filteredRows.find((row) => row.methodId === "baseline");
-  const remainingRows = filteredRows.filter((row) => row.methodId !== "baseline");
+  const baselineRow = rows.find((row) => row.methodId === "baseline");
+  const remainingRows = rows.filter((row) => row.methodId !== "baseline");
 
   return [baselineRow, ...remainingRows].filter(Boolean).slice(0, 3) as SummaryRouteMethodPreviewRow[];
 }
 
+function partitionPreviewRows(
+  rows: SummaryRouteMethodPreviewRow[],
+  scope: "official" | "all",
+) {
+  const officialRows = buildOfficialPreviewRows(rows.filter((row) => row.scope === "official"));
+  const exploratoryRows = scope === "all" ? rows.filter((row) => row.scope === "exploratory") : [];
+
+  return { officialRows, exploratoryRows };
+}
+
 export function buildSummaryRouteModel(scope: "official" | "all"): SummaryRouteSnapshot {
+  const robustness = partitionPreviewRows(
+    summaryRouteBaseSnapshot.lanes.robustness.methodPreviewRows,
+    scope,
+  );
+  const calibration = partitionPreviewRows(
+    summaryRouteBaseSnapshot.lanes.calibration.methodPreviewRows,
+    scope,
+  );
+  const hasExploratoryInView =
+    robustness.exploratoryRows.length > 0 || calibration.exploratoryRows.length > 0;
+
   return {
-    verdict: summaryRouteBaseSnapshot.verdict,
+    verdict: {
+      ...summaryRouteBaseSnapshot.verdict,
+      modifier: hasExploratoryInView ? "Exploratory in view" : undefined,
+    },
     laneOrder: summaryRouteBaseSnapshot.laneOrder,
+    scopeNote: hasExploratoryInView
+      ? "Exploratory evidence is visible below. Official verdict labels remain canonical."
+      : undefined,
     lanes: {
       robustness: {
         ...summaryRouteBaseSnapshot.lanes.robustness,
-        methodPreviewRows: buildPreviewRows(
-          summaryRouteBaseSnapshot.lanes.robustness.methodPreviewRows,
-          scope,
-        ),
+        officialMethodPreviewRows: robustness.officialRows,
+        exploratoryMethodPreviewRows: robustness.exploratoryRows,
       },
       calibration: {
         ...summaryRouteBaseSnapshot.lanes.calibration,
-        methodPreviewRows: buildPreviewRows(
-          summaryRouteBaseSnapshot.lanes.calibration.methodPreviewRows,
-          scope,
-        ),
+        officialMethodPreviewRows: calibration.officialRows,
+        exploratoryMethodPreviewRows: calibration.exploratoryRows,
       },
     },
   };

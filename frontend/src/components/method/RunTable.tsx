@@ -11,7 +11,8 @@ type RunTableProps = {
   laneId: MethodRouteLaneId;
   methodId: string;
   methodLabel: string;
-  runs: MethodRouteRunRow[];
+  officialRuns: MethodRouteRunRow[];
+  exploratoryRuns: MethodRouteRunRow[];
   scope: TraceScope;
   selectedEntityId: string;
   onSelectRun: (entityId: string) => void;
@@ -36,12 +37,57 @@ export function RunTable({
   laneId,
   methodId,
   methodLabel,
-  runs,
+  officialRuns,
+  exploratoryRuns,
   scope,
   selectedEntityId,
   onSelectRun,
 }: RunTableProps) {
   const primaryMetricLabel = laneId === "robustness" ? "Worst-group" : "ECE";
+
+  function renderRows(runs: MethodRouteRunRow[]) {
+    return runs.map((run) => {
+      const primaryMetric =
+        run.metrics.find((metric) => metric.label === primaryMetricLabel) ?? run.metrics[0];
+      const isSelected = run.entityId === selectedEntityId;
+
+      return (
+        <tr
+          key={run.entityId}
+          aria-selected={isSelected}
+          className={cn(
+            "border-t border-border/60 transition-colors",
+            isSelected ? "bg-primary/5" : "hover:bg-muted/20",
+          )}
+          data-testid={`method-run-row-${run.runId}`}
+          onClick={() => onSelectRun(run.entityId)}
+        >
+          <td className="px-4 py-3">
+            <Link
+              className="font-mono text-xs underline decoration-border underline-offset-4 hover:text-primary"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              to={buildRunRoutePath(run.runId, scope, { laneId, methodId })}
+            >
+              {run.runId}
+            </Link>
+          </td>
+          <td className="px-4 py-3 font-mono text-xs text-foreground">{run.seed}</td>
+          <td className="px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge {...getStatusBadgeProps(run.status)}>{formatLabel(run.status)}</Badge>
+              {run.scope === "exploratory" ? <Badge tone="exploratory">Exploratory</Badge> : null}
+              {isSelected ? <Badge tone="muted">Selected</Badge> : null}
+            </div>
+          </td>
+          <td className="px-4 py-3 text-right font-mono text-xs text-foreground">
+            {primaryMetric ? formatMetric(primaryMetric.value) : "n/a"}
+          </td>
+        </tr>
+      );
+    });
+  }
 
   return (
     <section className="space-y-3">
@@ -73,47 +119,20 @@ export function RunTable({
             </tr>
           </thead>
           <tbody>
-            {runs.map((run) => {
-              const primaryMetric =
-                run.metrics.find((metric) => metric.label === primaryMetricLabel) ?? run.metrics[0];
-              const isSelected = run.entityId === selectedEntityId;
-
-              return (
-                <tr
-                  key={run.entityId}
-                  aria-selected={isSelected}
-                  className={cn(
-                    "border-t border-border/60 transition-colors",
-                    isSelected ? "bg-primary/5" : "hover:bg-muted/20",
-                  )}
-                  data-testid={`method-run-row-${run.runId}`}
-                  onClick={() => onSelectRun(run.entityId)}
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      className="font-mono text-xs underline decoration-border underline-offset-4 hover:text-primary"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                      }}
-                      to={buildRunRoutePath(run.runId, scope, { laneId, methodId })}
-                    >
-                      {run.runId}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-foreground">{run.seed}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge {...getStatusBadgeProps(run.status)}>{formatLabel(run.status)}</Badge>
-                      {run.scope === "exploratory" ? <Badge tone="exploratory">Exploratory</Badge> : null}
-                      {isSelected ? <Badge tone="muted">Selected</Badge> : null}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono text-xs text-foreground">
-                    {primaryMetric ? formatMetric(primaryMetric.value) : "n/a"}
-                  </td>
-                </tr>
-              );
-            })}
+            {renderRows(officialRuns)}
+            {exploratoryRuns.length > 0 ? (
+              <tr>
+                <td className="bg-muted/20 px-4 py-3" colSpan={4}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="exploratory">Exploratory runs</Badge>
+                    <p className="text-xs text-muted-foreground">
+                      Shown because scope includes exploratory evidence.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : null}
+            {renderRows(exploratoryRuns)}
           </tbody>
         </table>
       </div>
