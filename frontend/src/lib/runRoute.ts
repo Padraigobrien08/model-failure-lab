@@ -50,7 +50,8 @@ export type RunRouteInspectorEntity = {
   rawPath: string;
 };
 
-export type RunRouteModel = {
+export type RunRouteReadyModel = {
+  state: "ready";
   question: "What happened in this run?";
   entityId: string;
   runId: string;
@@ -73,7 +74,30 @@ export type RunRouteModel = {
   inspector: RunRouteInspectorEntity;
 };
 
-type RunRouteSnapshot = Omit<RunRouteModel, "breadcrumbs" | "inspector">;
+export type RunRouteScopeHiddenModel = {
+  state: "scope-hidden";
+  question: "What happened in this run?";
+  entityId: string;
+  runId: string;
+  seed: number;
+  laneId: LaneRouteLaneId;
+  laneLabel: string;
+  methodId: LaneRouteMethodId;
+  methodLabel: string;
+  status: LaneRouteStatus;
+  scope: LaneRouteRowScope;
+  breadcrumbs: {
+    summaryPath: string;
+    lanePath: string;
+    methodPath: string;
+  };
+  message: string;
+  recoveryPath: string;
+};
+
+export type RunRouteModel = RunRouteReadyModel | RunRouteScopeHiddenModel;
+
+type RunRouteSnapshot = Omit<RunRouteReadyModel, "state" | "breadcrumbs" | "inspector">;
 
 type RunRouteContext = {
   laneId?: string | null;
@@ -613,11 +637,63 @@ function findSnapshot(
   );
 }
 
+function findRequestedSnapshot(
+  runId: string | undefined,
+  context?: RunRouteContext,
+): RunRouteSnapshot | null {
+  if (!runId) {
+    return null;
+  }
+
+  const requestedMethodId = normalizeMethodId(runId, context?.methodId);
+  const requestedLaneId = normalizeLaneId(context?.laneId, runId, requestedMethodId);
+
+  return (
+    RUN_ROUTE_SNAPSHOT.find(
+      (snapshot) => snapshot.runId === runId && snapshot.laneId === requestedLaneId,
+    ) ??
+    RUN_ROUTE_SNAPSHOT.find((snapshot) => snapshot.runId === runId) ??
+    null
+  );
+}
+
 export function buildRunRouteModel(
   runId: string | undefined,
   scope: TraceScope,
   context?: RunRouteContext,
 ): RunRouteModel {
+  const requestedSnapshot = findRequestedSnapshot(runId, context);
+
+  if (requestedSnapshot?.scope === "exploratory" && scope === "official") {
+    return {
+      state: "scope-hidden",
+      question: "What happened in this run?",
+      entityId: requestedSnapshot.entityId,
+      runId: requestedSnapshot.runId,
+      seed: requestedSnapshot.seed,
+      laneId: requestedSnapshot.laneId,
+      laneLabel: requestedSnapshot.laneLabel,
+      methodId: requestedSnapshot.methodId,
+      methodLabel: requestedSnapshot.methodLabel,
+      status: requestedSnapshot.status,
+      scope: requestedSnapshot.scope,
+      breadcrumbs: {
+        summaryPath: buildScopedPath("/", scope),
+        lanePath: buildScopedPath(`/lane/${requestedSnapshot.laneId}`, scope),
+        methodPath: buildScopedPath(
+          `/lane/${requestedSnapshot.laneId}/${requestedSnapshot.methodId}`,
+          scope,
+        ),
+      },
+      message:
+        "This run is exploratory. Switch scope to include exploratory evidence before opening its run-level trace.",
+      recoveryPath: buildRunRoutePath(requestedSnapshot.runId, "all", {
+        laneId: requestedSnapshot.laneId,
+        methodId: requestedSnapshot.methodId,
+      }),
+    };
+  }
+
   const snapshot = findSnapshot(runId, scope, context);
   const methodPath = buildScopedPath(`/lane/${snapshot.laneId}/${snapshot.methodId}`, scope);
   const provenance = buildProvenanceFields(snapshot.laneId, snapshot.methodId, snapshot.runId);
@@ -648,6 +724,7 @@ export function buildRunRouteModel(
   }));
 
   return {
+    state: "ready",
     ...snapshot,
     breadcrumbs: {
       summaryPath: buildScopedPath("/", scope),

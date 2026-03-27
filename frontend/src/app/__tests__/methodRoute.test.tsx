@@ -11,6 +11,11 @@ describe("Method route model", () => {
 
   it("keeps robustness runs in seed-first order and selects the first official run by default", () => {
     const model = buildMethodRouteModel("robustness", "reweighting", "official");
+    expect(model.state).toBe("ready");
+
+    if (model.state !== "ready") {
+      throw new Error("Expected the robustness reweighting route to be ready.");
+    }
 
     expect(model.metricStrip.map((metric) => metric.label)).toEqual(["Worst-group", "OOD", "ID"]);
     expect(model.metricStrip.map((metric) => metric.deltaVsBaseline)).toEqual([0.061, -0.018, -0.008]);
@@ -20,6 +25,11 @@ describe("Method route model", () => {
 
   it("keeps calibration runs in seed-first order and exposes lower-is-better metrics", () => {
     const model = buildMethodRouteModel("calibration", "temperature_scaling", "official");
+    expect(model.state).toBe("ready");
+
+    if (model.state !== "ready") {
+      throw new Error("Expected the calibration temperature-scaling route to be ready.");
+    }
 
     expect(model.metricStrip.map((metric) => metric.label)).toEqual(["ECE", "Brier"]);
     expect(model.metricStrip.every((metric) => metric.lowerIsBetter)).toBe(true);

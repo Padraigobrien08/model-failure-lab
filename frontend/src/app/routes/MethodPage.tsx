@@ -9,6 +9,7 @@ import { InspectorPanel } from "@/components/method/InspectorPanel";
 import { LineageChain } from "@/components/method/LineageChain";
 import { MethodMetricStrip } from "@/components/method/MethodMetricStrip";
 import { RunTable } from "@/components/method/RunTable";
+import { ScopeFilteredState } from "@/components/routes/ScopeFilteredState";
 import {
   buildMethodRouteModel,
   getDefaultMethodRunEntityId,
@@ -20,15 +21,47 @@ export function MethodPage() {
   const { laneId, methodId } = useParams();
   const { scope } = useTraceScope();
   const methodRoute = buildMethodRouteModel(laneId, methodId, scope);
-  const [selectedRunEntityId, setSelectedRunEntityId] = useState<string>(
-    getDefaultMethodRunEntityId(methodRoute),
+  const [selectedRunEntityId, setSelectedRunEntityId] = useState<string | null>(
+    methodRoute.state === "ready" ? getDefaultMethodRunEntityId(methodRoute) : null,
   );
 
   useEffect(() => {
+    if (methodRoute.state !== "ready") {
+      setSelectedRunEntityId(null);
+      return;
+    }
+
     setSelectedRunEntityId((current) => resolveMethodRunEntityId(methodRoute, current));
   }, [laneId, methodId, scope]);
 
-  const selectedInspectorEntity = getMethodInspectorEntity(methodRoute, selectedRunEntityId);
+  if (methodRoute.state === "scope-hidden") {
+    return (
+      <section className="space-y-6">
+        <MethodHeader
+          laneId={methodRoute.laneId}
+          laneLabel={methodRoute.laneLabel}
+          methodLabel={methodRoute.methodLabel}
+          methodScope={methodRoute.scope}
+          question={methodRoute.question}
+          scope={scope}
+          status={methodRoute.status}
+          summary={methodRoute.summary}
+        />
+        <ScopeFilteredState
+          message={methodRoute.message}
+          recoveryPath={methodRoute.recoveryPath}
+          state="scope-hidden"
+          testId="method-scope-hidden"
+          title={methodRoute.methodLabel}
+        />
+      </section>
+    );
+  }
+
+  const selectedInspectorEntity = getMethodInspectorEntity(
+    methodRoute,
+    selectedRunEntityId ?? getDefaultMethodRunEntityId(methodRoute),
+  );
 
   return (
     <section className="space-y-6">
@@ -55,7 +88,7 @@ export function MethodPage() {
             officialRuns={methodRoute.officialRuns}
             exploratoryRuns={methodRoute.exploratoryRuns}
             scope={scope}
-            selectedEntityId={selectedRunEntityId}
+            selectedEntityId={selectedRunEntityId ?? getDefaultMethodRunEntityId(methodRoute)}
           />
           <MethodExplanation sections={methodRoute.explanation} />
           <LineageChain lineage={methodRoute.lineage} scope={scope} />

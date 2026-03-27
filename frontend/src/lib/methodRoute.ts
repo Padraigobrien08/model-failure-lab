@@ -69,7 +69,8 @@ export type MethodRouteInspectorEntity = {
   provenance: MethodRouteProvenanceField[];
 };
 
-export type MethodRouteModel = {
+export type MethodRouteReadyModel = {
+  state: "ready";
   question: string;
   laneId: LaneRouteLaneId;
   laneLabel: string;
@@ -88,6 +89,22 @@ export type MethodRouteModel = {
   explanation: MethodRouteExplanationSection[];
   lineage: MethodRouteLineage;
 };
+
+export type MethodRouteScopeHiddenModel = {
+  state: "scope-hidden";
+  question: string;
+  laneId: LaneRouteLaneId;
+  laneLabel: string;
+  methodId: LaneRouteMethodId;
+  methodLabel: string;
+  status: LaneRouteStatus;
+  summary: string;
+  scope: LaneRouteRowScope;
+  message: string;
+  recoveryPath: string;
+};
+
+export type MethodRouteModel = MethodRouteReadyModel | MethodRouteScopeHiddenModel;
 
 type MethodRouteMethodSnapshot = {
   methodId: LaneRouteMethodId;
@@ -514,6 +531,27 @@ export function buildMethodRouteModel(
 ): MethodRouteModel {
   const normalizedLaneId: LaneRouteLaneId = laneId === "calibration" ? "calibration" : "robustness";
   const lane = METHOD_ROUTE_SNAPSHOT[normalizedLaneId];
+  const requestedMethod = methodId
+    ? lane.methods.find((candidate) => candidate.methodId === methodId)
+    : null;
+
+  if (requestedMethod?.scope === "exploratory" && scope === "official") {
+    return {
+      state: "scope-hidden",
+      question: "Why is this method judged this way?",
+      laneId: lane.laneId,
+      laneLabel: lane.laneLabel,
+      methodId: requestedMethod.methodId,
+      methodLabel: requestedMethod.methodLabel,
+      status: requestedMethod.status,
+      summary: requestedMethod.summary,
+      scope: requestedMethod.scope,
+      message:
+        "This method is exploratory. Switch scope to include exploratory evidence before opening its method-level breakdown.",
+      recoveryPath: `/lane/${lane.laneId}/${requestedMethod.methodId}?scope=all`,
+    };
+  }
+
   const visibleMethods = lane.methods.filter((candidate) => scope === "all" || candidate.scope === "official");
   const method = normalizeMethodRouteMethodId(visibleMethods, methodId);
   const officialRuns = method.runs.filter((candidate) => candidate.scope === "official");
@@ -524,6 +562,7 @@ export function buildMethodRouteModel(
   const hasExploratoryInView = method.scope === "exploratory" || exploratoryRuns.length > 0;
 
   return {
+    state: "ready",
     question: "Why is this method judged this way?",
     laneId: lane.laneId,
     laneLabel: lane.laneLabel,
@@ -548,12 +587,12 @@ export function buildMethodRouteModel(
   };
 }
 
-export function getDefaultMethodRunEntityId(model: MethodRouteModel) {
+export function getDefaultMethodRunEntityId(model: MethodRouteReadyModel) {
   return model.defaultRunEntityId;
 }
 
 export function resolveMethodRunEntityId(
-  model: MethodRouteModel,
+  model: MethodRouteReadyModel,
   entityId: string | null,
 ) {
   if (!entityId) {
@@ -564,7 +603,7 @@ export function resolveMethodRunEntityId(
 }
 
 export function getMethodInspectorEntity(
-  model: MethodRouteModel,
+  model: MethodRouteReadyModel,
   entityId: string,
 ): MethodRouteInspectorEntity {
   const run = model.runs.find((candidate) => candidate.entityId === entityId) ?? model.runs[0];

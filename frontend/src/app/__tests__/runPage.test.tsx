@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { App } from "@/app/App";
 
@@ -57,5 +58,32 @@ describe("Run page", () => {
       "href",
       "/mock-artifacts/distilbert_reweighting_seed_13/report.md",
     );
+  });
+
+  it("shows a recoverable scope warning instead of silently falling back from an exploratory run", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/run/distilbert_group_dro_seed_13?scope=official&lane=robustness&method=group_dro"]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "distilbert_group_dro_seed_13", level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("run-scope-hidden")).toBeInTheDocument();
+    expect(screen.getByText("Scope warning")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Include exploratory" })).toHaveAttribute(
+      "href",
+      "/run/distilbert_group_dro_seed_13?scope=all&lane=robustness&method=group_dro",
+    );
+    expect(screen.queryByText("Artifacts")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Include exploratory" }));
+
+    expect(await screen.findByText("Artifacts")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
   });
 });

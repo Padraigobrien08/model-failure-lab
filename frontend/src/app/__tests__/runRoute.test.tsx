@@ -8,6 +8,11 @@ describe("runRoute", () => {
       laneId: "calibration",
       methodId: "reweighting",
     });
+    expect(runRoute.state).toBe("ready");
+
+    if (runRoute.state !== "ready") {
+      throw new Error("Expected the calibration reweighting run route to be ready.");
+    }
 
     expect(runRoute.question).toBe("What happened in this run?");
     expect(runRoute.runId).toBe("distilbert_reweighting_seed_13");

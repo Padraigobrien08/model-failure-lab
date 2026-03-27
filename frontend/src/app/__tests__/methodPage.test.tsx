@@ -40,4 +40,24 @@ describe("Method page", () => {
       "/debug/raw/run_distilbert_reweighting_seed_42?scope=all",
     );
   });
+
+  it("shows a recoverable scope warning instead of silently falling back from an exploratory method", async () => {
+    const user = userEvent.setup();
+
+    render(<App useMemoryRouter initialEntries={["/lane/robustness/group_dro?scope=official"]} />);
+
+    expect(screen.getByRole("heading", { name: "Group DRO", level: 1 })).toBeInTheDocument();
+    expect(screen.getByTestId("method-scope-hidden")).toBeInTheDocument();
+    expect(screen.getByText("Scope warning")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Include exploratory" })).toHaveAttribute(
+      "href",
+      "/lane/robustness/group_dro?scope=all",
+    );
+    expect(screen.queryByRole("table", { name: "Reweighting runs" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Include exploratory" }));
+
+    expect(await screen.findByRole("table", { name: "Group DRO runs" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+  });
 });

@@ -131,6 +131,22 @@ describe("App shell", () => {
     );
   });
 
+  it("keeps the trace chain aligned to a scope-hidden exploratory method instead of switching to an official default", () => {
+    render(<App useMemoryRouter initialEntries={["/lane/robustness/group_dro?scope=official"]} />);
+
+    const traceChain = screen.getByLabelText("Trace chain");
+
+    expect(within(traceChain).getByText("Method")).toHaveAttribute("aria-current", "page");
+    expect(within(traceChain).getByRole("link", { name: "Run" })).toHaveAttribute(
+      "href",
+      "/run/distilbert_group_dro_seed_13?scope=official&lane=robustness&method=group_dro",
+    );
+    expect(within(traceChain).getByRole("link", { name: "Artifact" })).toHaveAttribute(
+      "href",
+      "/debug/raw/run_distilbert_group_dro_seed_13?scope=official",
+    );
+  });
+
   it("normalizes invalid browser scope params back to official", async () => {
     window.history.replaceState({}, "", "/run/demo-run?scope=exploratory");
 

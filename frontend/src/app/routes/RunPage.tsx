@@ -7,6 +7,7 @@ import { RunHeader } from "@/components/run/RunHeader";
 import { InterpretationNote } from "@/components/run/InterpretationNote";
 import { LineageStack } from "@/components/run/LineageStack";
 import { RunMetricStrip } from "@/components/run/RunMetricStrip";
+import { ScopeFilteredState } from "@/components/routes/ScopeFilteredState";
 import { buildRunRouteModel } from "@/lib/runRoute";
 
 export function RunPage() {
@@ -17,6 +18,28 @@ export function RunPage() {
     laneId: searchParams.get("lane"),
     methodId: searchParams.get("method"),
   });
+
+  if (runRoute.state === "scope-hidden") {
+    return (
+      <section className="space-y-6">
+        <RunHeader
+          breadcrumbs={runRoute.breadcrumbs}
+          laneLabel={runRoute.laneLabel}
+          methodLabel={runRoute.methodLabel}
+          runId={runRoute.runId}
+          seed={runRoute.seed}
+          status={runRoute.status}
+        />
+        <ScopeFilteredState
+          message={runRoute.message}
+          recoveryPath={runRoute.recoveryPath}
+          state="scope-hidden"
+          testId="run-scope-hidden"
+          title={runRoute.runId}
+        />
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">

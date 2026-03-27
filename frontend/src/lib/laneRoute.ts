@@ -193,7 +193,7 @@ function buildCalibrationRun(
 
 const laneRouteBaseSnapshot: Record<
   LaneRouteLaneId,
-  Omit<LaneRouteModel, "rows"> & { rows: LaneRouteMethodRow[] }
+  Omit<LaneRouteModel, "rows" | "officialRows" | "exploratoryRows"> & { rows: LaneRouteMethodRow[] }
 > = {
   robustness: {
     laneId: "robustness",

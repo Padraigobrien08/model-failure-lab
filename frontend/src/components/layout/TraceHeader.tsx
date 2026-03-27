@@ -53,15 +53,16 @@ function pickPreferredMethodId(
   scope: "official" | "all",
   preferredMethodId?: string,
 ) {
-  const laneModel = buildLaneRouteModel(laneId, scope);
-  const explicitMethod =
-    preferredMethodId &&
-    laneModel.rows.find((row) => row.methodId === preferredMethodId);
-
-  if (explicitMethod) {
-    return explicitMethod.methodId;
+  if (
+    preferredMethodId === "baseline" ||
+    preferredMethodId === "reweighting" ||
+    preferredMethodId === "temperature_scaling" ||
+    preferredMethodId === "group_dro"
+  ) {
+    return preferredMethodId;
   }
 
+  const laneModel = buildLaneRouteModel(laneId, scope);
   return (
     laneModel.rows.find((row) => row.methodId !== "baseline")?.methodId ??
     laneModel.rows[0]?.methodId ??
@@ -80,11 +81,15 @@ function pickPreferredRunId(
   }
 
   const laneModel = buildLaneRouteModel(laneId, scope);
-  const methodRow = laneModel.rows.find((row) => row.methodId === methodId) ?? laneModel.rows[0];
+  const methodRow = laneModel.rows.find((row) => row.methodId === methodId);
   const preferredRun =
     methodRow?.runs.find((run) => run.scope === "official") ?? methodRow?.runs[0];
 
-  return preferredRun?.runId ?? "distilbert_reweighting_seed_13";
+  if (preferredRun) {
+    return preferredRun.runId;
+  }
+
+  return `distilbert_${methodId}_seed_13`;
 }
 
 function resolveTraceTargets(
