@@ -37,19 +37,13 @@ describe("App shell", () => {
     );
     expect(screen.getByRole("button", { name: "Official" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-    expect(
-      screen.getByRole("heading", { name: "Why is this method judged this way?" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("/lane/:laneId/:methodId")).toBeInTheDocument();
-    expect(screen.getByText("methodId")).toBeInTheDocument();
-    expect(screen.getByText("reweighting")).toBeInTheDocument();
-    expect(
-      screen.getByText((_, element) => element?.textContent === "Current scope: All"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Previous step")).toBeInTheDocument();
-    expect(screen.getByText("Next step")).toBeInTheDocument();
+    expect(screen.getByText("Why is this method judged this way?")).toBeInTheDocument();
+    expect(screen.getByLabelText("Method breadcrumb")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Reweighting runs" })).toBeInTheDocument();
+    expect(screen.getByText("Method explanation")).toBeInTheDocument();
+    expect(screen.getByText("Lineage")).toBeInTheDocument();
     expect(container.querySelector("main")).not.toBeNull();
-    expect(container.querySelector("aside")).toBeNull();
+    expect(screen.getByTestId("method-inspector")).toBeInTheDocument();
   });
 
   it("lets users navigate backward through the trace chain without losing scope", async () => {
@@ -99,9 +93,7 @@ describe("App shell", () => {
 
     await user.click(within(screen.getByLabelText("Trace chain")).getByRole("link", { name: "Method" }));
 
-    expect(
-      await screen.findByRole("heading", { name: "Why is this method judged this way?" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Why is this method judged this way?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
   });
 
