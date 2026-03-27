@@ -24,7 +24,7 @@ from model_failure_lab.utils.paths import repository_root
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Launch the React failure debugger UI.")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=5173)
+    parser.add_argument("--port", type=int, default=5174)
     return parser
 
 
