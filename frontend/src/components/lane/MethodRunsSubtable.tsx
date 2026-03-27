@@ -95,23 +95,23 @@ export function MethodRunsSubtable({
   }
 
   return (
-    <div className="px-4 py-3">
-      <table aria-label={`${methodLabel} runs`} className="min-w-full border-collapse text-xs">
+    <div className="px-3 py-2.5">
+      <table aria-label={`${methodLabel} runs`} className="min-w-full border-collapse text-[11px]">
         <thead>
           <tr>
-            <th className="px-3 py-2 text-left font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <th className="px-2.5 py-2 text-left font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Run ID
             </th>
-            <th className="px-3 py-2 text-left font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <th className="px-2.5 py-2 text-left font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Seed
             </th>
-            <th className="px-3 py-2 text-left font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <th className="px-2.5 py-2 text-left font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Status
             </th>
-            <th className="px-3 py-2 text-right font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <th className="px-2.5 py-2 text-right font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {laneId === "robustness" ? "Worst-group" : "ECE"}
             </th>
-            <th className="px-3 py-2 text-right font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <th className="px-2.5 py-2 text-right font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Delta
             </th>
           </tr>
@@ -120,7 +120,7 @@ export function MethodRunsSubtable({
           {renderRows(officialRuns)}
           {exploratoryRuns.length > 0 ? (
             <tr className="border-t border-border/50">
-              <td className="bg-muted/20 px-3 py-2" colSpan={5}>
+              <td className="bg-muted/10 px-2.5 py-2" colSpan={5}>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="exploratory">Exploratory runs</Badge>
                   <p className="text-[11px] text-muted-foreground">

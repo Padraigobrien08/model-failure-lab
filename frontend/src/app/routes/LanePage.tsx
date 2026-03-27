@@ -60,7 +60,7 @@ export function LanePage() {
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-5">
       <LaneHeader
         laneLabel={lane.label}
         scope={scope}
@@ -70,7 +70,7 @@ export function LanePage() {
       />
       {lane.scopeNote ? <ScopeRouteNote message={lane.scopeNote} /> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <MethodComparisonTable
           columns={lane.columns}
           expandedMethodIds={expandedMethodIds}

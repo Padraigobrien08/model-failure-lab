@@ -150,20 +150,20 @@ export function TraceHeader() {
   const searchParams = new URLSearchParams(location.search);
 
   return (
-    <header className="border-b border-border/70 bg-background/95">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-2">
-          <div className="space-y-1">
+    <header className="border-b border-border/60 bg-background/95">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="space-y-1.5">
+          <div className="space-y-0.5">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Model Failure Lab
             </p>
-            <Link className="text-lg font-semibold tracking-[-0.03em] text-foreground" to={homeHref}>
+            <Link className="text-base font-semibold tracking-[-0.03em] text-foreground sm:text-lg" to={homeHref}>
               Failure Debugger
             </Link>
           </div>
           <div
             aria-label="Trace chain"
-            className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground"
+            className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground"
           >
             {NAVIGATION_ITEMS.map((item, index) => (
               <Fragment key={item.path}>
@@ -177,9 +177,9 @@ export function TraceHeader() {
                   const isActive = item.label === activeRouteLabel;
                   const isAvailable = href !== null;
                   const pillClassName = cn(
-                    "rounded-full border border-border/70 px-2.5 py-1 transition-colors",
-                    isActive && "border-foreground text-foreground",
-                    isAvailable && !isActive && "hover:border-foreground/60 hover:text-foreground",
+                    "rounded-md border border-border/60 px-2 py-1 transition-colors",
+                    isActive && "border-foreground/70 bg-muted/20 text-foreground",
+                    isAvailable && !isActive && "hover:border-foreground/50 hover:text-foreground",
                     !isAvailable && "opacity-50",
                   );
 
@@ -208,7 +208,7 @@ export function TraceHeader() {
 
         <div
           aria-label="Trace scope"
-          className="flex items-center gap-2 rounded-full border border-border/70 bg-card/70 p-1"
+          className="flex items-center gap-1 rounded-md border border-border/60 bg-muted/10 p-1"
         >
           <Button
             size="sm"

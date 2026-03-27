@@ -12,8 +12,8 @@ function getVerdictTone(status: SummaryRouteVerdictStrip["status"]) {
 
 export function VerdictStrip({ verdict }: VerdictStripProps) {
   return (
-    <section className="rounded-[18px] border border-border/70 bg-card/45 px-4 py-4 sm:px-5">
-      <div className="space-y-3">
+    <section className="rounded-lg border border-border/60 bg-muted/[0.08] px-4 py-3 sm:px-5">
+      <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">Final verdict</Badge>
           <Badge tone={getVerdictTone(verdict.status)}>{formatLabel(verdict.status)}</Badge>

@@ -9,10 +9,12 @@ export function SummaryPage() {
   const summaryRoute = buildSummaryRouteModel(scope);
 
   return (
-    <section className="space-y-5">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">Where should I look?</h1>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+    <section className="space-y-4">
+      <header className="space-y-1.5">
+        <h1 className="text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
+          Where should I look?
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
           Start with the lane that best explains the verdict, then jump directly into the supporting
           method path.
         </p>
@@ -21,7 +23,7 @@ export function SummaryPage() {
       <VerdictStrip verdict={summaryRoute.verdict} />
       {summaryRoute.scopeNote ? <ScopeRouteNote message={summaryRoute.scopeNote} /> : null}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {summaryRoute.laneOrder.map((laneId) => (
           <LaneSummaryPanel key={laneId} lane={summaryRoute.lanes[laneId]} scope={scope} />
         ))}

@@ -112,8 +112,8 @@ export function MethodComparisonTable({
           <tr
             aria-selected={isSelected}
             className={cn(
-              "border-b border-border/60 last:border-b-0 cursor-pointer transition-colors",
-              isSelected ? "bg-muted/35" : "hover:bg-muted/15",
+              "cursor-pointer border-b border-border/60 last:border-b-0 transition-colors",
+              isSelected ? "bg-muted/25" : "hover:bg-muted/10",
             )}
             data-testid={`method-row-${row.methodId}`}
             onClick={() => onSelectMethod(row.entityId)}
@@ -122,7 +122,7 @@ export function MethodComparisonTable({
               <td
                 key={`${row.entityId}-${column.key}`}
                 className={cn(
-                  "px-4 py-3 align-top text-foreground",
+                  "px-3 py-2.5 align-top text-foreground",
                   column.align === "right" ? "text-right" : "text-left",
                 )}
               >
@@ -132,7 +132,7 @@ export function MethodComparisonTable({
                       <Button
                         aria-label={`${isExpanded ? "Hide" : "Show"} runs for ${row.label}`}
                         aria-expanded={isExpanded}
-                        className="h-7 rounded-md px-2 text-[10px]"
+                        className="h-6 rounded-md px-1.5 text-[10px]"
                         onClick={(event) => {
                           event.stopPropagation();
                           onToggleRuns(row.methodId);
@@ -153,7 +153,7 @@ export function MethodComparisonTable({
                       </Link>
                       {row.methodId === "baseline" ? <Badge tone="muted">Baseline</Badge> : null}
                     </div>
-                    <p className="max-w-sm text-xs leading-5 text-muted-foreground">{row.summary}</p>
+                    <p className="max-w-sm text-[11px] leading-5 text-muted-foreground">{row.summary}</p>
                   </div>
                 ) : (
                   renderMetricCell(row, column.key)
@@ -163,7 +163,7 @@ export function MethodComparisonTable({
           </tr>
           {isExpanded ? (
             <tr className="border-b border-border/60">
-              <td className="bg-muted/10 px-0 py-0" colSpan={columns.length}>
+              <td className="bg-muted/[0.06] px-0 py-0" colSpan={columns.length}>
                 <MethodRunsSubtable
                   laneId={laneId}
                   methodId={row.methodId}
@@ -182,15 +182,15 @@ export function MethodComparisonTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-[16px] border border-border/70">
+    <div className="overflow-x-auto rounded-md border border-border/60 bg-background">
       <table className="min-w-full border-collapse text-sm">
-        <thead className="bg-muted/40">
+        <thead className="bg-muted/20">
           <tr>
             {columns.map((column) => (
               <th
                 key={column.key}
                 className={cn(
-                  "border-b border-border/70 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground",
+                  "border-b border-border/60 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground",
                   column.align === "right" ? "text-right" : "text-left",
                 )}
                 scope="col"
@@ -204,7 +204,7 @@ export function MethodComparisonTable({
           {renderRows(officialRows)}
           {exploratoryRows.length > 0 ? (
             <tr>
-              <td className="bg-muted/20 px-4 py-3" colSpan={columns.length}>
+              <td className="bg-muted/15 px-3 py-2.5" colSpan={columns.length}>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="exploratory">Exploratory methods</Badge>
                   <p className="text-xs text-muted-foreground">

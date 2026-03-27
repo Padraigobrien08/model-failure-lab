@@ -50,21 +50,23 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
   return (
     <section
       aria-label={`${lane.label} lane`}
-      className="grid cursor-pointer gap-4 rounded-[20px] border border-border/70 bg-card/45 p-4 transition-colors hover:border-foreground/30 sm:p-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.9fr)]"
+      className="grid cursor-pointer gap-4 rounded-lg border border-border/60 bg-transparent p-3 transition-colors hover:border-foreground/30 sm:p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.9fr)]"
       data-testid={`${lane.laneId}-lane-panel`}
       onClick={openLane}
       onKeyDown={handlePanelKeyDown}
       role="link"
       tabIndex={0}
     >
-      <div className="space-y-4">
-        <div className="space-y-3">
+      <div className="space-y-3">
+        <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="muted">Lane</Badge>
             <Badge {...getStatusBadgeProps(lane.status)}>{formatLabel(lane.status)}</Badge>
           </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">{lane.label}</h2>
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
+              {lane.label}
+            </h2>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{lane.summary}</p>
           </div>
         </div>
@@ -76,13 +78,15 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
             return (
               <div
                 key={`${lane.laneId}-${metric.label}`}
-                className="rounded-[16px] border border-border/70 bg-background/55 px-4 py-3"
+                className="border-t border-border/60 px-0 pt-3 first:border-t-0 first:pt-0"
               >
                 <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {metric.label}
                 </dt>
-                <dd className="mt-2 space-y-1">
-                  <p className="text-lg font-semibold text-foreground">{formatMetric(metric.value)}</p>
+                <dd className="mt-1.5 space-y-0.5">
+                  <p className="text-base font-semibold text-foreground sm:text-lg">
+                    {formatMetric(metric.value)}
+                  </p>
                   <p className={cn("text-sm", deltaTone)}>
                     {metric.deltaVsBaseline === undefined || metric.deltaVsBaseline === null
                       ? "No baseline delta"
@@ -95,7 +99,7 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
         </dl>
       </div>
 
-      <div className="rounded-[18px] border border-border/70 bg-background/55 p-4">
+      <div className="space-y-3 lg:border-l lg:border-border/60 lg:pl-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Method preview
@@ -103,13 +107,16 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
           <p className="text-xs text-muted-foreground">Baseline first</p>
         </div>
 
-        <div className="mt-3 space-y-3">
+        <div className="space-y-3">
           {lane.officialMethodPreviewRows.map((row) => {
             const statusBadgeProps = getStatusBadgeProps(row.status);
 
             return (
-              <div key={`${lane.laneId}-${row.methodId}`} className="rounded-[14px] border border-border/70 px-3 py-3">
-                <div className="space-y-2">
+              <div
+                key={`${lane.laneId}-${row.methodId}`}
+                className="border-t border-border/60 pt-3 first:border-t-0 first:pt-0"
+              >
+                <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
                       className="text-sm font-semibold text-foreground underline decoration-border underline-offset-4 hover:text-primary"
@@ -126,7 +133,7 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
                   <p className="text-sm leading-6 text-muted-foreground">{row.summary}</p>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-semibold text-foreground">{row.headlineMetric.label}</span>
                   <span className="text-foreground">{formatMetric(row.headlineMetric.value)}</span>
                   <span
@@ -148,7 +155,7 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
             );
           })}
           {lane.exploratoryMethodPreviewRows.length > 0 ? (
-            <div className="rounded-[14px] border border-dashed border-border/80 px-3 py-3">
+            <div className="border-t border-dashed border-border/70 pt-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="exploratory">Exploratory methods</Badge>
                 <p className="text-xs text-muted-foreground">
@@ -161,8 +168,11 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
             const statusBadgeProps = getStatusBadgeProps(row.status);
 
             return (
-              <div key={`${lane.laneId}-${row.methodId}`} className="rounded-[14px] border border-dashed border-border/70 px-3 py-3">
-                <div className="space-y-2">
+              <div
+                key={`${lane.laneId}-${row.methodId}`}
+                className="border-t border-dashed border-border/60 pt-3"
+              >
+                <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
                       className="text-sm font-semibold text-foreground underline decoration-border underline-offset-4 hover:text-primary"
@@ -179,7 +189,7 @@ export function LaneSummaryPanel({ lane, scope }: LaneSummaryPanelProps) {
                   <p className="text-sm leading-6 text-muted-foreground">{row.summary}</p>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-semibold text-foreground">{row.headlineMetric.label}</span>
                   <span className="text-foreground">{formatMetric(row.headlineMetric.value)}</span>
                   <span
