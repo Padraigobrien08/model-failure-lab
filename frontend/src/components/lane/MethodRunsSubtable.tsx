@@ -4,20 +4,19 @@ import type { TraceScope } from "@/app/scope";
 import { Badge } from "@/components/ui/badge";
 import { formatLabel, formatMetric, formatSignedMetric, getMetricTextTone } from "@/lib/formatters";
 import type { LaneRouteLaneId, LaneRouteRunRow } from "@/lib/laneRoute";
+import type { LaneRouteMethodId } from "@/lib/laneRoute";
+import { buildRunRoutePath } from "@/lib/runRoute";
 import { cn } from "@/lib/utils";
 
 type MethodRunsSubtableProps = {
   laneId: LaneRouteLaneId;
+  methodId: LaneRouteMethodId;
   methodLabel: string;
   runs: LaneRouteRunRow[];
   scope: TraceScope;
   selectedEntityId: string;
   onSelectRun: (entityId: string) => void;
 };
-
-function withScope(path: string, scope: TraceScope) {
-  return `${path}?scope=${scope}`;
-}
 
 function getStatusBadgeProps(status: LaneRouteRunRow["status"]) {
   if (status === "stable") {
@@ -36,6 +35,7 @@ function getStatusBadgeProps(status: LaneRouteRunRow["status"]) {
 
 export function MethodRunsSubtable({
   laneId,
+  methodId,
   methodLabel,
   runs,
   scope,
@@ -85,7 +85,7 @@ export function MethodRunsSubtable({
                     onClick={(event) => {
                       event.stopPropagation();
                     }}
-                    to={withScope(`/run/${run.runId}`, scope)}
+                    to={buildRunRoutePath(run.runId, scope, { laneId, methodId })}
                   >
                     {run.runId}
                   </Link>

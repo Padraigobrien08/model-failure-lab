@@ -183,6 +183,7 @@ export function MethodComparisonTable({
                     <td className="bg-muted/10 px-0 py-0" colSpan={columns.length}>
                       <MethodRunsSubtable
                         laneId={laneId}
+                        methodId={row.methodId}
                         methodLabel={row.label}
                         runs={row.runs}
                         scope={scope}

@@ -9,6 +9,7 @@ import {
   type LaneRouteLaneId,
   type LaneRouteMethodId,
 } from "@/lib/laneRoute";
+import { buildRunRoutePath } from "@/lib/runRoute";
 import { buildSummaryRouteModel } from "@/lib/summaryRoute";
 import { cn } from "@/lib/utils";
 
@@ -89,13 +90,19 @@ function pickPreferredRunId(
 function resolveTraceTargets(
   params: Readonly<Record<string, string | undefined>>,
   scope: "official" | "all",
+  searchParams: URLSearchParams,
 ) {
   const summaryModel = buildSummaryRouteModel(scope);
   const inferredMethodId = inferMethodIdFromRunId(params.runId);
   const laneId = (params.laneId as LaneRouteLaneId | undefined) ??
+    ((searchParams.get("lane") as LaneRouteLaneId | null) ?? undefined) ??
     inferLaneIdFromMethodId(inferredMethodId) ??
     summaryModel.laneOrder[0];
-  const methodId = pickPreferredMethodId(laneId, scope, params.methodId ?? inferredMethodId ?? undefined);
+  const methodId = pickPreferredMethodId(
+    laneId,
+    scope,
+    params.methodId ?? searchParams.get("method") ?? inferredMethodId ?? undefined,
+  );
   const runId = pickPreferredRunId(laneId, methodId, scope, params.runId);
   const entityId = params.entityId ?? `run_${runId}`;
 
@@ -106,8 +113,9 @@ function getTraceHref(
   label: string,
   params: Readonly<Record<string, string | undefined>>,
   scope: "official" | "all",
+  searchParams: URLSearchParams,
 ) {
-  const targets = resolveTraceTargets(params, scope);
+  const targets = resolveTraceTargets(params, scope, searchParams);
 
   switch (label) {
     case "Verdict":
@@ -117,7 +125,10 @@ function getTraceHref(
     case "Method":
       return buildScopedPath(`/lane/${targets.laneId}/${targets.methodId}`, scope);
     case "Run":
-      return buildScopedPath(`/run/${targets.runId}`, scope);
+      return buildRunRoutePath(targets.runId, scope, {
+        laneId: targets.laneId,
+        methodId: targets.methodId,
+      });
     case "Artifact":
       return buildScopedPath(`/debug/raw/${targets.entityId}`, scope);
     default:
@@ -131,6 +142,7 @@ export function TraceHeader() {
   const { scope, setScope } = useTraceScope();
   const activeRouteLabel = getActiveRouteLabel(location.pathname);
   const homeHref = `/?scope=${scope}`;
+  const searchParams = new URLSearchParams(location.search);
 
   return (
     <header className="border-b border-border/70 bg-background/95">
@@ -156,7 +168,7 @@ export function TraceHeader() {
                   </span>
                 ) : null}
                 {(() => {
-                  const href = getTraceHref(item.label, params, scope);
+                  const href = getTraceHref(item.label, params, scope, searchParams);
                   const isActive = item.label === activeRouteLabel;
                   const isAvailable = href !== null;
                   const pillClassName = cn(

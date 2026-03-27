@@ -11,11 +11,6 @@ type RouteCase = {
 
 const ROUTE_CASES: RouteCase[] = [
   {
-    entry: "/run/distilbert_reweighting_seed_13",
-    question: "What happened in this run?",
-    params: [["runId", "distilbert_reweighting_seed_13"]],
-  },
-  {
     entry: "/debug/raw/run_distilbert_reweighting_seed_13",
     question: "What artifact backs this entity?",
     params: [["entityId", "run_distilbert_reweighting_seed_13"]],
@@ -56,6 +51,21 @@ describe("Trace scaffold routes", () => {
     expect(screen.queryByText("Current params")).not.toBeInTheDocument();
   });
 
+  it("renders /run/:runId as a real run workspace instead of placeholder content", () => {
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/run/distilbert_reweighting_seed_13?scope=all&lane=robustness&method=reweighting"]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "distilbert_reweighting_seed_13" })).toBeInTheDocument();
+    expect(screen.getByText("What happened in this run?")).toBeInTheDocument();
+    expect(screen.getByLabelText("Run breadcrumb")).toBeInTheDocument();
+    expect(screen.getByText("Interpretation")).toBeInTheDocument();
+    expect(screen.queryByText("Current params")).not.toBeInTheDocument();
+  });
+
   it.each(ROUTE_CASES)("renders $entry with its dedicated placeholder content", ({ entry, question, params }) => {
     render(<App useMemoryRouter initialEntries={[entry]} />);
 
@@ -85,21 +95,18 @@ describe("Trace scaffold routes", () => {
     const runLink = within(runTable).getByRole("link", {
       name: "distilbert_reweighting_seed_13",
     });
-    expect(runLink).toHaveAttribute("href", "/run/distilbert_reweighting_seed_13?scope=all");
+    expect(runLink).toHaveAttribute(
+      "href",
+      "/run/distilbert_reweighting_seed_13?scope=all&lane=robustness&method=reweighting",
+    );
 
     await user.click(runLink);
 
-    expect(
-      await screen.findByRole("heading", { name: "What happened in this run?" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "distilbert_reweighting_seed_13" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-    expect(
-      within(screen.getByLabelText("Run scaffold navigation")).getByRole("link", {
-        name: "Artifact sample",
-      }),
-    ).toHaveAttribute(
+    expect(within(screen.getByLabelText("Run breadcrumb")).getByRole("link", { name: "Reweighting" })).toHaveAttribute(
       "href",
-      "/debug/raw/run_distilbert_reweighting_seed_13?scope=all",
+      "/lane/robustness/reweighting?scope=all",
     );
   });
 });

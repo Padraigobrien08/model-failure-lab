@@ -4,20 +4,18 @@ import type { TraceScope } from "@/app/scope";
 import { Badge } from "@/components/ui/badge";
 import { formatLabel, formatMetric } from "@/lib/formatters";
 import type { MethodRouteLaneId, MethodRouteRunRow } from "@/lib/methodRoute";
+import { buildRunRoutePath } from "@/lib/runRoute";
 import { cn } from "@/lib/utils";
 
 type RunTableProps = {
   laneId: MethodRouteLaneId;
+  methodId: string;
   methodLabel: string;
   runs: MethodRouteRunRow[];
   scope: TraceScope;
   selectedEntityId: string;
   onSelectRun: (entityId: string) => void;
 };
-
-function withScope(path: string, scope: TraceScope) {
-  return `${path}?scope=${scope}`;
-}
 
 function getStatusBadgeProps(status: MethodRouteRunRow["status"]) {
   if (status === "stable") {
@@ -36,6 +34,7 @@ function getStatusBadgeProps(status: MethodRouteRunRow["status"]) {
 
 export function RunTable({
   laneId,
+  methodId,
   methodLabel,
   runs,
   scope,
@@ -96,7 +95,7 @@ export function RunTable({
                       onClick={(event) => {
                         event.stopPropagation();
                       }}
-                      to={withScope(`/run/${run.runId}`, scope)}
+                      to={buildRunRoutePath(run.runId, scope, { laneId, methodId })}
                     >
                       {run.runId}
                     </Link>

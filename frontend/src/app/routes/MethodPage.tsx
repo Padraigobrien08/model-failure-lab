@@ -45,6 +45,7 @@ export function MethodPage() {
         <div className="space-y-6">
           <RunTable
             laneId={methodRoute.laneId}
+            methodId={methodRoute.methodId}
             methodLabel={methodRoute.methodLabel}
             onSelectRun={setSelectedRunEntityId}
             runs={methodRoute.runs}

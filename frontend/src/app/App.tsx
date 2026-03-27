@@ -3,7 +3,7 @@ import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 import { LanePage } from "@/app/routes/LanePage";
 import { MethodPage } from "@/app/routes/MethodPage";
 import { RawDebugPlaceholderPage } from "@/app/routes/RawDebugPlaceholderPage";
-import { RunPlaceholderPage } from "@/app/routes/RunPlaceholderPage";
+import { RunPage } from "@/app/routes/RunPage";
 import { SummaryPage } from "@/app/routes/SummaryPage";
 import { TraceScopeProvider } from "@/app/scope";
 import { TraceShell } from "@/components/layout/TraceShell";
@@ -31,7 +31,7 @@ function AppFrame() {
         <Route path="/" element={<SummaryPage />} />
         <Route path="/lane/:laneId" element={<LanePage />} />
         <Route path="/lane/:laneId/:methodId" element={<MethodPage />} />
-        <Route path="/run/:runId" element={<RunPlaceholderPage />} />
+        <Route path="/run/:runId" element={<RunPage />} />
         <Route path="/debug/raw/:entityId" element={<RawDebugPlaceholderPage />} />
       </Route>
     </Routes>
