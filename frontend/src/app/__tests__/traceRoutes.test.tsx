@@ -11,14 +11,6 @@ type RouteCase = {
 
 const ROUTE_CASES: RouteCase[] = [
   {
-    entry: "/lane/robustness/reweighting",
-    question: "Why is this method judged this way?",
-    params: [
-      ["laneId", "robustness"],
-      ["methodId", "reweighting"],
-    ],
-  },
-  {
     entry: "/run/distilbert_reweighting_seed_13",
     question: "What happened in this run?",
     params: [["runId", "distilbert_reweighting_seed_13"]],
@@ -55,6 +47,15 @@ describe("Trace scaffold routes", () => {
     expect(screen.queryByText("Current params")).not.toBeInTheDocument();
   });
 
+  it("renders /lane/:laneId/:methodId as a real method workspace instead of placeholder content", () => {
+    render(<App useMemoryRouter initialEntries={["/lane/robustness/reweighting"]} />);
+
+    expect(screen.getByRole("heading", { name: "Reweighting" })).toBeInTheDocument();
+    expect(screen.getByText("Why is this method judged this way?")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Reweighting runs" })).toBeInTheDocument();
+    expect(screen.queryByText("Current params")).not.toBeInTheDocument();
+  });
+
   it.each(ROUTE_CASES)("renders $entry with its dedicated placeholder content", ({ entry, question, params }) => {
     render(<App useMemoryRouter initialEntries={[entry]} />);
 
@@ -66,23 +67,27 @@ describe("Trace scaffold routes", () => {
     }
   });
 
-  it("preserves scope=all across scaffold route links", async () => {
+  it("preserves scope=all across method route links", async () => {
     const user = userEvent.setup();
 
     render(<App useMemoryRouter initialEntries={["/lane/robustness/reweighting?scope=all"]} />);
 
-    expect(
-      screen.getByText((_, element) => element?.textContent === "Current scope: All"),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
 
-    const scaffoldNav = screen.getByLabelText("Method scaffold navigation");
-    const previousLink = within(scaffoldNav).getByRole("link", { name: "Lane" });
-    expect(previousLink).toHaveAttribute("href", "/lane/robustness?scope=all");
+    const breadcrumb = screen.getByLabelText("Method breadcrumb");
+    const summaryLink = within(breadcrumb).getByRole("link", { name: "Summary" });
+    expect(summaryLink).toHaveAttribute("href", "/?scope=all");
 
-    const nextLink = within(scaffoldNav).getByRole("link", { name: "Run sample" });
-    expect(nextLink).toHaveAttribute("href", "/run/distilbert_reweighting_seed_13?scope=all");
+    const laneLink = within(breadcrumb).getByRole("link", { name: "Robustness" });
+    expect(laneLink).toHaveAttribute("href", "/lane/robustness?scope=all");
 
-    await user.click(nextLink);
+    const runTable = screen.getByRole("table", { name: "Reweighting runs" });
+    const runLink = within(runTable).getByRole("link", {
+      name: "distilbert_reweighting_seed_13",
+    });
+    expect(runLink).toHaveAttribute("href", "/run/distilbert_reweighting_seed_13?scope=all");
+
+    await user.click(runLink);
 
     expect(
       await screen.findByRole("heading", { name: "What happened in this run?" }),

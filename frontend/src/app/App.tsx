@@ -1,7 +1,7 @@
 import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { LanePage } from "@/app/routes/LanePage";
-import { MethodPlaceholderPage } from "@/app/routes/MethodPlaceholderPage";
+import { MethodPage } from "@/app/routes/MethodPage";
 import { RawDebugPlaceholderPage } from "@/app/routes/RawDebugPlaceholderPage";
 import { RunPlaceholderPage } from "@/app/routes/RunPlaceholderPage";
 import { SummaryPage } from "@/app/routes/SummaryPage";
@@ -30,7 +30,7 @@ function AppFrame() {
       >
         <Route path="/" element={<SummaryPage />} />
         <Route path="/lane/:laneId" element={<LanePage />} />
-        <Route path="/lane/:laneId/:methodId" element={<MethodPlaceholderPage />} />
+        <Route path="/lane/:laneId/:methodId" element={<MethodPage />} />
         <Route path="/run/:runId" element={<RunPlaceholderPage />} />
         <Route path="/debug/raw/:entityId" element={<RawDebugPlaceholderPage />} />
       </Route>
