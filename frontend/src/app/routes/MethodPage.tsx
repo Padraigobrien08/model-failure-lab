@@ -64,7 +64,7 @@ export function MethodPage() {
   );
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-5">
       <MethodHeader
         laneId={methodRoute.laneId}
         laneLabel={methodRoute.laneLabel}
@@ -78,7 +78,7 @@ export function MethodPage() {
       />
       {methodRoute.scopeNote ? <ScopeRouteNote message={methodRoute.scopeNote} /> : null}
       <MethodMetricStrip metrics={methodRoute.metricStrip} />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="space-y-6">
           <RunTable
             laneId={methodRoute.laneId}

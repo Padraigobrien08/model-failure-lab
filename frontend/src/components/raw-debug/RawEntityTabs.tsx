@@ -34,13 +34,13 @@ export function RawEntityTabs({ tabs }: RawEntityTabsProps) {
   }
 
   return (
-    <section className="space-y-4" aria-label="Raw entity tabs">
+    <section className="space-y-3.5" aria-label="Raw entity tabs">
       <Tabs
-        className="space-y-4"
+        className="space-y-3.5"
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as RawDebugTabKey)}
       >
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto">
           {tabs.map((tab) => (
             <TabsTrigger key={tab.key} value={tab.key}>
               {tab.label}
@@ -50,7 +50,7 @@ export function RawEntityTabs({ tabs }: RawEntityTabsProps) {
 
         {tabs.map((tab) => (
           <TabsContent key={tab.key} className="space-y-3" value={tab.key}>
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {tab.label}
               </p>
@@ -63,7 +63,7 @@ export function RawEntityTabs({ tabs }: RawEntityTabsProps) {
                 {copiedTab === tab.key ? `Copied ${tab.label}` : tab.copyLabel}
               </Button>
             </div>
-            <pre className="overflow-x-auto border border-border/70 bg-muted/10 p-4 font-mono text-xs leading-6 text-foreground">
+            <pre className="overflow-x-auto border border-border/60 bg-muted/[0.08] p-3 font-mono text-xs leading-6 text-foreground">
               <code>{tab.content}</code>
             </pre>
           </TabsContent>

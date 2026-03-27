@@ -11,7 +11,7 @@ type InspectorPanelProps = {
 export function InspectorPanel({ entity, scope }: InspectorPanelProps) {
   return (
     <SharedInspectorPanel
-      className="space-y-4 rounded-[16px] border border-border/70 bg-background/70 p-4 xl:sticky xl:top-24"
+      className="space-y-4 border-t border-border/60 pt-4 xl:sticky xl:top-24 xl:border-t-0 xl:border-l xl:pl-5 xl:pt-0"
       entity={{ ...entity, rawPath: buildRawDebugPath(entity.entityId, scope) }}
       testId="lane-inspector"
     />

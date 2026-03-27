@@ -100,20 +100,21 @@ export function RunTable({
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-[16px] border border-border/70">
-        <table aria-label={`${methodLabel} runs`} className="min-w-full border-collapse text-sm">
+      <div className="overflow-hidden rounded-md border border-border/60 bg-background">
+        <div className="overflow-x-auto">
+          <table aria-label={`${methodLabel} runs`} className="min-w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-muted/20">
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <tr className="bg-muted/15">
+              <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Run ID
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Seed
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Status
               </th>
-              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {primaryMetricLabel}
               </th>
             </tr>
@@ -122,7 +123,7 @@ export function RunTable({
             {renderRows(officialRuns)}
             {exploratoryRuns.length > 0 ? (
               <tr>
-                <td className="bg-muted/20 px-4 py-3" colSpan={4}>
+                <td className="bg-muted/10 px-3 py-2.5" colSpan={4}>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone="exploratory">Exploratory runs</Badge>
                     <p className="text-xs text-muted-foreground">
@@ -132,9 +133,10 @@ export function RunTable({
                 </td>
               </tr>
             ) : null}
-            {renderRows(exploratoryRuns)}
+          {renderRows(exploratoryRuns)}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </section>
   );

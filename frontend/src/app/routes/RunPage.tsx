@@ -42,7 +42,7 @@ export function RunPage() {
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-5">
       <RunHeader
         breadcrumbs={runRoute.breadcrumbs}
         laneLabel={runRoute.laneLabel}
@@ -52,7 +52,7 @@ export function RunPage() {
         status={runRoute.status}
       />
       <RunMetricStrip metrics={runRoute.metricStrip} />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="space-y-6">
           <InterpretationNote note={runRoute.interpretationNote} />
           <LineageStack lineage={runRoute.lineage} />

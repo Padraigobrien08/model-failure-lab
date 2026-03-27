@@ -10,7 +10,7 @@ type RelatedEntitiesPanelProps = {
 export function RelatedEntitiesPanel({ entities }: RelatedEntitiesPanelProps) {
   return (
     <aside
-      className="space-y-3 border border-border/70 bg-muted/10 p-4"
+      className="space-y-3 border-t border-border/60 pt-4 xl:border-t-0 xl:border-l xl:pl-4 xl:pt-0"
       data-testid="related-entities"
     >
       <div className="space-y-1">
@@ -26,7 +26,7 @@ export function RelatedEntitiesPanel({ entities }: RelatedEntitiesPanelProps) {
         {entities.map((entity) => (
           <div
             key={`${entity.entityId}-${entity.relation}`}
-            className="space-y-2 border border-border/70 bg-background/70 p-3"
+            className="space-y-1.5 border-t border-border/60 pt-3 first:border-t-0 first:pt-0"
           >
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone="muted">{entity.entityType}</Badge>

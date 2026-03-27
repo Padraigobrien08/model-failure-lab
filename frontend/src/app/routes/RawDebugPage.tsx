@@ -14,8 +14,8 @@ export function RawDebugPage() {
   const rawRoute = buildRawDebugRouteModel(entityId, scope);
 
   return (
-    <section className="space-y-6">
-      <header className="space-y-3">
+    <section className="space-y-5">
+      <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           {rawRoute.question}
         </p>
@@ -40,12 +40,12 @@ export function RawDebugPage() {
       </header>
 
       {rawRoute.state === "ready" ? (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_17rem]">
           <RawEntityTabs tabs={rawRoute.tabs} />
           <RelatedEntitiesPanel entities={rawRoute.relatedEntities} />
         </div>
       ) : rawRoute.state === "scope-hidden" ? (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_17rem]">
           <ScopeStateNotice
             state="scope-hidden"
             title={rawRoute.label}
