@@ -44,6 +44,8 @@ export type RunRouteInspectorEntity = {
   label: string;
   status: LaneRouteStatus;
   scope: LaneRouteRowScope;
+  summary: string;
+  evidenceLinks: RunRouteArtifactLink[];
   provenance: RunRouteProvenanceField[];
   rawPath: string;
 };
@@ -133,6 +135,14 @@ function buildArtifactGroups(runId: string): RunRouteArtifactGroup[] {
         { label: "Test", path: `/mock-artifacts/${runId}/predictions_test.parquet` },
       ],
     },
+  ];
+}
+
+function buildInspectorEvidenceLinks(runId: string): RunRouteArtifactLink[] {
+  return [
+    { label: "Report", path: `/mock-artifacts/${runId}/report.md` },
+    { label: "Eval bundle", path: `/mock-artifacts/${runId}/eval_bundle.json` },
+    { label: "Metadata", path: `/mock-artifacts/${runId}/metadata.json` },
   ];
 }
 
@@ -651,6 +661,8 @@ export function buildRunRouteModel(
       label: snapshot.runId,
       status: snapshot.status,
       scope: snapshot.scope,
+      summary: snapshot.interpretationNote,
+      evidenceLinks: buildInspectorEvidenceLinks(snapshot.runId),
       provenance,
       rawPath: buildRawDebugPath(snapshot.entityId, scope),
     },

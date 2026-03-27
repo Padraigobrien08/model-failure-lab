@@ -33,7 +33,7 @@ describe("Run page", () => {
     );
   });
 
-  it("shows a provenance-only inspector with open raw while keeping artifact actions in the main column", () => {
+  it("shows the shared inspector contract while keeping artifact actions in the main column", () => {
     render(
       <App
         useMemoryRouter
@@ -43,6 +43,11 @@ describe("Run page", () => {
 
     const inspector = screen.getByTestId("run-inspector");
 
+    expect(within(inspector).getByText("Evidence")).toBeInTheDocument();
+    expect(within(inspector).getByRole("link", { name: "Report" })).toHaveAttribute(
+      "href",
+      "/mock-artifacts/distilbert_reweighting_seed_13/report.md",
+    );
     expect(within(inspector).getByText("Source path")).toBeInTheDocument();
     expect(within(inspector).getByRole("link", { name: "Open raw" })).toHaveAttribute(
       "href",
@@ -52,6 +57,5 @@ describe("Run page", () => {
       "href",
       "/mock-artifacts/distilbert_reweighting_seed_13/report.md",
     );
-    expect(within(inspector).queryByRole("link", { name: "Run report" })).not.toBeInTheDocument();
   });
 });
