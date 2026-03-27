@@ -59,7 +59,9 @@ describe("Trace scaffold routes", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "distilbert_reweighting_seed_13" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "distilbert_reweighting_seed_13", level: 1 }),
+    ).toBeInTheDocument();
     expect(screen.getByText("What happened in this run?")).toBeInTheDocument();
     expect(screen.getByLabelText("Run breadcrumb")).toBeInTheDocument();
     expect(screen.getByText("Interpretation")).toBeInTheDocument();
@@ -102,7 +104,12 @@ describe("Trace scaffold routes", () => {
 
     await user.click(runLink);
 
-    expect(await screen.findByRole("heading", { name: "distilbert_reweighting_seed_13" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", {
+        name: "distilbert_reweighting_seed_13",
+        level: 1,
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     expect(within(screen.getByLabelText("Run breadcrumb")).getByRole("link", { name: "Reweighting" })).toHaveAttribute(
       "href",

@@ -29,7 +29,7 @@ describe("App shell", () => {
     expect(within(traceChain).getByText("Method")).toHaveAttribute("aria-current", "page");
     expect(within(traceChain).getByRole("link", { name: "Run" })).toHaveAttribute(
       "href",
-      "/run/distilbert_reweighting_seed_13?scope=all",
+      "/run/distilbert_reweighting_seed_13?scope=all&lane=robustness&method=reweighting",
     );
     expect(within(traceChain).getByRole("link", { name: "Artifact" })).toHaveAttribute(
       "href",
@@ -83,7 +83,7 @@ describe("App shell", () => {
     );
     expect(within(traceChain).getByRole("link", { name: "Run" })).toHaveAttribute(
       "href",
-      "/run/distilbert_reweighting_seed_13?scope=all",
+      "/run/distilbert_reweighting_seed_13?scope=all&lane=robustness&method=reweighting",
     );
 
     await user.click(within(traceChain).getByRole("link", { name: "Lane" }));
@@ -103,15 +103,15 @@ describe("App shell", () => {
     render(<App />);
 
     expect(
-      await screen.findByRole("heading", { name: "What happened in this run?" }),
+      await screen.findByRole("heading", {
+        name: "distilbert_baseline_seed_13",
+        level: 1,
+      }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Official" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(
-      screen.getByText((_, element) => element?.textContent === "Current scope: Official"),
-    ).toBeInTheDocument();
     await waitFor(() => {
       expect(window.location.search).toBe("?scope=official");
     });

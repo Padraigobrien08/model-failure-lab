@@ -611,6 +611,31 @@ export function buildRunRouteModel(
   const snapshot = findSnapshot(runId, scope, context);
   const methodPath = buildScopedPath(`/lane/${snapshot.laneId}/${snapshot.methodId}`, scope);
   const provenance = buildProvenanceFields(snapshot.laneId, snapshot.methodId, snapshot.runId);
+  const lineage = snapshot.lineage.map((entry) => ({
+    ...entry,
+    items: entry.items.map((item) => {
+      if (!item.path) {
+        return item;
+      }
+
+      if (item.path.startsWith("/run/")) {
+        const lineageRunId = item.path.replace("/run/", "");
+
+        return {
+          ...item,
+          path: buildRunRoutePath(lineageRunId, scope, {
+            laneId: snapshot.laneId,
+            methodId: "baseline",
+          }),
+        };
+      }
+
+      return {
+        ...item,
+        path: buildScopedPath(item.path, scope),
+      };
+    }),
+  }));
 
   return {
     ...snapshot,
@@ -619,6 +644,7 @@ export function buildRunRouteModel(
       lanePath: buildScopedPath(`/lane/${snapshot.laneId}`, scope),
       methodPath,
     },
+    lineage,
     inspector: {
       entityId: snapshot.entityId,
       entityType: "Run",
