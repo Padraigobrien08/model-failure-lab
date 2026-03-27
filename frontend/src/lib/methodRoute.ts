@@ -6,6 +6,8 @@ import type {
   LaneRouteStatus,
 } from "@/lib/laneRoute";
 
+export type MethodRouteLaneId = LaneRouteLaneId;
+
 export type MethodRouteMetric = {
   label: string;
   value: number;
