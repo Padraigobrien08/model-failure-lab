@@ -225,6 +225,25 @@ export type EvidenceAction = {
 
 export type EvidenceScope = "official" | "exploratory";
 
+export type InspectorTone = "default" | "accent" | "exploratory" | "muted";
+
+export type WorkbenchSelection = {
+  scope: EvidenceScope;
+  verdict: string | null;
+  lane: string | null;
+  method: string | null;
+  run: string | null;
+  artifact: string | null;
+  domain: FailureDomainKey | null;
+};
+
+export type BreadcrumbItemModel = {
+  label: string;
+  value: string;
+  href: string;
+  isActive: boolean;
+};
+
 export type SeedBreakdownRow = {
   seed: string;
   runId?: string;
@@ -348,12 +367,29 @@ export type RunDetailMetricModel = {
 export type RunLineageItemModel = {
   label: string;
   value: string;
-  path?: string;
+  href?: string;
 };
 
 export type EvidenceActionGroup = {
   title: string;
   actions: EvidenceAction[];
+};
+
+export type InspectorBadgeModel = {
+  label: string;
+  tone: InspectorTone;
+};
+
+export type InspectorFieldModel = {
+  label: string;
+  value: string;
+  href?: string;
+  mono?: boolean;
+};
+
+export type InspectorRouteActionModel = {
+  label: string;
+  href: string;
 };
 
 export type RunDetailModel = {
@@ -371,18 +407,43 @@ export type RunDetailModel = {
   actionGroups: EvidenceActionGroup[];
 };
 
-export type EvidenceDrawerModel = {
-  run: RunCardModel;
-  detail: RunDetailModel;
+export type ArtifactPreviewModel = {
+  title: string;
+  description?: string;
+  items: InspectorFieldModel[];
+};
+
+export type InspectorModel = {
+  kind: "verdict" | "lane" | "method" | "run" | "artifact" | "manifest";
+  title: string;
+  subtitle: string;
+  description?: string;
+  scope: EvidenceScope;
+  badges: InspectorBadgeModel[];
+  isOfficial: boolean;
+  defaultVisible: boolean;
+  warning?: string;
+  relatedRunId?: string | null;
+  manifestEntityId?: string | null;
+  lineage: InspectorFieldModel[];
+  provenance: InspectorFieldModel[];
+  routeActions: InspectorRouteActionModel[];
+  actionGroups: EvidenceActionGroup[];
+  preview?: ArtifactPreviewModel | null;
 };
 
 export type EvidenceEntityCardModel = {
   id: string;
+  entityType: "report" | "evaluation" | "run";
   title: string;
   subtitle: string;
   scope: EvidenceScope;
+  isOfficial: boolean;
+  defaultVisible: boolean;
   badgeLabel: string;
   description?: string;
+  sourcePath?: string;
+  relatedRunId?: string | null;
   actions: EvidenceAction[];
 };
 
@@ -391,6 +452,30 @@ export type EvidenceSectionModel = {
   title: string;
   description: string;
   items: EvidenceEntityCardModel[];
+};
+
+export type ManifestEntityOptionModel = {
+  id: string;
+  entityType: "report" | "evaluation" | "run";
+  title: string;
+  subtitle: string;
+  scope: EvidenceScope;
+  isSelected: boolean;
+};
+
+export type ManifestRelationshipSectionModel = {
+  title: string;
+  items: InspectorFieldModel[];
+};
+
+export type ManifestRelationshipLedgerModel = {
+  selectedTitle: string;
+  selectedSubtitle: string;
+  selectedDescription?: string;
+  selectedBadges: InspectorBadgeModel[];
+  selectedScope: EvidenceScope;
+  entityOptions: ManifestEntityOptionModel[];
+  sections: ManifestRelationshipSectionModel[];
 };
 
 export type OverviewSnapshot = {
@@ -409,4 +494,27 @@ export type OverviewSnapshot = {
   };
   officialMethods: string[];
   exploratoryMethods: string[];
+};
+
+export type VerdictLaneModel = {
+  key: string;
+  label: string;
+  verdict: string;
+  description: string;
+  summary: string;
+  sourceDomain: FailureDomainKey;
+  dominant: boolean;
+  actions: EvidenceAction[];
+  items: FailureDomainItemModel[];
+};
+
+export type VerdictWorkspaceModel = {
+  finalVerdict: string;
+  dominantLaneKey: string;
+  supportingReportScope: string;
+  primaryActions: EvidenceAction[];
+  summaryBullets: string[];
+  recommendationReason?: string;
+  nextStep?: string;
+  lanes: VerdictLaneModel[];
 };

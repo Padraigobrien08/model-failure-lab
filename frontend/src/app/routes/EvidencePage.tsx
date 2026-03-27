@@ -1,9 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EvidenceEntitySection } from "@/components/evidence/EvidenceEntitySection";
+import { ArtifactPreviewPanel } from "@/components/evidence/ArtifactPreviewPanel";
 import { ScopeStateBanner } from "@/components/layout/ScopeStateBanner";
+import { WorkbenchHeader } from "@/components/layout/WorkbenchHeader";
+import { WorkbenchSection } from "@/components/layout/WorkbenchSection";
 import { useAppRouteContext } from "@/app/router";
-import { buildEvidenceSections } from "@/lib/manifest/selectors";
+import { buildEvidenceSections, buildInspectorModel } from "@/lib/manifest/selectors";
 
 export function EvidencePage() {
   const {
@@ -15,6 +18,10 @@ export function EvidencePage() {
     finalRobustnessBundle,
     finalRobustnessBundleError,
     isFinalRobustnessBundleLoading,
+    selection,
+    selectedArtifact,
+    setSelectedArtifact,
+    setSelectedRunId,
   } = useAppRouteContext();
 
   if (isLoading || isFinalRobustnessBundleLoading) {
@@ -45,35 +52,86 @@ export function EvidencePage() {
   }
 
   const sections = buildEvidenceSections(index, finalRobustnessBundle, includeExploratory);
+  const inspectorModel = buildInspectorModel(
+    index,
+    finalRobustnessBundle,
+    selection,
+    includeExploratory,
+  );
+
+  function handleInspectItem(
+    id: string,
+    entityType: "report" | "evaluation" | "run",
+    relatedRunId?: string | null,
+  ) {
+    setSelectedArtifact(id);
+    setSelectedRunId(entityType === "run" ? relatedRunId ?? null : relatedRunId ?? null);
+  }
 
   return (
     <section className="space-y-8">
-      <header className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone="accent">Evidence</Badge>
-          {includeExploratory ? <Badge tone="exploratory">Exploratory scope active</Badge> : null}
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-[2.75rem] font-semibold tracking-[-0.06em] text-foreground">
-            Official-first artifact browser.
-          </h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-            Reports, evaluations, and runs stay grouped by evidence type so you can jump directly
-            to the saved artifact that backs a claim without losing scope boundaries.
-          </p>
-        </div>
-      </header>
+      <WorkbenchHeader
+        meta={
+          <>
+            <Badge tone="accent">Evidence</Badge>
+            {includeExploratory ? <Badge tone="exploratory">Exploratory scope active</Badge> : null}
+          </>
+        }
+        title="Artifact browser with live provenance handoff."
+        description="Reports, eval bundles, and run artifacts stay grouped by entity type. Every card can hand focus into the live inspector without breaking the current route context."
+        aside={
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Active scope
+              </p>
+              <p className="mt-1 text-foreground">
+                {includeExploratory ? "Official + exploratory" : "Official only"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+                Focused artifact
+              </p>
+              <p className="mt-1 break-all text-foreground">
+                {selectedArtifact ?? "No artifact selected"}
+              </p>
+            </div>
+          </div>
+        }
+      />
 
       <ScopeStateBanner
         includeExploratory={includeExploratory}
         onChange={setIncludeExploratory}
       />
 
-      <div className="space-y-8">
-        {sections.map((section) => (
-          <EvidenceEntitySection key={section.key} section={section} />
-        ))}
-      </div>
+      <WorkbenchSection
+        eyebrow="Artifact groups"
+        title="Manifest-backed entity groups"
+        description="Choose an entity family first, then pivot the shared inspector into the exact report, eval bundle, or run that backs a claim."
+      >
+        <div className="space-y-8">
+          {sections.map((section) => (
+            <EvidenceEntitySection
+              key={section.key}
+              section={section}
+              selectedItemId={selectedArtifact}
+              onInspectItem={handleInspectItem}
+            />
+          ))}
+        </div>
+      </WorkbenchSection>
+
+      {selectedArtifact && inspectorModel.kind === "artifact" ? (
+        <WorkbenchSection
+          eyebrow="Selected artifact"
+          title="Preview the currently focused manifest entity"
+          description="The center canvas mirrors the current artifact selection while the right inspector keeps the full provenance stack visible."
+        >
+          <ArtifactPreviewPanel preview={inspectorModel.preview} />
+        </WorkbenchSection>
+      ) : null}
     </section>
   );
 }

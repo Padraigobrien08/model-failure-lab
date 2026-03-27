@@ -11,7 +11,12 @@ type RunDetailPanelProps = {
 
 export function RunDetailPanel({ detail, onOpenDrawer }: RunDetailPanelProps) {
   return (
-    <Card className={cn("bg-background/60", detail.isExploratory ? "border-dashed" : "")}>
+    <Card
+      className={cn(
+        "rounded-[18px] bg-background/55",
+        detail.isExploratory ? "border-dashed" : "",
+      )}
+    >
       <CardHeader className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">Run detail</Badge>
@@ -40,7 +45,7 @@ export function RunDetailPanel({ detail, onOpenDrawer }: RunDetailPanelProps) {
             </div>
             {onOpenDrawer ? (
               <Button variant="outline" size="sm" onClick={onOpenDrawer}>
-                Open evidence drawer
+                Pin in inspector
               </Button>
             ) : null}
           </div>
@@ -49,7 +54,7 @@ export function RunDetailPanel({ detail, onOpenDrawer }: RunDetailPanelProps) {
             {detail.lineage.map((item) => (
               <div
                 key={`${detail.runId}-${item.label}`}
-                className="rounded-[22px] border border-border/70 bg-card/70 px-4 py-4"
+                className="rounded-[16px] border border-border/70 bg-card/45 px-4 py-4"
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {item.label}
@@ -74,7 +79,7 @@ export function RunDetailPanel({ detail, onOpenDrawer }: RunDetailPanelProps) {
             {detail.metrics.map((metric) => (
               <div
                 key={`${detail.runId}-${metric.label}`}
-                className="rounded-[22px] border border-border/70 bg-card/70 px-4 py-4"
+                className="rounded-[16px] border border-border/70 bg-card/45 px-4 py-4"
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {metric.label}
@@ -102,7 +107,7 @@ export function RunDetailPanel({ detail, onOpenDrawer }: RunDetailPanelProps) {
             {detail.actionGroups.map((group) => (
               <div
                 key={`${detail.runId}-${group.title}`}
-                className="rounded-[24px] border border-border/70 bg-card/70 p-4"
+                className="rounded-[16px] border border-border/70 bg-card/45 p-4"
               >
                 <p className="text-sm font-semibold text-foreground">{group.title}</p>
                 <div className="mt-3 flex flex-wrap gap-2">

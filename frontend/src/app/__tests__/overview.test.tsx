@@ -6,8 +6,8 @@ import {
   buildManifestFixture,
 } from "@/test/fixtures";
 
-describe("Overview route", () => {
-  it("renders final verdicts and the primary CTA from manifest data", () => {
+describe("Verdicts route", () => {
+  it("renders the final verdict, supporting lanes, and trace path from manifest data", () => {
     render(
       <App
         useMemoryRouter
@@ -18,18 +18,23 @@ describe("Overview route", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: /Final evidence, turned into an explorable debugging surface/i,
+        name: /Verdict traceability starts with the final decision\./i,
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Still Mixed/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Defer Now Reopen Under Conditions/i)).toHaveLength(2);
-    expect(screen.getByRole("link", { name: /Inspect Failure Traces/i })).toHaveAttribute(
-      "href",
-      "/comparisons",
-    );
-    expect(screen.getByText(/Temperature scaling remains the stable calibration lane/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Still Mixed/i).length).toBeGreaterThanOrEqual(1);
     expect(
-      screen.getByText(/This is the primary UI\. Streamlit remains available as a fallback\./i),
-    ).toBeInTheDocument();
+      screen.getAllByText(/Why the final verdict still turns on worst-group and OOD tradeoffs under shift\./i)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/Why reliability moved more cleanly than robustness in the official package\./i)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen
+        .getAllByRole("link", { name: /^Trace Evidence$/i })
+        .some((link) => link.getAttribute("href") === "/lanes?lane=robustness"),
+    ).toBe(true);
+    expect(screen.getByText(/Supporting narrative and reopen conditions/i)).toBeInTheDocument();
   });
 });

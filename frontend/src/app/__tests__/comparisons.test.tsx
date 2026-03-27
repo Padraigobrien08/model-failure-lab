@@ -7,8 +7,8 @@ import {
   buildManifestFixture,
 } from "@/test/fixtures";
 
-describe("comparisons route", () => {
-  it("renders the ranked comparison canvas with official-first ordering", () => {
+describe("lanes route", () => {
+  it("redirects legacy comparisons URLs into the lane workspace with official-first ordering", () => {
     render(
       <App
         useMemoryRouter
@@ -19,14 +19,16 @@ describe("comparisons route", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: /Ranked comparison canvas/i }),
+      screen.getByRole("heading", { name: /Robustness lane workspace\./i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Robustness$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Calibration$/i })).toBeInTheDocument();
 
     const cards = screen.getAllByText(/Ranked method summary/i);
     expect(cards).toHaveLength(3);
-    expect(screen.getByRole("heading", { name: /Temperature Scaling/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Reweighting/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /DistilBERT Baseline/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: /Temperature Scaling/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: /Reweighting/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: /DistilBERT Baseline/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Group DRO/i)).not.toBeInTheDocument();
   });
 
@@ -36,21 +38,21 @@ describe("comparisons route", () => {
     render(
       <App
         useMemoryRouter
-        initialEntries={["/comparisons"]}
+        initialEntries={["/lanes"]}
         initialIndex={buildManifestFixture()}
         initialFinalRobustnessBundle={buildFinalRobustnessBundleFixture()}
       />,
     );
 
-    const reweightingCard = screen.getByRole("heading", {
+    const reweightingCard = screen.getAllByRole("heading", {
       name: /Reweighting/i,
-    }).closest("div");
+    })[0].closest("div");
     expect(reweightingCard).not.toBeNull();
 
     await user.click(screen.getAllByRole("button", { name: /Show per-seed breakdown/i })[0]);
     expect(screen.getByText(/Seed 13/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Show exploratory evidence/i }));
+    await user.click(screen.getAllByRole("button", { name: /Include exploratory/i })[0]);
     expect(screen.getAllByRole("heading", { name: /Group DRO/i })).not.toHaveLength(0);
   });
 });

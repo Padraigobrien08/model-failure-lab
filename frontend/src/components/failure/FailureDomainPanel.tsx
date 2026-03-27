@@ -57,7 +57,7 @@ export function FailureDomainPanel({
   return (
     <Card
       className={cn(
-        "bg-background/60",
+        "rounded-[18px] bg-background/55",
         isSelected ? "border-primary/35 shadow-panel" : "",
         item.isExploratory ? "border-dashed" : "",
       )}
@@ -85,7 +85,7 @@ export function FailureDomainPanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-[22px] border border-border/70 bg-card/75 px-4 py-4">
+        <div className="rounded-[16px] border border-border/70 bg-card/45 px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Aggregate summary
           </p>

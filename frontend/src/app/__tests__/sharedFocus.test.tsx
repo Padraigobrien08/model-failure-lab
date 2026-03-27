@@ -20,9 +20,9 @@ describe("sharedFocus flow", () => {
       />,
     );
 
-    const reweightingCard = screen.getByRole("heading", {
+    const reweightingCard = screen.getAllByRole("heading", {
       name: /Reweighting/i,
-    }).closest('[class*="rounded"]');
+    })[0].closest('[class*="rounded"]');
     expect(reweightingCard).not.toBeNull();
 
     await user.click(
@@ -30,7 +30,10 @@ describe("sharedFocus flow", () => {
     );
     await user.click(screen.getByRole("link", { name: /Trace Worst Group/i }));
 
-    expect(screen.getByText(/Focused lane: reweighting/i)).toBeInTheDocument();
+    const workbenchState = screen.getByRole("region", { name: /Workbench state/i });
+
+    expect(within(workbenchState).getByText(/^Robustness$/i)).toBeInTheDocument();
+    expect(within(workbenchState).getByText(/^Reweighting$/i)).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Worst Group/i })).toHaveAttribute(
       "aria-selected",
       "true",

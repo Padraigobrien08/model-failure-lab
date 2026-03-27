@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --background: 42 31% 92%;
-  --foreground: 210 25% 16%;
-  --card: 37 24% 88%;
+  --background: 40 22% 92%;
+  --foreground: 210 23% 14%;
+  --card: 42 18% 88%;
   --card-foreground: 210 25% 16%;
-  --muted: 39 19% 84%;
-  --muted-foreground: 211 18% 38%;
-  --border: 36 17% 69%;
+  --muted: 41 14% 84%;
+  --muted-foreground: 212 15% 36%;
+  --border: 38 13% 70%;
   --primary: 176 78% 26%;
   --primary-foreground: 42 25% 95%;
   --accent: 176 78% 26%;
@@ -25,9 +25,8 @@
 html {
   min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.14), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.48), transparent 30%),
-    linear-gradient(135deg, #f4efe6 0%, #ebe3d2 52%, #f6f3ea 100%);
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.09), transparent 32%),
+    linear-gradient(135deg, #f0ebe2 0%, #e7dfcf 54%, #f3efe7 100%);
 }
 
 body {
@@ -36,10 +35,10 @@ body {
   color: hsl(var(--foreground));
   font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.28)),
-    linear-gradient(90deg, rgba(15, 118, 110, 0.05) 1px, transparent 1px),
-    linear-gradient(rgba(15, 118, 110, 0.05) 1px, transparent 1px);
-  background-size: auto, 48px 48px, 48px 48px;
+    linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.18)),
+    linear-gradient(90deg, rgba(31, 41, 51, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(31, 41, 51, 0.035) 1px, transparent 1px);
+  background-size: auto, 36px 36px, 36px 36px;
 }
 
 body::before {
@@ -47,13 +46,9 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.22;
-  background-image:
-    radial-gradient(rgba(31, 41, 51, 0.18) 0.7px, transparent 0.7px),
-    radial-gradient(rgba(255, 255, 255, 0.35) 0.7px, transparent 0.7px);
-  background-position: 0 0, 12px 12px;
-  background-size: 24px 24px;
-  mix-blend-mode: soft-light;
+  opacity: 0.08;
+  background-image: radial-gradient(rgba(31, 41, 51, 0.25) 0.7px, transparent 0.7px);
+  background-size: 18px 18px;
 }
 
 #root {
