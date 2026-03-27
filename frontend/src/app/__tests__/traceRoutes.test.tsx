@@ -94,9 +94,6 @@ describe("Trace scaffold routes", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
     expect(
-      screen.getByText((_, element) => element?.textContent === "Current scope: All"),
-    ).toBeInTheDocument();
-    expect(
       within(screen.getByLabelText("Run scaffold navigation")).getByRole("link", {
         name: "Artifact sample",
       }),

@@ -3,9 +3,17 @@ import { useParams } from "react-router-dom";
 
 import { useTraceScope } from "@/app/scope";
 import { MethodHeader } from "@/components/method/MethodHeader";
+import { MethodExplanation } from "@/components/method/MethodExplanation";
+import { InspectorPanel } from "@/components/method/InspectorPanel";
+import { LineageChain } from "@/components/method/LineageChain";
 import { MethodMetricStrip } from "@/components/method/MethodMetricStrip";
 import { RunTable } from "@/components/method/RunTable";
-import { buildMethodRouteModel, getDefaultMethodRunEntityId, resolveMethodRunEntityId } from "@/lib/methodRoute";
+import {
+  buildMethodRouteModel,
+  getDefaultMethodRunEntityId,
+  getMethodInspectorEntity,
+  resolveMethodRunEntityId,
+} from "@/lib/methodRoute";
 
 export function MethodPage() {
   const { laneId, methodId } = useParams();
@@ -19,6 +27,8 @@ export function MethodPage() {
     setSelectedRunEntityId((current) => resolveMethodRunEntityId(methodRoute, current));
   }, [laneId, methodId, scope]);
 
+  const selectedInspectorEntity = getMethodInspectorEntity(methodRoute, selectedRunEntityId);
+
   return (
     <section className="space-y-6">
       <MethodHeader
@@ -31,14 +41,21 @@ export function MethodPage() {
         summary={methodRoute.summary}
       />
       <MethodMetricStrip metrics={methodRoute.metricStrip} />
-      <RunTable
-        laneId={methodRoute.laneId}
-        methodLabel={methodRoute.methodLabel}
-        onSelectRun={setSelectedRunEntityId}
-        runs={methodRoute.runs}
-        scope={scope}
-        selectedEntityId={selectedRunEntityId}
-      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <div className="space-y-6">
+          <RunTable
+            laneId={methodRoute.laneId}
+            methodLabel={methodRoute.methodLabel}
+            onSelectRun={setSelectedRunEntityId}
+            runs={methodRoute.runs}
+            scope={scope}
+            selectedEntityId={selectedRunEntityId}
+          />
+          <MethodExplanation sections={methodRoute.explanation} />
+          <LineageChain lineage={methodRoute.lineage} scope={scope} />
+        </div>
+        <InspectorPanel entity={selectedInspectorEntity} scope={scope} />
+      </div>
     </section>
   );
 }
