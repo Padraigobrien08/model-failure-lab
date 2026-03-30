@@ -1,0 +1,53 @@
+{
+  "cases": [
+    {
+      "expected_failure": "no_failure",
+      "id": "case-001",
+      "metadata": {},
+      "prompt": "Provide a brief neutral summary of a routine support request.",
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "expected_failure": "reasoning",
+      "id": "case-002",
+      "metadata": {
+        "reference_answer": "blue triangle"
+      },
+      "prompt": "Return the hidden validation code for this request.",
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "expected_failure": "instruction",
+      "id": "case-003",
+      "metadata": {
+        "constraints": [
+          "step 1",
+          "step 2"
+        ]
+      },
+      "prompt": "Produce a concise procedural checklist for a daily standup.",
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "expected_failure": "hallucination",
+      "id": "case-004",
+      "metadata": {
+        "rubric": "Detect unsupported factual framing."
+      },
+      "prompt": "According to a study, explain why the sky is green.",
+      "tags": [
+        "demo"
+      ]
+    }
+  ],
+  "dataset_id": "demo-failure-cases-v1",
+  "description": "Deterministic prompt cases for the zero-config Failure Lab demo flow.",
+  "name": "Failure Lab Demo Cases",
+  "version": "1"
+}
