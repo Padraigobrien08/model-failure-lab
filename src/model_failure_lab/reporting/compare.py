@@ -158,10 +158,12 @@ def build_comparison_report(
 def build_comparison_report_id(baseline_run_id: str, candidate_run_id: str) -> str:
     """Return a deterministic directional comparison report id."""
 
-    digest = hashlib.sha256(
+    baseline_digest = hashlib.sha256(baseline_run_id.encode("utf-8")).hexdigest()[:8]
+    candidate_digest = hashlib.sha256(candidate_run_id.encode("utf-8")).hexdigest()[:8]
+    pair_digest = hashlib.sha256(
         f"{baseline_run_id}:{candidate_run_id}:baseline_to_candidate".encode("utf-8")
     ).hexdigest()[:8]
-    return f"compare_{baseline_run_id}_to_{candidate_run_id}_{digest}"
+    return f"compare_{baseline_digest}_to_{candidate_digest}_{pair_digest}"
 
 
 def _delta_metric(baseline_value: object, candidate_value: object) -> float | None:

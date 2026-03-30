@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+from dataclasses import replace
 from datetime import datetime, timezone
+
+import pytest
 
 from model_failure_lab.adapters import ModelMetadata, ModelRequest, ModelResult, register_model
 from model_failure_lab.classifiers import ClassifierInput, ClassifierResult, register_classifier
@@ -134,6 +138,39 @@ def test_write_run_artifacts_persists_run_and_results_payloads(tmp_path) -> None
     assert results_payload["total_cases"] == 1
     assert results_payload["cases"][0]["prompt"]["id"] == "case-001"
     assert results_payload["cases"][0]["execution"]["run_seed"] == 13
+
+
+def test_write_run_artifacts_fails_fast_on_existing_artifact_paths(tmp_path) -> None:
+    dataset = FailureDataset(
+        dataset_id="reasoning-basics-v1",
+        cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+    )
+    original_execution = execute_dataset_run(
+        dataset=dataset,
+        adapter_id="demo",
+        classifier_id="heuristic_v1",
+        model="demo-model",
+        run_seed=13,
+        now=datetime(2026, 3, 30, 11, 45, 0, tzinfo=timezone.utc),
+    )
+    run_path, _ = write_run_artifacts(original_execution, root=tmp_path)
+
+    preserved_payload = read_json(run_path)
+    preserved_payload["model"] = "preserved-model"
+    run_path.write_text(
+        json.dumps(preserved_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    colliding_execution = replace(
+        original_execution,
+        run=replace(original_execution.run, model="replacement-model"),
+    )
+
+    with pytest.raises(FileExistsError, match="run artifacts already exist"):
+        write_run_artifacts(colliding_execution, root=tmp_path)
+
+    assert read_json(run_path)["model"] == "preserved-model"
 
 
 def test_execute_dataset_run_uses_model_and_config_in_run_identity() -> None:

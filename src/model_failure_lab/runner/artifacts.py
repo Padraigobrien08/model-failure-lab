@@ -38,8 +38,19 @@ def write_run_artifacts(
 ) -> tuple[Path, Path]:
     """Persist one executed dataset run through the Phase 44 storage helpers."""
 
-    run_path = run_file(run_execution.run.run_id, root=root, create=True)
-    results_path = results_file(run_execution.run.run_id, root=root, create=True)
+    run_path = run_file(run_execution.run.run_id, root=root, create=False)
+    results_path = results_file(run_execution.run.run_id, root=root, create=False)
+    colliding_paths = tuple(
+        str(path) for path in (run_path, results_path) if path.exists()
+    )
+    if colliding_paths:
+        joined_paths = ", ".join(colliding_paths)
+        raise FileExistsError(
+            "run artifacts already exist for "
+            f"{run_execution.run.run_id}: {joined_paths}"
+        )
+
+    run_path.parent.mkdir(parents=True, exist_ok=True)
     write_json(run_path, build_run_payload(run_execution))
     write_json(results_path, build_results_payload(run_execution))
     return run_path, results_path

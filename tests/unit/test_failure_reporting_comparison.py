@@ -193,6 +193,7 @@ def test_write_comparison_report_artifacts_persists_summary_and_detail_payloads(
         load_saved_run_artifacts(candidate_run_id, root=tmp_path),
         now=datetime(2026, 3, 30, 12, 55, 0, tzinfo=timezone.utc),
     )
+    assert len(built.report.report_id) < 64
     report_path, details_path = write_comparison_report_artifacts(
         built.report,
         built.details,

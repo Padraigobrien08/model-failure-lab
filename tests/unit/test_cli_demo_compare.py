@@ -4,8 +4,10 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
+import model_failure_lab.runner.execute as runner_execute_module
 from model_failure_lab.cli import main
 from model_failure_lab.datasets import FailureDataset, demo_dataset_path
 from model_failure_lab.schemas import PromptCase
@@ -152,3 +154,80 @@ def test_compare_command_writes_artifacts_and_keeps_incompatible_results_non_fat
     assert len(report_dirs) == 1
     assert (report_dirs[0] / "report.json").exists()
     assert (report_dirs[0] / "report_details.json").exists()
+
+
+def test_compare_command_handles_rapid_same_dataset_runs_without_sleep(
+    tmp_path,
+    capsys,
+    monkeypatch,
+) -> None:
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="Return the hidden validation code."),
+                PromptCase(id="case-002", prompt="Explain why 2 + 2 = 4."),
+            ),
+        ),
+    )
+
+    class FixedDatetime:
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 3, 30, 13, 0, 0, 123456, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(runner_execute_module, "datetime", FixedDatetime)
+
+    assert (
+        main(
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--model",
+                "demo:baseline",
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    _ = capsys.readouterr()
+    assert (
+        main(
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--model",
+                "demo:candidate",
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    _ = capsys.readouterr()
+
+    run_dirs = sorted((tmp_path / "runs").iterdir())
+    assert len(run_dirs) == 2
+    baseline_path = run_dirs[0] / "run.json"
+    candidate_path = run_dirs[1] / "run.json"
+
+    exit_code = main(
+        [
+            "compare",
+            str(baseline_path),
+            str(candidate_path),
+            "--root",
+            str(tmp_path),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Failure Lab Compare" in captured.out
+    assert "Compatible: True" in captured.out
+    assert "Status: unchanged" in captured.out
