@@ -2,6 +2,15 @@
 
 from pathlib import Path
 
+from .bundled import (
+    BundledDatasetSummary,
+    UnknownBundledDatasetError,
+    available_bundled_dataset_ids,
+    available_bundled_datasets,
+    describe_bundled_dataset,
+    has_bundled_dataset,
+    load_bundled_dataset,
+)
 from .contracts import FailureDataset
 from .load import load_dataset, parse_dataset_payload
 
@@ -21,9 +30,16 @@ def load_demo_dataset() -> FailureDataset:
 
 
 __all__ = [
+    "BundledDatasetSummary",
     "FailureDataset",
+    "UnknownBundledDatasetError",
+    "available_bundled_datasets",
+    "available_bundled_dataset_ids",
     "demo_dataset_path",
+    "describe_bundled_dataset",
+    "has_bundled_dataset",
     "load_dataset",
+    "load_bundled_dataset",
     "load_demo_dataset",
     "parse_dataset_payload",
 ]

@@ -11,6 +11,7 @@ from pathlib import Path
 from model_failure_lab.cli import main
 from model_failure_lab.datasets import FailureDataset
 from model_failure_lab.schemas import PromptCase
+from model_failure_lab.storage import read_json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -60,6 +61,7 @@ def test_python_module_entrypoint_prints_new_help_surface_without_args() -> None
     assert "report" in result.stdout
     assert "compare" in result.stdout
     assert "demo" in result.stdout
+    assert "datasets" in result.stdout
     assert "run-baseline" not in result.stdout
 
 
@@ -160,3 +162,118 @@ def test_run_and_report_support_canonical_id_and_path_resolution(tmp_path, capsy
     assert len(report_dirs) == 1
     assert (report_dirs[0] / "report.json").exists()
     assert (report_dirs[0] / "report_details.json").exists()
+
+
+def test_run_command_supports_bundled_dataset_ids_with_core_default(tmp_path, capsys) -> None:
+    exit_code = main(
+        [
+            "run",
+            "--dataset",
+            "reasoning-failures-v1",
+            "--model",
+            "demo",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    run_dirs = sorted((tmp_path / "runs").iterdir())
+    run_dir = run_dirs[0]
+    run_payload = read_json(run_dir / "run.json")
+    results_payload = read_json(run_dir / "results.json")
+
+    assert exit_code == 0
+    assert "Failure Lab Run" in captured.out
+    assert "Dataset: reasoning-failures-v1" in captured.out
+    assert "Dataset scope: core" in captured.out
+    assert run_payload["config"]["dataset_scope"] == "core"
+    assert run_payload["config"]["dataset_source"] == "bundled"
+    assert results_payload["total_cases"] == 8
+
+
+def test_run_command_supports_full_bundled_dataset_execution(tmp_path, capsys) -> None:
+    exit_code = main(
+        [
+            "run",
+            "--dataset",
+            "reasoning-failures-v1",
+            "--model",
+            "demo",
+            "--full",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    run_dirs = sorted((tmp_path / "runs").iterdir())
+    run_dir = run_dirs[0]
+    run_payload = read_json(run_dir / "run.json")
+    results_payload = read_json(run_dir / "results.json")
+
+    assert exit_code == 0
+    assert "Dataset scope: full" in captured.out
+    assert run_payload["config"]["dataset_scope"] == "full"
+    assert results_payload["total_cases"] == 12
+
+
+def test_run_command_supports_hallucination_bundled_dataset_ids(tmp_path, capsys) -> None:
+    exit_code = main(
+        [
+            "run",
+            "--dataset",
+            "hallucination-failures-v1",
+            "--model",
+            "demo",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    run_dirs = sorted((tmp_path / "runs").iterdir())
+    run_dir = run_dirs[0]
+    results_payload = read_json(run_dir / "results.json")
+
+    assert exit_code == 0
+    assert "Dataset: hallucination-failures-v1" in captured.out
+    assert "Dataset scope: core" in captured.out
+    assert results_payload["total_cases"] == 8
+
+
+def test_run_command_supports_rag_bundled_dataset_ids(tmp_path, capsys) -> None:
+    exit_code = main(
+        [
+            "run",
+            "--dataset",
+            "rag-failures-v1",
+            "--model",
+            "demo",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    run_dirs = sorted((tmp_path / "runs").iterdir())
+    run_dir = run_dirs[0]
+    results_payload = read_json(run_dir / "results.json")
+
+    assert exit_code == 0
+    assert "Dataset: rag-failures-v1" in captured.out
+    assert "Dataset scope: core" in captured.out
+    assert results_payload["total_cases"] == 8
+
+
+def test_datasets_list_command_shows_compact_bundled_catalog(capsys) -> None:
+    exit_code = main(["datasets", "list"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Failure Lab Datasets" in captured.out
+    assert "reasoning-failures-v1" in captured.out
+    assert "hallucination-failures-v1" in captured.out
+    assert "rag-failures-v1" in captured.out
+    assert "core" in captured.out
+    assert "full" in captured.out

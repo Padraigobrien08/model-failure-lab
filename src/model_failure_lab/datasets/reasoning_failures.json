@@ -1,0 +1,118 @@
+{
+  "dataset_id": "reasoning-failures-v1",
+  "name": "Reasoning Failures",
+  "description": "Bundled reasoning-failure probes with explicit no-failure controls and a core-first execution order.",
+  "version": "1",
+  "metadata": {
+    "target_failure_type": "reasoning",
+    "default_scope": "core"
+  },
+  "cases": [
+    {
+      "id": "reasoning-core-001",
+      "prompt": "Solve the two-step arithmetic problem: a baker has 12 loaves, sells 5, then bakes 3 more. How many loaves remain?",
+      "tags": ["core", "multi_step"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "10"
+      }
+    },
+    {
+      "id": "reasoning-core-002",
+      "prompt": "A museum opens at 9, closes at 17, and pauses tours for 1 hour at lunch. How many tour hours remain?",
+      "tags": ["core", "numerical"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "7"
+      }
+    },
+    {
+      "id": "reasoning-core-003",
+      "prompt": "If Maya walks north 3 blocks and east 4 blocks, what is the shortest straight-line distance home in blocks?",
+      "tags": ["core", "multi_step"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "5"
+      }
+    },
+    {
+      "id": "reasoning-core-004",
+      "prompt": "Three friends split 24 apples equally, then one friend gives away 2 apples. How many apples does that friend keep?",
+      "tags": ["core", "numerical"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "6"
+      }
+    },
+    {
+      "id": "reasoning-core-005",
+      "prompt": "A librarian shelves 18 books on Monday and 7 on Tuesday, then removes 5 damaged copies. How many stay on the shelf?",
+      "tags": ["core", "multi_step"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "20"
+      }
+    },
+    {
+      "id": "reasoning-core-006",
+      "prompt": "A chess club doubles its 6-member practice group for a tournament and later 3 players leave. How many remain?",
+      "tags": ["core", "commonsense"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "9"
+      }
+    },
+    {
+      "id": "reasoning-core-007",
+      "prompt": "Give a brief neutral summary of a routine office coffee restock request.",
+      "tags": ["core", "control"],
+      "expectations": {
+        "expected_failure": "no_failure"
+      }
+    },
+    {
+      "id": "reasoning-core-008",
+      "prompt": "Write one calm sentence acknowledging a standard package delivery confirmation.",
+      "tags": ["core", "control"],
+      "expectations": {
+        "expected_failure": "no_failure"
+      }
+    },
+    {
+      "id": "reasoning-extended-001",
+      "prompt": "A relay team runs 4 legs of 400 meters each and then a coach adds a 200 meter warm-down. What total distance is covered?",
+      "tags": ["extended", "numerical"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "1800"
+      }
+    },
+    {
+      "id": "reasoning-extended-002",
+      "prompt": "A train travels 90 km in the first hour and 60 km in the second. What is the average speed over the two hours?",
+      "tags": ["extended", "multi_step"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "75 km/h"
+      }
+    },
+    {
+      "id": "reasoning-extended-003",
+      "prompt": "An event planner arranges 5 tables with 8 seats each and removes 6 reserved seats. How many open seats remain?",
+      "tags": ["extended", "commonsense"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "34"
+      }
+    },
+    {
+      "id": "reasoning-extended-004",
+      "prompt": "If a gardener plants 14 tomatoes, loses 4 to frost, and later adds 9 seedlings, how many tomato plants remain?",
+      "tags": ["extended", "multi_step"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "19"
+      }
+    }
+  ]
+}
