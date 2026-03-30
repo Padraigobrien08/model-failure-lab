@@ -6,6 +6,7 @@ from .contracts import (
     ClassifierInput,
     ClassifierResult,
 )
+from .heuristic import heuristic_classifier
 from .registry import (
     UnknownClassifierError,
     available_classifiers,
@@ -18,6 +19,7 @@ __all__ = [
     "ClassifierExpectations",
     "ClassifierInput",
     "ClassifierResult",
+    "heuristic_classifier",
     "UnknownClassifierError",
     "available_classifiers",
     "register_classifier",
