@@ -7,8 +7,12 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from model_failure_lab.datasets import FailureDataset, load_dataset
-from model_failure_lab.reporting.artifacts import write_report_artifacts
+from model_failure_lab.datasets import FailureDataset, load_dataset, load_demo_dataset
+from model_failure_lab.reporting.artifacts import (
+    write_comparison_report_artifacts,
+    write_report_artifacts,
+)
+from model_failure_lab.reporting.compare import build_comparison_report
 from model_failure_lab.reporting.core import build_run_report, summarize_case_executions
 from model_failure_lab.reporting.load import SavedRunArtifacts, load_saved_run_artifacts
 from model_failure_lab.runner.artifacts import write_run_artifacts
@@ -19,6 +23,7 @@ from model_failure_lab.storage import (
     RUN_FILENAME,
     dataset_file,
     read_json,
+    write_json,
 )
 
 CANONICAL_COMMAND = "failure-lab"
@@ -166,11 +171,46 @@ def _handle_report(args: argparse.Namespace) -> int:
 
 
 def _handle_compare(args: argparse.Namespace) -> int:
-    raise NotImplementedError("compare is implemented in Phase 48-02")
+    root = _normalized_root(args.root)
+    baseline = _load_saved_run_reference(args.baseline, root=root)
+    candidate = _load_saved_run_reference(args.candidate, root=root)
+    built = build_comparison_report(baseline, candidate)
+    report_path, details_path = write_comparison_report_artifacts(
+        built.report,
+        built.details,
+        root=root,
+    )
+    print(_render_compare_summary(built.report, report_path, details_path))
+    return 0
 
 
 def _handle_demo(args: argparse.Namespace) -> int:
-    raise NotImplementedError("demo is implemented in Phase 48-02")
+    root = _normalized_root(args.root)
+    dataset = load_demo_dataset()
+    dataset_path = _write_dataset_snapshot(dataset, root=root)
+    execution = execute_dataset_run(
+        dataset=dataset,
+        adapter_id="demo",
+        classifier_id=DEFAULT_CLASSIFIER_ID,
+        model="demo",
+        run_seed=DEFAULT_RUN_SEED,
+    )
+    run_path, results_path = write_run_artifacts(execution, root=root)
+    built = build_run_report(load_saved_run_artifacts(execution.run.run_id, root=root))
+    report_path, details_path = write_report_artifacts(built.report, built.details, root=root)
+    print(
+        _render_demo_summary(
+            dataset=dataset,
+            execution=execution,
+            dataset_path=dataset_path,
+            run_path=run_path,
+            results_path=results_path,
+            report_path=report_path,
+            details_path=details_path,
+            report_id=built.report.report_id,
+        )
+    )
+    return 0
 
 
 def _resolve_dataset_reference(reference: str, *, root: Path | None) -> Path:
@@ -243,6 +283,12 @@ def _normalized_root(root: Path | None) -> Path | None:
     return root.resolve() if root is not None else None
 
 
+def _write_dataset_snapshot(dataset: FailureDataset, *, root: Path | None) -> Path:
+    dataset_path = dataset_file(dataset.dataset_id, root=root, create=True)
+    write_json(dataset_path, dataset.to_payload())
+    return dataset_path
+
+
 def _render_run_summary(
     execution: DatasetRunExecution,
     dataset: FailureDataset,
@@ -305,9 +351,81 @@ def _render_report_summary(
         lines.append("Warning: source run completed with per-case errors.")
     return "\n".join(lines)
 
+
+def _render_demo_summary(
+    *,
+    dataset: FailureDataset,
+    execution: DatasetRunExecution,
+    dataset_path: Path,
+    run_path: Path,
+    results_path: Path,
+    report_path: Path,
+    details_path: Path,
+    report_id: str,
+) -> str:
+    summary = summarize_case_executions(execution.case_results)
+    metrics = summary.metrics_payload()
+    lines = [
+        "Failure Lab Demo",
+        f"Dataset: {dataset.dataset_id}",
+        f"Run ID: {execution.run.run_id}",
+        f"Report ID: {report_id}",
+        f"Status: {execution.status}",
+        (
+            "Cases: "
+            f"attempted={metrics['attempted_case_count']} "
+            f"classified={metrics['classified_case_count']} "
+            f"errors={metrics['execution_error_count']}"
+        ),
+        f"Failure rate: {_format_rate(metrics.get('failure_rate'))}",
+        "Artifacts:",
+        f"- {dataset_path}",
+        f"- {run_path}",
+        f"- {results_path}",
+        f"- {report_path}",
+        f"- {details_path}",
+    ]
+    if execution.status == "completed_with_errors":
+        lines.append("Warning: demo run completed with per-case errors.")
+    return "\n".join(lines)
+
+
+def _render_compare_summary(report, report_path: Path, details_path: Path) -> str:
+    comparison = report.comparison
+    delta = report.metrics.get("delta", {})
+    lines = [
+        "Failure Lab Compare",
+        f"Baseline: {comparison.get('baseline_run_id', 'unknown')}",
+        f"Candidate: {comparison.get('candidate_run_id', 'unknown')}",
+        f"Report ID: {report.report_id}",
+        f"Status: {report.status.get('overall', 'unknown')}",
+        f"Compatible: {comparison.get('compatible', False)}",
+        (
+            "Shared coverage: "
+            f"shared={comparison.get('shared_case_count', 0)} "
+            f"baseline_only={comparison.get('baseline_only_case_count', 0)} "
+            f"candidate_only={comparison.get('candidate_only_case_count', 0)}"
+        ),
+        f"Failure rate delta: {_format_signed_rate(delta.get('failure_rate'))}",
+        f"Coverage delta: {_format_signed_rate(delta.get('classification_coverage'))}",
+        "Artifacts:",
+        f"- {report_path}",
+        f"- {details_path}",
+    ]
+    if comparison.get("compatible") is False:
+        lines.append("Warning: comparison is incompatible, but artifacts were still written.")
+    return "\n".join(lines)
+
 def _format_rate(value: object) -> str:
     if isinstance(value, (int, float)):
         return f"{float(value) * 100:.1f}%"
+    return "n/a"
+
+
+def _format_signed_rate(value: object) -> str:
+    if isinstance(value, (int, float)):
+        sign = "+" if float(value) > 0 else ""
+        return f"{sign}{float(value) * 100:.1f}%"
     return "n/a"
 
 
