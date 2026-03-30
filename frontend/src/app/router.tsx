@@ -1,6 +1,10 @@
 import { useOutletContext } from "react-router-dom";
 
-import type { ArtifactOverview, ArtifactShellState } from "@/lib/artifacts/types";
+import type {
+  ArtifactOverview,
+  ArtifactShellState,
+  RunInventoryState,
+} from "@/lib/artifacts/types";
 import type {
   ArtifactIndex,
   FailureDomainKey,
@@ -31,6 +35,8 @@ export type AppRouteContext = {
   artifactState: ArtifactShellState;
   artifactOverview: ArtifactOverview | null;
   reloadArtifacts: () => void;
+  runInventoryState: RunInventoryState;
+  reloadRunInventory: () => void;
   index: ArtifactIndex | null;
   isLoading: boolean;
   error: string | null;

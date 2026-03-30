@@ -1,5 +1,10 @@
+import { useDeferredValue, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
+import { RunInventoryFilters } from "@/components/runs/RunInventoryFilters";
+import { RunInventoryTable } from "@/components/runs/RunInventoryTable";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -8,17 +13,120 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import type { RunInventoryItem } from "@/lib/artifacts/types";
+
+function compareRunsNewestFirst(left: RunInventoryItem, right: RunInventoryItem): number {
+  const leftTime = Date.parse(left.createdAt);
+  const rightTime = Date.parse(right.createdAt);
+
+  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
+    return rightTime - leftTime;
+  }
+
+  if (left.createdAt !== right.createdAt) {
+    return right.createdAt.localeCompare(left.createdAt);
+  }
+
+  return right.runId.localeCompare(left.runId);
+}
 
 export function RunsPage() {
-  const { artifactState, artifactOverview } = useAppRouteContext();
+  const navigate = useNavigate();
+  const { artifactState, artifactOverview, runInventoryState } = useAppRouteContext();
+  const [query, setQuery] = useState("");
+  const [datasetFilter, setDatasetFilter] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const deferredQuery = useDeferredValue(query);
+  const inventory = runInventoryState.status === "ready" ? runInventoryState.inventory : null;
+  const runs = inventory?.runs ?? [];
+
+  const datasetOptions = useMemo(
+    () =>
+      Array.from(new Set(runs.map((run) => run.dataset))).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    [runs],
+  );
+  const modelOptions = useMemo(
+    () =>
+      Array.from(new Set(runs.map((run) => run.model))).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    [runs],
+  );
+  const statusOptions = useMemo(
+    () =>
+      Array.from(new Set(runs.map((run) => run.status))).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    [runs],
+  );
+  const filteredRuns = useMemo(() => {
+    const normalizedQuery = deferredQuery.trim().toLowerCase();
+
+    return runs
+      .filter((run) => {
+        if (normalizedQuery && !run.runId.toLowerCase().includes(normalizedQuery)) {
+          return false;
+        }
+        if (datasetFilter && run.dataset !== datasetFilter) {
+          return false;
+        }
+        if (modelFilter && run.model !== modelFilter) {
+          return false;
+        }
+        if (statusFilter && run.status !== statusFilter) {
+          return false;
+        }
+        return true;
+      })
+      .slice()
+      .sort(compareRunsNewestFirst);
+  }, [datasetFilter, deferredQuery, modelFilter, runs, statusFilter]);
 
   if (artifactState.status !== "ready" || artifactOverview === null) {
     return <ArtifactStatePanel area="Runs" state={artifactState} />;
   }
 
   const readyOverview = artifactOverview;
+  if (runInventoryState.status === "idle" || runInventoryState.status === "loading") {
+    return (
+      <section className="space-y-4">
+        <Badge tone="accent">Runs</Badge>
+        <Card>
+          <CardHeader>
+            <CardTitle>Loading saved runs inventory.</CardTitle>
+            <CardDescription>
+              The shell is resolving the browser-facing runs index from the default local artifact root.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </section>
+    );
+  }
 
-  if (readyOverview.runs.count === 0) {
+  if (runInventoryState.status === "incompatible") {
+    return (
+      <section className="space-y-4">
+        <Badge tone="default">Runs</Badge>
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle>The runs inventory could not be read.</CardTitle>
+            <CardDescription>
+              The shell found a runs source, but the saved artifacts do not match the supported
+              inventory contract.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {runInventoryState.message}
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+
+  if (inventory === null || inventory.runs.length === 0) {
     return (
       <section className="space-y-4">
         <Badge tone="accent">Runs</Badge>
@@ -33,8 +141,8 @@ export function RunsPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p className="font-mono text-foreground">{readyOverview.source.runsPath}</p>
             <p>
-              Generate a run with `failure-lab demo` or `failure-lab run`. Phase 58
-              will replace this placeholder with the full sortable inventory.
+              Generate a run with `failure-lab demo` or `failure-lab run` to populate the
+              inventory.
             </p>
           </CardContent>
         </Card>
@@ -42,47 +150,59 @@ export function RunsPage() {
     );
   }
 
+  const readyInventory = inventory;
+
   return (
     <section className="space-y-6">
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Runs</Badge>
-          <Badge tone="muted">{readyOverview.runs.count} detected</Badge>
+          <Badge tone="muted">{readyInventory.runs.length} detected</Badge>
         </div>
         <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-          Saved runs are now the home route.
+          Saved runs inventory.
         </h1>
         <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-          Phase 57 cuts the mounted app over to the real engine artifact root.
-          The detailed sortable inventory lands in Phase 58, but this shell is
-          already reading saved run directories instead of the old manifest copy.
+          The home route now reads real saved run artifacts from the engine contract and renders
+          them as a dense inventory you can scan, narrow, and open.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Active run source</CardTitle>
-          <CardDescription>
-            The shell is indexing deterministic `run.json` and `results.json`
-            artifacts from the local engine root.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="font-mono text-sm text-foreground">{readyOverview.source.runsPath}</p>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Detected run ids
-            </p>
-            <ul className="space-y-2">
-              {readyOverview.runs.ids.slice(0, 6).map((runId) => (
-                <li key={runId} className="font-mono text-sm text-foreground">
-                  {runId}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
+      <RunInventoryFilters
+        search={query}
+        dataset={datasetFilter}
+        model={modelFilter}
+        status={statusFilter}
+        datasetOptions={datasetOptions}
+        modelOptions={modelOptions}
+        statusOptions={statusOptions}
+        onSearchChange={setQuery}
+        onDatasetChange={setDatasetFilter}
+        onModelChange={setModelFilter}
+        onStatusChange={setStatusFilter}
+        onClear={() => {
+          setQuery("");
+          setDatasetFilter("");
+          setModelFilter("");
+          setStatusFilter("");
+        }}
+      />
+
+      {filteredRuns.length > 0 ? (
+        <RunInventoryTable
+          rows={filteredRuns}
+          onOpenRun={(runId) => navigate(`/runs/${encodeURIComponent(runId)}`)}
+        />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>No runs match the current filters.</CardTitle>
+            <CardDescription>
+              Clear one or more filters to return to the full newest-first inventory.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
     </section>
   );
 }

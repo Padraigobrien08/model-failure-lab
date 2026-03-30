@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { App } from "@/app/App";
-import type { ArtifactShellState } from "@/lib/artifacts/types";
+import type { ArtifactShellState, RunInventoryState } from "@/lib/artifacts/types";
 
 function buildReadyState(overrides?: Partial<ArtifactShellState & { status: "ready" }>): ArtifactShellState {
   return {
@@ -30,6 +30,37 @@ function buildReadyState(overrides?: Partial<ArtifactShellState & { status: "rea
   };
 }
 
+function buildReadyInventoryState(): RunInventoryState {
+  return {
+    status: "ready",
+    inventory: {
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      runs: [
+        {
+          runId: "run_alpha",
+          dataset: "reasoning-failures-v1",
+          model: "demo",
+          createdAt: "2026-03-29T09:00:00Z",
+          status: "completed",
+        },
+        {
+          runId: "run_beta",
+          dataset: "hallucination-failures-v1",
+          model: "gpt-4.1-mini",
+          createdAt: "2026-03-30T11:30:00Z",
+          status: "completed",
+        },
+      ],
+    },
+    message: null,
+  };
+}
+
 describe("App shell", () => {
   afterEach(() => {
     cleanup();
@@ -42,6 +73,7 @@ describe("App shell", () => {
         useMemoryRouter
         initialEntries={["/"]}
         initialArtifactState={buildReadyState()}
+        initialRunInventoryState={buildReadyInventoryState()}
       />,
     );
 
@@ -63,11 +95,12 @@ describe("App shell", () => {
         useMemoryRouter
         initialEntries={["/"]}
         initialArtifactState={buildReadyState()}
+        initialRunInventoryState={buildReadyInventoryState()}
       />,
     );
 
     expect(
-      screen.getByRole("heading", { name: "Saved runs are now the home route." }),
+      screen.getByRole("heading", { name: "Saved runs inventory." }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("link", { name: "Comparisons" }));
@@ -89,6 +122,11 @@ describe("App shell", () => {
         useMemoryRouter
         initialEntries={["/"]}
         initialArtifactState={{ status: "loading", overview: null }}
+        initialRunInventoryState={{
+          status: "idle",
+          inventory: null,
+          message: null,
+        }}
       />,
     );
 
@@ -120,6 +158,11 @@ describe("App shell", () => {
             issues: ["run demo_run is missing run.json or results.json"],
             message: "Saved artifacts do not match the supported contract.",
           },
+        }}
+        initialRunInventoryState={{
+          status: "idle",
+          inventory: null,
+          message: null,
         }}
       />,
     );

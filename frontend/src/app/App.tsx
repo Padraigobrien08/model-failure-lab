@@ -3,13 +3,18 @@ import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from "react-rout
 
 import type { AppRouteContext } from "@/app/router";
 import { ComparisonsPage } from "@/app/routes/ComparisonsPage";
+import { RunDetailPage } from "@/app/routes/RunDetailPage";
 import { RunsPage } from "@/app/routes/RunsPage";
 import { TraceShell } from "@/components/layout/TraceShell";
 import {
   buildIncompatibleArtifactOverview,
   loadArtifactOverview,
+  loadRunInventory,
 } from "@/lib/artifacts/load";
-import type { ArtifactShellState } from "@/lib/artifacts/types";
+import type {
+  ArtifactShellState,
+  RunInventoryState,
+} from "@/lib/artifacts/types";
 import type { ArtifactIndex, FinalRobustnessBundle } from "@/lib/manifest/types";
 import type { FailureDomainKey, WorkbenchSelection } from "@/lib/manifest/types";
 
@@ -19,6 +24,7 @@ type AppProps = {
   initialFinalRobustnessBundle?: FinalRobustnessBundle | null;
   initialIncludeExploratory?: boolean;
   initialArtifactState?: ArtifactShellState;
+  initialRunInventoryState?: RunInventoryState;
   useMemoryRouter?: boolean;
   initialEntries?: string[];
 };
@@ -35,11 +41,21 @@ const DEFAULT_SELECTION: WorkbenchSelection = {
 
 const noop = () => {};
 
-function AppFrame({ initialArtifactState }: Pick<AppProps, "initialArtifactState">) {
+function AppFrame({
+  initialArtifactState,
+  initialRunInventoryState,
+}: Pick<AppProps, "initialArtifactState" | "initialRunInventoryState">) {
   const [artifactState, setArtifactState] = useState<ArtifactShellState>(
     initialArtifactState ?? {
       status: "loading",
       overview: null,
+    },
+  );
+  const [runInventoryState, setRunInventoryState] = useState<RunInventoryState>(
+    initialRunInventoryState ?? {
+      status: "idle",
+      inventory: null,
+      message: null,
     },
   );
   const [selection, setSelection] = useState<WorkbenchSelection>(DEFAULT_SELECTION);
@@ -90,11 +106,70 @@ function AppFrame({ initialArtifactState }: Pick<AppProps, "initialArtifactState
     refreshArtifacts();
   }, [refreshArtifacts]);
 
+  const refreshRunInventory = useMemo(
+    () => () => {
+      if (artifactState.status !== "ready") {
+        startTransition(() => {
+          setRunInventoryState({
+            status: "idle",
+            inventory: null,
+            message: null,
+          });
+        });
+        return;
+      }
+
+      if (initialRunInventoryState) {
+        startTransition(() => {
+          setRunInventoryState(initialRunInventoryState);
+        });
+        return;
+      }
+
+      startTransition(() => {
+        setRunInventoryState({
+          status: "loading",
+          inventory: null,
+          message: null,
+        });
+      });
+
+      void loadRunInventory()
+        .then((inventory) => {
+          startTransition(() => {
+            setRunInventoryState({
+              status: "ready",
+              inventory,
+              message: null,
+            });
+          });
+        })
+        .catch((error: unknown) => {
+          const message =
+            error instanceof Error ? error.message : "Failed to load run inventory";
+          startTransition(() => {
+            setRunInventoryState({
+              status: "incompatible",
+              inventory: null,
+              message,
+            });
+          });
+        });
+    },
+    [artifactState.status, initialRunInventoryState],
+  );
+
+  useEffect(() => {
+    refreshRunInventory();
+  }, [refreshRunInventory]);
+
   const routeContext = useMemo<AppRouteContext>(
     () => ({
       artifactState,
       artifactOverview: artifactState.overview,
       reloadArtifacts: refreshArtifacts,
+      runInventoryState,
+      reloadRunInventory: refreshRunInventory,
       index: null,
       isLoading: false,
       error: null,
@@ -127,6 +202,8 @@ function AppFrame({ initialArtifactState }: Pick<AppProps, "initialArtifactState
     [
       artifactState,
       refreshArtifacts,
+      refreshRunInventory,
+      runInventoryState,
       selectedArtifact,
       selectedDomain,
       selectedLane,
@@ -142,6 +219,7 @@ function AppFrame({ initialArtifactState }: Pick<AppProps, "initialArtifactState
       <Route element={<TraceShell routeContext={routeContext} />}>
         <Route path="/" element={<RunsPage />} />
         <Route path="/runs" element={<Navigate to="/" replace />} />
+        <Route path="/runs/:runId" element={<RunDetailPage />} />
         <Route path="/comparisons" element={<ComparisonsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
@@ -153,8 +231,14 @@ export function App({
   useMemoryRouter = false,
   initialEntries = ["/"],
   initialArtifactState,
+  initialRunInventoryState,
 }: AppProps) {
-  const appFrame = <AppFrame initialArtifactState={initialArtifactState} />;
+  const appFrame = (
+    <AppFrame
+      initialArtifactState={initialArtifactState}
+      initialRunInventoryState={initialRunInventoryState}
+    />
+  );
 
   if (useMemoryRouter) {
     return <MemoryRouter initialEntries={initialEntries}>{appFrame}</MemoryRouter>;

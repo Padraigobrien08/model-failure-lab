@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 
 import { App } from "@/app/App";
-import type { ArtifactShellState } from "@/lib/artifacts/types";
+import type { ArtifactShellState, RunInventoryState } from "@/lib/artifacts/types";
 
 function buildReadyState(comparisonIds: string[]): ArtifactShellState {
   return {
@@ -28,6 +28,37 @@ function buildReadyState(comparisonIds: string[]): ArtifactShellState {
   };
 }
 
+function buildReadyInventoryState(): RunInventoryState {
+  return {
+    status: "ready",
+    inventory: {
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      runs: [
+        {
+          runId: "run_alpha",
+          dataset: "reasoning-failures-v1",
+          model: "demo",
+          createdAt: "2026-03-29T09:00:00Z",
+          status: "completed",
+        },
+        {
+          runId: "run_beta",
+          dataset: "hallucination-failures-v1",
+          model: "gpt-4.1-mini",
+          createdAt: "2026-03-30T11:30:00Z",
+          status: "completed",
+        },
+      ],
+    },
+    message: null,
+  };
+}
+
 describe("comparisons route", () => {
   it("summarizes detected comparison artifacts from the active source", () => {
     render(
@@ -38,6 +69,7 @@ describe("comparisons route", () => {
           "compare_alpha_to_beta",
           "compare_beta_to_gamma",
         ])}
+        initialRunInventoryState={buildReadyInventoryState()}
       />,
     );
 
@@ -55,6 +87,7 @@ describe("comparisons route", () => {
         useMemoryRouter
         initialEntries={["/comparisons"]}
         initialArtifactState={buildReadyState([])}
+        initialRunInventoryState={buildReadyInventoryState()}
       />,
     );
 

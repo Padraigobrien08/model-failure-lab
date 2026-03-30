@@ -1,9 +1,13 @@
 import {
   ARTIFACT_OVERVIEW_PATH,
   DEFAULT_ARTIFACT_SOURCE,
+  RUNS_INDEX_PATH,
   type ArtifactCollectionSummary,
   type ArtifactOverview,
   type ArtifactOverviewStatus,
+  type ArtifactSourceDescriptor,
+  type RunInventory,
+  type RunInventoryItem,
 } from "@/lib/artifacts/types";
 
 function requireString(value: unknown, field: string): string {
@@ -38,6 +42,20 @@ function requireCollection(value: unknown, field: string): ArtifactCollectionSum
   };
 }
 
+function requireSource(value: unknown, field: string): ArtifactSourceDescriptor {
+  if (value === null || typeof value !== "object") {
+    throw new Error(`${field} must be an object`);
+  }
+
+  const source = value as Record<string, unknown>;
+  return {
+    label: requireString(source.label, `${field}.label`),
+    path: requireString(source.path, `${field}.path`),
+    runsPath: requireString(source.runsPath, `${field}.runsPath`),
+    reportsPath: requireString(source.reportsPath, `${field}.reportsPath`),
+  };
+}
+
 export function validateArtifactOverview(payload: unknown): ArtifactOverview {
   if (payload === null || typeof payload !== "object") {
     throw new Error("artifact overview payload must be an object");
@@ -49,12 +67,6 @@ export function validateArtifactOverview(payload: unknown): ArtifactOverview {
     throw new Error("status must be ready, empty, or incompatible");
   }
 
-  const sourcePayload = data.source;
-  if (sourcePayload === null || typeof sourcePayload !== "object") {
-    throw new Error("source must be an object");
-  }
-  const sourceData = sourcePayload as Record<string, unknown>;
-
   const issuesValue = data.issues;
   const issues =
     issuesValue === undefined ? [] : requireStringArray(issuesValue, "issues");
@@ -62,12 +74,7 @@ export function validateArtifactOverview(payload: unknown): ArtifactOverview {
 
   return {
     status: status as ArtifactOverviewStatus,
-    source: {
-      label: requireString(sourceData.label, "source.label"),
-      path: requireString(sourceData.path, "source.path"),
-      runsPath: requireString(sourceData.runsPath, "source.runsPath"),
-      reportsPath: requireString(sourceData.reportsPath, "source.reportsPath"),
-    },
+    source: requireSource(data.source, "source"),
     runs: requireCollection(data.runs, "runs"),
     comparisons: requireCollection(data.comparisons, "comparisons"),
     issues,
@@ -86,6 +93,51 @@ export async function loadArtifactOverview(
 
   const payload = await response.json();
   return validateArtifactOverview(payload);
+}
+
+function requireRunInventoryItems(value: unknown, field: string): RunInventoryItem[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+
+  return value.map((item, index) => {
+    if (item === null || typeof item !== "object") {
+      throw new Error(`${field}[${index}] must be an object`);
+    }
+
+    const row = item as Record<string, unknown>;
+    return {
+      runId: requireString(row.run_id, `${field}[${index}].run_id`),
+      dataset: requireString(row.dataset, `${field}[${index}].dataset`),
+      model: requireString(row.model, `${field}[${index}].model`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      status: requireString(row.status, `${field}[${index}].status`),
+    };
+  });
+}
+
+export function validateRunInventory(payload: unknown): RunInventory {
+  if (payload === null || typeof payload !== "object") {
+    throw new Error("run inventory payload must be an object");
+  }
+
+  const data = payload as Record<string, unknown>;
+  return {
+    source: requireSource(data.source, "source"),
+    runs: requireRunInventoryItems(data.runs, "runs"),
+  };
+}
+
+export async function loadRunInventory(
+  fetchImpl: typeof fetch = fetch,
+): Promise<RunInventory> {
+  const response = await fetchImpl(RUNS_INDEX_PATH);
+  if (!response.ok) {
+    throw new Error(`run inventory request failed with status ${response.status}`);
+  }
+
+  const payload = await response.json();
+  return validateRunInventory(payload);
 }
 
 export function buildIncompatibleArtifactOverview(message: string): ArtifactOverview {

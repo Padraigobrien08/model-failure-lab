@@ -5,6 +5,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
 const ARTIFACT_OVERVIEW_PATH = "/__failure_lab__/artifacts/overview.json";
+const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
 const REPORT_FILENAME = "report.json";
@@ -20,6 +21,14 @@ type ArtifactCollectionOptions = {
   primaryFile: string;
   secondaryFile: string;
   primaryIdField: "run_id" | "report_id";
+};
+
+type RunInventoryRow = {
+  run_id: string;
+  dataset: string;
+  model: string;
+  created_at: string;
+  status: string;
 };
 
 function failureLabArtifactsPlugin(): Plugin {
@@ -96,17 +105,105 @@ function failureLabArtifactsPlugin(): Plugin {
     };
   }
 
+  function requireStringField(
+    payload: Record<string, unknown>,
+    key: string,
+    label: string,
+  ): string {
+    const value = payload[key];
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new Error(`${label} must be a non-empty string`);
+    }
+    return value;
+  }
+
+  function readRunStatus(
+    resultsPayload: Record<string, unknown>,
+    runPayload: Record<string, unknown>,
+  ): string {
+    const resultStatus = resultsPayload.status;
+    if (typeof resultStatus === "string" && resultStatus.trim().length > 0) {
+      return resultStatus;
+    }
+
+    const metadata = runPayload.metadata;
+    if (metadata !== null && typeof metadata === "object") {
+      const metadataStatus = (metadata as Record<string, unknown>).status;
+      if (typeof metadataStatus === "string" && metadataStatus.trim().length > 0) {
+        return metadataStatus;
+      }
+    }
+
+    throw new Error("status must be present in results.json or run metadata");
+  }
+
+  async function collectRunInventory(
+    runsPath: string,
+  ): Promise<{ rows: RunInventoryRow[]; issues: string[] }> {
+    const issues: string[] = [];
+    let entries: Array<{ isDirectory: () => boolean; name: string }>;
+
+    try {
+      entries = (await fs.readdir(runsPath, { withFileTypes: true })) as Array<{
+        isDirectory: () => boolean;
+        name: string;
+      }>;
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? String(error.code) : null;
+      if (code === "ENOENT") {
+        return { rows: [], issues };
+      }
+      throw error;
+    }
+
+    const rows: RunInventoryRow[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      const entryPath = path.join(runsPath, entry.name);
+      const runPath = path.join(entryPath, RUN_FILENAME);
+      const resultsPath = path.join(entryPath, RESULTS_FILENAME);
+
+      try {
+        const runPayload = JSON.parse(await fs.readFile(runPath, "utf-8")) as Record<
+          string,
+          unknown
+        >;
+        const resultsPayload = JSON.parse(
+          await fs.readFile(resultsPath, "utf-8"),
+        ) as Record<string, unknown>;
+
+        rows.push({
+          run_id: requireStringField(runPayload, "run_id", `${entry.name}.run_id`),
+          dataset: requireStringField(runPayload, "dataset", `${entry.name}.dataset`),
+          model: requireStringField(runPayload, "model", `${entry.name}.model`),
+          created_at: requireStringField(runPayload, "created_at", `${entry.name}.created_at`),
+          status: readRunStatus(resultsPayload, runPayload),
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown error";
+        issues.push(`run ${entry.name} could not be indexed: ${message}`);
+      }
+    }
+
+    rows.sort((left, right) => {
+      if (left.created_at !== right.created_at) {
+        return right.created_at.localeCompare(left.created_at);
+      }
+      return right.run_id.localeCompare(left.run_id);
+    });
+
+    return { rows, issues };
+  }
+
   async function buildArtifactOverview() {
     const runsPath = path.join(repoRoot, "runs");
     const reportsPath = path.join(repoRoot, "reports");
 
-    const [runsResult, reportsResult] = await Promise.all([
-      collectArtifactIds(runsPath, {
-        label: "run",
-        primaryFile: RUN_FILENAME,
-        secondaryFile: RESULTS_FILENAME,
-        primaryIdField: "run_id",
-      }),
+    const [runInventory, reportsResult] = await Promise.all([
+      collectRunInventory(runsPath),
       collectArtifactIds(reportsPath, {
         label: "report",
         primaryFile: REPORT_FILENAME,
@@ -115,11 +212,11 @@ function failureLabArtifactsPlugin(): Plugin {
       }),
     ]);
 
-    const issues = [...runsResult.issues, ...reportsResult.issues];
+    const issues = [...runInventory.issues, ...reportsResult.issues];
     const status =
       issues.length > 0
         ? "incompatible"
-        : runsResult.summary.count === 0 && reportsResult.summary.count === 0
+        : runInventory.rows.length === 0 && reportsResult.summary.count === 0
           ? "empty"
           : "ready";
 
@@ -131,7 +228,10 @@ function failureLabArtifactsPlugin(): Plugin {
         runsPath,
         reportsPath,
       },
-      runs: runsResult.summary,
+      runs: {
+        count: runInventory.rows.length,
+        ids: runInventory.rows.map((row) => row.run_id),
+      },
       comparisons: reportsResult.summary,
       issues,
       message:
@@ -173,6 +273,64 @@ function failureLabArtifactsPlugin(): Plugin {
     }
   }
 
+  async function handleRunsIndex(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const runsPath = path.join(repoRoot, "runs");
+    const reportsPath = path.join(repoRoot, "reports");
+
+    try {
+      const runInventory = await collectRunInventory(runsPath);
+      if (runInventory.issues.length > 0) {
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            source: {
+              label: "Repo root artifact store",
+              path: repoRoot,
+              runsPath,
+              reportsPath,
+            },
+            runs: [],
+            issues: runInventory.issues,
+          }),
+        );
+        return;
+      }
+
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          source: {
+            label: "Repo root artifact store",
+            path: repoRoot,
+            runsPath,
+            reportsPath,
+          },
+          runs: runInventory.rows,
+        }),
+      );
+    } catch (error) {
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          source: {
+            label: "Repo root artifact store",
+            path: repoRoot,
+            runsPath,
+            reportsPath,
+          },
+          runs: [],
+          issues: [error instanceof Error ? error.message : "run inventory failed"],
+        }),
+      );
+    }
+  }
+
   function registerArtifactMiddleware(
     middlewares: {
       use: (
@@ -187,6 +345,9 @@ function failureLabArtifactsPlugin(): Plugin {
   ) {
     middlewares.use(ARTIFACT_OVERVIEW_PATH, (req, res, next) => {
       void handleArtifactOverview(req, res).catch(next);
+    });
+    middlewares.use(RUNS_INDEX_PATH, (req, res, next) => {
+      void handleRunsIndex(req, res).catch(next);
     });
   }
 
