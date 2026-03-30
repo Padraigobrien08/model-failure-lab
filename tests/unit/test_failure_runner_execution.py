@@ -134,3 +134,42 @@ def test_write_run_artifacts_persists_run_and_results_payloads(tmp_path) -> None
     assert results_payload["total_cases"] == 1
     assert results_payload["cases"][0]["prompt"]["id"] == "case-001"
     assert results_payload["cases"][0]["execution"]["run_seed"] == 13
+
+
+def test_execute_dataset_run_uses_model_and_config_in_run_identity() -> None:
+    dataset = FailureDataset(
+        dataset_id="reasoning-basics-v1",
+        cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+    )
+    current_time = datetime(2026, 3, 30, 11, 46, 0, tzinfo=timezone.utc)
+
+    baseline = execute_dataset_run(
+        dataset=dataset,
+        adapter_id="demo",
+        classifier_id="heuristic_v1",
+        model="demo-model",
+        run_seed=13,
+        run_config={"temperature": 0.1},
+        now=current_time,
+    )
+    different_model = execute_dataset_run(
+        dataset=dataset,
+        adapter_id="demo",
+        classifier_id="heuristic_v1",
+        model="demo-model-v2",
+        run_seed=13,
+        run_config={"temperature": 0.1},
+        now=current_time,
+    )
+    different_config = execute_dataset_run(
+        dataset=dataset,
+        adapter_id="demo",
+        classifier_id="heuristic_v1",
+        model="demo-model",
+        run_seed=13,
+        run_config={"temperature": 0.2},
+        now=current_time,
+    )
+
+    assert baseline.run.run_id != different_model.run.run_id
+    assert baseline.run.run_id != different_config.run.run_id

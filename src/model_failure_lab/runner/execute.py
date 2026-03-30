@@ -140,7 +140,9 @@ def execute_dataset_run(
         dataset_id=dataset.dataset_id,
         adapter_id=adapter_id,
         classifier_id=classifier_id,
+        model=model,
         run_seed=run_seed,
+        run_config=config,
         now=current_time,
     )
     run_metadata: dict[str, JsonValue] = {

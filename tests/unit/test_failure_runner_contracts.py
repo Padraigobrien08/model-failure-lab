@@ -46,11 +46,51 @@ def test_build_run_id_is_readable_and_deterministic_for_fixed_inputs() -> None:
         dataset_id="Reasoning Basics",
         adapter_id="demo",
         classifier_id="heuristic_v1",
+        model="demo-model",
         run_seed=13,
+        run_config={"temperature": 0.1},
         now=datetime(2026, 3, 30, 11, 15, 0, tzinfo=timezone.utc),
     )
 
-    assert run_id == "20260330_111500_reasoning_basics_demo_heuristic_v1_seed_13_447fcf"
+    assert (
+        run_id
+        == "20260330_111500_000000_reasoning_basics_demo_heuristic_v1_demo_model_seed_13_426a6d0f"
+    )
+
+
+def test_build_run_id_changes_for_model_and_config_variants_under_same_time() -> None:
+    current_time = datetime(2026, 3, 30, 11, 15, 0, tzinfo=timezone.utc)
+
+    base = build_run_id(
+        dataset_id="Reasoning Basics",
+        adapter_id="demo",
+        classifier_id="heuristic_v1",
+        model="demo-model",
+        run_seed=13,
+        run_config={"temperature": 0.1},
+        now=current_time,
+    )
+    different_model = build_run_id(
+        dataset_id="Reasoning Basics",
+        adapter_id="demo",
+        classifier_id="heuristic_v1",
+        model="demo-model-v2",
+        run_seed=13,
+        run_config={"temperature": 0.1},
+        now=current_time,
+    )
+    different_config = build_run_id(
+        dataset_id="Reasoning Basics",
+        adapter_id="demo",
+        classifier_id="heuristic_v1",
+        model="demo-model",
+        run_seed=13,
+        run_config={"temperature": 0.2},
+        now=current_time,
+    )
+
+    assert base != different_model
+    assert base != different_config
 
 
 def test_prompt_snapshot_extracts_authored_expectations_from_prompt_case() -> None:
