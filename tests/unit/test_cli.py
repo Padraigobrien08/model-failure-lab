@@ -10,7 +10,7 @@ from pathlib import Path
 
 from model_failure_lab.cli import main
 from model_failure_lab.datasets import FailureDataset
-from model_failure_lab.schemas import PromptCase
+from model_failure_lab.schemas import PromptCase, PromptExpectations
 from model_failure_lab.storage import read_json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -162,6 +162,59 @@ def test_run_and_report_support_canonical_id_and_path_resolution(tmp_path, capsy
     assert len(report_dirs) == 1
     assert (report_dirs[0] / "report.json").exists()
     assert (report_dirs[0] / "report_details.json").exists()
+
+
+def test_report_command_surfaces_expectation_verdicts_when_present(tmp_path, capsys) -> None:
+    dataset_root = tmp_path / "datasets"
+    dataset_path = dataset_root / "hallucination-failures-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="hallucination-failures-v1",
+            name="Hallucination Failures",
+            cases=(
+                PromptCase(
+                    id="case-001",
+                    prompt="Explain why 2 + 2 = 4.",
+                    tags=("core", "factuality"),
+                    expectations=PromptExpectations(
+                        expected_failure="no_failure",
+                        reference_answer="The answer must explicitly say exactly forty-two.",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    run_exit = main(
+        [
+            "run",
+            "--dataset",
+            "hallucination-failures-v1",
+            "--model",
+            "demo",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+    capsys.readouterr()
+    run_dir = sorted((tmp_path / "runs").iterdir())[0]
+
+    report_exit = main(
+        [
+            "report",
+            "--run",
+            str(run_dir),
+            "--root",
+            str(tmp_path),
+        ]
+    )
+    report_output = capsys.readouterr().out
+
+    assert run_exit == 0
+    assert report_exit == 0
+    assert "Failure types:" in report_output
+    assert "Verdicts: unexpected_failure=1" in report_output
 
 
 def test_run_command_supports_bundled_dataset_ids_with_core_default(tmp_path, capsys) -> None:

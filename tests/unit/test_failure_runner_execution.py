@@ -43,6 +43,7 @@ def test_execute_dataset_run_completes_successfully_with_builtins() -> None:
             PromptCase(
                 id="case-001",
                 prompt="Explain why 2 + 2 = 4.",
+                tags=("core", "numerical"),
                 expectations=PromptExpectations(expected_failure="no_failure"),
             ),
         ),
@@ -126,6 +127,7 @@ def test_write_run_artifacts_persists_run_and_results_payloads(tmp_path) -> None
             PromptCase(
                 id="case-001",
                 prompt="Explain why 2 + 2 = 4.",
+                tags=("core", "numerical"),
                 expectations=PromptExpectations(expected_failure="no_failure"),
             ),
         ),
@@ -150,6 +152,7 @@ def test_write_run_artifacts_persists_run_and_results_payloads(tmp_path) -> None
     assert results_payload["status"] == "completed"
     assert results_payload["total_cases"] == 1
     assert results_payload["cases"][0]["prompt"]["id"] == "case-001"
+    assert results_payload["cases"][0]["prompt"]["tags"] == ["core", "numerical"]
     assert results_payload["cases"][0]["execution"]["run_seed"] == 13
     assert results_payload["cases"][0]["expectation"] == {
         "expected_failure": {"failure_type": "no_failure"},

@@ -62,12 +62,14 @@ class PromptSnapshot:
 
     id: str
     prompt: str
+    tags: tuple[str, ...] = ()
     expectations: PromptExpectations | None = None
 
     def to_payload(self) -> dict[str, JsonValue]:
         payload: dict[str, JsonValue] = {
             "id": self.id,
             "prompt": self.prompt,
+            "tags": list(self.tags),
         }
         if self.expectations is not None:
             payload["expectations"] = self.expectations.to_payload()
@@ -80,6 +82,7 @@ class PromptSnapshot:
         return cls(
             id=_require_string(data, "id"),
             prompt=_require_string(data, "prompt"),
+            tags=_optional_string_tuple(data, "tags"),
             expectations=(
                 PromptExpectations.from_payload(expectations)
                 if expectations is not None
@@ -92,6 +95,7 @@ class PromptSnapshot:
         return cls(
             id=prompt_case.id,
             prompt=prompt_case.prompt,
+            tags=prompt_case.tags,
             expectations=prompt_case.expectations,
         )
 
@@ -107,6 +111,20 @@ class PromptSnapshot:
         if self.expectations is None:
             return None
         return self.expectations.to_failure_label()
+
+
+def _optional_string_tuple(payload: Mapping[str, object], key: str) -> tuple[str, ...]:
+    value = payload.get(key)
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise PayloadValidationError(f"{key} must be a list of strings")
+    items: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise PayloadValidationError(f"{key} must contain non-empty strings")
+        items.append(item)
+    return tuple(items)
 
 
 @dataclass(slots=True, frozen=True)

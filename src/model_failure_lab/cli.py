@@ -196,7 +196,15 @@ def _handle_report(args: argparse.Namespace) -> int:
         built.details,
         root=root,
     )
-    print(_render_report_summary(saved_run, built.report, report_path, details_path))
+    print(
+        _render_report_summary(
+            saved_run,
+            built.report,
+            built.details,
+            report_path,
+            details_path,
+        )
+    )
     return 0
 
 
@@ -471,6 +479,7 @@ def _render_run_summary(
 def _render_report_summary(
     saved_run: SavedRunArtifacts,
     report,
+    details: dict[str, object],
     report_path: Path,
     details_path: Path,
 ) -> str:
@@ -489,10 +498,20 @@ def _render_report_summary(
         ),
         f"Failure rate: {_format_rate(metrics.get('failure_rate'))}",
         f"Classification coverage: {_format_rate(metrics.get('classification_coverage'))}",
-        "Artifacts:",
-        f"- {report_path}",
-        f"- {details_path}",
     ]
+    failure_summary = _render_failure_type_summary(report.failure_counts, report.failure_rates)
+    if failure_summary is not None:
+        lines.append(f"Failure types: {failure_summary}")
+    verdict_summary = _render_verdict_summary(details)
+    if verdict_summary is not None:
+        lines.append(f"Verdicts: {verdict_summary}")
+    lines.extend(
+        [
+            "Artifacts:",
+            f"- {report_path}",
+            f"- {details_path}",
+        ]
+    )
     if saved_run.status == "completed_with_errors":
         lines.append("Warning: source run completed with per-case errors.")
     return "\n".join(lines)
@@ -561,6 +580,35 @@ def _render_compare_summary(report, report_path: Path, details_path: Path) -> st
     if comparison.get("compatible") is False:
         lines.append("Warning: comparison is incompatible, but artifacts were still written.")
     return "\n".join(lines)
+
+
+def _render_failure_type_summary(
+    failure_counts: dict[str, int],
+    failure_rates: dict[str, float],
+) -> str | None:
+    if not failure_counts:
+        return None
+    return ", ".join(
+        f"{failure_type}={_format_rate(failure_rates.get(failure_type))} ({count})"
+        for failure_type, count in sorted(
+            failure_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:3]
+    )
+
+
+def _render_verdict_summary(details: dict[str, object]) -> str | None:
+    raw_counts = details.get("expectation_verdict_counts")
+    if not isinstance(raw_counts, dict):
+        return None
+    parts: list[str] = []
+    for verdict in ("unexpected_failure", "missed_expected"):
+        count = raw_counts.get(verdict)
+        if type(count) is int and count > 0:
+            parts.append(f"{verdict}={count}")
+    if not parts:
+        return None
+    return ", ".join(parts)
 
 
 def _format_rate(value: object) -> str:

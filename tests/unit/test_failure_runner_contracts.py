@@ -104,6 +104,7 @@ def test_prompt_snapshot_extracts_authored_expectations_from_prompt_case() -> No
         PromptCase(
             id="case-001",
             prompt="What is the answer?",
+            tags=("core", "numerical"),
             expectations=PromptExpectations(
                 expected_failure="reasoning",
                 reference_answer="42",
@@ -120,6 +121,7 @@ def test_prompt_snapshot_extracts_authored_expectations_from_prompt_case() -> No
     assert snapshot == PromptSnapshot(
         id="case-001",
         prompt="What is the answer?",
+        tags=("core", "numerical"),
         expectations=PromptExpectations(
             expected_failure="reasoning",
             reference_answer="42",
@@ -162,6 +164,7 @@ def test_case_execution_round_trips_with_compact_sections() -> None:
         prompt=PromptSnapshot(
             id="case-001",
             prompt="What is the answer?",
+            tags=("core",),
             expectations=PromptExpectations(
                 expected_failure="no_failure",
                 reference_answer="42",
@@ -192,6 +195,7 @@ def test_case_execution_derives_expectation_verdicts_directionally() -> None:
         prompt=PromptSnapshot(
             id="case-001",
             prompt="What is the answer?",
+            tags=("core",),
             expectations=PromptExpectations(expected_failure="reasoning"),
         ),
         execution=ExecutionMetadata(
