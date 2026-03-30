@@ -3,6 +3,9 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
+import { RunCaseDetailPanel } from "@/components/run/RunCaseDetailPanel";
+import { RunCaseLensTabs } from "@/components/run/RunCaseLensTabs";
+import { RunCaseTable } from "@/components/run/RunCaseTable";
 import { RunDetailHeader } from "@/components/run/RunDetailHeader";
 import { RunNotableCases } from "@/components/run/RunNotableCases";
 import { RunSummaryMetricStrip } from "@/components/run/RunSummaryMetricStrip";
@@ -16,13 +19,44 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { loadRunDetail } from "@/lib/artifacts/load";
-import type { RunCaseRecord, RunDetailState } from "@/lib/artifacts/types";
+import type {
+  RunCaseLensKey,
+  RunCaseRecord,
+  RunDetailState,
+} from "@/lib/artifacts/types";
 
 function selectCasesById(caseIds: string[], cases: RunCaseRecord[]): RunCaseRecord[] {
   const caseMap = new Map(cases.map((caseRow) => [caseRow.caseId, caseRow]));
   return caseIds
     .map((caseId) => caseMap.get(caseId))
     .filter((caseRow): caseRow is RunCaseRecord => caseRow !== undefined);
+}
+
+function resolveLensCases(
+  lens: RunCaseLensKey,
+  detail: {
+    lenses: {
+      mismatchCaseIds: string[];
+      notableCaseIds: string[];
+      allCaseIds: string[];
+      errorCaseIds: string[];
+    };
+    cases: RunCaseRecord[];
+  },
+) {
+  if (lens === "mismatches") {
+    return selectCasesById(detail.lenses.mismatchCaseIds, detail.cases);
+  }
+
+  if (lens === "notable") {
+    return selectCasesById(detail.lenses.notableCaseIds, detail.cases);
+  }
+
+  if (lens === "errors") {
+    return selectCasesById(detail.lenses.errorCaseIds, detail.cases);
+  }
+
+  return selectCasesById(detail.lenses.allCaseIds, detail.cases);
 }
 
 export function RunDetailPage() {
@@ -33,6 +67,8 @@ export function RunDetailPage() {
     detail: null,
     message: null,
   });
+  const [activeLens, setActiveLens] = useState<RunCaseLensKey>("mismatches");
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const inventory = runInventoryState.status === "ready" ? runInventoryState.inventory : null;
   const run = inventory?.runs.find((item) => item.runId === runId);
 
@@ -44,6 +80,8 @@ export function RunDetailPage() {
           detail: null,
           message: null,
         });
+        setActiveLens("mismatches");
+        setSelectedCaseId(null);
       });
       return;
     }
@@ -88,6 +126,58 @@ export function RunDetailPage() {
       detailState.detail.cases,
     ).slice(0, 3);
   }, [detailState]);
+
+  const caseLensCounts = useMemo(
+    () => ({
+      mismatches:
+        detailState.status === "ready" ? detailState.detail.lenses.mismatchCaseIds.length : 0,
+      notable:
+        detailState.status === "ready" ? detailState.detail.lenses.notableCaseIds.length : 0,
+      all: detailState.status === "ready" ? detailState.detail.lenses.allCaseIds.length : 0,
+      errors: detailState.status === "ready" ? detailState.detail.lenses.errorCaseIds.length : 0,
+    }),
+    [detailState],
+  );
+
+  const visibleCases = useMemo(() => {
+    if (detailState.status !== "ready") {
+      return [];
+    }
+
+    return resolveLensCases(activeLens, detailState.detail);
+  }, [activeLens, detailState]);
+
+  const selectedCase = useMemo(() => {
+    if (selectedCaseId === null) {
+      return null;
+    }
+
+    return visibleCases.find((caseRow) => caseRow.caseId === selectedCaseId) ?? null;
+  }, [selectedCaseId, visibleCases]);
+
+  useEffect(() => {
+    if (detailState.status !== "ready") {
+      startTransition(() => {
+        setActiveLens("mismatches");
+        setSelectedCaseId(null);
+      });
+      return;
+    }
+
+    startTransition(() => {
+      setSelectedCaseId((current) => {
+        if (visibleCases.length === 0) {
+          return null;
+        }
+
+        if (current && visibleCases.some((caseRow) => caseRow.caseId === current)) {
+          return current;
+        }
+
+        return visibleCases[0]?.caseId ?? null;
+      });
+    });
+  }, [detailState.status, visibleCases]);
 
   if (artifactState.status !== "ready") {
     return <ArtifactStatePanel area="Runs" state={artifactState} />;
@@ -191,6 +281,10 @@ export function RunDetailPage() {
     );
   }
 
+  if (detailState.status !== "ready") {
+    return null;
+  }
+
   const detail = detailState.detail;
 
   return (
@@ -214,23 +308,47 @@ export function RunDetailPage() {
       <RunNotableCases cases={notableCases} />
 
       <section className="space-y-3" aria-label="Case inspection">
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Inspection
-          </p>
-          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-            Case inspection
-          </h2>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Inspection
+            </p>
+            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
+              Case inspection
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Stay inside the run flow while you move between mismatches, notable examples, saved
+              errors, and the full case set.
+            </p>
+          </div>
+
+          <RunCaseLensTabs
+            value={activeLens}
+            counts={caseLensCounts}
+            onValueChange={setActiveLens}
+          />
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Case lenses land next in this phase.</CardTitle>
-            <CardDescription>
-              The summary-first page is now live. The next plan adds mismatches-first case tabs and
-              in-page selected-case drilldown without leaving this route.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+
+        {visibleCases.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>No cases match this lens.</CardTitle>
+              <CardDescription>
+                This run has no saved rows under the {activeLens} lens. Switch lenses to inspect
+                other cases without leaving the route.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
+            <RunCaseTable
+              cases={visibleCases}
+              selectedCaseId={selectedCaseId}
+              onSelectCase={setSelectedCaseId}
+            />
+            <RunCaseDetailPanel caseRow={selectedCase} />
+          </div>
+        )}
       </section>
 
       <Link className="text-sm font-semibold text-primary no-underline" to="/">

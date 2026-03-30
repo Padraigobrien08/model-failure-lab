@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 import { App } from "@/app/App";
@@ -268,10 +268,51 @@ describe("run detail route", () => {
     expect(screen.getByRole("heading", { name: "Failure types, verdicts, and tag slices" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Notable cases" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Case inspection" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Mismatches (3)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(screen.getAllByText("Unexpected Failure").length).toBeGreaterThan(0);
-    expect(screen.getByText("Answer using only the supplied source snippet.")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Answer using only the supplied source snippet.").length,
+    ).toBeGreaterThan(0);
     expect(screen.getByText("Attempted")).toBeInTheDocument();
     expect(screen.getByText("Failure rate")).toBeInTheDocument();
+    expect(screen.getByText("Unsupported factual framing detected.")).toBeInTheDocument();
+  });
+
+  it("switches case lenses and keeps inspection inside the run route", async () => {
+    const detail = buildRunDetail(SAMPLE_RUN);
+    mockRunDetail(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/runs/run_gamma"]}
+        initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
+        initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "All (5)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Inspect case case-001" }));
+
+    expect(screen.getByRole("tab", { name: "All (5)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Grounded summary.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Errors (1)" }));
+
+    expect(screen.getByRole("tab", { name: "Errors (1)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Request timed out")).toBeInTheDocument();
+    expect(screen.getAllByText("Emit a structured answer.").length).toBeGreaterThan(0);
   });
 
   it("shows an explicit incompatible-detail state when the saved run payload cannot be read", async () => {

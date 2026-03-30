@@ -109,6 +109,8 @@ export type RunCaseRecord = {
   } | null;
 };
 
+export type RunCaseLensKey = "mismatches" | "notable" | "all" | "errors";
+
 export type RunDetail = {
   source: ArtifactSourceDescriptor;
   run: {
