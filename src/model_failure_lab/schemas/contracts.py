@@ -235,18 +235,29 @@ class Report:
     total_cases: int
     failure_counts: dict[str, int]
     failure_rates: dict[str, float]
+    comparison: dict[str, JsonValue] = field(default_factory=dict)
+    metrics: dict[str, JsonValue] = field(default_factory=dict)
+    status: dict[str, JsonValue] = field(default_factory=dict)
     metadata: dict[str, JsonValue] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, JsonValue]:
-        return {
+        payload: dict[str, JsonValue] = {
             "report_id": self.report_id,
             "run_ids": _json_list(self.run_ids),
             "created_at": self.created_at,
             "total_cases": self.total_cases,
             "failure_counts": dict(self.failure_counts),
             "failure_rates": dict(self.failure_rates),
-            "metadata": dict(self.metadata),
         }
+        if self.comparison:
+            payload["comparison"] = dict(self.comparison)
+        if self.metrics:
+            payload["metrics"] = dict(self.metrics)
+        if self.status:
+            payload["status"] = dict(self.status)
+        if self.metadata:
+            payload["metadata"] = dict(self.metadata)
+        return payload
 
     @classmethod
     def from_payload(cls, payload: object) -> "Report":
@@ -258,5 +269,8 @@ class Report:
             total_cases=_require_int(data, "total_cases"),
             failure_counts=_require_int_mapping(data, "failure_counts"),
             failure_rates=_require_float_mapping(data, "failure_rates"),
+            comparison=_optional_json_mapping(data, "comparison"),
+            metrics=_optional_json_mapping(data, "metrics"),
+            status=_optional_json_mapping(data, "status"),
             metadata=_optional_json_mapping(data, "metadata"),
         )

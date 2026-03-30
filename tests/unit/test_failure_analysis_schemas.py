@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from model_failure_lab.schemas import PayloadValidationError, PromptCase, Report, Result, Run
+from model_failure_lab.storage import report_details_file
 
 
 def test_prompt_case_to_payload_is_json_safe() -> None:
@@ -87,6 +88,32 @@ def test_report_to_payload_supports_aggregate_metrics() -> None:
     }
 
 
+def test_report_to_payload_supports_structured_summary_sections() -> None:
+    report = Report(
+        report_id="report_002",
+        run_ids=("run_a", "run_b"),
+        created_at="2026-03-30T12:10:00Z",
+        total_cases=10,
+        failure_counts={"reasoning": 1},
+        failure_rates={"reasoning": 0.1},
+        comparison={"baseline_run_id": "run_a", "candidate_run_id": "run_b"},
+        metrics={"classification_coverage": 0.9},
+        status={"overall": "improved"},
+    )
+
+    assert report.to_payload() == {
+        "report_id": "report_002",
+        "run_ids": ["run_a", "run_b"],
+        "created_at": "2026-03-30T12:10:00Z",
+        "total_cases": 10,
+        "failure_counts": {"reasoning": 1},
+        "failure_rates": {"reasoning": 0.1},
+        "comparison": {"baseline_run_id": "run_a", "candidate_run_id": "run_b"},
+        "metrics": {"classification_coverage": 0.9},
+        "status": {"overall": "improved"},
+    }
+
+
 def test_prompt_case_from_payload_round_trips() -> None:
     payload = {
         "id": "reasoning_001",
@@ -140,6 +167,22 @@ def test_report_from_payload_round_trips() -> None:
     assert Report.from_payload(payload).to_payload() == payload
 
 
+def test_report_from_payload_round_trips_with_structured_sections() -> None:
+    payload = {
+        "report_id": "report_002",
+        "run_ids": ["run_a", "run_b"],
+        "created_at": "2026-03-30T12:10:00Z",
+        "total_cases": 10,
+        "failure_counts": {"reasoning": 1},
+        "failure_rates": {"reasoning": 0.1},
+        "comparison": {"baseline_run_id": "run_a", "candidate_run_id": "run_b"},
+        "metrics": {"classification_coverage": 0.9},
+        "status": {"overall": "improved"},
+    }
+
+    assert Report.from_payload(payload).to_payload() == payload
+
+
 def test_prompt_case_from_payload_rejects_missing_required_fields() -> None:
     with pytest.raises(PayloadValidationError, match="prompt must be a non-empty string"):
         PromptCase.from_payload({"id": "reasoning_001", "prompt": ""})
@@ -157,3 +200,9 @@ def test_report_from_payload_rejects_non_numeric_rates() -> None:
 
     with pytest.raises(PayloadValidationError, match="failure_rates"):
         Report.from_payload(payload)
+
+
+def test_report_details_file_uses_report_directory(tmp_path) -> None:
+    path = report_details_file("Report 001", root=tmp_path, create=True)
+
+    assert path == tmp_path / "reports" / "report_001" / "report_details.json"

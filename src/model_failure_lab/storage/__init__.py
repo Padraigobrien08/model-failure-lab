@@ -2,12 +2,14 @@
 
 from .json_artifacts import read_json, write_json
 from .layout import (
+    REPORT_DETAILS_FILENAME,
     REPORT_FILENAME,
     RESULTS_FILENAME,
     RUN_FILENAME,
     dataset_file,
     datasets_root,
     project_root,
+    report_details_file,
     report_directory,
     report_file,
     reports_root,
@@ -19,6 +21,7 @@ from .layout import (
 
 __all__ = [
     "REPORT_FILENAME",
+    "REPORT_DETAILS_FILENAME",
     "RESULTS_FILENAME",
     "RUN_FILENAME",
     "dataset_file",
@@ -26,6 +29,7 @@ __all__ = [
     "project_root",
     "read_json",
     "report_directory",
+    "report_details_file",
     "report_file",
     "reports_root",
     "results_file",
