@@ -1,6 +1,11 @@
 """Saved-evaluation reporting helpers."""
 
-from .artifacts import build_report_details_payload, build_report_payload, write_report_artifacts
+from .artifacts import (
+    build_report_details_payload,
+    build_report_payload,
+    write_comparison_report_artifacts,
+    write_report_artifacts,
+)
 from .bundle import (
     build_perturbation_report_metadata,
     build_report_metadata,
@@ -18,6 +23,7 @@ from .closeout import (
     load_saved_json,
     write_final_gate,
 )
+from .compare import build_comparison_report, build_comparison_report_id
 from .core import (
     NO_FAILURE_TYPE,
     BuiltReport,
@@ -100,6 +106,8 @@ __all__ = [
     "ReportCandidate",
     "SavedRunArtifacts",
     "build_clean_vs_perturbed_figure",
+    "build_comparison_report",
+    "build_comparison_report_id",
     "build_perturbation_family_drop_figure",
     "build_report_details_payload",
     "build_perturbation_report_metadata",
@@ -112,6 +120,7 @@ __all__ = [
     "build_run_report",
     "build_run_report_id",
     "build_stability_report_metadata",
+    "write_comparison_report_artifacts",
     "write_report_bundle",
     "write_report_artifacts",
     "write_perturbation_report_bundle",
