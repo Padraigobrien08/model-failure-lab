@@ -4,6 +4,7 @@ import { afterEach, vi } from "vitest";
 import { App } from "@/app/App";
 import type {
   ArtifactShellState,
+  ComparisonInventoryState,
   RunDetail,
   RunInventoryItem,
   RunInventoryState,
@@ -45,6 +46,22 @@ function buildReadyInventoryState(runs: RunInventoryItem[]): RunInventoryState {
         reportsPath: "/tmp/model-failure-lab/reports",
       },
       runs,
+    },
+    message: null,
+  };
+}
+
+function buildReadyComparisonInventoryState(): ComparisonInventoryState {
+  return {
+    status: "ready",
+    inventory: {
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      comparisons: [],
     },
     message: null,
   };
@@ -260,6 +277,7 @@ describe("run detail route", () => {
         initialEntries={["/runs/run_gamma"]}
         initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
         initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 
@@ -291,6 +309,7 @@ describe("run detail route", () => {
         initialEntries={["/runs/run_gamma"]}
         initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
         initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 
@@ -331,6 +350,7 @@ describe("run detail route", () => {
         initialEntries={["/runs/run_gamma"]}
         initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
         initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 

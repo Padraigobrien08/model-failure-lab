@@ -1,11 +1,14 @@
 import {
   ARTIFACT_OVERVIEW_PATH,
+  COMPARISONS_INDEX_PATH,
   DEFAULT_ARTIFACT_SOURCE,
   RUN_DETAIL_PATH,
   RUNS_INDEX_PATH,
   type ArtifactCollectionSummary,
   type ArtifactOverview,
   type ArtifactOverviewStatus,
+  type ComparisonInventory,
+  type ComparisonInventoryItem,
   type ArtifactSourceDescriptor,
   type FailureLabelRecord,
   type RunCaseRecord,
@@ -142,6 +145,43 @@ function requireRunInventoryItems(value: unknown, field: string): RunInventoryIt
       model: requireString(row.model, `${field}[${index}].model`),
       createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
       status: requireString(row.status, `${field}[${index}].status`),
+    };
+  });
+}
+
+function requireComparisonInventoryItems(
+  value: unknown,
+  field: string,
+): ComparisonInventoryItem[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+
+  return value.map((item, index) => {
+    if (item === null || typeof item !== "object") {
+      throw new Error(`${field}[${index}] must be an object`);
+    }
+
+    const row = item as Record<string, unknown>;
+    return {
+      reportId: requireString(row.report_id, `${field}[${index}].report_id`),
+      baselineRunId: requireString(
+        row.baseline_run_id,
+        `${field}[${index}].baseline_run_id`,
+      ),
+      candidateRunId: requireString(
+        row.candidate_run_id,
+        `${field}[${index}].candidate_run_id`,
+      ),
+      dataset: requireStringOrNull(row.dataset, `${field}[${index}].dataset`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      status: requireString(row.status, `${field}[${index}].status`),
+      compatible:
+        typeof row.compatible === "boolean"
+          ? row.compatible
+          : (() => {
+              throw new Error(`${field}[${index}].compatible must be a boolean`);
+            })(),
     };
   });
 }
@@ -314,6 +354,45 @@ export async function loadRunInventory(
 
   const payload = await response.json();
   return validateRunInventory(payload);
+}
+
+export function validateComparisonInventory(payload: unknown): ComparisonInventory {
+  if (payload === null || typeof payload !== "object") {
+    throw new Error("comparison inventory payload must be an object");
+  }
+
+  const data = payload as Record<string, unknown>;
+  return {
+    source: requireSource(data.source, "source"),
+    comparisons: requireComparisonInventoryItems(data.comparisons, "comparisons"),
+  };
+}
+
+export async function loadComparisonInventory(
+  fetchImpl: typeof fetch = fetch,
+): Promise<ComparisonInventory> {
+  const response = await fetchImpl(COMPARISONS_INDEX_PATH);
+  let payload: unknown = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    if (!response.ok) {
+      throw new Error(`comparison inventory request failed with status ${response.status}`);
+    }
+    throw new Error("comparison inventory response was not valid JSON");
+  }
+
+  if (!response.ok) {
+    const data = payload as Record<string, unknown> | null;
+    const message =
+      data !== null && typeof data.message === "string"
+        ? data.message
+        : `comparison inventory request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return validateComparisonInventory(payload);
 }
 
 export function buildRunDetailPath(runId: string): string {

@@ -9,10 +9,12 @@ import { TraceShell } from "@/components/layout/TraceShell";
 import {
   buildIncompatibleArtifactOverview,
   loadArtifactOverview,
+  loadComparisonInventory,
   loadRunInventory,
 } from "@/lib/artifacts/load";
 import type {
   ArtifactShellState,
+  ComparisonInventoryState,
   RunInventoryState,
 } from "@/lib/artifacts/types";
 import type { ArtifactIndex, FinalRobustnessBundle } from "@/lib/manifest/types";
@@ -25,6 +27,7 @@ type AppProps = {
   initialIncludeExploratory?: boolean;
   initialArtifactState?: ArtifactShellState;
   initialRunInventoryState?: RunInventoryState;
+  initialComparisonInventoryState?: ComparisonInventoryState;
   useMemoryRouter?: boolean;
   initialEntries?: string[];
 };
@@ -44,7 +47,11 @@ const noop = () => {};
 function AppFrame({
   initialArtifactState,
   initialRunInventoryState,
-}: Pick<AppProps, "initialArtifactState" | "initialRunInventoryState">) {
+  initialComparisonInventoryState,
+}: Pick<
+  AppProps,
+  "initialArtifactState" | "initialRunInventoryState" | "initialComparisonInventoryState"
+>) {
   const [artifactState, setArtifactState] = useState<ArtifactShellState>(
     initialArtifactState ?? {
       status: "loading",
@@ -58,6 +65,14 @@ function AppFrame({
       message: null,
     },
   );
+  const [comparisonInventoryState, setComparisonInventoryState] =
+    useState<ComparisonInventoryState>(
+      initialComparisonInventoryState ?? {
+        status: "idle",
+        inventory: null,
+        message: null,
+      },
+    );
   const [selection, setSelection] = useState<WorkbenchSelection>(DEFAULT_SELECTION);
   const [selectedVerdict, setSelectedVerdict] = useState<string | null>(null);
   const [selectedLane, setSelectedLane] = useState<string | null>(null);
@@ -163,6 +178,63 @@ function AppFrame({
     refreshRunInventory();
   }, [refreshRunInventory]);
 
+  const refreshComparisonInventory = useMemo(
+    () => () => {
+      if (artifactState.status !== "ready") {
+        startTransition(() => {
+          setComparisonInventoryState({
+            status: "idle",
+            inventory: null,
+            message: null,
+          });
+        });
+        return;
+      }
+
+      if (initialComparisonInventoryState) {
+        startTransition(() => {
+          setComparisonInventoryState(initialComparisonInventoryState);
+        });
+        return;
+      }
+
+      startTransition(() => {
+        setComparisonInventoryState({
+          status: "loading",
+          inventory: null,
+          message: null,
+        });
+      });
+
+      void loadComparisonInventory()
+        .then((inventory) => {
+          startTransition(() => {
+            setComparisonInventoryState({
+              status: "ready",
+              inventory,
+              message: null,
+            });
+          });
+        })
+        .catch((error: unknown) => {
+          const message =
+            error instanceof Error ? error.message : "Failed to load comparison inventory";
+          startTransition(() => {
+            setComparisonInventoryState({
+              status: "incompatible",
+              inventory: null,
+              message,
+            });
+          });
+        });
+    },
+    [artifactState.status, initialComparisonInventoryState],
+  );
+
+  useEffect(() => {
+    refreshComparisonInventory();
+  }, [refreshComparisonInventory]);
+
   const routeContext = useMemo<AppRouteContext>(
     () => ({
       artifactState,
@@ -170,6 +242,8 @@ function AppFrame({
       reloadArtifacts: refreshArtifacts,
       runInventoryState,
       reloadRunInventory: refreshRunInventory,
+      comparisonInventoryState,
+      reloadComparisonInventory: refreshComparisonInventory,
       index: null,
       isLoading: false,
       error: null,
@@ -201,7 +275,9 @@ function AppFrame({
     }),
     [
       artifactState,
+      comparisonInventoryState,
       refreshArtifacts,
+      refreshComparisonInventory,
       refreshRunInventory,
       runInventoryState,
       selectedArtifact,
@@ -221,6 +297,7 @@ function AppFrame({
         <Route path="/runs" element={<Navigate to="/" replace />} />
         <Route path="/runs/:runId" element={<RunDetailPage />} />
         <Route path="/comparisons" element={<ComparisonsPage />} />
+        <Route path="/comparisons/:reportId" element={<ComparisonsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
@@ -232,11 +309,13 @@ export function App({
   initialEntries = ["/"],
   initialArtifactState,
   initialRunInventoryState,
+  initialComparisonInventoryState,
 }: AppProps) {
   const appFrame = (
     <AppFrame
       initialArtifactState={initialArtifactState}
       initialRunInventoryState={initialRunInventoryState}
+      initialComparisonInventoryState={initialComparisonInventoryState}
     />
   );
 

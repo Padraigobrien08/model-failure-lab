@@ -5,6 +5,7 @@ import { afterEach, vi } from "vitest";
 import { App } from "@/app/App";
 import type {
   ArtifactShellState,
+  ComparisonInventoryState,
   RunDetail,
   RunInventoryItem,
   RunInventoryState,
@@ -46,6 +47,22 @@ function buildReadyInventoryState(runs: RunInventoryItem[]): RunInventoryState {
         reportsPath: "/tmp/model-failure-lab/reports",
       },
       runs,
+    },
+    message: null,
+  };
+}
+
+function buildReadyComparisonInventoryState(): ComparisonInventoryState {
+  return {
+    status: "ready",
+    inventory: {
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      comparisons: [],
     },
     message: null,
   };
@@ -207,6 +224,7 @@ describe("runs route", () => {
         initialEntries={["/"]}
         initialArtifactState={buildReadyArtifactState(SAMPLE_RUNS.map((run) => run.runId))}
         initialRunInventoryState={buildReadyInventoryState(SAMPLE_RUNS)}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 
@@ -232,6 +250,7 @@ describe("runs route", () => {
         initialEntries={["/"]}
         initialArtifactState={buildReadyArtifactState(SAMPLE_RUNS.map((run) => run.runId))}
         initialRunInventoryState={buildReadyInventoryState(SAMPLE_RUNS)}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 
@@ -266,6 +285,7 @@ describe("runs route", () => {
         initialEntries={["/"]}
         initialArtifactState={buildReadyArtifactState(SAMPLE_RUNS.map((run) => run.runId))}
         initialRunInventoryState={buildReadyInventoryState(SAMPLE_RUNS)}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 
@@ -294,6 +314,7 @@ describe("runs route", () => {
         initialEntries={["/"]}
         initialArtifactState={buildReadyArtifactState([])}
         initialRunInventoryState={buildReadyInventoryState([])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 

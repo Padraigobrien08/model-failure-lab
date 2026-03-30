@@ -6,23 +6,12 @@ import react from "@vitejs/plugin-react";
 
 const ARTIFACT_OVERVIEW_PATH = "/__failure_lab__/artifacts/overview.json";
 const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
+const COMPARISONS_INDEX_PATH = "/__failure_lab__/artifacts/comparisons.json";
 const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
 const REPORT_FILENAME = "report.json";
 const REPORT_DETAILS_FILENAME = "report_details.json";
-
-type ArtifactCollectionSummary = {
-  count: number;
-  ids: string[];
-};
-
-type ArtifactCollectionOptions = {
-  label: "run" | "report";
-  primaryFile: string;
-  secondaryFile: string;
-  primaryIdField: "run_id" | "report_id";
-};
 
 type RunInventoryRow = {
   run_id: string;
@@ -30,6 +19,16 @@ type RunInventoryRow = {
   model: string;
   created_at: string;
   status: string;
+};
+
+type ComparisonInventoryRow = {
+  report_id: string;
+  baseline_run_id: string;
+  candidate_run_id: string;
+  dataset: string | null;
+  created_at: string;
+  status: string;
+  compatible: boolean;
 };
 
 type FailureLabelPayload = {
@@ -121,77 +120,6 @@ type RunDetailPayload = {
 
 function failureLabArtifactsPlugin(): Plugin {
   const repoRoot = path.resolve(__dirname, "..");
-
-  async function collectArtifactIds(
-    rootPath: string,
-    options: ArtifactCollectionOptions,
-  ): Promise<{ summary: ArtifactCollectionSummary; issues: string[] }> {
-    const { label, primaryFile, secondaryFile, primaryIdField } = options;
-    const issues: string[] = [];
-    let entries: Array<{ isDirectory: () => boolean; name: string }>;
-
-    try {
-      entries = (await fs.readdir(rootPath, { withFileTypes: true })) as Array<{
-        isDirectory: () => boolean;
-        name: string;
-      }>;
-    } catch (error) {
-      const code = error instanceof Error && "code" in error ? String(error.code) : null;
-      if (code === "ENOENT") {
-        return {
-          summary: { count: 0, ids: [] },
-          issues,
-        };
-      }
-      throw error;
-    }
-
-    const ids: string[] = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory()) {
-        continue;
-      }
-
-      const entryPath = path.join(rootPath, entry.name);
-      const primaryPath = path.join(entryPath, primaryFile);
-      const secondaryPath = path.join(entryPath, secondaryFile);
-
-      try {
-        await fs.access(primaryPath);
-        await fs.access(secondaryPath);
-      } catch {
-        issues.push(
-          `${label} ${entry.name} is missing ${primaryFile} or ${secondaryFile}`,
-        );
-        continue;
-      }
-
-      try {
-        const payload = JSON.parse(await fs.readFile(primaryPath, "utf-8")) as Record<
-          string,
-          unknown
-        >;
-        const artifactId = payload[primaryIdField];
-        if (typeof artifactId !== "string" || artifactId.trim().length === 0) {
-          issues.push(`${label} ${entry.name} has an invalid ${primaryIdField}`);
-          continue;
-        }
-        ids.push(artifactId);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
-        issues.push(`${label} ${entry.name} could not be read: ${message}`);
-      }
-    }
-
-    ids.sort((left, right) => left.localeCompare(right));
-    return {
-      summary: {
-        count: ids.length,
-        ids,
-      },
-      issues,
-    };
-  }
 
   function requireStringField(
     payload: Record<string, unknown>,
@@ -379,6 +307,127 @@ function failureLabArtifactsPlugin(): Plugin {
         return right.created_at.localeCompare(left.created_at);
       }
       return right.run_id.localeCompare(left.run_id);
+    });
+
+    return { rows, issues };
+  }
+
+  function readComparisonStatus(reportPayload: Record<string, unknown>): string {
+    const status = reportPayload.status;
+    if (status !== null && typeof status === "object") {
+      const overall = (status as Record<string, unknown>).overall;
+      if (typeof overall === "string" && overall.trim().length > 0) {
+        return overall;
+      }
+    }
+
+    return "comparison_ready";
+  }
+
+  async function collectComparisonInventory(
+    reportsPath: string,
+  ): Promise<{ rows: ComparisonInventoryRow[]; issues: string[] }> {
+    const issues: string[] = [];
+    let entries: Array<{ isDirectory: () => boolean; name: string }>;
+
+    try {
+      entries = (await fs.readdir(reportsPath, { withFileTypes: true })) as Array<{
+        isDirectory: () => boolean;
+        name: string;
+      }>;
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? String(error.code) : null;
+      if (code === "ENOENT") {
+        return { rows: [], issues };
+      }
+      throw error;
+    }
+
+    const rows: ComparisonInventoryRow[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      const entryPath = path.join(reportsPath, entry.name);
+      const reportPath = path.join(entryPath, REPORT_FILENAME);
+      const reportDetailsPath = path.join(entryPath, REPORT_DETAILS_FILENAME);
+
+      let reportPayload: Record<string, unknown>;
+      try {
+        reportPayload = await readJsonRecord(reportPath, `${entry.name}.report`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown error";
+        issues.push(`report ${entry.name} could not be read: ${message}`);
+        continue;
+      }
+
+      const metadata =
+        reportPayload.metadata !== null && typeof reportPayload.metadata === "object"
+          ? (reportPayload.metadata as Record<string, unknown>)
+          : null;
+      const reportKind = metadata?.report_kind;
+      if (reportKind !== "comparison") {
+        continue;
+      }
+
+      try {
+        await fs.access(reportDetailsPath);
+      } catch {
+        issues.push(`comparison ${entry.name} is missing ${REPORT_DETAILS_FILENAME}`);
+        continue;
+      }
+
+      try {
+        const comparison = requireObjectField(
+          reportPayload,
+          "comparison",
+          `${entry.name}.comparison`,
+        );
+        rows.push({
+          report_id: requireStringField(
+            reportPayload,
+            "report_id",
+            `${entry.name}.report_id`,
+          ),
+          baseline_run_id: requireStringField(
+            comparison,
+            "baseline_run_id",
+            `${entry.name}.comparison.baseline_run_id`,
+          ),
+          candidate_run_id: requireStringField(
+            comparison,
+            "candidate_run_id",
+            `${entry.name}.comparison.candidate_run_id`,
+          ),
+          dataset:
+            typeof comparison.dataset_id === "string" && comparison.dataset_id.trim().length > 0
+              ? comparison.dataset_id
+              : null,
+          created_at: requireStringField(
+            reportPayload,
+            "created_at",
+            `${entry.name}.created_at`,
+          ),
+          status: readComparisonStatus(reportPayload),
+          compatible:
+            typeof comparison.compatible === "boolean"
+              ? comparison.compatible
+              : (() => {
+                  throw new Error(`${entry.name}.comparison.compatible must be a boolean`);
+                })(),
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown error";
+        issues.push(`comparison ${entry.name} could not be indexed: ${message}`);
+      }
+    }
+
+    rows.sort((left, right) => {
+      if (left.created_at !== right.created_at) {
+        return right.created_at.localeCompare(left.created_at);
+      }
+      return right.report_id.localeCompare(left.report_id);
     });
 
     return { rows, issues };
@@ -834,21 +883,16 @@ function failureLabArtifactsPlugin(): Plugin {
     const runsPath = path.join(repoRoot, "runs");
     const reportsPath = path.join(repoRoot, "reports");
 
-    const [runInventory, reportsResult] = await Promise.all([
+    const [runInventory, comparisonInventory] = await Promise.all([
       collectRunInventory(runsPath),
-      collectArtifactIds(reportsPath, {
-        label: "report",
-        primaryFile: REPORT_FILENAME,
-        secondaryFile: REPORT_DETAILS_FILENAME,
-        primaryIdField: "report_id",
-      }),
+      collectComparisonInventory(reportsPath),
     ]);
 
-    const issues = [...runInventory.issues, ...reportsResult.issues];
+    const issues = [...runInventory.issues, ...comparisonInventory.issues];
     const status =
       issues.length > 0
         ? "incompatible"
-        : runInventory.rows.length === 0 && reportsResult.summary.count === 0
+        : runInventory.rows.length === 0 && comparisonInventory.rows.length === 0
           ? "empty"
           : "ready";
 
@@ -864,7 +908,10 @@ function failureLabArtifactsPlugin(): Plugin {
         count: runInventory.rows.length,
         ids: runInventory.rows.map((row) => row.run_id),
       },
-      comparisons: reportsResult.summary,
+      comparisons: {
+        count: comparisonInventory.rows.length,
+        ids: comparisonInventory.rows.map((row) => row.report_id),
+      },
       issues,
       message:
         status === "empty"
@@ -963,6 +1010,68 @@ function failureLabArtifactsPlugin(): Plugin {
     }
   }
 
+  async function handleComparisonsIndex(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const runsPath = path.join(repoRoot, "runs");
+    const reportsPath = path.join(repoRoot, "reports");
+
+    try {
+      const comparisonInventory = await collectComparisonInventory(reportsPath);
+      if (comparisonInventory.issues.length > 0) {
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            source: {
+              label: "Repo root artifact store",
+              path: repoRoot,
+              runsPath,
+              reportsPath,
+            },
+            comparisons: [],
+            message: comparisonInventory.issues[0],
+            issues: comparisonInventory.issues,
+          }),
+        );
+        return;
+      }
+
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          source: {
+            label: "Repo root artifact store",
+            path: repoRoot,
+            runsPath,
+            reportsPath,
+          },
+          comparisons: comparisonInventory.rows,
+        }),
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "comparison inventory failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          source: {
+            label: "Repo root artifact store",
+            path: repoRoot,
+            runsPath,
+            reportsPath,
+          },
+          comparisons: [],
+          message,
+          issues: [message],
+        }),
+      );
+    }
+  }
+
   async function handleRunDetail(
     req: IncomingMessage,
     res: ServerResponse,
@@ -1013,6 +1122,9 @@ function failureLabArtifactsPlugin(): Plugin {
     });
     middlewares.use(RUNS_INDEX_PATH, (req, res, next) => {
       void handleRunsIndex(req, res).catch(next);
+    });
+    middlewares.use(COMPARISONS_INDEX_PATH, (req, res, next) => {
+      void handleComparisonsIndex(req, res).catch(next);
     });
     middlewares.use(RUN_DETAIL_PATH, (req, res, next) => {
       void handleRunDetail(req, res).catch(next);

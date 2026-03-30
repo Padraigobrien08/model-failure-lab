@@ -3,6 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import type {
   ArtifactOverview,
   ArtifactShellState,
+  ComparisonInventoryState,
   RunInventoryState,
 } from "@/lib/artifacts/types";
 import type {
@@ -37,6 +38,8 @@ export type AppRouteContext = {
   reloadArtifacts: () => void;
   runInventoryState: RunInventoryState;
   reloadRunInventory: () => void;
+  comparisonInventoryState: ComparisonInventoryState;
+  reloadComparisonInventory: () => void;
   index: ArtifactIndex | null;
   isLoading: boolean;
   error: string | null;

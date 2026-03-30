@@ -2,7 +2,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { App } from "@/app/App";
-import type { ArtifactShellState, RunInventoryState } from "@/lib/artifacts/types";
+import type {
+  ArtifactShellState,
+  ComparisonInventoryState,
+  RunInventoryState,
+} from "@/lib/artifacts/types";
 
 function buildReadyState(overrides?: Partial<ArtifactShellState & { status: "ready" }>): ArtifactShellState {
   return {
@@ -61,6 +65,32 @@ function buildReadyInventoryState(): RunInventoryState {
   };
 }
 
+function buildReadyComparisonInventoryState(): ComparisonInventoryState {
+  return {
+    status: "ready",
+    inventory: {
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      comparisons: [
+        {
+          reportId: "compare_alpha_to_beta",
+          baselineRunId: "run_alpha",
+          candidateRunId: "run_beta",
+          dataset: "reasoning-failures-v1",
+          createdAt: "2026-03-30T11:40:00Z",
+          status: "improved",
+          compatible: true,
+        },
+      ],
+    },
+    message: null,
+  };
+}
+
 describe("App shell", () => {
   afterEach(() => {
     cleanup();
@@ -74,6 +104,7 @@ describe("App shell", () => {
         initialEntries={["/"]}
         initialArtifactState={buildReadyState()}
         initialRunInventoryState={buildReadyInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 
@@ -96,6 +127,7 @@ describe("App shell", () => {
         initialEntries={["/"]}
         initialArtifactState={buildReadyState()}
         initialRunInventoryState={buildReadyInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
     );
 
@@ -107,7 +139,7 @@ describe("App shell", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "Saved comparisons stay secondary to runs.",
+        name: "Saved comparisons inventory.",
       }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Comparisons" })).toHaveAttribute(
@@ -123,6 +155,11 @@ describe("App shell", () => {
         initialEntries={["/"]}
         initialArtifactState={{ status: "loading", overview: null }}
         initialRunInventoryState={{
+          status: "idle",
+          inventory: null,
+          message: null,
+        }}
+        initialComparisonInventoryState={{
           status: "idle",
           inventory: null,
           message: null,
@@ -160,6 +197,11 @@ describe("App shell", () => {
           },
         }}
         initialRunInventoryState={{
+          status: "idle",
+          inventory: null,
+          message: null,
+        }}
+        initialComparisonInventoryState={{
           status: "idle",
           inventory: null,
           message: null,

@@ -1,5 +1,6 @@
 export const ARTIFACT_OVERVIEW_PATH = "/__failure_lab__/artifacts/overview.json";
 export const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
+export const COMPARISONS_INDEX_PATH = "/__failure_lab__/artifacts/comparisons.json";
 export const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
 
 export type ArtifactOverviewStatus = "ready" | "empty" | "incompatible";
@@ -57,6 +58,38 @@ export type RunInventoryState =
   | {
       status: "ready";
       inventory: RunInventory;
+      message: null;
+    }
+  | {
+      status: "incompatible";
+      inventory: null;
+      message: string;
+    };
+
+export type ComparisonInventoryItem = {
+  reportId: string;
+  baselineRunId: string;
+  candidateRunId: string;
+  dataset: string | null;
+  createdAt: string;
+  status: string;
+  compatible: boolean;
+};
+
+export type ComparisonInventory = {
+  source: ArtifactSourceDescriptor;
+  comparisons: ComparisonInventoryItem[];
+};
+
+export type ComparisonInventoryState =
+  | {
+      status: "idle" | "loading";
+      inventory: null;
+      message: null;
+    }
+  | {
+      status: "ready";
+      inventory: ComparisonInventory;
       message: null;
     }
   | {
