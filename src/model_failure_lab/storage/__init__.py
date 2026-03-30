@@ -1,5 +1,6 @@
 """Local storage helpers for failure-analysis artifacts."""
 
+from .json_artifacts import read_json, write_json
 from .layout import (
     REPORT_FILENAME,
     RESULTS_FILENAME,
@@ -23,6 +24,7 @@ __all__ = [
     "dataset_file",
     "datasets_root",
     "project_root",
+    "read_json",
     "report_directory",
     "report_file",
     "reports_root",
@@ -30,4 +32,5 @@ __all__ = [
     "run_directory",
     "run_file",
     "runs_root",
+    "write_json",
 ]
