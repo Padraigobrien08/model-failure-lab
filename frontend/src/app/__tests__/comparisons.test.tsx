@@ -1,58 +1,66 @@
-import userEvent from "@testing-library/user-event";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 import { App } from "@/app/App";
-import {
-  buildFinalRobustnessBundleFixture,
-  buildManifestFixture,
-} from "@/test/fixtures";
+import type { ArtifactShellState } from "@/lib/artifacts/types";
 
-describe("lanes route", () => {
-  it("redirects legacy comparisons URLs into the lane workspace with official-first ordering", () => {
+function buildReadyState(comparisonIds: string[]): ArtifactShellState {
+  return {
+    status: "ready",
+    overview: {
+      status: "ready",
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      runs: {
+        count: 2,
+        ids: ["run_alpha", "run_beta"],
+      },
+      comparisons: {
+        count: comparisonIds.length,
+        ids: comparisonIds,
+      },
+      issues: [],
+      message: null,
+    },
+  };
+}
+
+describe("comparisons route", () => {
+  it("summarizes detected comparison artifacts from the active source", () => {
     render(
       <App
         useMemoryRouter
         initialEntries={["/comparisons"]}
-        initialIndex={buildManifestFixture()}
-        initialFinalRobustnessBundle={buildFinalRobustnessBundleFixture()}
+        initialArtifactState={buildReadyState([
+          "compare_alpha_to_beta",
+          "compare_beta_to_gamma",
+        ])}
       />,
     );
 
     expect(
-      screen.getByRole("heading", { name: /Robustness lane workspace\./i }),
+      screen.getByRole("heading", { name: "Saved comparisons stay secondary to runs." }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Robustness$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Calibration$/i })).toBeInTheDocument();
-
-    const cards = screen.getAllByText(/Ranked method summary/i);
-    expect(cards).toHaveLength(3);
-    expect(screen.getAllByRole("heading", { name: /Temperature Scaling/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("heading", { name: /Reweighting/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("heading", { name: /DistilBERT Baseline/i }).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Group DRO/i)).not.toBeInTheDocument();
+    expect(screen.getByText("/tmp/model-failure-lab/reports")).toBeInTheDocument();
+    expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
+    expect(screen.getByText("compare_beta_to_gamma")).toBeInTheDocument();
   });
 
-  it("expands seeded detail and reveals exploratory methods only when scope is enabled", async () => {
-    const user = userEvent.setup();
-
+  it("shows a route-level empty state when no comparison reports exist yet", () => {
     render(
       <App
         useMemoryRouter
-        initialEntries={["/lanes"]}
-        initialIndex={buildManifestFixture()}
-        initialFinalRobustnessBundle={buildFinalRobustnessBundleFixture()}
+        initialEntries={["/comparisons"]}
+        initialArtifactState={buildReadyState([])}
       />,
     );
 
-    const reweightingCard = screen.getAllByRole("heading", {
-      name: /Reweighting/i,
-    })[0].closest("div");
-    expect(reweightingCard).not.toBeNull();
-
-    await user.click(screen.getAllByRole("button", { name: /Show per-seed breakdown/i })[0]);
-    expect(screen.getByText(/Seed 13/i)).toBeInTheDocument();
-
-    await user.click(screen.getAllByRole("button", { name: /Include exploratory/i })[0]);
-    expect(screen.getAllByRole("heading", { name: /Group DRO/i })).not.toHaveLength(0);
+    expect(
+      screen.getByRole("heading", { name: "No comparison reports are available yet." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/generate a comparison with `failure-lab compare`/i)).toBeInTheDocument();
   });
 });

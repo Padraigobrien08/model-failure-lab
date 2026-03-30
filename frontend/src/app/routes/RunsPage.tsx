@@ -1,121 +1,88 @@
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { ScopeStateBanner } from "@/components/layout/ScopeStateBanner";
-import { WorkbenchHeader } from "@/components/layout/WorkbenchHeader";
-import { WorkbenchSection } from "@/components/layout/WorkbenchSection";
-import { RunDetailPanel } from "@/components/runs/RunDetailPanel";
-import { RunGroupSection } from "@/components/runs/RunGroupSection";
 import { useAppRouteContext } from "@/app/router";
-import { buildRunDetailModel, buildRunLaneModels } from "@/lib/manifest/selectors";
+import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export function RunsPage() {
-  const {
-    index,
-    isLoading,
-    error,
-    includeExploratory,
-    setIncludeExploratory,
-    finalRobustnessBundle,
-    finalRobustnessBundleError,
-    isFinalRobustnessBundleLoading,
-    selectedRunId,
-    setSelectedRunId,
-    openEvidenceDrawer,
-  } = useAppRouteContext();
+  const { artifactState, artifactOverview } = useAppRouteContext();
 
-  if (isLoading || isFinalRobustnessBundleLoading) {
+  if (artifactState.status !== "ready" || artifactOverview === null) {
+    return <ArtifactStatePanel area="Runs" state={artifactState} />;
+  }
+
+  const readyOverview = artifactOverview;
+
+  if (readyOverview.runs.count === 0) {
     return (
       <section className="space-y-4">
         <Badge tone="accent">Runs</Badge>
-        <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-          Loading run-level drillthrough.
-        </h2>
-      </section>
-    );
-  }
-
-  if (error || finalRobustnessBundleError || index === null || finalRobustnessBundle === null) {
-    return (
-      <section className="space-y-4">
-        <Badge tone="default">Runs</Badge>
-        <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-          The run explorer could not load its saved evidence.
-        </h2>
-        <Card className="bg-background/60">
-          <CardContent className="px-6 py-6 font-mono text-sm text-foreground">
-            {finalRobustnessBundleError ?? error ?? "Missing saved run payload."}
+        <Card>
+          <CardHeader>
+            <CardTitle>No saved runs are available yet.</CardTitle>
+            <CardDescription>
+              The shell is reading the right artifact root, but there are no
+              `runs/&lt;run_id&gt;` directories to index yet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p className="font-mono text-foreground">{readyOverview.source.runsPath}</p>
+            <p>
+              Generate a run with `failure-lab demo` or `failure-lab run`. Phase 58
+              will replace this placeholder with the full sortable inventory.
+            </p>
           </CardContent>
         </Card>
       </section>
     );
   }
 
-  const lanes = buildRunLaneModels(index, finalRobustnessBundle, includeExploratory);
-  const fallbackRunId = lanes[0]?.seedGroups[0]?.runs[0]?.runId ?? null;
-  const activeRunId = selectedRunId ?? fallbackRunId;
-  const detail = buildRunDetailModel(index, finalRobustnessBundle, activeRunId);
-
   return (
-    <section className="space-y-8">
-      <WorkbenchHeader
-        meta={
-          <>
-            <Badge tone="accent">Runs</Badge>
-            {activeRunId ? <Badge tone="default">Focused run: {activeRunId}</Badge> : null}
-          </>
-        }
-        title="Grouped runs by method lane, then by seed."
-        description="Start with method families, move into individual saved runs, then read the selected lineage, summary, and artifact stack without losing the official-versus-exploratory boundary."
-        aside={
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
-                Active run
-              </p>
-              <p className="mt-1 break-all text-foreground">
-                {activeRunId ?? "No selected run"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
-                Scope
-              </p>
-              <p className="mt-1 text-foreground">
-                {includeExploratory ? "Official + exploratory" : "Official only"}
-              </p>
-            </div>
-          </div>
-        }
-      />
-
-      <ScopeStateBanner
-        includeExploratory={includeExploratory}
-        onChange={setIncludeExploratory}
-      />
-
-      <WorkbenchSection
-        eyebrow="Run workspace"
-        title="Lane inventory"
-        description="Scan the saved run families first, then open the balanced lineage → summary → artifacts panel for the currently selected run."
-      >
-        <div className="space-y-6">
-          {lanes.map((lane) => (
-            <RunGroupSection
-              key={lane.laneKey}
-              lane={lane}
-              activeRunId={activeRunId}
-              onSelectRun={setSelectedRunId}
-            />
-          ))}
+    <section className="space-y-6">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge tone="accent">Runs</Badge>
+          <Badge tone="muted">{readyOverview.runs.count} detected</Badge>
         </div>
-      </WorkbenchSection>
+        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+          Saved runs are now the home route.
+        </h1>
+        <p className="max-w-3xl text-base leading-7 text-muted-foreground">
+          Phase 57 cuts the mounted app over to the real engine artifact root.
+          The detailed sortable inventory lands in Phase 58, but this shell is
+          already reading saved run directories instead of the old manifest copy.
+        </p>
+      </div>
 
-      {detail ? (
-        <RunDetailPanel
-          detail={detail}
-          onOpenDrawer={() => openEvidenceDrawer(detail.runId)}
-        />
-      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle>Active run source</CardTitle>
+          <CardDescription>
+            The shell is indexing deterministic `run.json` and `results.json`
+            artifacts from the local engine root.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="font-mono text-sm text-foreground">{readyOverview.source.runsPath}</p>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Detected run ids
+            </p>
+            <ul className="space-y-2">
+              {readyOverview.runs.ids.slice(0, 6).map((runId) => (
+                <li key={runId} className="font-mono text-sm text-foreground">
+                  {runId}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
     </section>
   );
 }
