@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from model_failure_lab.adapters import (
+    DemoAdapter,
     ModelMetadata,
     ModelRequest,
     ModelResult,
@@ -56,6 +57,39 @@ def test_register_model_resolves_named_adapter() -> None:
     assert result.metadata is not None
     assert result.metadata.usage is not None
     assert result.metadata.usage.total_tokens == 7
+
+
+def test_demo_adapter_is_registered_by_default() -> None:
+    adapter = resolve_model("demo")
+
+    assert isinstance(adapter, DemoAdapter)
+
+
+def test_demo_adapter_returns_deterministic_results_for_repeat_inputs() -> None:
+    adapter = resolve_model("demo")
+    request = ModelRequest(
+        model="demo-model",
+        prompt="Explain why the answer is 42.",
+        seed=13,
+        options={"temperature": 0},
+    )
+
+    first = adapter.generate(request)
+    second = adapter.generate(request)
+
+    assert first == second
+    assert first.metadata is not None
+    assert first.metadata.model == "demo-model"
+    assert first.metadata.latency_ms == 0.0
+
+
+def test_demo_adapter_changes_when_request_seed_changes() -> None:
+    adapter = resolve_model("demo")
+
+    first = adapter.generate(ModelRequest(model="demo-model", prompt="Explain 42", seed=13))
+    second = adapter.generate(ModelRequest(model="demo-model", prompt="Explain 42", seed=42))
+
+    assert first.text != second.text
 
 
 def test_resolve_model_rejects_unknown_adapter() -> None:
