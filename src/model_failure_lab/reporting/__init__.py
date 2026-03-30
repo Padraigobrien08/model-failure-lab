@@ -1,5 +1,6 @@
 """Saved-evaluation reporting helpers."""
 
+from .artifacts import build_report_details_payload, build_report_payload, write_report_artifacts
 from .bundle import (
     build_perturbation_report_metadata,
     build_report_metadata,
@@ -16,6 +17,14 @@ from .closeout import (
     build_final_gate_payload,
     load_saved_json,
     write_final_gate,
+)
+from .core import (
+    NO_FAILURE_TYPE,
+    BuiltReport,
+    CaseSummary,
+    build_run_report,
+    build_run_report_id,
+    summarize_case_executions,
 )
 from .discovery import (
     PerturbationReportCandidate,
@@ -38,6 +47,7 @@ from .figures import (
     build_worst_subgroups_figure,
     build_worst_subgroups_frame,
 )
+from .load import SavedRunArtifacts, load_saved_run_artifacts
 from .markdown import (
     render_perturbation_report_markdown,
     render_report_markdown,
@@ -80,21 +90,30 @@ from .summary import build_perturbation_report_summary, build_report_summary
 from .tables import build_comparison_table, build_subgroup_table
 
 __all__ = [
+    "BuiltReport",
+    "CaseSummary",
     "PRIMARY_METRIC",
     "PRIMARY_METRIC_LABEL",
     "DEFAULT_REOPEN_CONDITIONS",
+    "NO_FAILURE_TYPE",
     "PerturbationReportCandidate",
     "ReportCandidate",
+    "SavedRunArtifacts",
     "build_clean_vs_perturbed_figure",
     "build_perturbation_family_drop_figure",
+    "build_report_details_payload",
     "build_perturbation_report_metadata",
     "build_perturbation_report_summary",
     "build_perturbation_report_tables",
+    "build_report_payload",
     "build_robustness_report_metadata",
     "write_robustness_report_bundle",
     "build_report_metadata",
+    "build_run_report",
+    "build_run_report_id",
     "build_stability_report_metadata",
     "write_report_bundle",
+    "write_report_artifacts",
     "write_perturbation_report_bundle",
     "write_stability_report_bundle",
     "build_calibration_curve_figure",
@@ -129,6 +148,7 @@ __all__ = [
     "load_perturbation_candidates",
     "load_perturbation_report_inputs",
     "load_report_inputs",
+    "load_saved_run_artifacts",
     "load_saved_json",
     "load_saved_report_metadata",
     "load_saved_report_payload",
@@ -140,6 +160,7 @@ __all__ = [
     "render_report_markdown",
     "render_stability_report_markdown",
     "select_report_candidates",
+    "summarize_case_executions",
     "validate_perturbation_report_candidates",
     "validate_report_candidates",
     "write_final_gate",

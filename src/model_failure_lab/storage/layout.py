@@ -8,6 +8,7 @@ from pathlib import Path
 RUN_FILENAME = "run.json"
 RESULTS_FILENAME = "results.json"
 REPORT_FILENAME = "report.json"
+REPORT_DETAILS_FILENAME = "report_details.json"
 
 _INVALID_SEGMENT_PATTERN = re.compile(r"[^a-zA-Z0-9._-]+")
 
@@ -79,3 +80,9 @@ def report_directory(
 
 def report_file(report_id: str, *, root: str | Path | None = None, create: bool = False) -> Path:
     return report_directory(report_id, root=root, create=create) / REPORT_FILENAME
+
+
+def report_details_file(
+    report_id: str, *, root: str | Path | None = None, create: bool = False
+) -> Path:
+    return report_directory(report_id, root=root, create=create) / REPORT_DETAILS_FILENAME
