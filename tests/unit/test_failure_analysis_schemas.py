@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from model_failure_lab.schemas import PayloadValidationError, PromptCase, Report, Result, Run
+from model_failure_lab.schemas import (
+    PayloadValidationError,
+    PromptCase,
+    PromptContextExpectations,
+    PromptExpectations,
+    Report,
+    Result,
+    Run,
+)
 from model_failure_lab.storage import report_details_file
 
 
@@ -10,16 +18,38 @@ def test_prompt_case_to_payload_is_json_safe() -> None:
     case = PromptCase(
         id="reasoning_001",
         prompt="Solve the equation.",
-        expected_failure="reasoning",
         tags=("multi-step", "algebra"),
+        expectations=PromptExpectations(
+            expected_failure="reasoning",
+            reference_answer="4",
+            rubric=("show work",),
+            constraints=("do not skip steps",),
+            context=PromptContextExpectations(
+                context="Arithmetic task",
+                evidence_items=("2 + 2",),
+                required_sources=("worksheet",),
+                grounding_notes="Use only provided numbers.",
+            ),
+        ),
         metadata={"source": "demo"},
     )
 
     assert case.to_payload() == {
         "id": "reasoning_001",
         "prompt": "Solve the equation.",
-        "expected_failure": "reasoning",
         "tags": ["multi-step", "algebra"],
+        "expectations": {
+            "expected_failure": "reasoning",
+            "reference_answer": "4",
+            "rubric": ["show work"],
+            "constraints": ["do not skip steps"],
+            "context": {
+                "context": "Arithmetic task",
+                "evidence_items": ["2 + 2"],
+                "required_sources": ["worksheet"],
+                "grounding_notes": "Use only provided numbers.",
+            },
+        },
         "metadata": {"source": "demo"},
     }
 
@@ -49,6 +79,7 @@ def test_result_to_payload_includes_optional_analysis_fields() -> None:
         prompt_id="reasoning_001",
         output="The answer is 7.",
         failure_type="reasoning",
+        failure_subtype="arithmetic",
         score=0.8,
         confidence=0.6,
         explanation="Arithmetic step skipped.",
@@ -59,6 +90,7 @@ def test_result_to_payload_includes_optional_analysis_fields() -> None:
         "prompt_id": "reasoning_001",
         "output": "The answer is 7.",
         "failure_type": "reasoning",
+        "failure_subtype": "arithmetic",
         "score": 0.8,
         "confidence": 0.6,
         "explanation": "Arithmetic step skipped.",
@@ -118,12 +150,75 @@ def test_prompt_case_from_payload_round_trips() -> None:
     payload = {
         "id": "reasoning_001",
         "prompt": "Solve the equation.",
-        "expected_failure": "reasoning",
         "tags": ["multi-step", "algebra"],
+        "expectations": {
+            "expected_failure": "reasoning",
+            "reference_answer": "4",
+            "rubric": ["show work"],
+            "constraints": ["do not skip steps"],
+            "context": {
+                "context": "Arithmetic task",
+                "evidence_items": ["2 + 2"],
+                "required_sources": ["worksheet"],
+                "grounding_notes": "Use only provided numbers.",
+            },
+        },
         "metadata": {"source": "demo"},
     }
 
     assert PromptCase.from_payload(payload).to_payload() == payload
+
+
+def test_prompt_case_from_payload_normalizes_legacy_expectation_fields() -> None:
+    payload = {
+        "id": "reasoning_001",
+        "prompt": "Solve the equation.",
+        "expected_failure": "reasoning",
+        "tags": ["multi-step", "algebra"],
+        "metadata": {
+            "reference_answer": "4",
+            "rubric": ["show work"],
+            "constraints": ["do not skip steps"],
+            "source": "legacy-demo",
+        },
+    }
+
+    assert PromptCase.from_payload(payload).to_payload() == {
+        "id": "reasoning_001",
+        "prompt": "Solve the equation.",
+        "tags": ["multi-step", "algebra"],
+        "expectations": {
+            "expected_failure": "reasoning",
+            "reference_answer": "4",
+            "rubric": ["show work"],
+            "constraints": ["do not skip steps"],
+        },
+        "metadata": {"source": "legacy-demo"},
+    }
+
+
+def test_prompt_case_normalizes_legacy_taxonomy_labels_in_expectations() -> None:
+    case = PromptCase.from_payload(
+        {
+            "id": "reasoning_002",
+            "prompt": "Follow both steps.",
+            "expectations": {
+                "expected_failure": "instruction",
+                "constraints": ["step 1", "step 2"],
+            },
+        }
+    )
+
+    assert case.to_payload() == {
+        "id": "reasoning_002",
+        "prompt": "Follow both steps.",
+        "tags": [],
+        "expectations": {
+            "expected_failure": "instruction_following",
+            "constraints": ["step 1", "step 2"],
+        },
+        "metadata": {},
+    }
 
 
 def test_run_from_payload_round_trips() -> None:
@@ -144,6 +239,7 @@ def test_result_from_payload_round_trips() -> None:
         "prompt_id": "reasoning_001",
         "output": "The answer is 7.",
         "failure_type": "reasoning",
+        "failure_subtype": "arithmetic",
         "score": 0.8,
         "confidence": 0.6,
         "explanation": "Arithmetic step skipped.",

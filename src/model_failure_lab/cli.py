@@ -7,7 +7,14 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
-from model_failure_lab.datasets import load_dataset, load_demo_dataset
+from model_failure_lab.datasets import (
+    available_bundled_dataset_ids,
+    available_bundled_datasets,
+    has_bundled_dataset,
+    load_bundled_dataset,
+    load_dataset,
+    load_demo_dataset,
+)
 from model_failure_lab.runner.artifacts import write_run_artifacts
 from model_failure_lab.runner.execute import DatasetRunExecution, execute_dataset_run
 from model_failure_lab.schemas import Run
@@ -89,6 +96,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Override the dataset/run/report root for this invocation.",
     )
+    run_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="For bundled datasets, include the extended tail instead of the default core slice.",
+    )
     run_parser.set_defaults(handler=_handle_run)
 
     report_parser = subparsers.add_parser(
@@ -138,20 +150,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     demo_parser.set_defaults(handler=_handle_demo)
 
+    datasets_parser = subparsers.add_parser(
+        "datasets",
+        help="Inspect bundled datasets available by canonical ID.",
+    )
+    datasets_subparsers = datasets_parser.add_subparsers(dest="datasets_command")
+
+    datasets_list_parser = datasets_subparsers.add_parser(
+        "list",
+        help="List bundled datasets available by canonical ID.",
+    )
+    datasets_list_parser.set_defaults(handler=_handle_datasets_list)
+
     return parser
 
 
 def _handle_run(args: argparse.Namespace) -> int:
     root = _normalized_root(args.root)
-    dataset_path = _resolve_dataset_reference(args.dataset, root=root)
-    dataset = load_dataset(dataset_path)
+    dataset, dataset_source = _load_dataset_reference(
+        args.dataset,
+        root=root,
+        include_full=args.full,
+    )
     adapter_id, model_name = _resolve_model_target(args.model)
+    run_config = _build_run_config(dataset_source=dataset_source, include_full=args.full)
     execution = execute_dataset_run(
         dataset=dataset,
         adapter_id=adapter_id,
         classifier_id=args.classifier,
         model=model_name,
         run_seed=DEFAULT_RUN_SEED,
+        run_config=run_config,
     )
     run_path, results_path = write_run_artifacts(execution, root=root)
     print(_render_run_summary(execution, dataset, run_path, results_path))
@@ -167,7 +196,15 @@ def _handle_report(args: argparse.Namespace) -> int:
         built.details,
         root=root,
     )
-    print(_render_report_summary(saved_run, built.report, report_path, details_path))
+    print(
+        _render_report_summary(
+            saved_run,
+            built.report,
+            built.details,
+            report_path,
+            details_path,
+        )
+    )
     return 0
 
 
@@ -181,7 +218,7 @@ def _handle_compare(args: argparse.Namespace) -> int:
         built.details,
         root=root,
     )
-    print(_render_compare_summary(built.report, report_path, details_path))
+    print(_render_compare_summary(built.report, built.details, report_path, details_path))
     return 0
 
 
@@ -218,21 +255,53 @@ def _handle_demo(args: argparse.Namespace) -> int:
     return 0
 
 
-def _resolve_dataset_reference(reference: str, *, root: Path | None) -> Path:
+def _handle_datasets_list(args: argparse.Namespace) -> int:
+    del args
+    print(_render_bundled_dataset_list())
+    return 0
+
+
+def _load_dataset_reference(
+    reference: str,
+    *,
+    root: Path | None,
+    include_full: bool,
+) -> tuple[FailureDataset, str]:
     source = Path(reference)
     if source.exists():
         if source.is_dir():
             raise FileNotFoundError(
                 f"dataset reference is a directory, expected JSON file: {source}"
             )
-        return source
+        return load_dataset(source), "path"
 
     candidate = dataset_file(reference, root=root)
     if candidate.exists():
-        return candidate
+        return load_dataset(candidate), "root"
+    if has_bundled_dataset(reference):
+        return (
+            load_bundled_dataset(reference, include_extended=include_full),
+            "bundled",
+        )
+
+    bundled_ids = available_bundled_dataset_ids()
+    bundled_hint = ""
+    if bundled_ids:
+        bundled_hint = f" Bundled IDs: {', '.join(bundled_ids)}."
     raise FileNotFoundError(
-        f"dataset not found: {reference}. Use a valid path or dataset ID under the active root."
+        "dataset not found: "
+        f"{reference}. Use a valid path, dataset ID under the active root, or a bundled dataset ID."
+        f"{bundled_hint}"
     )
+
+
+def _build_run_config(*, dataset_source: str, include_full: bool) -> dict[str, object]:
+    if dataset_source != "bundled":
+        return {}
+    return {
+        "dataset_source": "bundled",
+        "dataset_scope": "full" if include_full else "core",
+    }
 
 
 def _load_saved_run_reference(reference: str, *, root: Path | None) -> SavedRunArtifacts:
@@ -296,6 +365,51 @@ def _write_dataset_snapshot(dataset: FailureDataset, *, root: Path | None) -> Pa
     return dataset_path
 
 
+def _render_bundled_dataset_list() -> str:
+    summaries = available_bundled_datasets()
+    if not summaries:
+        return "Failure Lab Datasets\nNo bundled datasets registered."
+
+    rows = [
+        (
+            "id",
+            "name",
+            "target",
+            "scope",
+            "core",
+            "full",
+            "description",
+        )
+    ]
+    for summary in summaries:
+        rows.append(
+            (
+                summary.dataset_id,
+                _truncate(summary.name, 24),
+                summary.target_failure_type,
+                summary.default_scope,
+                str(summary.core_case_count),
+                str(summary.full_case_count),
+                _truncate(summary.description, 68),
+            )
+        )
+
+    widths = [max(len(row[index]) for row in rows) for index in range(len(rows[0]))]
+    rendered_rows = []
+    for index, row in enumerate(rows):
+        rendered_row = "  ".join(
+            value.ljust(widths[column_index])
+            for column_index, value in enumerate(row)
+        ).rstrip()
+        rendered_rows.append(rendered_row)
+        if index == 0:
+            rendered_rows.append(
+                "  ".join("-" * widths[column_index] for column_index in range(len(widths)))
+            )
+
+    return "\n".join(["Failure Lab Datasets", *rendered_rows])
+
+
 def _build_run_report(saved_run: SavedRunArtifacts):
     from model_failure_lab.reporting.core import build_run_report
 
@@ -354,6 +468,9 @@ def _render_run_summary(
         f"- {run_path}",
         f"- {results_path}",
     ]
+    dataset_scope = execution.run.config.get("dataset_scope")
+    if isinstance(dataset_scope, str):
+        lines.insert(6, f"Dataset scope: {dataset_scope}")
     if execution.status == "completed_with_errors":
         lines.append("Warning: run completed with per-case errors.")
     return "\n".join(lines)
@@ -362,6 +479,7 @@ def _render_run_summary(
 def _render_report_summary(
     saved_run: SavedRunArtifacts,
     report,
+    details: dict[str, object],
     report_path: Path,
     details_path: Path,
 ) -> str:
@@ -380,10 +498,20 @@ def _render_report_summary(
         ),
         f"Failure rate: {_format_rate(metrics.get('failure_rate'))}",
         f"Classification coverage: {_format_rate(metrics.get('classification_coverage'))}",
-        "Artifacts:",
-        f"- {report_path}",
-        f"- {details_path}",
     ]
+    failure_summary = _render_failure_type_summary(report.failure_counts, report.failure_rates)
+    if failure_summary is not None:
+        lines.append(f"Failure types: {failure_summary}")
+    verdict_summary = _render_verdict_summary(details)
+    if verdict_summary is not None:
+        lines.append(f"Verdicts: {verdict_summary}")
+    lines.extend(
+        [
+            "Artifacts:",
+            f"- {report_path}",
+            f"- {details_path}",
+        ]
+    )
     if saved_run.status == "completed_with_errors":
         lines.append("Warning: source run completed with per-case errors.")
     return "\n".join(lines)
@@ -427,7 +555,12 @@ def _render_demo_summary(
     return "\n".join(lines)
 
 
-def _render_compare_summary(report, report_path: Path, details_path: Path) -> str:
+def _render_compare_summary(
+    report,
+    details: dict[str, object],
+    report_path: Path,
+    details_path: Path,
+) -> str:
     comparison = report.comparison
     delta = report.metrics.get("delta", {})
     lines = [
@@ -445,13 +578,69 @@ def _render_compare_summary(report, report_path: Path, details_path: Path) -> st
         ),
         f"Failure rate delta: {_format_signed_rate(delta.get('failure_rate'))}",
         f"Coverage delta: {_format_signed_rate(delta.get('classification_coverage'))}",
-        "Artifacts:",
-        f"- {report_path}",
-        f"- {details_path}",
     ]
+    transition_summary = _render_transition_summary(details)
+    if transition_summary is not None:
+        lines.append(f"Case changes: {transition_summary}")
+    lines.extend(
+        [
+            "Artifacts:",
+            f"- {report_path}",
+            f"- {details_path}",
+        ]
+    )
     if comparison.get("compatible") is False:
         lines.append("Warning: comparison is incompatible, but artifacts were still written.")
     return "\n".join(lines)
+
+
+def _render_failure_type_summary(
+    failure_counts: dict[str, int],
+    failure_rates: dict[str, float],
+) -> str | None:
+    if not failure_counts:
+        return None
+    return ", ".join(
+        f"{failure_type}={_format_rate(failure_rates.get(failure_type))} ({count})"
+        for failure_type, count in sorted(
+            failure_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:3]
+    )
+
+
+def _render_verdict_summary(details: dict[str, object]) -> str | None:
+    raw_counts = details.get("expectation_verdict_counts")
+    if not isinstance(raw_counts, dict):
+        return None
+    parts: list[str] = []
+    for verdict in ("unexpected_failure", "missed_expected"):
+        count = raw_counts.get(verdict)
+        if type(count) is int and count > 0:
+            parts.append(f"{verdict}={count}")
+    if not parts:
+        return None
+    return ", ".join(parts)
+
+
+def _render_transition_summary(details: dict[str, object]) -> str | None:
+    raw_counts = details.get("case_transition_counts")
+    if not isinstance(raw_counts, dict):
+        return None
+    ordered_keys = (
+        ("improvements", "improvements"),
+        ("regressions", "regressions"),
+        ("failure_type_swaps", "swaps"),
+        ("error_changes", "error_changes"),
+    )
+    parts: list[str] = []
+    for key, label in ordered_keys:
+        count = raw_counts.get(key)
+        if type(count) is int and count > 0:
+            parts.append(f"{label}={count}")
+    if not parts:
+        return None
+    return ", ".join(parts)
 
 
 def _format_rate(value: object) -> str:
@@ -465,6 +654,13 @@ def _format_signed_rate(value: object) -> str:
         sign = "+" if float(value) > 0 else ""
         return f"{sign}{float(value) * 100:.1f}%"
     return "n/a"
+
+
+def _truncate(value: str, limit: int) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[: limit - 1].rstrip()}…"
 
 
 if __name__ == "__main__":

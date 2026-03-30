@@ -4,8 +4,14 @@ import json
 
 import pytest
 
-from model_failure_lab.datasets import FailureDataset, load_dataset, parse_dataset_payload
-from model_failure_lab.schemas import PayloadValidationError, PromptCase
+from model_failure_lab.datasets import (
+    FailureDataset,
+    available_bundled_dataset_ids,
+    load_bundled_dataset,
+    load_dataset,
+    parse_dataset_payload,
+)
+from model_failure_lab.schemas import PayloadValidationError, PromptCase, PromptExpectations
 
 
 def test_parse_dataset_payload_accepts_envelope_shape() -> None:
@@ -19,7 +25,7 @@ def test_parse_dataset_payload_accepts_envelope_shape() -> None:
                 {
                     "id": "case-001",
                     "prompt": "Explain why 2 + 2 = 4.",
-                    "expected_failure": "reasoning",
+                    "expectations": {"expected_failure": "reasoning"},
                 }
             ],
         }
@@ -34,7 +40,7 @@ def test_parse_dataset_payload_accepts_envelope_shape() -> None:
             PromptCase(
                 id="case-001",
                 prompt="Explain why 2 + 2 = 4.",
-                expected_failure="reasoning",
+                expectations=PromptExpectations(expected_failure="reasoning"),
             ),
         ),
     )
@@ -66,6 +72,7 @@ def test_load_dataset_reads_json_file_into_normalized_contract(tmp_path) -> None
                     {
                         "id": "case-001",
                         "prompt": "Compute the answer.",
+                        "expected_failure": "reasoning",
                         "metadata": {"reference_answer": "42"},
                     }
                 ],
@@ -77,7 +84,11 @@ def test_load_dataset_reads_json_file_into_normalized_contract(tmp_path) -> None
     dataset = load_dataset(dataset_path)
 
     assert dataset.dataset_id == "reasoning-set"
-    assert dataset.cases[0].metadata == {"reference_answer": "42"}
+    assert dataset.cases[0].expectations == PromptExpectations(
+        expected_failure="reasoning",
+        reference_answer="42",
+    )
+    assert dataset.cases[0].metadata == {}
 
 
 def test_parse_dataset_payload_rejects_invalid_root_shape() -> None:
@@ -88,3 +99,24 @@ def test_parse_dataset_payload_rejects_invalid_root_shape() -> None:
 def test_parse_dataset_payload_rejects_envelope_without_cases() -> None:
     with pytest.raises(PayloadValidationError, match="dataset envelope must contain cases"):
         parse_dataset_payload({"dataset_id": "broken"})
+
+
+def test_available_bundled_dataset_ids_exposes_reasoning_pack() -> None:
+    bundled_ids = available_bundled_dataset_ids()
+
+    assert "reasoning-failures-v1" in bundled_ids
+    assert "hallucination-failures-v1" in bundled_ids
+    assert "rag-failures-v1" in bundled_ids
+
+
+def test_load_bundled_dataset_defaults_to_core_cases_only() -> None:
+    dataset = load_bundled_dataset("reasoning-failures-v1")
+
+    assert dataset.dataset_id == "reasoning-failures-v1"
+    assert len(dataset.cases) == 8
+    assert all("core" in case.tags for case in dataset.cases)
+    assert sum(
+        1
+        for case in dataset.cases
+        if case.expectations and case.expectations.expected_failure == "no_failure"
+    ) == 2

@@ -8,13 +8,19 @@ from model_failure_lab.runner import (
     CaseClassification,
     CaseError,
     CaseExecution,
+    CaseExpectationAssessment,
     CaseOutput,
     ExecutionMetadata,
     PromptSnapshot,
     build_run_id,
     derive_case_seed,
 )
-from model_failure_lab.schemas import PromptCase
+from model_failure_lab.schemas import (
+    FailureLabel,
+    PromptCase,
+    PromptContextExpectations,
+    PromptExpectations,
+)
 
 
 def test_derive_case_seed_is_stable_and_order_independent() -> None:
@@ -98,25 +104,43 @@ def test_prompt_snapshot_extracts_authored_expectations_from_prompt_case() -> No
         PromptCase(
             id="case-001",
             prompt="What is the answer?",
-            expected_failure="reasoning",
-            metadata={
-                "reference_answer": "42",
-                "rubric": ["show reasoning"],
-                "constraints": ["be concise"],
-            },
+            tags=("core", "numerical"),
+            expectations=PromptExpectations(
+                expected_failure="reasoning",
+                reference_answer="42",
+                rubric=("show reasoning",),
+                constraints=("be concise",),
+                context=PromptContextExpectations(
+                    context="Math worksheet",
+                    evidence_items=("2 + 2",),
+                ),
+            ),
         )
     )
 
     assert snapshot == PromptSnapshot(
         id="case-001",
         prompt="What is the answer?",
-        expected_failure="reasoning",
-        expectations=ClassifierExpectations(
+        tags=("core", "numerical"),
+        expectations=PromptExpectations(
+            expected_failure="reasoning",
             reference_answer="42",
             rubric=("show reasoning",),
             constraints=("be concise",),
+            context=PromptContextExpectations(
+                context="Math worksheet",
+                evidence_items=("2 + 2",),
+            ),
         ),
     )
+    assert snapshot.to_classifier_expectations() == ClassifierExpectations(
+        reference_answer="42",
+        rubric=("show reasoning",),
+        constraints=("be concise",),
+        context="Math worksheet",
+        evidence_items=("2 + 2",),
+    )
+    assert snapshot.expected_failure_label() == FailureLabel("reasoning")
 
 
 def test_case_execution_round_trips_with_compact_sections() -> None:
@@ -140,7 +164,11 @@ def test_case_execution_round_trips_with_compact_sections() -> None:
         prompt=PromptSnapshot(
             id="case-001",
             prompt="What is the answer?",
-            expectations=ClassifierExpectations(reference_answer="42"),
+            tags=("core",),
+            expectations=PromptExpectations(
+                expected_failure="no_failure",
+                reference_answer="42",
+            ),
         ),
         execution=execution,
         output=CaseOutput.from_model_result(model_result),
@@ -154,6 +182,41 @@ def test_case_execution_round_trips_with_compact_sections() -> None:
     )
 
     assert CaseExecution.from_payload(record.to_payload()) == record
+    assert record.expectation == CaseExpectationAssessment(
+        expected_failure=FailureLabel("no_failure"),
+        observed_failure=FailureLabel("no_failure"),
+        expectation_verdict="no_failure_as_expected",
+    )
+
+
+def test_case_execution_derives_expectation_verdicts_directionally() -> None:
+    record = CaseExecution(
+        case_id="case-001",
+        prompt=PromptSnapshot(
+            id="case-001",
+            prompt="What is the answer?",
+            tags=("core",),
+            expectations=PromptExpectations(expected_failure="reasoning"),
+        ),
+        execution=ExecutionMetadata(
+            adapter_id="demo",
+            model="demo-model",
+            classifier_id="heuristic_v1",
+            run_seed=13,
+            case_seed=99,
+        ),
+        output=CaseOutput(text="According to a study, the answer is blue."),
+        classification=CaseClassification(
+            failure_type="hallucination",
+            confidence=0.6,
+        ),
+    )
+
+    assert record.expectation == CaseExpectationAssessment(
+        expected_failure=FailureLabel("reasoning"),
+        observed_failure=FailureLabel("hallucination"),
+        expectation_verdict="unexpected_failure",
+    )
 
 
 def test_case_error_from_exception_captures_stage_type_and_message() -> None:

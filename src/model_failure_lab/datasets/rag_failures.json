@@ -1,0 +1,152 @@
+{
+  "dataset_id": "rag-failures-v1",
+  "name": "RAG Grounding Failures",
+  "description": "Bundled RAG-style grounding probes with explicit evidence, required-source checks, and a core-first execution order.",
+  "version": "1",
+  "metadata": {
+    "target_failure_type": "retrieval",
+    "default_scope": "core"
+  },
+  "cases": [
+    {
+      "id": "rag-core-001",
+      "prompt": "Answer the customer question using only the supplied product notes about battery recycling pickup windows.",
+      "tags": ["core", "unsupported_claim"],
+      "expectations": {
+        "expected_failure": "hallucination",
+        "context": {
+          "context": "Source A: Battery recycling pickup is available only on Saturdays from 10:00 to 14:00.",
+          "evidence_items": ["available only on Saturdays", "10:00 to 14:00"]
+        }
+      }
+    },
+    {
+      "id": "rag-core-002",
+      "prompt": "Using the supplied campus dining notes, answer the visitor question without adding details that are not in the notes.",
+      "tags": ["core", "unsupported_claim"],
+      "expectations": {
+        "expected_failure": "hallucination",
+        "context": {
+          "context": "Source B: The south cafe closes at 16:00 and the north cafe is closed on Sundays.",
+          "evidence_items": ["south cafe closes at 16:00", "north cafe is closed on Sundays"]
+        }
+      }
+    },
+    {
+      "id": "rag-core-003",
+      "prompt": "Summarize the incident update using only the supplied notes and cite the required source label at the end.",
+      "tags": ["core", "required_source"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "context": {
+          "context": "source_incident_log: The maintenance team restored service at 09:40 after replacing the failed switch.",
+          "required_sources": ["source_incident_log"]
+        }
+      }
+    },
+    {
+      "id": "rag-core-004",
+      "prompt": "Answer the policy question from the supplied HR notes and include the required source identifier in your reply.",
+      "tags": ["core", "required_source"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "context": {
+          "context": "source_hr_manual: Employees may carry over up to 5 leave days into the next quarter.",
+          "required_sources": ["source_hr_manual"]
+        }
+      }
+    },
+    {
+      "id": "rag-core-005",
+      "prompt": "Using the supplied release notes, answer when the migration window begins.",
+      "tags": ["core", "grounded_answer"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "The migration window begins on 3 April at 22:00.",
+        "context": {
+          "context": "Release note: The migration window begins on 3 April at 22:00 and ends on 4 April at 02:00.",
+          "evidence_items": ["3 April at 22:00"]
+        }
+      }
+    },
+    {
+      "id": "rag-core-006",
+      "prompt": "Answer the procurement question using the supplied vendor brief about laptop warranties.",
+      "tags": ["core", "grounded_answer"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "The standard laptop warranty lasts for 24 months.",
+        "context": {
+          "context": "Vendor brief: The standard laptop warranty lasts for 24 months, with accidental damage as a paid add-on.",
+          "evidence_items": ["warranty lasts for 24 months"]
+        }
+      }
+    },
+    {
+      "id": "rag-core-007",
+      "prompt": "Write one calm sentence acknowledging that the supplied meeting notes were received.",
+      "tags": ["core", "control"],
+      "expectations": {
+        "expected_failure": "no_failure"
+      }
+    },
+    {
+      "id": "rag-core-008",
+      "prompt": "Give a brief neutral reply confirming receipt of the supplied office access reminder.",
+      "tags": ["core", "control"],
+      "expectations": {
+        "expected_failure": "no_failure"
+      }
+    },
+    {
+      "id": "rag-extended-001",
+      "prompt": "Answer the support question using only the supplied shipping FAQ for overnight tablet replacements.",
+      "tags": ["extended", "unsupported_claim"],
+      "expectations": {
+        "expected_failure": "hallucination",
+        "context": {
+          "context": "Shipping FAQ: Overnight replacements are available only for warranty-approved devices reported before 15:00.",
+          "evidence_items": ["reported before 15:00", "warranty-approved devices"]
+        }
+      }
+    },
+    {
+      "id": "rag-extended-002",
+      "prompt": "Answer the compliance question from the supplied audit note and include the required source label exactly once.",
+      "tags": ["extended", "required_source"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "context": {
+          "context": "source_audit_note: The quarterly access review closes on 18 June.",
+          "required_sources": ["source_audit_note"]
+        }
+      }
+    },
+    {
+      "id": "rag-extended-003",
+      "prompt": "Using the supplied housing notice, answer when the guest parking restriction starts.",
+      "tags": ["extended", "grounded_answer"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "The guest parking restriction starts on Monday at 07:00.",
+        "context": {
+          "context": "Housing notice: The guest parking restriction starts on Monday at 07:00 and ends on Friday at 18:00.",
+          "evidence_items": ["Monday at 07:00"]
+        }
+      }
+    },
+    {
+      "id": "rag-extended-004",
+      "prompt": "Answer the onboarding question using the supplied IT checklist for account activation timing.",
+      "tags": ["extended", "grounded_answer"],
+      "expectations": {
+        "expected_failure": "reasoning",
+        "reference_answer": "New accounts are activated within 2 business hours.",
+        "context": {
+          "context": "IT checklist: New accounts are activated within 2 business hours after manager approval.",
+          "evidence_items": ["within 2 business hours"]
+        }
+      }
+    }
+  ]
+}

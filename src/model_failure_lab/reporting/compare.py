@@ -3,12 +3,30 @@
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 from datetime import datetime, timezone
 
-from model_failure_lab.schemas import JsonValue, Report
+from model_failure_lab.schemas import NO_FAILURE_TYPE, JsonValue, Report
 
 from .core import BuiltReport, summarize_case_executions
 from .load import SavedRunArtifacts
+
+TRANSITION_LABELS = {
+    "failure_to_no_failure": "failure -> no_failure",
+    "no_failure_to_failure": "no_failure -> failure",
+    "failure_type_swap": "failure type swap",
+    "error_cleared": "error cleared",
+    "new_error": "new error",
+    "error_stage_changed": "error stage changed",
+}
+TRANSITION_ORDER = (
+    "failure_to_no_failure",
+    "no_failure_to_failure",
+    "failure_type_swap",
+    "error_cleared",
+    "new_error",
+    "error_stage_changed",
+)
 
 
 def build_comparison_report(
@@ -68,6 +86,9 @@ def build_comparison_report(
             "candidate_full_metrics": candidate_full.metrics_payload(),
             "baseline_case_ids": list(baseline.case_ids),
             "candidate_case_ids": list(candidate.case_ids),
+            "case_transition_counts": {},
+            "case_transition_summary": [],
+            "case_deltas": [],
         }
         return BuiltReport(report=report, details=details)
 
@@ -134,6 +155,7 @@ def build_comparison_report(
             "detail_artifact": "report_details.json",
         },
     )
+    case_deltas = _case_deltas(shared_case_ids, baseline_map, candidate_map)
     details: dict[str, JsonValue] = {
         "report_id": report_id,
         "report_kind": "comparison",
@@ -150,7 +172,9 @@ def build_comparison_report(
         "candidate_failure_breakdown": list(candidate_shared.failure_breakdown),
         "failure_count_deltas": dict(failure_count_deltas),
         "failure_rate_deltas": dict(failure_rate_deltas),
-        "case_deltas": _case_deltas(shared_case_ids, baseline_map, candidate_map),
+        "case_transition_counts": _case_transition_counts(case_deltas),
+        "case_transition_summary": _case_transition_summary(case_deltas),
+        "case_deltas": case_deltas,
     }
     return BuiltReport(report=report, details=details)
 
@@ -221,22 +245,129 @@ def _case_deltas(
         )
         if not changed:
             continue
+        transition_type = _transition_type(
+            baseline_failure_type=baseline_failure_type,
+            candidate_failure_type=candidate_failure_type,
+            baseline_error_stage=baseline_error_stage,
+            candidate_error_stage=candidate_error_stage,
+        )
         rows.append(
             {
                 "case_id": case_id,
+                "prompt": _prompt_text(baseline_case),
+                "tags": _tags(baseline_case),
+                "transition_type": transition_type,
+                "transition_label": TRANSITION_LABELS[transition_type],
                 "baseline_failure_type": baseline_failure_type,
                 "candidate_failure_type": candidate_failure_type,
+                "baseline_expectation_verdict": _expectation_verdict(baseline_case),
+                "candidate_expectation_verdict": _expectation_verdict(candidate_case),
                 "baseline_error_stage": baseline_error_stage,
                 "candidate_error_stage": candidate_error_stage,
+                "baseline_explanation": _explanation(baseline_case),
+                "candidate_explanation": _explanation(candidate_case),
                 "changed": True,
             }
         )
     return rows
 
 
+def _case_transition_counts(case_deltas: list[dict[str, JsonValue]]) -> dict[str, int]:
+    transition_counts = Counter(
+        str(row["transition_type"])
+        for row in case_deltas
+        if isinstance(row.get("transition_type"), str)
+    )
+    return {
+        "improvements": transition_counts["failure_to_no_failure"],
+        "regressions": transition_counts["no_failure_to_failure"],
+        "failure_type_swaps": transition_counts["failure_type_swap"],
+        "error_changes": (
+            transition_counts["error_cleared"]
+            + transition_counts["new_error"]
+            + transition_counts["error_stage_changed"]
+        ),
+    }
+
+
+def _case_transition_summary(
+    case_deltas: list[dict[str, JsonValue]],
+) -> list[dict[str, JsonValue]]:
+    rows_by_transition: dict[str, list[dict[str, JsonValue]]] = {}
+    for row in case_deltas:
+        transition_type = row.get("transition_type")
+        if isinstance(transition_type, str):
+            rows_by_transition.setdefault(transition_type, []).append(row)
+
+    summary: list[dict[str, JsonValue]] = []
+    for transition_type in TRANSITION_ORDER:
+        rows = rows_by_transition.get(transition_type, [])
+        if not rows:
+            continue
+        summary.append(
+            {
+                "transition_type": transition_type,
+                "label": TRANSITION_LABELS[transition_type],
+                "count": len(rows),
+                "case_ids": [str(row["case_id"]) for row in rows],
+            }
+        )
+    return summary
+
+
+def _transition_type(
+    *,
+    baseline_failure_type: str | None,
+    candidate_failure_type: str | None,
+    baseline_error_stage: str | None,
+    candidate_error_stage: str | None,
+) -> str:
+    if baseline_error_stage != candidate_error_stage:
+        if baseline_error_stage is not None and candidate_error_stage is None:
+            return "error_cleared"
+        if baseline_error_stage is None and candidate_error_stage is not None:
+            return "new_error"
+        return "error_stage_changed"
+
+    if (
+        baseline_failure_type is not None
+        and baseline_failure_type != NO_FAILURE_TYPE
+        and candidate_failure_type == NO_FAILURE_TYPE
+    ):
+        return "failure_to_no_failure"
+    if (
+        baseline_failure_type == NO_FAILURE_TYPE
+        and candidate_failure_type is not None
+        and candidate_failure_type != NO_FAILURE_TYPE
+    ):
+        return "no_failure_to_failure"
+    return "failure_type_swap"
+
+
 def _failure_type(case: object) -> str | None:
     classification = getattr(case, "classification", None)
     return getattr(classification, "failure_type", None)
+
+
+def _explanation(case: object) -> str | None:
+    classification = getattr(case, "classification", None)
+    return getattr(classification, "explanation", None)
+
+
+def _expectation_verdict(case: object) -> str | None:
+    expectation = getattr(case, "expectation", None)
+    return getattr(expectation, "expectation_verdict", None)
+
+
+def _prompt_text(case: object) -> str | None:
+    prompt = getattr(case, "prompt", None)
+    return getattr(prompt, "prompt", None)
+
+
+def _tags(case: object) -> list[str]:
+    prompt = getattr(case, "prompt", None)
+    tags = getattr(prompt, "tags", ())
+    return [str(tag) for tag in tags]
 
 
 def _error_stage(case: object) -> str | None:
