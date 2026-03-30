@@ -6,6 +6,7 @@ import react from "@vitejs/plugin-react";
 
 const ARTIFACT_OVERVIEW_PATH = "/__failure_lab__/artifacts/overview.json";
 const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
+const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
 const REPORT_FILENAME = "report.json";
@@ -29,6 +30,93 @@ type RunInventoryRow = {
   model: string;
   created_at: string;
   status: string;
+};
+
+type FailureLabelPayload = {
+  failureType: string;
+  failureSubtype: string | null;
+};
+
+type RunDetailSummaryRowPayload = {
+  label: string;
+  count: number;
+  share: number | null;
+  caseIds: string[];
+};
+
+type RunTagSlicePayload = {
+  tag: string;
+  attemptedCaseCount: number;
+  classifiedCaseCount: number;
+  failureCaseCount: number;
+  failureRate: number | null;
+  expectationVerdictCounts: Record<string, number>;
+};
+
+type RunCasePayload = {
+  caseId: string;
+  promptId: string;
+  prompt: string;
+  tags: string[];
+  outputText: string | null;
+  expectation: {
+    expectedFailure: FailureLabelPayload | null;
+    observedFailure: FailureLabelPayload | null;
+    verdict: string | null;
+  };
+  classification: {
+    failure: FailureLabelPayload;
+    confidence: number | null;
+    explanation: string | null;
+  } | null;
+  error: {
+    stage: string;
+    type: string;
+    message: string;
+  } | null;
+};
+
+type RunDetailPayload = {
+  source: {
+    label: string;
+    path: string;
+    runsPath: string;
+    reportsPath: string;
+  };
+  run: {
+    runId: string;
+    dataset: string;
+    model: string;
+    createdAt: string;
+    status: string;
+    reportId: string;
+    adapterId: string | null;
+    classifierId: string | null;
+    runSeed: number | null;
+  };
+  metrics: {
+    attemptedCaseCount: number;
+    classifiedCaseCount: number;
+    executionErrorCount: number;
+    unclassifiedCount: number;
+    successfulModelInvocationCount: number;
+    failureCaseCount: number;
+    failureRate: number | null;
+    classificationCoverage: number | null;
+    executionSuccessRate: number | null;
+  };
+  summary: {
+    failureTypes: RunDetailSummaryRowPayload[];
+    expectationVerdicts: RunDetailSummaryRowPayload[];
+    tagSlices: RunTagSlicePayload[];
+  };
+  lenses: {
+    mismatchCaseIds: string[];
+    notableCaseIds: string[];
+    allCaseIds: string[];
+    errorCaseIds: string[];
+  };
+  cases: RunCasePayload[];
 };
 
 function failureLabArtifactsPlugin(): Plugin {
@@ -117,6 +205,104 @@ function failureLabArtifactsPlugin(): Plugin {
     return value;
   }
 
+  function optionalStringField(
+    payload: Record<string, unknown>,
+    key: string,
+    label: string,
+  ): string | null {
+    const value = payload[key];
+    if (value == null) {
+      return null;
+    }
+    return requireStringField(payload, key, label);
+  }
+
+  function requireNumberField(
+    payload: Record<string, unknown>,
+    key: string,
+    label: string,
+  ): number {
+    const value = payload[key];
+    if (typeof value !== "number" || Number.isNaN(value)) {
+      throw new Error(`${label} must be a number`);
+    }
+    return value;
+  }
+
+  function optionalNumberField(
+    payload: Record<string, unknown>,
+    key: string,
+    label: string,
+  ): number | null {
+    const value = payload[key];
+    if (value == null) {
+      return null;
+    }
+    return requireNumberField(payload, key, label);
+  }
+
+  function requireObjectField(
+    payload: Record<string, unknown>,
+    key: string,
+    label: string,
+  ): Record<string, unknown> {
+    const value = payload[key];
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`${label} must be an object`);
+    }
+    return value as Record<string, unknown>;
+  }
+
+  function requireStringArrayField(
+    payload: Record<string, unknown>,
+    key: string,
+    label: string,
+  ): string[] {
+    const value = payload[key];
+    if (!Array.isArray(value)) {
+      throw new Error(`${label} must be an array`);
+    }
+    return value.map((entry, index) => {
+      if (typeof entry !== "string" || entry.trim().length === 0) {
+        throw new Error(`${label}[${index}] must be a non-empty string`);
+      }
+      return entry;
+    });
+  }
+
+  async function readJsonRecord(
+    filePath: string,
+    label: string,
+  ): Promise<Record<string, unknown>> {
+    const payload = JSON.parse(await fs.readFile(filePath, "utf-8")) as unknown;
+    if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new Error(`${label} must contain a JSON object`);
+    }
+    return payload as Record<string, unknown>;
+  }
+
+  function optionalFailureLabelPayload(
+    value: unknown,
+    label: string,
+  ): FailureLabelPayload | null {
+    if (value == null) {
+      return null;
+    }
+    if (typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`${label} must be an object or null`);
+    }
+
+    const payload = value as Record<string, unknown>;
+    return {
+      failureType: requireStringField(payload, "failure_type", `${label}.failure_type`),
+      failureSubtype: optionalStringField(
+        payload,
+        "failure_subtype",
+        `${label}.failure_subtype`,
+      ),
+    };
+  }
+
   function readRunStatus(
     resultsPayload: Record<string, unknown>,
     runPayload: Record<string, unknown>,
@@ -196,6 +382,452 @@ function failureLabArtifactsPlugin(): Plugin {
     });
 
     return { rows, issues };
+  }
+
+  function readRunReportStatus(
+    reportPayload: Record<string, unknown>,
+    resultsPayload: Record<string, unknown>,
+    runPayload: Record<string, unknown>,
+  ): string {
+    const status = reportPayload.status;
+    if (status !== null && typeof status === "object") {
+      const overall = (status as Record<string, unknown>).overall;
+      if (typeof overall === "string" && overall.trim().length > 0) {
+        return overall;
+      }
+    }
+
+    return readRunStatus(resultsPayload, runPayload);
+  }
+
+  function collectCaseIds(
+    rows: unknown,
+    label: string,
+  ): string[] {
+    if (!Array.isArray(rows)) {
+      throw new Error(`${label} must be an array`);
+    }
+
+    return rows.map((entry, index) => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(`${label}[${index}] must be an object`);
+      }
+      return requireStringField(
+        entry as Record<string, unknown>,
+        "case_id",
+        `${label}[${index}].case_id`,
+      );
+    });
+  }
+
+  async function collectRunDetail(
+    runId: string,
+    runsPath: string,
+    reportsPath: string,
+  ): Promise<RunDetailPayload> {
+    const runDir = path.join(runsPath, runId);
+    const reportDir = path.join(reportsPath, `${runId}_report`);
+    const runPayload = await readJsonRecord(path.join(runDir, RUN_FILENAME), `${runId}.run`);
+    const resultsPayload = await readJsonRecord(
+      path.join(runDir, RESULTS_FILENAME),
+      `${runId}.results`,
+    );
+    const reportPayload = await readJsonRecord(
+      path.join(reportDir, REPORT_FILENAME),
+      `${runId}.report`,
+    );
+    const reportDetailsPayload = await readJsonRecord(
+      path.join(reportDir, REPORT_DETAILS_FILENAME),
+      `${runId}.report_details`,
+    );
+
+    const casePayloads = resultsPayload.cases;
+    if (!Array.isArray(casePayloads)) {
+      throw new Error(`${runId}.results.cases must be an array`);
+    }
+
+    const cases: RunCasePayload[] = casePayloads.map((entry, index) => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(`${runId}.results.cases[${index}] must be an object`);
+      }
+      const payload = entry as Record<string, unknown>;
+      const prompt = requireObjectField(
+        payload,
+        "prompt",
+        `${runId}.results.cases[${index}].prompt`,
+      );
+      const expectation = requireObjectField(
+        payload,
+        "expectation",
+        `${runId}.results.cases[${index}].expectation`,
+      );
+      const outputValue = payload.output;
+      const classificationValue = payload.classification;
+      const errorValue = payload.error;
+
+      const outputText =
+        outputValue == null
+          ? null
+          : requireStringField(
+              requireObjectField(payload, "output", `${runId}.results.cases[${index}].output`),
+              "text",
+              `${runId}.results.cases[${index}].output.text`,
+            );
+
+      const classification =
+        classificationValue == null
+          ? null
+          : (() => {
+              const rawClassification = requireObjectField(
+                payload,
+                "classification",
+                `${runId}.results.cases[${index}].classification`,
+              );
+              const failure = optionalFailureLabelPayload(
+                {
+                  failure_type: rawClassification.failure_type,
+                  failure_subtype: rawClassification.failure_subtype,
+                },
+                `${runId}.results.cases[${index}].classification.failure`,
+              );
+              if (failure === null) {
+                throw new Error(
+                  `${runId}.results.cases[${index}].classification.failure must be present`,
+                );
+              }
+              return {
+                failure,
+                confidence: optionalNumberField(
+                  rawClassification,
+                  "confidence",
+                  `${runId}.results.cases[${index}].classification.confidence`,
+                ),
+                explanation: optionalStringField(
+                  rawClassification,
+                  "explanation",
+                  `${runId}.results.cases[${index}].classification.explanation`,
+                ),
+              };
+            })();
+
+      const error =
+        errorValue == null
+          ? null
+          : (() => {
+              const rawError = requireObjectField(
+                payload,
+                "error",
+                `${runId}.results.cases[${index}].error`,
+              );
+              return {
+                stage: requireStringField(
+                  rawError,
+                  "stage",
+                  `${runId}.results.cases[${index}].error.stage`,
+                ),
+                type: requireStringField(
+                  rawError,
+                  "type",
+                  `${runId}.results.cases[${index}].error.type`,
+                ),
+                message: requireStringField(
+                  rawError,
+                  "message",
+                  `${runId}.results.cases[${index}].error.message`,
+                ),
+              };
+            })();
+
+      return {
+        caseId: requireStringField(payload, "case_id", `${runId}.results.cases[${index}].case_id`),
+        promptId: requireStringField(prompt, "id", `${runId}.results.cases[${index}].prompt.id`),
+        prompt: requireStringField(
+          prompt,
+          "prompt",
+          `${runId}.results.cases[${index}].prompt.prompt`,
+        ),
+        tags: requireStringArrayField(
+          prompt,
+          "tags",
+          `${runId}.results.cases[${index}].prompt.tags`,
+        ),
+        outputText,
+        expectation: {
+          expectedFailure: optionalFailureLabelPayload(
+            expectation.expected_failure,
+            `${runId}.results.cases[${index}].expectation.expected_failure`,
+          ),
+          observedFailure: optionalFailureLabelPayload(
+            expectation.observed_failure,
+            `${runId}.results.cases[${index}].expectation.observed_failure`,
+          ),
+          verdict: optionalStringField(
+            expectation,
+            "expectation_verdict",
+            `${runId}.results.cases[${index}].expectation.expectation_verdict`,
+          ),
+        },
+        classification,
+        error,
+      };
+    });
+
+    const metrics = requireObjectField(reportPayload, "metrics", `${runId}.report.metrics`);
+    const failureBreakdown = reportDetailsPayload.failure_type_breakdown;
+    if (!Array.isArray(failureBreakdown)) {
+      throw new Error(`${runId}.report_details.failure_type_breakdown must be an array`);
+    }
+
+    const failureTypes: RunDetailSummaryRowPayload[] = failureBreakdown.map((entry, index) => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(`${runId}.report_details.failure_type_breakdown[${index}] must be an object`);
+      }
+      const row = entry as Record<string, unknown>;
+      return {
+        label: requireStringField(
+          row,
+          "failure_type",
+          `${runId}.report_details.failure_type_breakdown[${index}].failure_type`,
+        ),
+        count: requireNumberField(
+          row,
+          "count",
+          `${runId}.report_details.failure_type_breakdown[${index}].count`,
+        ),
+        share: optionalNumberField(
+          row,
+          "rate",
+          `${runId}.report_details.failure_type_breakdown[${index}].rate`,
+        ),
+        caseIds: requireStringArrayField(
+          row,
+          "case_ids",
+          `${runId}.report_details.failure_type_breakdown[${index}].case_ids`,
+        ),
+      };
+    });
+
+    const expectationBreakdown = reportDetailsPayload.expectation_verdict_breakdown;
+    if (!Array.isArray(expectationBreakdown)) {
+      throw new Error(`${runId}.report_details.expectation_verdict_breakdown must be an array`);
+    }
+    const verdictRows = expectationBreakdown.map((entry, index) => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(
+          `${runId}.report_details.expectation_verdict_breakdown[${index}] must be an object`,
+        );
+      }
+      return entry as Record<string, unknown>;
+    });
+    const verdictTotal = verdictRows.reduce(
+      (total, row) =>
+        total +
+        requireNumberField(
+          row,
+          "count",
+          `${runId}.report_details.expectation_verdict_breakdown.count`,
+        ),
+      0,
+    );
+    const expectationVerdicts: RunDetailSummaryRowPayload[] = verdictRows.map((row, index) => {
+      const count = requireNumberField(
+        row,
+        "count",
+        `${runId}.report_details.expectation_verdict_breakdown[${index}].count`,
+      );
+      return {
+        label: requireStringField(
+          row,
+          "expectation_verdict",
+          `${runId}.report_details.expectation_verdict_breakdown[${index}].expectation_verdict`,
+        ),
+        count,
+        share: verdictTotal > 0 ? count / verdictTotal : null,
+        caseIds: requireStringArrayField(
+          row,
+          "case_ids",
+          `${runId}.report_details.expectation_verdict_breakdown[${index}].case_ids`,
+        ),
+      };
+    });
+
+    const tagBreakdown = reportDetailsPayload.tag_breakdown;
+    if (!Array.isArray(tagBreakdown)) {
+      throw new Error(`${runId}.report_details.tag_breakdown must be an array`);
+    }
+    const tagSlices: RunTagSlicePayload[] = tagBreakdown.map((entry, index) => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(`${runId}.report_details.tag_breakdown[${index}] must be an object`);
+      }
+      const row = entry as Record<string, unknown>;
+      const verdictCounts = requireObjectField(
+        row,
+        "expectation_verdict_counts",
+        `${runId}.report_details.tag_breakdown[${index}].expectation_verdict_counts`,
+      );
+      return {
+        tag: requireStringField(row, "tag", `${runId}.report_details.tag_breakdown[${index}].tag`),
+        attemptedCaseCount: requireNumberField(
+          row,
+          "attempted_case_count",
+          `${runId}.report_details.tag_breakdown[${index}].attempted_case_count`,
+        ),
+        classifiedCaseCount: requireNumberField(
+          row,
+          "classified_case_count",
+          `${runId}.report_details.tag_breakdown[${index}].classified_case_count`,
+        ),
+        failureCaseCount: requireNumberField(
+          row,
+          "failure_case_count",
+          `${runId}.report_details.tag_breakdown[${index}].failure_case_count`,
+        ),
+        failureRate: optionalNumberField(
+          row,
+          "failure_rate",
+          `${runId}.report_details.tag_breakdown[${index}].failure_rate`,
+        ),
+        expectationVerdictCounts: Object.fromEntries(
+          Object.entries(verdictCounts).map(([key, value]) => {
+            if (typeof value !== "number" || Number.isNaN(value)) {
+              throw new Error(
+                `${runId}.report_details.tag_breakdown[${index}].expectation_verdict_counts.${key} must be a number`,
+              );
+            }
+            return [key, value];
+          }),
+        ),
+      };
+    });
+
+    const expectationMismatches = requireObjectField(
+      reportDetailsPayload,
+      "expectation_mismatches",
+      `${runId}.report_details.expectation_mismatches`,
+    );
+    const mismatchCaseIds = [
+      ...collectCaseIds(
+        expectationMismatches.unexpected_failure ?? [],
+        `${runId}.report_details.expectation_mismatches.unexpected_failure`,
+      ),
+      ...collectCaseIds(
+        expectationMismatches.missed_expected ?? [],
+        `${runId}.report_details.expectation_mismatches.missed_expected`,
+      ),
+    ];
+    const notableCaseIds = collectCaseIds(
+      reportDetailsPayload.notable_cases ?? [],
+      `${runId}.report_details.notable_cases`,
+    );
+    const errorCaseIds = Array.from(
+      new Set([
+        ...collectCaseIds(
+          reportDetailsPayload.execution_errors ?? [],
+          `${runId}.report_details.execution_errors`,
+        ),
+        ...collectCaseIds(
+          reportDetailsPayload.unclassified_cases ?? [],
+          `${runId}.report_details.unclassified_cases`,
+        ),
+      ]),
+    );
+
+    const metadata =
+      reportPayload.metadata !== null && typeof reportPayload.metadata === "object"
+        ? (reportPayload.metadata as Record<string, unknown>)
+        : null;
+
+    return {
+      source: {
+        label: "Repo root artifact store",
+        path: repoRoot,
+        runsPath,
+        reportsPath,
+      },
+      run: {
+        runId: requireStringField(runPayload, "run_id", `${runId}.run.run_id`),
+        dataset: requireStringField(runPayload, "dataset", `${runId}.run.dataset`),
+        model: requireStringField(runPayload, "model", `${runId}.run.model`),
+        createdAt: requireStringField(runPayload, "created_at", `${runId}.run.created_at`),
+        status: readRunReportStatus(reportPayload, resultsPayload, runPayload),
+        reportId: requireStringField(reportPayload, "report_id", `${runId}.report.report_id`),
+        adapterId:
+          metadata !== null
+            ? optionalStringField(metadata, "adapter_id", `${runId}.report.metadata.adapter_id`)
+            : null,
+        classifierId:
+          metadata !== null
+            ? optionalStringField(
+                metadata,
+                "classifier_id",
+                `${runId}.report.metadata.classifier_id`,
+              )
+            : null,
+        runSeed:
+          metadata !== null && typeof metadata.run_seed === "number" && Number.isInteger(metadata.run_seed)
+            ? metadata.run_seed
+            : null,
+      },
+      metrics: {
+        attemptedCaseCount: requireNumberField(
+          metrics,
+          "attempted_case_count",
+          `${runId}.report.metrics.attempted_case_count`,
+        ),
+        classifiedCaseCount: requireNumberField(
+          metrics,
+          "classified_case_count",
+          `${runId}.report.metrics.classified_case_count`,
+        ),
+        executionErrorCount: requireNumberField(
+          metrics,
+          "execution_error_count",
+          `${runId}.report.metrics.execution_error_count`,
+        ),
+        unclassifiedCount: requireNumberField(
+          metrics,
+          "unclassified_count",
+          `${runId}.report.metrics.unclassified_count`,
+        ),
+        successfulModelInvocationCount: requireNumberField(
+          metrics,
+          "successful_model_invocation_count",
+          `${runId}.report.metrics.successful_model_invocation_count`,
+        ),
+        failureCaseCount: requireNumberField(
+          metrics,
+          "failure_case_count",
+          `${runId}.report.metrics.failure_case_count`,
+        ),
+        failureRate: optionalNumberField(
+          metrics,
+          "failure_rate",
+          `${runId}.report.metrics.failure_rate`,
+        ),
+        classificationCoverage: optionalNumberField(
+          metrics,
+          "classification_coverage",
+          `${runId}.report.metrics.classification_coverage`,
+        ),
+        executionSuccessRate: optionalNumberField(
+          metrics,
+          "execution_success_rate",
+          `${runId}.report.metrics.execution_success_rate`,
+        ),
+      },
+      summary: {
+        failureTypes,
+        expectationVerdicts,
+        tagSlices,
+      },
+      lenses: {
+        mismatchCaseIds,
+        notableCaseIds,
+        allCaseIds: cases.map((caseRow) => caseRow.caseId),
+        errorCaseIds,
+      },
+      cases,
+    };
   }
 
   async function buildArtifactOverview() {
@@ -331,6 +963,39 @@ function failureLabArtifactsPlugin(): Plugin {
     }
   }
 
+  async function handleRunDetail(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const runsPath = path.join(repoRoot, "runs");
+    const reportsPath = path.join(repoRoot, "reports");
+
+    const requestUrl = new URL(req.url ?? RUN_DETAIL_PATH, "http://failure-lab.local");
+    const runId = requestUrl.searchParams.get("runId");
+    if (!runId) {
+      res.statusCode = 400;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message: "runId query parameter is required" }));
+      return;
+    }
+
+    try {
+      const payload = await collectRunDetail(runId, runsPath, reportsPath);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "run detail failed";
+      const statusCode =
+        message.includes("ENOENT") || message.includes("no such file")
+          ? 404
+          : 500;
+      res.statusCode = statusCode;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
   function registerArtifactMiddleware(
     middlewares: {
       use: (
@@ -348,6 +1013,9 @@ function failureLabArtifactsPlugin(): Plugin {
     });
     middlewares.use(RUNS_INDEX_PATH, (req, res, next) => {
       void handleRunsIndex(req, res).catch(next);
+    });
+    middlewares.use(RUN_DETAIL_PATH, (req, res, next) => {
+      void handleRunDetail(req, res).catch(next);
     });
   }
 

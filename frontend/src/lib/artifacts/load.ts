@@ -1,13 +1,19 @@
 import {
   ARTIFACT_OVERVIEW_PATH,
   DEFAULT_ARTIFACT_SOURCE,
+  RUN_DETAIL_PATH,
   RUNS_INDEX_PATH,
   type ArtifactCollectionSummary,
   type ArtifactOverview,
   type ArtifactOverviewStatus,
   type ArtifactSourceDescriptor,
+  type FailureLabelRecord,
+  type RunCaseRecord,
+  type RunDetail,
+  type RunDetailSummaryRow,
   type RunInventory,
   type RunInventoryItem,
+  type RunTagSlice,
 } from "@/lib/artifacts/types";
 
 function requireString(value: unknown, field: string): string {
@@ -31,6 +37,34 @@ function requireCount(value: unknown, field: string): number {
   return value;
 }
 
+function requireObject(value: unknown, field: string): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${field} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function requireNumber(value: unknown, field: string): number {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    throw new Error(`${field} must be a number`);
+  }
+  return value;
+}
+
+function requireNumberOrNull(value: unknown, field: string): number | null {
+  if (value == null) {
+    return null;
+  }
+  return requireNumber(value, field);
+}
+
+function requireStringOrNull(value: unknown, field: string): string | null {
+  if (value == null) {
+    return null;
+  }
+  return requireString(value, field);
+}
+
 function requireCollection(value: unknown, field: string): ArtifactCollectionSummary {
   if (value === null || typeof value !== "object") {
     throw new Error(`${field} must be an object`);
@@ -43,11 +77,7 @@ function requireCollection(value: unknown, field: string): ArtifactCollectionSum
 }
 
 function requireSource(value: unknown, field: string): ArtifactSourceDescriptor {
-  if (value === null || typeof value !== "object") {
-    throw new Error(`${field} must be an object`);
-  }
-
-  const source = value as Record<string, unknown>;
+  const source = requireObject(value, field);
   return {
     label: requireString(source.label, `${field}.label`),
     path: requireString(source.path, `${field}.path`),
@@ -116,6 +146,152 @@ function requireRunInventoryItems(value: unknown, field: string): RunInventoryIt
   });
 }
 
+function requireFailureLabelRecord(
+  value: unknown,
+  field: string,
+): FailureLabelRecord | null {
+  if (value == null) {
+    return null;
+  }
+
+  const label = requireObject(value, field);
+  return {
+    failureType: requireString(label.failureType, `${field}.failureType`),
+    failureSubtype: requireStringOrNull(label.failureSubtype, `${field}.failureSubtype`),
+  };
+}
+
+function requireIntRecord(
+  value: unknown,
+  field: string,
+): Record<string, number> {
+  const record = requireObject(value, field);
+  return Object.fromEntries(
+    Object.entries(record).map(([key, entryValue]) => [key, requireCount(entryValue, `${field}.${key}`)]),
+  );
+}
+
+function requireSummaryRows(
+  value: unknown,
+  field: string,
+): RunDetailSummaryRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      label: requireString(row.label, `${field}[${index}].label`),
+      count: requireCount(row.count, `${field}[${index}].count`),
+      share: requireNumberOrNull(row.share, `${field}[${index}].share`),
+      caseIds: requireStringArray(row.caseIds, `${field}[${index}].caseIds`),
+    };
+  });
+}
+
+function requireTagSlices(value: unknown, field: string): RunTagSlice[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      tag: requireString(row.tag, `${field}[${index}].tag`),
+      attemptedCaseCount: requireCount(
+        row.attemptedCaseCount,
+        `${field}[${index}].attemptedCaseCount`,
+      ),
+      classifiedCaseCount: requireCount(
+        row.classifiedCaseCount,
+        `${field}[${index}].classifiedCaseCount`,
+      ),
+      failureCaseCount: requireCount(
+        row.failureCaseCount,
+        `${field}[${index}].failureCaseCount`,
+      ),
+      failureRate: requireNumberOrNull(
+        row.failureRate,
+        `${field}[${index}].failureRate`,
+      ),
+      expectationVerdictCounts: requireIntRecord(
+        row.expectationVerdictCounts,
+        `${field}[${index}].expectationVerdictCounts`,
+      ),
+    };
+  });
+}
+
+function requireRunCaseRecords(value: unknown, field: string): RunCaseRecord[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    const expectation = requireObject(row.expectation, `${field}[${index}].expectation`);
+    const classificationValue = row.classification;
+    const errorValue = row.error;
+
+    return {
+      caseId: requireString(row.caseId, `${field}[${index}].caseId`),
+      promptId: requireString(row.promptId, `${field}[${index}].promptId`),
+      prompt: requireString(row.prompt, `${field}[${index}].prompt`),
+      tags: requireStringArray(row.tags, `${field}[${index}].tags`),
+      outputText: requireStringOrNull(row.outputText, `${field}[${index}].outputText`),
+      expectation: {
+        expectedFailure: requireFailureLabelRecord(
+          expectation.expectedFailure,
+          `${field}[${index}].expectation.expectedFailure`,
+        ),
+        observedFailure: requireFailureLabelRecord(
+          expectation.observedFailure,
+          `${field}[${index}].expectation.observedFailure`,
+        ),
+        verdict: requireStringOrNull(
+          expectation.verdict,
+          `${field}[${index}].expectation.verdict`,
+        ),
+      },
+      classification:
+        classificationValue == null
+          ? null
+          : (() => {
+              const classification = requireObject(
+                classificationValue,
+                `${field}[${index}].classification`,
+              );
+              return {
+                failure: requireFailureLabelRecord(
+                  classification.failure,
+                  `${field}[${index}].classification.failure`,
+                )!,
+                confidence: requireNumberOrNull(
+                  classification.confidence,
+                  `${field}[${index}].classification.confidence`,
+                ),
+                explanation: requireStringOrNull(
+                  classification.explanation,
+                  `${field}[${index}].classification.explanation`,
+                ),
+              };
+            })(),
+      error:
+        errorValue == null
+          ? null
+          : (() => {
+              const error = requireObject(errorValue, `${field}[${index}].error`);
+              return {
+                stage: requireString(error.stage, `${field}[${index}].error.stage`),
+                type: requireString(error.type, `${field}[${index}].error.type`),
+                message: requireString(error.message, `${field}[${index}].error.message`),
+              };
+            })(),
+    };
+  });
+}
+
 export function validateRunInventory(payload: unknown): RunInventory {
   if (payload === null || typeof payload !== "object") {
     throw new Error("run inventory payload must be an object");
@@ -138,6 +314,101 @@ export async function loadRunInventory(
 
   const payload = await response.json();
   return validateRunInventory(payload);
+}
+
+export function buildRunDetailPath(runId: string): string {
+  const params = new URLSearchParams({ runId });
+  return `${RUN_DETAIL_PATH}?${params.toString()}`;
+}
+
+export function validateRunDetail(payload: unknown): RunDetail {
+  const data = requireObject(payload, "run detail payload");
+  const run = requireObject(data.run, "run");
+  const metrics = requireObject(data.metrics, "metrics");
+  const summary = requireObject(data.summary, "summary");
+  const lenses = requireObject(data.lenses, "lenses");
+
+  return {
+    source: requireSource(data.source, "source"),
+    run: {
+      runId: requireString(run.runId, "run.runId"),
+      dataset: requireString(run.dataset, "run.dataset"),
+      model: requireString(run.model, "run.model"),
+      createdAt: requireString(run.createdAt, "run.createdAt"),
+      status: requireString(run.status, "run.status"),
+      reportId: requireString(run.reportId, "run.reportId"),
+      adapterId: requireStringOrNull(run.adapterId, "run.adapterId"),
+      classifierId: requireStringOrNull(run.classifierId, "run.classifierId"),
+      runSeed:
+        run.runSeed == null ? null : requireCount(run.runSeed, "run.runSeed"),
+    },
+    metrics: {
+      attemptedCaseCount: requireCount(metrics.attemptedCaseCount, "metrics.attemptedCaseCount"),
+      classifiedCaseCount: requireCount(metrics.classifiedCaseCount, "metrics.classifiedCaseCount"),
+      executionErrorCount: requireCount(
+        metrics.executionErrorCount,
+        "metrics.executionErrorCount",
+      ),
+      unclassifiedCount: requireCount(metrics.unclassifiedCount, "metrics.unclassifiedCount"),
+      successfulModelInvocationCount: requireCount(
+        metrics.successfulModelInvocationCount,
+        "metrics.successfulModelInvocationCount",
+      ),
+      failureCaseCount: requireCount(metrics.failureCaseCount, "metrics.failureCaseCount"),
+      failureRate: requireNumberOrNull(metrics.failureRate, "metrics.failureRate"),
+      classificationCoverage: requireNumberOrNull(
+        metrics.classificationCoverage,
+        "metrics.classificationCoverage",
+      ),
+      executionSuccessRate: requireNumberOrNull(
+        metrics.executionSuccessRate,
+        "metrics.executionSuccessRate",
+      ),
+    },
+    summary: {
+      failureTypes: requireSummaryRows(summary.failureTypes, "summary.failureTypes"),
+      expectationVerdicts: requireSummaryRows(
+        summary.expectationVerdicts,
+        "summary.expectationVerdicts",
+      ),
+      tagSlices: requireTagSlices(summary.tagSlices, "summary.tagSlices"),
+    },
+    lenses: {
+      mismatchCaseIds: requireStringArray(lenses.mismatchCaseIds, "lenses.mismatchCaseIds"),
+      notableCaseIds: requireStringArray(lenses.notableCaseIds, "lenses.notableCaseIds"),
+      allCaseIds: requireStringArray(lenses.allCaseIds, "lenses.allCaseIds"),
+      errorCaseIds: requireStringArray(lenses.errorCaseIds, "lenses.errorCaseIds"),
+    },
+    cases: requireRunCaseRecords(data.cases, "cases"),
+  };
+}
+
+export async function loadRunDetail(
+  runId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RunDetail> {
+  const response = await fetchImpl(buildRunDetailPath(runId));
+  let payload: unknown = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    if (!response.ok) {
+      throw new Error(`run detail request failed with status ${response.status}`);
+    }
+    throw new Error("run detail response was not valid JSON");
+  }
+
+  if (!response.ok) {
+    const data = payload as Record<string, unknown> | null;
+    const message =
+      data !== null && typeof data.message === "string"
+        ? data.message
+        : `run detail request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return validateRunDetail(payload);
 }
 
 export function buildIncompatibleArtifactOverview(message: string): ArtifactOverview {

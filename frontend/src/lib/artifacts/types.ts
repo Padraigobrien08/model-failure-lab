@@ -1,5 +1,6 @@
 export const ARTIFACT_OVERVIEW_PATH = "/__failure_lab__/artifacts/overview.json";
 export const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
+export const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
 
 export type ArtifactOverviewStatus = "ready" | "empty" | "incompatible";
 
@@ -61,6 +62,105 @@ export type RunInventoryState =
   | {
       status: "incompatible";
       inventory: null;
+      message: string;
+    };
+
+export type FailureLabelRecord = {
+  failureType: string;
+  failureSubtype: string | null;
+};
+
+export type RunDetailSummaryRow = {
+  label: string;
+  count: number;
+  share: number | null;
+  caseIds: string[];
+};
+
+export type RunTagSlice = {
+  tag: string;
+  attemptedCaseCount: number;
+  classifiedCaseCount: number;
+  failureCaseCount: number;
+  failureRate: number | null;
+  expectationVerdictCounts: Record<string, number>;
+};
+
+export type RunCaseRecord = {
+  caseId: string;
+  promptId: string;
+  prompt: string;
+  tags: string[];
+  outputText: string | null;
+  expectation: {
+    expectedFailure: FailureLabelRecord | null;
+    observedFailure: FailureLabelRecord | null;
+    verdict: string | null;
+  };
+  classification: {
+    failure: FailureLabelRecord;
+    confidence: number | null;
+    explanation: string | null;
+  } | null;
+  error: {
+    stage: string;
+    type: string;
+    message: string;
+  } | null;
+};
+
+export type RunDetail = {
+  source: ArtifactSourceDescriptor;
+  run: {
+    runId: string;
+    dataset: string;
+    model: string;
+    createdAt: string;
+    status: string;
+    reportId: string;
+    adapterId: string | null;
+    classifierId: string | null;
+    runSeed: number | null;
+  };
+  metrics: {
+    attemptedCaseCount: number;
+    classifiedCaseCount: number;
+    executionErrorCount: number;
+    unclassifiedCount: number;
+    successfulModelInvocationCount: number;
+    failureCaseCount: number;
+    failureRate: number | null;
+    classificationCoverage: number | null;
+    executionSuccessRate: number | null;
+  };
+  summary: {
+    failureTypes: RunDetailSummaryRow[];
+    expectationVerdicts: RunDetailSummaryRow[];
+    tagSlices: RunTagSlice[];
+  };
+  lenses: {
+    mismatchCaseIds: string[];
+    notableCaseIds: string[];
+    allCaseIds: string[];
+    errorCaseIds: string[];
+  };
+  cases: RunCaseRecord[];
+};
+
+export type RunDetailState =
+  | {
+      status: "idle" | "loading";
+      detail: null;
+      message: null;
+    }
+  | {
+      status: "ready";
+      detail: RunDetail;
+      message: null;
+    }
+  | {
+      status: "incompatible";
+      detail: null;
       message: string;
     };
 

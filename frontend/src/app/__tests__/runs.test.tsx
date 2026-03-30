@@ -1,9 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { afterEach, vi } from "vitest";
 
 import { App } from "@/app/App";
 import type {
   ArtifactShellState,
+  RunDetail,
   RunInventoryItem,
   RunInventoryState,
 } from "@/lib/artifacts/types";
@@ -73,7 +75,131 @@ const SAMPLE_RUNS: RunInventoryItem[] = [
   },
 ];
 
+function buildRunDetail(run: RunInventoryItem): RunDetail {
+  return {
+    source: {
+      label: "Repo root artifact store",
+      path: "/tmp/model-failure-lab",
+      runsPath: "/tmp/model-failure-lab/runs",
+      reportsPath: "/tmp/model-failure-lab/reports",
+    },
+    run: {
+      runId: run.runId,
+      dataset: run.dataset,
+      model: run.model,
+      createdAt: run.createdAt,
+      status: run.status,
+      reportId: `${run.runId}_report`,
+      adapterId: "demo",
+      classifierId: "heuristic_v1",
+      runSeed: 17,
+    },
+    metrics: {
+      attemptedCaseCount: 12,
+      classifiedCaseCount: 10,
+      executionErrorCount: 1,
+      unclassifiedCount: 1,
+      successfulModelInvocationCount: 11,
+      failureCaseCount: 4,
+      failureRate: 0.4,
+      classificationCoverage: 10 / 12,
+      executionSuccessRate: 11 / 12,
+    },
+    summary: {
+      failureTypes: [
+        { label: "hallucination", count: 3, share: 0.3, caseIds: ["case-002"] },
+      ],
+      expectationVerdicts: [
+        { label: "unexpected_failure", count: 2, share: 0.2, caseIds: ["case-002"] },
+      ],
+      tagSlices: [
+        {
+          tag: "factuality",
+          attemptedCaseCount: 4,
+          classifiedCaseCount: 3,
+          failureCaseCount: 2,
+          failureRate: 2 / 3,
+          expectationVerdictCounts: { unexpected_failure: 2 },
+        },
+      ],
+    },
+    lenses: {
+      mismatchCaseIds: ["case-002"],
+      notableCaseIds: ["case-002"],
+      allCaseIds: ["case-001", "case-002"],
+      errorCaseIds: ["case-006"],
+    },
+    cases: [
+      {
+        caseId: "case-002",
+        promptId: "case-002",
+        prompt: "Answer using only the supplied source snippet.",
+        tags: ["core", "factuality"],
+        outputText: "Invented unsupported detail.",
+        expectation: {
+          expectedFailure: { failureType: "no_failure", failureSubtype: null },
+          observedFailure: { failureType: "hallucination", failureSubtype: null },
+          verdict: "unexpected_failure",
+        },
+        classification: {
+          failure: { failureType: "hallucination", failureSubtype: null },
+          confidence: 0.91,
+          explanation: "Unsupported factual framing detected.",
+        },
+        error: null,
+      },
+      {
+        caseId: "case-006",
+        promptId: "case-006",
+        prompt: "Emit a structured answer.",
+        tags: ["extended"],
+        outputText: null,
+        expectation: {
+          expectedFailure: null,
+          observedFailure: null,
+          verdict: null,
+        },
+        classification: null,
+        error: {
+          stage: "model_invoke",
+          type: "TimeoutError",
+          message: "Request timed out",
+        },
+      },
+    ],
+  };
+}
+
+function mockRunDetail(runs: RunInventoryItem[]) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      const matchedRun = runs.find((run) =>
+        url.includes(`/__failure_lab__/artifacts/run-detail.json?runId=${run.runId}`),
+      );
+      if (matchedRun) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => buildRunDetail(matchedRun),
+        } as Response;
+      }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ message: `Unexpected request: ${url}` }),
+      } as Response;
+    }),
+  );
+}
+
 describe("runs route", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("renders a dense newest-first inventory table from the active source", () => {
     render(
       <App
@@ -132,6 +258,7 @@ describe("runs route", () => {
 
   it("opens the dedicated run route from both row activation and the explicit affordance", async () => {
     const user = userEvent.setup();
+    mockRunDetail([SAMPLE_RUNS[1], SAMPLE_RUNS[2]]);
 
     render(
       <App
@@ -148,6 +275,7 @@ describe("runs route", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Run breadcrumb" })).toBeInTheDocument();
     expect(screen.getByText("hallucination-failures-v1")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Failure types, verdicts, and tag slices" })).toBeInTheDocument();
 
     const backToRuns = screen.getAllByRole("link", { name: "Back to runs" })[0];
     await user.click(backToRuns);
