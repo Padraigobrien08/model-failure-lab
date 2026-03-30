@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import tomllib
+import importlib
 from pathlib import Path
 
 from model_failure_lab.cli import main
@@ -19,6 +20,12 @@ def _module_env() -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC_ROOT)
     return env
+
+
+def _purge_modules(*prefixes: str) -> None:
+    for name in list(sys.modules):
+        if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes):
+            sys.modules.pop(name, None)
 
 
 def _write_dataset(path: Path, dataset: FailureDataset) -> None:
@@ -54,6 +61,14 @@ def test_python_module_entrypoint_prints_new_help_surface_without_args() -> None
     assert "compare" in result.stdout
     assert "demo" in result.stdout
     assert "run-baseline" not in result.stdout
+
+
+def test_cli_module_import_does_not_load_matplotlib() -> None:
+    _purge_modules("model_failure_lab.cli", "model_failure_lab.reporting", "matplotlib")
+
+    importlib.import_module("model_failure_lab.cli")
+
+    assert "matplotlib" not in sys.modules
 
 
 def test_run_command_supports_direct_dataset_paths_and_writes_artifacts(tmp_path, capsys) -> None:
