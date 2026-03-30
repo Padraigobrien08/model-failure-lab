@@ -1,178 +1,108 @@
-"""Saved-evaluation reporting helpers."""
+"""Saved-evaluation reporting helpers with a lazy package surface."""
 
-from .artifacts import (
-    build_report_details_payload,
-    build_report_payload,
-    write_comparison_report_artifacts,
-    write_report_artifacts,
-)
-from .bundle import (
-    build_perturbation_report_metadata,
-    build_report_metadata,
-    build_robustness_report_metadata,
-    build_stability_report_metadata,
-    write_perturbation_report_bundle,
-    write_report_bundle,
-    write_robustness_report_bundle,
-    write_stability_report_bundle,
-)
-from .calibration import build_calibration_curve_figure, build_calibration_table
-from .closeout import (
-    DEFAULT_REOPEN_CONDITIONS,
-    build_final_gate_payload,
-    load_saved_json,
-    write_final_gate,
-)
-from .compare import build_comparison_report, build_comparison_report_id
-from .core import (
-    NO_FAILURE_TYPE,
-    BuiltReport,
-    CaseSummary,
-    build_run_report,
-    build_run_report_id,
-    summarize_case_executions,
-)
-from .discovery import (
-    PerturbationReportCandidate,
-    ReportCandidate,
-    discover_evaluation_bundles,
-    discover_perturbation_bundles,
-    load_perturbation_candidates,
-    load_report_inputs,
-)
-from .figures import (
-    PRIMARY_METRIC,
-    PRIMARY_METRIC_LABEL,
-    build_clean_vs_perturbed_figure,
-    build_id_ood_comparison_frame,
-    build_id_ood_figure,
-    build_perturbation_family_drop_figure,
-    build_severity_ladder_figure,
-    build_worst_group_vs_average_figure,
-    build_worst_group_vs_average_frame,
-    build_worst_subgroups_figure,
-    build_worst_subgroups_frame,
-)
-from .load import SavedRunArtifacts, load_saved_run_artifacts
-from .markdown import (
-    render_perturbation_report_markdown,
-    render_report_markdown,
-    render_robustness_report_markdown,
-    render_stability_report_markdown,
-)
-from .mitigation import (
-    build_mitigation_comparison_table,
-    classify_mitigation_verdict,
-    pair_mitigation_candidates_with_parents,
-)
-from .perturbation import (
-    build_perturbation_report_tables,
-    load_perturbation_report_inputs,
-    validate_perturbation_report_candidates,
-)
-from .robustness import (
-    build_exploratory_mitigation_summary,
-    build_final_robustness_summary,
-    build_official_mitigation_summary,
-    build_promotion_audit,
-    build_robustness_method_tables,
-    build_robustness_reference_reports,
-    build_robustness_story,
-    build_seeded_baseline_summary,
-    load_saved_report_metadata,
-    load_saved_report_payload,
-    render_promotion_audit_markdown,
-)
-from .selection import report_label, select_report_candidates, validate_report_candidates
-from .stability import (
-    BASELINE_STABILITY_COLUMNS,
-    MITIGATION_STABILITY_COLUMNS,
-    build_baseline_stability_table,
-    build_default_reference_reports,
-    build_mitigation_stability_table,
-    build_stability_summary,
-)
-from .summary import build_perturbation_report_summary, build_report_summary
-from .tables import build_comparison_table, build_subgroup_table
+from __future__ import annotations
 
-__all__ = [
-    "BuiltReport",
-    "CaseSummary",
-    "PRIMARY_METRIC",
-    "PRIMARY_METRIC_LABEL",
-    "DEFAULT_REOPEN_CONDITIONS",
-    "NO_FAILURE_TYPE",
-    "PerturbationReportCandidate",
-    "ReportCandidate",
-    "SavedRunArtifacts",
-    "build_clean_vs_perturbed_figure",
-    "build_comparison_report",
-    "build_comparison_report_id",
-    "build_perturbation_family_drop_figure",
-    "build_report_details_payload",
-    "build_perturbation_report_metadata",
-    "build_perturbation_report_summary",
-    "build_perturbation_report_tables",
-    "build_report_payload",
-    "build_robustness_report_metadata",
-    "write_robustness_report_bundle",
-    "build_report_metadata",
-    "build_run_report",
-    "build_run_report_id",
-    "build_stability_report_metadata",
-    "write_comparison_report_artifacts",
-    "write_report_bundle",
-    "write_report_artifacts",
-    "write_perturbation_report_bundle",
-    "write_stability_report_bundle",
-    "build_calibration_curve_figure",
-    "build_calibration_table",
-    "build_baseline_stability_table",
-    "build_comparison_table",
-    "build_default_reference_reports",
-    "build_id_ood_comparison_frame",
-    "build_id_ood_figure",
-    "build_mitigation_stability_table",
-    "build_mitigation_comparison_table",
-    "build_exploratory_mitigation_summary",
-    "build_final_gate_payload",
-    "build_final_robustness_summary",
-    "build_official_mitigation_summary",
-    "build_promotion_audit",
-    "build_robustness_method_tables",
-    "build_robustness_reference_reports",
-    "build_robustness_story",
-    "build_report_summary",
-    "build_seeded_baseline_summary",
-    "build_stability_summary",
-    "build_severity_ladder_figure",
-    "build_subgroup_table",
-    "build_worst_group_vs_average_figure",
-    "build_worst_group_vs_average_frame",
-    "build_worst_subgroups_figure",
-    "build_worst_subgroups_frame",
-    "classify_mitigation_verdict",
-    "discover_evaluation_bundles",
-    "discover_perturbation_bundles",
-    "load_perturbation_candidates",
-    "load_perturbation_report_inputs",
-    "load_report_inputs",
-    "load_saved_run_artifacts",
-    "load_saved_json",
-    "load_saved_report_metadata",
-    "load_saved_report_payload",
-    "pair_mitigation_candidates_with_parents",
-    "report_label",
-    "render_perturbation_report_markdown",
-    "render_promotion_audit_markdown",
-    "render_robustness_report_markdown",
-    "render_report_markdown",
-    "render_stability_report_markdown",
-    "select_report_candidates",
-    "summarize_case_executions",
-    "validate_perturbation_report_candidates",
-    "validate_report_candidates",
-    "write_final_gate",
-    "BASELINE_STABILITY_COLUMNS",
-    "MITIGATION_STABILITY_COLUMNS",
-]
+from importlib import import_module
+
+_EXPORTS: dict[str, str] = {
+    "BuiltReport": ".core",
+    "CaseSummary": ".core",
+    "PRIMARY_METRIC": ".figures",
+    "PRIMARY_METRIC_LABEL": ".figures",
+    "DEFAULT_REOPEN_CONDITIONS": ".closeout",
+    "NO_FAILURE_TYPE": ".core",
+    "PerturbationReportCandidate": ".discovery",
+    "ReportCandidate": ".discovery",
+    "SavedRunArtifacts": ".load",
+    "build_clean_vs_perturbed_figure": ".figures",
+    "build_comparison_report": ".compare",
+    "build_comparison_report_id": ".compare",
+    "build_perturbation_family_drop_figure": ".figures",
+    "build_report_details_payload": ".artifacts",
+    "build_perturbation_report_metadata": ".bundle",
+    "build_perturbation_report_summary": ".summary",
+    "build_perturbation_report_tables": ".perturbation",
+    "build_report_payload": ".artifacts",
+    "build_robustness_report_metadata": ".bundle",
+    "write_robustness_report_bundle": ".bundle",
+    "build_report_metadata": ".bundle",
+    "build_run_report": ".core",
+    "build_run_report_id": ".core",
+    "build_stability_report_metadata": ".bundle",
+    "write_comparison_report_artifacts": ".artifacts",
+    "write_report_bundle": ".bundle",
+    "write_report_artifacts": ".artifacts",
+    "write_perturbation_report_bundle": ".bundle",
+    "write_stability_report_bundle": ".bundle",
+    "build_calibration_curve_figure": ".calibration",
+    "build_calibration_table": ".calibration",
+    "build_baseline_stability_table": ".stability",
+    "build_comparison_table": ".tables",
+    "build_default_reference_reports": ".stability",
+    "build_id_ood_comparison_frame": ".figures",
+    "build_id_ood_figure": ".figures",
+    "build_mitigation_stability_table": ".stability",
+    "build_mitigation_comparison_table": ".mitigation",
+    "build_exploratory_mitigation_summary": ".robustness",
+    "build_final_gate_payload": ".closeout",
+    "build_final_robustness_summary": ".robustness",
+    "build_official_mitigation_summary": ".robustness",
+    "build_promotion_audit": ".robustness",
+    "build_robustness_method_tables": ".robustness",
+    "build_robustness_reference_reports": ".robustness",
+    "build_robustness_story": ".robustness",
+    "build_report_summary": ".summary",
+    "build_seeded_baseline_summary": ".robustness",
+    "build_stability_summary": ".stability",
+    "build_severity_ladder_figure": ".figures",
+    "build_subgroup_table": ".tables",
+    "build_worst_group_vs_average_figure": ".figures",
+    "build_worst_group_vs_average_frame": ".figures",
+    "build_worst_subgroups_figure": ".figures",
+    "build_worst_subgroups_frame": ".figures",
+    "classify_mitigation_verdict": ".mitigation",
+    "discover_evaluation_bundles": ".discovery",
+    "discover_perturbation_bundles": ".discovery",
+    "load_perturbation_candidates": ".discovery",
+    "load_perturbation_report_inputs": ".perturbation",
+    "load_report_inputs": ".discovery",
+    "load_saved_run_artifacts": ".load",
+    "load_saved_json": ".closeout",
+    "load_saved_report_metadata": ".robustness",
+    "load_saved_report_payload": ".robustness",
+    "pair_mitigation_candidates_with_parents": ".mitigation",
+    "report_label": ".selection",
+    "render_perturbation_report_markdown": ".markdown",
+    "render_promotion_audit_markdown": ".robustness",
+    "render_robustness_report_markdown": ".markdown",
+    "render_report_markdown": ".markdown",
+    "render_stability_report_markdown": ".markdown",
+    "select_report_candidates": ".selection",
+    "summarize_case_executions": ".core",
+    "validate_perturbation_report_candidates": ".perturbation",
+    "validate_report_candidates": ".selection",
+    "write_final_gate": ".closeout",
+    "BASELINE_STABILITY_COLUMNS": ".stability",
+    "MITIGATION_STABILITY_COLUMNS": ".stability",
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name: str) -> object:
+    """Resolve exported reporting symbols lazily."""
+
+    module_name = _EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module = import_module(module_name, __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Expose lazy exports to interactive help and autocomplete."""
+
+    return sorted(set(globals()) | set(__all__))
