@@ -32,6 +32,7 @@ ui = [
 ]
 
 [project.scripts]
+failure-lab = "model_failure_lab.cli:main"
 model-failure-lab = "model_failure_lab.cli:main"
 
 [tool.setuptools]
