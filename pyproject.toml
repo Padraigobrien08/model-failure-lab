@@ -24,15 +24,22 @@ dev = [
   "pytest",
   "ruff",
 ]
+openai = [
+  "openai>=1.0.0",
+]
 ui = [
   "streamlit",
 ]
 
 [project.scripts]
+failure-lab = "model_failure_lab.cli:main"
 model-failure-lab = "model_failure_lab.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+model_failure_lab = ["datasets/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
