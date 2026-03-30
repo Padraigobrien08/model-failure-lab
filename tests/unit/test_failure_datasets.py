@@ -1,0 +1,90 @@
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from model_failure_lab.datasets import FailureDataset, load_dataset, parse_dataset_payload
+from model_failure_lab.schemas import PayloadValidationError, PromptCase
+
+
+def test_parse_dataset_payload_accepts_envelope_shape() -> None:
+    dataset = parse_dataset_payload(
+        {
+            "dataset_id": "reasoning-basics-v1",
+            "name": "Reasoning Basics",
+            "description": "Small baseline set",
+            "version": "1",
+            "cases": [
+                {
+                    "id": "case-001",
+                    "prompt": "Explain why 2 + 2 = 4.",
+                    "expected_failure": "reasoning",
+                }
+            ],
+        }
+    )
+
+    assert dataset == FailureDataset(
+        dataset_id="reasoning-basics-v1",
+        name="Reasoning Basics",
+        description="Small baseline set",
+        version="1",
+        cases=(
+            PromptCase(
+                id="case-001",
+                prompt="Explain why 2 + 2 = 4.",
+                expected_failure="reasoning",
+            ),
+        ),
+    )
+
+
+def test_parse_dataset_payload_accepts_bare_case_list_with_fallback_metadata() -> None:
+    dataset = parse_dataset_payload(
+        [
+            {
+                "id": "case-001",
+                "prompt": "Explain why 2 + 2 = 4.",
+            }
+        ],
+        fallback_dataset_id="Reasoning Basics",
+    )
+
+    assert dataset.dataset_id == "reasoning-basics"
+    assert dataset.name == "Reasoning Basics"
+    assert dataset.cases == (PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),)
+
+
+def test_load_dataset_reads_json_file_into_normalized_contract(tmp_path) -> None:
+    dataset_path = tmp_path / "reasoning_set.json"
+    dataset_path.write_text(
+        json.dumps(
+            {
+                "dataset_id": "reasoning-set",
+                "cases": [
+                    {
+                        "id": "case-001",
+                        "prompt": "Compute the answer.",
+                        "metadata": {"reference_answer": "42"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    dataset = load_dataset(dataset_path)
+
+    assert dataset.dataset_id == "reasoning-set"
+    assert dataset.cases[0].metadata == {"reference_answer": "42"}
+
+
+def test_parse_dataset_payload_rejects_invalid_root_shape() -> None:
+    with pytest.raises(PayloadValidationError, match="list or an object with cases"):
+        parse_dataset_payload("not a dataset")
+
+
+def test_parse_dataset_payload_rejects_envelope_without_cases() -> None:
+    with pytest.raises(PayloadValidationError, match="dataset envelope must contain cases"):
+        parse_dataset_payload({"dataset_id": "broken"})
