@@ -218,7 +218,7 @@ def _handle_compare(args: argparse.Namespace) -> int:
         built.details,
         root=root,
     )
-    print(_render_compare_summary(built.report, report_path, details_path))
+    print(_render_compare_summary(built.report, built.details, report_path, details_path))
     return 0
 
 
@@ -555,7 +555,12 @@ def _render_demo_summary(
     return "\n".join(lines)
 
 
-def _render_compare_summary(report, report_path: Path, details_path: Path) -> str:
+def _render_compare_summary(
+    report,
+    details: dict[str, object],
+    report_path: Path,
+    details_path: Path,
+) -> str:
     comparison = report.comparison
     delta = report.metrics.get("delta", {})
     lines = [
@@ -573,10 +578,17 @@ def _render_compare_summary(report, report_path: Path, details_path: Path) -> st
         ),
         f"Failure rate delta: {_format_signed_rate(delta.get('failure_rate'))}",
         f"Coverage delta: {_format_signed_rate(delta.get('classification_coverage'))}",
-        "Artifacts:",
-        f"- {report_path}",
-        f"- {details_path}",
     ]
+    transition_summary = _render_transition_summary(details)
+    if transition_summary is not None:
+        lines.append(f"Case changes: {transition_summary}")
+    lines.extend(
+        [
+            "Artifacts:",
+            f"- {report_path}",
+            f"- {details_path}",
+        ]
+    )
     if comparison.get("compatible") is False:
         lines.append("Warning: comparison is incompatible, but artifacts were still written.")
     return "\n".join(lines)
@@ -606,6 +618,26 @@ def _render_verdict_summary(details: dict[str, object]) -> str | None:
         count = raw_counts.get(verdict)
         if type(count) is int and count > 0:
             parts.append(f"{verdict}={count}")
+    if not parts:
+        return None
+    return ", ".join(parts)
+
+
+def _render_transition_summary(details: dict[str, object]) -> str | None:
+    raw_counts = details.get("case_transition_counts")
+    if not isinstance(raw_counts, dict):
+        return None
+    ordered_keys = (
+        ("improvements", "improvements"),
+        ("regressions", "regressions"),
+        ("failure_type_swaps", "swaps"),
+        ("error_changes", "error_changes"),
+    )
+    parts: list[str] = []
+    for key, label in ordered_keys:
+        count = raw_counts.get(key)
+        if type(count) is int and count > 0:
+            parts.append(f"{label}={count}")
     if not parts:
         return None
     return ", ".join(parts)

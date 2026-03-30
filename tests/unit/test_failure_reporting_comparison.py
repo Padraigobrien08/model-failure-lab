@@ -31,6 +31,16 @@ class ComparisonClassifier:
         return ClassifierResult(failure_type="no_failure", confidence=0.2)
 
 
+class ComparisonFailingAdapter:
+    def generate(self, request: ModelRequest) -> ModelResult:
+        if "shared flaky" in request.prompt.lower() and request.model == "baseline-model":
+            raise TimeoutError("Request timed out")
+        return ModelResult(
+            text=f"model:{request.model}::{request.prompt}",
+            metadata=ModelMetadata(model=request.model, latency_ms=7.0),
+        )
+
+
 def test_build_comparison_report_surfaces_shared_and_missing_case_accounting(tmp_path) -> None:
     adapter_id = "unit-comparison-adapter-main"
     classifier_id = "unit-comparison-classifier-main"
@@ -95,16 +105,94 @@ def test_build_comparison_report_surfaces_shared_and_missing_case_accounting(tmp
     assert built.report.status == {"overall": "improved"}
     assert built.details["baseline_only_case_ids"] == ["case-001"]
     assert built.details["candidate_only_case_ids"] == ["case-004"]
+    assert built.details["case_transition_counts"] == {
+        "improvements": 1,
+        "regressions": 0,
+        "failure_type_swaps": 0,
+        "error_changes": 0,
+    }
+    assert built.details["case_transition_summary"] == [
+        {
+            "transition_type": "failure_to_no_failure",
+            "label": "failure -> no_failure",
+            "count": 1,
+            "case_ids": ["case-002"],
+        }
+    ]
     assert built.details["case_deltas"] == [
         {
             "case_id": "case-002",
+            "prompt": "shared improvement",
+            "tags": [],
+            "transition_type": "failure_to_no_failure",
+            "transition_label": "failure -> no_failure",
             "baseline_failure_type": "reasoning",
             "candidate_failure_type": "no_failure",
+            "baseline_expectation_verdict": None,
+            "candidate_expectation_verdict": None,
             "baseline_error_stage": None,
             "candidate_error_stage": None,
+            "baseline_explanation": None,
+            "candidate_explanation": None,
             "changed": True,
         }
     ]
+
+
+def test_build_comparison_report_surfaces_error_state_changes(tmp_path) -> None:
+    adapter_id = "unit-comparison-adapter-errors"
+    classifier_id = "unit-comparison-classifier-errors"
+    register_model(adapter_id, ComparisonFailingAdapter)
+    register_classifier(classifier_id, ComparisonClassifier())
+
+    baseline_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-001", prompt="shared flaky"),),
+        ),
+        model="baseline-model",
+        seed=51,
+        suffix_minutes=0,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+    candidate_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-001", prompt="shared flaky"),),
+        ),
+        model="candidate-model",
+        seed=52,
+        suffix_minutes=1,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+
+    built = build_comparison_report(
+        load_saved_run_artifacts(baseline_run_id, root=tmp_path),
+        load_saved_run_artifacts(candidate_run_id, root=tmp_path),
+        now=datetime(2026, 3, 30, 12, 47, 0, tzinfo=timezone.utc),
+    )
+
+    assert built.details["case_transition_counts"] == {
+        "improvements": 0,
+        "regressions": 0,
+        "failure_type_swaps": 0,
+        "error_changes": 1,
+    }
+    assert built.details["case_transition_summary"] == [
+        {
+            "transition_type": "error_cleared",
+            "label": "error cleared",
+            "count": 1,
+            "case_ids": ["case-001"],
+        }
+    ]
+    assert built.details["case_deltas"][0]["transition_type"] == "error_cleared"
+    assert built.details["case_deltas"][0]["baseline_error_stage"] == "model_invoke"
+    assert built.details["case_deltas"][0]["candidate_error_stage"] is None
 
 
 def test_build_comparison_report_flags_incompatible_datasets(tmp_path) -> None:
@@ -207,6 +295,7 @@ def test_write_comparison_report_artifacts_persists_summary_and_detail_payloads(
     assert report_payload["status"]["overall"] == "improved"
     assert details_payload["comparison_mode"] == "baseline_to_candidate"
     assert details_payload["compatibility"]["shared_case_count"] == 2
+    assert details_payload["case_transition_counts"]["improvements"] == 1
 
 
 def _write_saved_run(

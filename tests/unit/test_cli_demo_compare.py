@@ -8,8 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import model_failure_lab.runner.execute as runner_execute_module
+from model_failure_lab.adapters import ModelMetadata, ModelRequest, ModelResult, register_model
+from model_failure_lab.classifiers import ClassifierInput, ClassifierResult, register_classifier
 from model_failure_lab.cli import main
 from model_failure_lab.datasets import FailureDataset, demo_dataset_path
+from model_failure_lab.runner import execute_dataset_run, write_run_artifacts
 from model_failure_lab.schemas import PromptCase
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -28,6 +31,46 @@ def _module_env() -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC_ROOT)
     return env
+
+
+class CompareCliAdapter:
+    def generate(self, request: ModelRequest) -> ModelResult:
+        return ModelResult(
+            text=f"model:{request.model}::{request.prompt}",
+            metadata=ModelMetadata(model=request.model, latency_ms=5.0),
+        )
+
+
+class CompareCliClassifier:
+    def __call__(self, classifier_input: ClassifierInput) -> ClassifierResult:
+        output = classifier_input.output.text.lower()
+        if "shared improvement" in output and "baseline-model" in output:
+            return ClassifierResult(failure_type="reasoning", confidence=0.8)
+        if "shared stable failure" in output:
+            return ClassifierResult(failure_type="hallucination", confidence=0.7)
+        return ClassifierResult(failure_type="no_failure", confidence=0.2)
+
+
+def _write_saved_run(
+    root: Path,
+    *,
+    dataset: FailureDataset,
+    model: str,
+    seed: int,
+    suffix_minutes: int,
+    adapter_id: str,
+    classifier_id: str,
+) -> Path:
+    execution = execute_dataset_run(
+        dataset=dataset,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+        model=model,
+        run_seed=seed,
+        now=datetime(2026, 3, 30, 14, suffix_minutes, 0, tzinfo=timezone.utc),
+    )
+    run_path, _ = write_run_artifacts(execution, root=root)
+    return run_path
 
 
 def test_demo_command_uses_bundled_dataset_and_writes_normal_artifacts(tmp_path, capsys) -> None:
@@ -148,6 +191,7 @@ def test_compare_command_writes_artifacts_and_keeps_incompatible_results_non_fat
     assert "Failure Lab Compare" in captured.out
     assert "Status: incompatible_dataset" in captured.out
     assert "Compatible: False" in captured.out
+    assert "Case changes:" not in captured.out
     assert "Warning: comparison is incompatible" in captured.out
 
     report_dirs = sorted((tmp_path / "reports").iterdir())
@@ -231,3 +275,59 @@ def test_compare_command_handles_rapid_same_dataset_runs_without_sleep(
     assert "Failure Lab Compare" in captured.out
     assert "Compatible: True" in captured.out
     assert "Status: unchanged" in captured.out
+    assert "Case changes:" not in captured.out
+
+
+def test_compare_command_surfaces_directional_transition_summary(tmp_path, capsys) -> None:
+    adapter_id = "unit-cli-compare-adapter"
+    classifier_id = "unit-cli-compare-classifier"
+    register_model(adapter_id, CompareCliAdapter)
+    register_classifier(classifier_id, CompareCliClassifier())
+
+    baseline_path = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+        model="baseline-model",
+        seed=61,
+        suffix_minutes=0,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+    candidate_path = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+        model="candidate-model",
+        seed=62,
+        suffix_minutes=1,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+
+    exit_code = main(
+        [
+            "compare",
+            str(baseline_path),
+            str(candidate_path),
+            "--root",
+            str(tmp_path),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Failure Lab Compare" in captured.out
+    assert "Status: improved" in captured.out
+    assert "Compatible: True" in captured.out
+    assert "Case changes: improvements=1" in captured.out
