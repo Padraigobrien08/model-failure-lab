@@ -35,14 +35,37 @@ def test_classifier_expectations_accept_string_or_list_rubric() -> None:
     assert multiple.constraints == ("cite sources",)
 
 
+def test_classifier_expectations_accept_grounding_fields() -> None:
+    expectations = ClassifierExpectations.from_payload(
+        {
+            "context": "Source A: the launch is scheduled for Friday.",
+            "evidence_items": ["launch is scheduled for Friday"],
+            "required_sources": ["source-a"],
+            "grounding_notes": "Use only supplied sources.",
+        }
+    )
+
+    assert expectations.context == "Source A: the launch is scheduled for Friday."
+    assert expectations.evidence_items == ("launch is scheduled for Friday",)
+    assert expectations.required_sources == ("source-a",)
+    assert expectations.grounding_notes == "Use only supplied sources."
+
+
 def test_classifier_result_round_trips_optional_fields() -> None:
     result = ClassifierResult(
         failure_type="reasoning",
+        failure_subtype="arithmetic",
         confidence=0.8,
         explanation="Output contradicts the expected answer.",
     )
 
     assert ClassifierResult.from_payload(result.to_payload()) == result
+
+
+def test_classifier_result_normalizes_legacy_taxonomy_labels() -> None:
+    result = ClassifierResult(failure_type="instruction", confidence=0.7)
+
+    assert result.failure_type == "instruction_following"
 
 
 def test_register_classifier_resolves_named_callable() -> None:
@@ -90,9 +113,38 @@ def test_heuristic_classifier_uses_constraints_before_falling_back() -> None:
         )
     )
 
-    assert result.failure_type == "instruction"
+    assert result.failure_type == "instruction_following"
     assert result.confidence == 0.7
     assert result.explanation == "Output misses required constraint: cite sources."
+
+
+def test_heuristic_classifier_flags_missing_required_source() -> None:
+    result = heuristic_classifier(
+        ClassifierInput(
+            output=ModelResult(text="Answer using the supplied notes only."),
+            expectations=ClassifierExpectations(required_sources=("source_alpha",)),
+        )
+    )
+
+    assert result.failure_type == "instruction_following"
+    assert result.confidence == 0.75
+    assert result.explanation == "Output misses required source: source_alpha."
+
+
+def test_heuristic_classifier_flags_missing_grounding_as_hallucination() -> None:
+    result = heuristic_classifier(
+        ClassifierInput(
+            output=ModelResult(text="This answer adds unsupported details."),
+            expectations=ClassifierExpectations(
+                context="Source A says the rollout starts next week.",
+                evidence_items=("rollout starts next week",),
+            ),
+        )
+    )
+
+    assert result.failure_type == "hallucination"
+    assert result.confidence == 0.72
+    assert result.explanation == "Output is not grounded in the provided evidence."
 
 
 def test_heuristic_classifier_detects_hallucination_markers() -> None:

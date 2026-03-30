@@ -29,6 +29,20 @@ def heuristic_classifier(classifier_input: ClassifierInput) -> ClassifierResult:
                 explanation="Output does not match the reference answer.",
             )
 
+    if expectations and expectations.required_sources:
+        missing_sources = [
+            source
+            for source in expectations.required_sources
+            if _normalize_text(source) not in output_text
+        ]
+        if missing_sources:
+            missing = missing_sources[0]
+            return ClassifierResult(
+                failure_type="instruction_following",
+                confidence=0.75,
+                explanation=f"Output misses required source: {missing}.",
+            )
+
     if expectations and expectations.constraints:
         missing_constraints = [
             constraint
@@ -38,9 +52,29 @@ def heuristic_classifier(classifier_input: ClassifierInput) -> ClassifierResult:
         if missing_constraints:
             missing = missing_constraints[0]
             return ClassifierResult(
-                failure_type="instruction",
+                failure_type="instruction_following",
                 confidence=0.7,
                 explanation=f"Output misses required constraint: {missing}.",
+            )
+
+    if expectations and expectations.evidence_items:
+        matched_evidence = [
+            evidence
+            for evidence in expectations.evidence_items
+            if _normalize_text(evidence) in output_text
+        ]
+        if not matched_evidence:
+            if expectations.reference_answer is None and not expectations.required_sources:
+                return ClassifierResult(
+                    failure_type="hallucination",
+                    confidence=0.72,
+                    explanation="Output is not grounded in the provided evidence.",
+                )
+            missing = expectations.evidence_items[0]
+            return ClassifierResult(
+                failure_type="reasoning",
+                confidence=0.78,
+                explanation=f"Output misses grounded evidence: {missing}.",
             )
 
     if any(marker in output_text for marker in _HALLUCINATION_MARKERS):

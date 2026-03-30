@@ -7,12 +7,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from model_failure_lab.runner import CaseExecution
-from model_failure_lab.schemas import JsonValue, Report
+from model_failure_lab.schemas import JsonValue, NO_FAILURE_TYPE, Report
 
 from .load import SavedRunArtifacts
-
-NO_FAILURE_TYPE = "no_failure"
-
 
 @dataclass(slots=True, frozen=True)
 class CaseSummary:

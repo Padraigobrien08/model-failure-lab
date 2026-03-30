@@ -14,6 +14,7 @@ from .contracts import (
     CaseClassification,
     CaseError,
     CaseExecution,
+    CaseExpectationAssessment,
     CaseOutput,
     ExecutionMetadata,
     PromptSnapshot,
@@ -110,9 +111,10 @@ def execute_dataset_run(
         try:
             classifier_input = ClassifierInput(
                 output=model_result,
-                expectations=prompt.expectations,
+                expectations=prompt.to_classifier_expectations(),
             )
             classification_result = classifier(classifier_input)
+            classification = CaseClassification.from_classifier_result(classification_result)
         except Exception as exc:
             case_results.append(
                 CaseExecution(
@@ -121,6 +123,10 @@ def execute_dataset_run(
                     execution=execution,
                     output=output,
                     error=CaseError.from_exception(stage="classify", exc=exc),
+                    expectation=CaseExpectationAssessment.from_prompt_and_classification(
+                        prompt=prompt,
+                        classification=None,
+                    ),
                 )
             )
             continue
@@ -131,7 +137,11 @@ def execute_dataset_run(
                 prompt=prompt,
                 execution=execution,
                 output=output,
-                classification=CaseClassification.from_classifier_result(classification_result),
+                classification=classification,
+                expectation=CaseExpectationAssessment.from_prompt_and_classification(
+                    prompt=prompt,
+                    classification=classification,
+                ),
             )
         )
 

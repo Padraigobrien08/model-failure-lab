@@ -10,7 +10,7 @@ from model_failure_lab.adapters import ModelMetadata, ModelRequest, ModelResult,
 from model_failure_lab.classifiers import ClassifierInput, ClassifierResult, register_classifier
 from model_failure_lab.datasets import FailureDataset
 from model_failure_lab.runner import execute_dataset_run, write_run_artifacts
-from model_failure_lab.schemas import PromptCase, Run
+from model_failure_lab.schemas import PromptCase, PromptExpectations, Run
 from model_failure_lab.storage import read_json
 
 
@@ -39,7 +39,13 @@ def test_execute_dataset_run_completes_successfully_with_builtins() -> None:
     dataset = FailureDataset(
         dataset_id="reasoning-basics-v1",
         name="Reasoning Basics",
-        cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        cases=(
+            PromptCase(
+                id="case-001",
+                prompt="Explain why 2 + 2 = 4.",
+                expectations=PromptExpectations(expected_failure="no_failure"),
+            ),
+        ),
     )
 
     run_execution = execute_dataset_run(
@@ -58,6 +64,7 @@ def test_execute_dataset_run_completes_successfully_with_builtins() -> None:
     assert run_execution.case_results[0].output is not None
     assert run_execution.case_results[0].classification is not None
     assert run_execution.case_results[0].error is None
+    assert run_execution.case_results[0].expectation.expectation_verdict == "no_failure_as_expected"
 
 
 def test_execute_dataset_run_records_model_invoke_errors_per_case() -> None:
@@ -115,7 +122,13 @@ def test_execute_dataset_run_records_classifier_errors_per_case() -> None:
 def test_write_run_artifacts_persists_run_and_results_payloads(tmp_path) -> None:
     dataset = FailureDataset(
         dataset_id="reasoning-basics-v1",
-        cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        cases=(
+            PromptCase(
+                id="case-001",
+                prompt="Explain why 2 + 2 = 4.",
+                expectations=PromptExpectations(expected_failure="no_failure"),
+            ),
+        ),
     )
     run_execution = execute_dataset_run(
         dataset=dataset,
@@ -138,6 +151,11 @@ def test_write_run_artifacts_persists_run_and_results_payloads(tmp_path) -> None
     assert results_payload["total_cases"] == 1
     assert results_payload["cases"][0]["prompt"]["id"] == "case-001"
     assert results_payload["cases"][0]["execution"]["run_seed"] == 13
+    assert results_payload["cases"][0]["expectation"] == {
+        "expected_failure": {"failure_type": "no_failure"},
+        "observed_failure": {"failure_type": "no_failure"},
+        "expectation_verdict": "no_failure_as_expected",
+    }
 
 
 def test_write_run_artifacts_fails_fast_on_existing_artifact_paths(tmp_path) -> None:

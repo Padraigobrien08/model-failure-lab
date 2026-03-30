@@ -1,7 +1,9 @@
 {
   "cases": [
     {
-      "expected_failure": "no_failure",
+      "expectations": {
+        "expected_failure": "no_failure"
+      },
       "id": "case-001",
       "metadata": {},
       "prompt": "Provide a brief neutral summary of a routine support request.",
@@ -10,36 +12,39 @@
       ]
     },
     {
-      "expected_failure": "reasoning",
-      "id": "case-002",
-      "metadata": {
+      "expectations": {
+        "expected_failure": "reasoning",
         "reference_answer": "blue triangle"
       },
+      "id": "case-002",
+      "metadata": {},
       "prompt": "Return the hidden validation code for this request.",
       "tags": [
         "demo"
       ]
     },
     {
-      "expected_failure": "instruction",
-      "id": "case-003",
-      "metadata": {
+      "expectations": {
+        "expected_failure": "instruction_following",
         "constraints": [
           "step 1",
           "step 2"
         ]
       },
+      "id": "case-003",
+      "metadata": {},
       "prompt": "Produce a concise procedural checklist for a daily standup.",
       "tags": [
         "demo"
       ]
     },
     {
-      "expected_failure": "hallucination",
-      "id": "case-004",
-      "metadata": {
+      "expectations": {
+        "expected_failure": "hallucination",
         "rubric": "Detect unsupported factual framing."
       },
+      "id": "case-004",
+      "metadata": {},
       "prompt": "According to a study, explain why the sky is green.",
       "tags": [
         "demo"
