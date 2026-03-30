@@ -45,14 +45,19 @@ def reports_root(*, root: str | Path | None = None, create: bool = False) -> Pat
     return _ensure_dir(project_root(root) / "reports", create=create)
 
 
-def dataset_file(dataset_name: str, *, root: str | Path | None = None, create: bool = False) -> Path:
+def dataset_file(
+    dataset_name: str, *, root: str | Path | None = None, create: bool = False
+) -> Path:
     source = Path(dataset_name)
     dataset_id = _normalize_segment(source.stem if source.suffix else source.name)
     return datasets_root(root=root, create=create) / f"{dataset_id}.json"
 
 
 def run_directory(run_id: str, *, root: str | Path | None = None, create: bool = False) -> Path:
-    return _ensure_dir(runs_root(root=root, create=create) / _normalize_segment(run_id), create=create)
+    return _ensure_dir(
+        runs_root(root=root, create=create) / _normalize_segment(run_id),
+        create=create,
+    )
 
 
 def run_file(run_id: str, *, root: str | Path | None = None, create: bool = False) -> Path:
