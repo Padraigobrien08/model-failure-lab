@@ -3,6 +3,7 @@ import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from "react-rout
 
 import type { AppRouteContext } from "@/app/router";
 import { ComparisonsPage } from "@/app/routes/ComparisonsPage";
+import { ComparisonDetailPage } from "@/app/routes/ComparisonDetailPage";
 import { RunDetailPage } from "@/app/routes/RunDetailPage";
 import { RunsPage } from "@/app/routes/RunsPage";
 import { TraceShell } from "@/components/layout/TraceShell";
@@ -297,7 +298,7 @@ function AppFrame({
         <Route path="/runs" element={<Navigate to="/" replace />} />
         <Route path="/runs/:runId" element={<RunDetailPage />} />
         <Route path="/comparisons" element={<ComparisonsPage />} />
-        <Route path="/comparisons/:reportId" element={<ComparisonsPage />} />
+        <Route path="/comparisons/:reportId" element={<ComparisonDetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

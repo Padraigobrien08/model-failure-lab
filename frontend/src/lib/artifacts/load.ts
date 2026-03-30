@@ -1,5 +1,6 @@
 import {
   ARTIFACT_OVERVIEW_PATH,
+  COMPARISON_DETAIL_PATH,
   COMPARISONS_INDEX_PATH,
   DEFAULT_ARTIFACT_SOURCE,
   RUN_DETAIL_PATH,
@@ -7,8 +8,13 @@ import {
   type ArtifactCollectionSummary,
   type ArtifactOverview,
   type ArtifactOverviewStatus,
+  type ComparisonCaseDeltaRecord,
+  type ComparisonDetail,
+  type ComparisonDeltaMetrics,
   type ComparisonInventory,
   type ComparisonInventoryItem,
+  type ComparisonMetricsSnapshot,
+  type ComparisonTransitionSummaryRow,
   type ArtifactSourceDescriptor,
   type FailureLabelRecord,
   type RunCaseRecord,
@@ -395,9 +401,242 @@ export async function loadComparisonInventory(
   return validateComparisonInventory(payload);
 }
 
+export function buildComparisonDetailPath(reportId: string): string {
+  const params = new URLSearchParams({ reportId });
+  return `${COMPARISON_DETAIL_PATH}?${params.toString()}`;
+}
+
 export function buildRunDetailPath(runId: string): string {
   const params = new URLSearchParams({ runId });
   return `${RUN_DETAIL_PATH}?${params.toString()}`;
+}
+
+function requireComparisonMetricsSnapshot(
+  value: unknown,
+  field: string,
+): ComparisonMetricsSnapshot {
+  const metrics = requireObject(value, field);
+  return {
+    attemptedCaseCount: requireCount(metrics.attemptedCaseCount, `${field}.attemptedCaseCount`),
+    classifiedCaseCount: requireCount(
+      metrics.classifiedCaseCount,
+      `${field}.classifiedCaseCount`,
+    ),
+    executionErrorCount: requireCount(
+      metrics.executionErrorCount,
+      `${field}.executionErrorCount`,
+    ),
+    unclassifiedCount: requireCount(metrics.unclassifiedCount, `${field}.unclassifiedCount`),
+    successfulModelInvocationCount: requireCount(
+      metrics.successfulModelInvocationCount,
+      `${field}.successfulModelInvocationCount`,
+    ),
+    failureRate: requireNumberOrNull(metrics.failureRate, `${field}.failureRate`),
+    classificationCoverage: requireNumberOrNull(
+      metrics.classificationCoverage,
+      `${field}.classificationCoverage`,
+    ),
+    executionSuccessRate: requireNumberOrNull(
+      metrics.executionSuccessRate,
+      `${field}.executionSuccessRate`,
+    ),
+  };
+}
+
+function requireComparisonDeltaMetrics(
+  value: unknown,
+  field: string,
+): ComparisonDeltaMetrics {
+  const metrics = requireObject(value, field);
+  return {
+    failureRate: requireNumberOrNull(metrics.failureRate, `${field}.failureRate`),
+    classificationCoverage: requireNumberOrNull(
+      metrics.classificationCoverage,
+      `${field}.classificationCoverage`,
+    ),
+    executionSuccessRate: requireNumberOrNull(
+      metrics.executionSuccessRate,
+      `${field}.executionSuccessRate`,
+    ),
+  };
+}
+
+function requireComparisonTransitionSummaryRows(
+  value: unknown,
+  field: string,
+): ComparisonTransitionSummaryRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      transitionType: requireString(row.transitionType, `${field}[${index}].transitionType`),
+      label: requireString(row.label, `${field}[${index}].label`),
+      count: requireCount(row.count, `${field}[${index}].count`),
+      caseIds: requireStringArray(row.caseIds, `${field}[${index}].caseIds`),
+    };
+  });
+}
+
+function requireComparisonCaseDeltas(
+  value: unknown,
+  field: string,
+): ComparisonCaseDeltaRecord[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      caseId: requireString(row.caseId, `${field}[${index}].caseId`),
+      prompt: requireString(row.prompt, `${field}[${index}].prompt`),
+      tags: requireStringArray(row.tags, `${field}[${index}].tags`),
+      transitionType: requireString(row.transitionType, `${field}[${index}].transitionType`),
+      transitionLabel: requireString(
+        row.transitionLabel,
+        `${field}[${index}].transitionLabel`,
+      ),
+      baselineFailureType: requireStringOrNull(
+        row.baselineFailureType,
+        `${field}[${index}].baselineFailureType`,
+      ),
+      candidateFailureType: requireStringOrNull(
+        row.candidateFailureType,
+        `${field}[${index}].candidateFailureType`,
+      ),
+      baselineExpectationVerdict: requireStringOrNull(
+        row.baselineExpectationVerdict,
+        `${field}[${index}].baselineExpectationVerdict`,
+      ),
+      candidateExpectationVerdict: requireStringOrNull(
+        row.candidateExpectationVerdict,
+        `${field}[${index}].candidateExpectationVerdict`,
+      ),
+      baselineErrorStage: requireStringOrNull(
+        row.baselineErrorStage,
+        `${field}[${index}].baselineErrorStage`,
+      ),
+      candidateErrorStage: requireStringOrNull(
+        row.candidateErrorStage,
+        `${field}[${index}].candidateErrorStage`,
+      ),
+      baselineExplanation: requireStringOrNull(
+        row.baselineExplanation,
+        `${field}[${index}].baselineExplanation`,
+      ),
+      candidateExplanation: requireStringOrNull(
+        row.candidateExplanation,
+        `${field}[${index}].candidateExplanation`,
+      ),
+    };
+  });
+}
+
+export function validateComparisonDetail(payload: unknown): ComparisonDetail {
+  const data = requireObject(payload, "comparison detail payload");
+  const comparison = requireObject(data.comparison, "comparison");
+  const metrics = requireObject(data.metrics, "metrics");
+  const coverage = requireObject(data.coverage, "coverage");
+  const transitions = requireObject(data.transitions, "transitions");
+
+  return {
+    source: requireSource(data.source, "source"),
+    comparison: {
+      reportId: requireString(comparison.reportId, "comparison.reportId"),
+      createdAt: requireString(comparison.createdAt, "comparison.createdAt"),
+      status: requireString(comparison.status, "comparison.status"),
+      baselineRunId: requireString(comparison.baselineRunId, "comparison.baselineRunId"),
+      candidateRunId: requireString(comparison.candidateRunId, "comparison.candidateRunId"),
+      dataset: requireStringOrNull(comparison.dataset, "comparison.dataset"),
+      baselineDataset: requireStringOrNull(
+        comparison.baselineDataset,
+        "comparison.baselineDataset",
+      ),
+      candidateDataset: requireStringOrNull(
+        comparison.candidateDataset,
+        "comparison.candidateDataset",
+      ),
+      compatible:
+        typeof comparison.compatible === "boolean"
+          ? comparison.compatible
+          : (() => {
+              throw new Error("comparison.compatible must be a boolean");
+            })(),
+      reason: requireStringOrNull(comparison.reason, "comparison.reason"),
+      comparisonMode: requireStringOrNull(
+        comparison.comparisonMode,
+        "comparison.comparisonMode",
+      ),
+      metricsComputedOn: requireStringOrNull(
+        comparison.metricsComputedOn,
+        "comparison.metricsComputedOn",
+      ),
+    },
+    metrics: {
+      baseline: requireComparisonMetricsSnapshot(metrics.baseline, "metrics.baseline"),
+      candidate: requireComparisonMetricsSnapshot(metrics.candidate, "metrics.candidate"),
+      delta: requireComparisonDeltaMetrics(metrics.delta, "metrics.delta"),
+    },
+    coverage: {
+      sharedCaseCount: requireCount(coverage.sharedCaseCount, "coverage.sharedCaseCount"),
+      baselineOnlyCaseCount: requireCount(
+        coverage.baselineOnlyCaseCount,
+        "coverage.baselineOnlyCaseCount",
+      ),
+      candidateOnlyCaseCount: requireCount(
+        coverage.candidateOnlyCaseCount,
+        "coverage.candidateOnlyCaseCount",
+      ),
+      sharedCaseIds: requireStringArray(coverage.sharedCaseIds, "coverage.sharedCaseIds"),
+      baselineOnlyCaseIds: requireStringArray(
+        coverage.baselineOnlyCaseIds,
+        "coverage.baselineOnlyCaseIds",
+      ),
+      candidateOnlyCaseIds: requireStringArray(
+        coverage.candidateOnlyCaseIds,
+        "coverage.candidateOnlyCaseIds",
+      ),
+    },
+    transitions: {
+      counts: requireIntRecord(transitions.counts, "transitions.counts"),
+      summary: requireComparisonTransitionSummaryRows(
+        transitions.summary,
+        "transitions.summary",
+      ),
+    },
+    caseDeltas: requireComparisonCaseDeltas(data.caseDeltas, "caseDeltas"),
+  };
+}
+
+export async function loadComparisonDetail(
+  reportId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ComparisonDetail> {
+  const response = await fetchImpl(buildComparisonDetailPath(reportId));
+  let payload: unknown = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    if (!response.ok) {
+      throw new Error(`comparison detail request failed with status ${response.status}`);
+    }
+    throw new Error("comparison detail response was not valid JSON");
+  }
+
+  if (!response.ok) {
+    const data = payload as Record<string, unknown> | null;
+    const message =
+      data !== null && typeof data.message === "string"
+        ? data.message
+        : `comparison detail request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return validateComparisonDetail(payload);
 }
 
 export function validateRunDetail(payload: unknown): RunDetail {

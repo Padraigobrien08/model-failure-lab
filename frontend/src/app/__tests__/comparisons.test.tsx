@@ -1,9 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { afterEach, vi } from "vitest";
 
 import { App } from "@/app/App";
 import type {
   ArtifactShellState,
+  ComparisonDetail,
   ComparisonInventoryItem,
   ComparisonInventoryState,
   RunInventoryState,
@@ -83,7 +85,127 @@ function buildReadyComparisonInventoryState(
   };
 }
 
+function buildComparisonDetail(reportId: string): ComparisonDetail {
+  return {
+    source: {
+      label: "Repo root artifact store",
+      path: "/tmp/model-failure-lab",
+      runsPath: "/tmp/model-failure-lab/runs",
+      reportsPath: "/tmp/model-failure-lab/reports",
+    },
+    comparison: {
+      reportId,
+      createdAt: "2026-03-30T12:00:00Z",
+      status: "improved",
+      baselineRunId: "run_alpha",
+      candidateRunId: "run_beta",
+      dataset: "reasoning-failures-v1",
+      baselineDataset: null,
+      candidateDataset: null,
+      compatible: true,
+      reason: null,
+      comparisonMode: "baseline_to_candidate",
+      metricsComputedOn: "shared_cases_only",
+    },
+    metrics: {
+      baseline: {
+        attemptedCaseCount: 8,
+        classifiedCaseCount: 8,
+        executionErrorCount: 0,
+        unclassifiedCount: 0,
+        successfulModelInvocationCount: 8,
+        failureRate: 0.5,
+        classificationCoverage: 1,
+        executionSuccessRate: 1,
+      },
+      candidate: {
+        attemptedCaseCount: 8,
+        classifiedCaseCount: 8,
+        executionErrorCount: 0,
+        unclassifiedCount: 0,
+        successfulModelInvocationCount: 8,
+        failureRate: 0.25,
+        classificationCoverage: 1,
+        executionSuccessRate: 1,
+      },
+      delta: {
+        failureRate: -0.25,
+        classificationCoverage: 0,
+        executionSuccessRate: 0,
+      },
+    },
+    coverage: {
+      sharedCaseCount: 8,
+      baselineOnlyCaseCount: 1,
+      candidateOnlyCaseCount: 0,
+      sharedCaseIds: ["case-002", "case-003"],
+      baselineOnlyCaseIds: ["case-001"],
+      candidateOnlyCaseIds: [],
+    },
+    transitions: {
+      counts: {
+        improvements: 1,
+        regressions: 0,
+        failureTypeSwaps: 0,
+        errorChanges: 0,
+      },
+      summary: [
+        {
+          transitionType: "failure_to_no_failure",
+          label: "failure -> no_failure",
+          count: 1,
+          caseIds: ["case-002"],
+        },
+      ],
+    },
+    caseDeltas: [
+      {
+        caseId: "case-002",
+        prompt: "Answer using only the supplied source snippet.",
+        tags: ["core", "factuality"],
+        transitionType: "failure_to_no_failure",
+        transitionLabel: "failure -> no_failure",
+        baselineFailureType: "hallucination",
+        candidateFailureType: "no_failure",
+        baselineExpectationVerdict: "unexpected_failure",
+        candidateExpectationVerdict: "no_failure_as_expected",
+        baselineErrorStage: null,
+        candidateErrorStage: null,
+        baselineExplanation: "Unsupported factual framing detected.",
+        candidateExplanation: "No heuristic failure signal detected.",
+      },
+    ],
+  };
+}
+
+function mockComparisonDetail(detail: ComparisonDetail) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes(`/__failure_lab__/artifacts/comparison-detail.json?reportId=${detail.comparison.reportId}`)) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => detail,
+        } as Response;
+      }
+
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ message: `Unexpected request: ${url}` }),
+      } as Response;
+    }),
+  );
+}
+
 describe("comparisons route", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("renders a dense newest-first comparison inventory from the active source", () => {
     render(
       <App
@@ -148,6 +270,7 @@ describe("comparisons route", () => {
 
   it("opens the dedicated comparison route from row activation", async () => {
     const user = userEvent.setup();
+    mockComparisonDetail(buildComparisonDetail("compare_alpha_to_beta"));
 
     render(
       <App
@@ -175,6 +298,8 @@ describe("comparisons route", () => {
       await screen.findByRole("heading", { name: "compare_alpha_to_beta" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Comparison breadcrumb" })).toBeInTheDocument();
-    expect(screen.getByText("Selected comparison route is ready.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Directional change at a glance" }),
+    ).toBeInTheDocument();
   });
 });

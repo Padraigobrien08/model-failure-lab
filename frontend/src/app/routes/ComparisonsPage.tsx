@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
@@ -34,7 +34,6 @@ function compareComparisonsNewestFirst(
 
 export function ComparisonsPage() {
   const navigate = useNavigate();
-  const { reportId } = useParams();
   const { artifactState, artifactOverview, comparisonInventoryState } = useAppRouteContext();
 
   const inventory =
@@ -112,85 +111,6 @@ export function ComparisonsPage() {
     );
   }
 
-  if (reportId) {
-    const selectedComparison = inventory.comparisons.find((item) => item.reportId === reportId);
-    if (!selectedComparison) {
-      return (
-        <section className="space-y-4">
-          <Badge tone="default">Comparisons</Badge>
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparison not found.</CardTitle>
-              <CardDescription>
-                The requested comparison id is not present in the active inventory.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link className="text-sm font-semibold text-primary no-underline" to="/comparisons">
-                Back to comparisons
-              </Link>
-            </CardContent>
-          </Card>
-        </section>
-      );
-    }
-
-    return (
-      <section className="space-y-6">
-        <header className="space-y-4 border-b border-border/60 pb-5">
-          <nav
-            aria-label="Comparison breadcrumb"
-            className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
-          >
-            <Link className="font-semibold text-foreground no-underline" to="/comparisons">
-              Comparisons
-            </Link>
-            <span aria-hidden="true">/</span>
-            <span className="font-mono text-xs text-foreground">{selectedComparison.reportId}</span>
-          </nav>
-
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge tone="accent">Comparison detail</Badge>
-              <Badge tone="muted">{selectedComparison.baselineRunId}</Badge>
-              <Badge tone="muted">{selectedComparison.candidateRunId}</Badge>
-            </div>
-            <div className="space-y-1">
-              <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-                {selectedComparison.reportId}
-              </h1>
-              <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-                The dedicated comparison route handoff is now live. The full summary-first explorer
-                lands next in this phase.
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Selected comparison route is ready.</CardTitle>
-            <CardDescription>
-              The inventory now opens one dedicated comparison route per saved report instead of
-              keeping analysis trapped in the top-level list.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              Baseline <span className="font-mono text-foreground">{selectedComparison.baselineRunId}</span>
-            </p>
-            <p>
-              Candidate <span className="font-mono text-foreground">{selectedComparison.candidateRunId}</span>
-            </p>
-            <Link className="text-sm font-semibold text-primary no-underline" to="/comparisons">
-              Back to comparisons
-            </Link>
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
   return (
     <section className="space-y-6">
       <div className="space-y-3">
@@ -202,8 +122,8 @@ export function ComparisonsPage() {
           Saved comparisons inventory.
         </h1>
         <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-          The comparisons route now reads saved baseline-to-candidate reports from the engine
-          contract and renders them as a dense newest-first inventory you can scan and open.
+          The comparisons route reads saved baseline-to-candidate reports from the engine contract
+          and renders them as a dense newest-first inventory you can scan and open.
         </p>
       </div>
 
