@@ -33,3 +33,14 @@ def write_report_artifacts(
     write_json(report_path, build_report_payload(report))
     write_json(details_path, build_report_details_payload(details))
     return report_path, details_path
+
+
+def write_comparison_report_artifacts(
+    report: Report,
+    details: dict[str, JsonValue],
+    *,
+    root: str | Path | None = None,
+) -> tuple[Path, Path]:
+    """Persist one directional comparison report through the summary/detail report contract."""
+
+    return write_report_artifacts(report, details, root=root)
