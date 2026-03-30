@@ -5,16 +5,9 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
-from model_failure_lab.datasets import FailureDataset, load_dataset, load_demo_dataset
-from model_failure_lab.reporting.artifacts import (
-    write_comparison_report_artifacts,
-    write_report_artifacts,
-)
-from model_failure_lab.reporting.compare import build_comparison_report
-from model_failure_lab.reporting.core import build_run_report, summarize_case_executions
-from model_failure_lab.reporting.load import SavedRunArtifacts, load_saved_run_artifacts
+from model_failure_lab.datasets import load_dataset, load_demo_dataset
 from model_failure_lab.runner.artifacts import write_run_artifacts
 from model_failure_lab.runner.execute import DatasetRunExecution, execute_dataset_run
 from model_failure_lab.schemas import Run
@@ -25,6 +18,10 @@ from model_failure_lab.storage import (
     read_json,
     write_json,
 )
+
+if TYPE_CHECKING:
+    from model_failure_lab.datasets import FailureDataset
+    from model_failure_lab.reporting.load import SavedRunArtifacts
 
 CANONICAL_COMMAND = "failure-lab"
 COMPATIBILITY_COMMAND = "model-failure-lab"
@@ -164,8 +161,12 @@ def _handle_run(args: argparse.Namespace) -> int:
 def _handle_report(args: argparse.Namespace) -> int:
     root = _normalized_root(args.root)
     saved_run = _load_saved_run_reference(args.run_ref, root=root)
-    built = build_run_report(saved_run)
-    report_path, details_path = write_report_artifacts(built.report, built.details, root=root)
+    built = _build_run_report(saved_run)
+    report_path, details_path = _write_report_artifacts(
+        built.report,
+        built.details,
+        root=root,
+    )
     print(_render_report_summary(saved_run, built.report, report_path, details_path))
     return 0
 
@@ -174,8 +175,8 @@ def _handle_compare(args: argparse.Namespace) -> int:
     root = _normalized_root(args.root)
     baseline = _load_saved_run_reference(args.baseline, root=root)
     candidate = _load_saved_run_reference(args.candidate, root=root)
-    built = build_comparison_report(baseline, candidate)
-    report_path, details_path = write_comparison_report_artifacts(
+    built = _build_comparison_report(baseline, candidate)
+    report_path, details_path = _write_comparison_report_artifacts(
         built.report,
         built.details,
         root=root,
@@ -196,8 +197,12 @@ def _handle_demo(args: argparse.Namespace) -> int:
         run_seed=DEFAULT_RUN_SEED,
     )
     run_path, results_path = write_run_artifacts(execution, root=root)
-    built = build_run_report(load_saved_run_artifacts(execution.run.run_id, root=root))
-    report_path, details_path = write_report_artifacts(built.report, built.details, root=root)
+    built = _build_run_report(_load_saved_run_reference(execution.run.run_id, root=root))
+    report_path, details_path = _write_report_artifacts(
+        built.report,
+        built.details,
+        root=root,
+    )
     print(
         _render_demo_summary(
             dataset=dataset,
@@ -231,6 +236,8 @@ def _resolve_dataset_reference(reference: str, *, root: Path | None) -> Path:
 
 
 def _load_saved_run_reference(reference: str, *, root: Path | None) -> SavedRunArtifacts:
+    from model_failure_lab.reporting.load import load_saved_run_artifacts
+
     source = Path(reference)
     if source.exists():
         run_path = _resolve_run_json_path(source)
@@ -289,13 +296,43 @@ def _write_dataset_snapshot(dataset: FailureDataset, *, root: Path | None) -> Pa
     return dataset_path
 
 
+def _build_run_report(saved_run: SavedRunArtifacts):
+    from model_failure_lab.reporting.core import build_run_report
+
+    return build_run_report(saved_run)
+
+
+def _build_comparison_report(baseline: SavedRunArtifacts, candidate: SavedRunArtifacts):
+    from model_failure_lab.reporting.compare import build_comparison_report
+
+    return build_comparison_report(baseline, candidate)
+
+
+def _write_report_artifacts(report, details, *, root: Path | None):
+    from model_failure_lab.reporting.artifacts import write_report_artifacts
+
+    return write_report_artifacts(report, details, root=root)
+
+
+def _write_comparison_report_artifacts(report, details, *, root: Path | None):
+    from model_failure_lab.reporting.artifacts import write_comparison_report_artifacts
+
+    return write_comparison_report_artifacts(report, details, root=root)
+
+
+def _summarize_case_results(case_results):
+    from model_failure_lab.reporting.core import summarize_case_executions
+
+    return summarize_case_executions(case_results)
+
+
 def _render_run_summary(
     execution: DatasetRunExecution,
     dataset: FailureDataset,
     run_path: Path,
     results_path: Path,
 ) -> str:
-    summary = summarize_case_executions(execution.case_results)
+    summary = _summarize_case_results(execution.case_results)
     metrics = summary.metrics_payload()
     lines = [
         "Failure Lab Run",
@@ -363,7 +400,7 @@ def _render_demo_summary(
     details_path: Path,
     report_id: str,
 ) -> str:
-    summary = summarize_case_executions(execution.case_results)
+    summary = _summarize_case_results(execution.case_results)
     metrics = summary.metrics_payload()
     lines = [
         "Failure Lab Demo",
@@ -415,6 +452,7 @@ def _render_compare_summary(report, report_path: Path, details_path: Path) -> st
     if comparison.get("compatible") is False:
         lines.append("Warning: comparison is incompatible, but artifacts were still written.")
     return "\n".join(lines)
+
 
 def _format_rate(value: object) -> str:
     if isinstance(value, (int, float)):

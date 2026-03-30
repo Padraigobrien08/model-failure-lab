@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import subprocess
 import sys
 import tomllib
-import importlib
 from pathlib import Path
 
 from model_failure_lab.cli import main
@@ -69,6 +69,11 @@ def test_cli_module_import_does_not_load_matplotlib() -> None:
     importlib.import_module("model_failure_lab.cli")
 
     assert "matplotlib" not in sys.modules
+    assert not any(
+        name == "model_failure_lab.reporting"
+        or name.startswith("model_failure_lab.reporting.")
+        for name in sys.modules
+    )
 
 
 def test_run_command_supports_direct_dataset_paths_and_writes_artifacts(tmp_path, capsys) -> None:

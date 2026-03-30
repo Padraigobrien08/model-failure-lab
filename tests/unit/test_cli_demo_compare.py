@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from model_failure_lab.cli import main
 from model_failure_lab.datasets import FailureDataset, demo_dataset_path
 from model_failure_lab.schemas import PromptCase
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = PROJECT_ROOT / "src"
 
 
 def _write_dataset(path: Path, dataset: FailureDataset) -> None:
@@ -14,6 +20,12 @@ def _write_dataset(path: Path, dataset: FailureDataset) -> None:
         json.dumps(dataset.to_payload(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _module_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(SRC_ROOT)
+    return env
 
 
 def test_demo_command_uses_bundled_dataset_and_writes_normal_artifacts(tmp_path, capsys) -> None:
@@ -36,6 +48,31 @@ def test_demo_command_uses_bundled_dataset_and_writes_normal_artifacts(tmp_path,
     assert (run_dirs[0] / "results.json").exists()
     assert (report_dirs[0] / "report.json").exists()
     assert (report_dirs[0] / "report_details.json").exists()
+
+
+def test_demo_module_entrypoint_stays_quiet_on_normal_flow(tmp_path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "model_failure_lab",
+            "demo",
+            "--root",
+            str(tmp_path),
+        ],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    combined_output = f"{result.stdout}\n{result.stderr}"
+
+    assert result.returncode == 0
+    assert "Failure Lab Demo" in result.stdout
+    assert "font cache" not in combined_output
+    assert "fontManager" not in combined_output
 
 
 def test_compare_command_writes_artifacts_and_keeps_incompatible_results_non_fatal(
