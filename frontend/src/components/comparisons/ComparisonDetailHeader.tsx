@@ -6,6 +6,7 @@ import { formatLabel } from "@/lib/formatters";
 
 type ComparisonDetailHeaderProps = {
   comparison: ComparisonDetail["comparison"];
+  inventoryHref: string;
 };
 
 function formatTimestamp(createdAt: string): string {
@@ -53,6 +54,7 @@ function datasetBadgeText(comparison: ComparisonDetail["comparison"]): string {
 
 export function ComparisonDetailHeader({
   comparison,
+  inventoryHref,
 }: ComparisonDetailHeaderProps) {
   return (
     <header className="space-y-4 border-b border-border/60 pb-5">
@@ -60,7 +62,7 @@ export function ComparisonDetailHeader({
         aria-label="Comparison breadcrumb"
         className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
       >
-        <Link className="font-semibold text-foreground no-underline" to="/comparisons">
+        <Link className="font-semibold text-foreground no-underline" to={inventoryHref}>
           Comparisons
         </Link>
         <span aria-hidden="true">/</span>
@@ -70,8 +72,18 @@ export function ComparisonDetailHeader({
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Comparison detail</Badge>
-          <Badge tone="muted">{comparison.baselineRunId}</Badge>
-          <Badge tone="muted">{comparison.candidateRunId}</Badge>
+          <Link
+            className="rounded-full text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            to={`/runs/${encodeURIComponent(comparison.baselineRunId)}`}
+          >
+            <Badge tone="muted">{comparison.baselineRunId}</Badge>
+          </Link>
+          <Link
+            className="rounded-full text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            to={`/runs/${encodeURIComponent(comparison.candidateRunId)}`}
+          >
+            <Badge tone="muted">{comparison.candidateRunId}</Badge>
+          </Link>
           <Badge tone="muted">{datasetBadgeText(comparison)}</Badge>
           <Badge tone={statusTone(comparison.compatible, comparison.status)}>
             {formatLabel(comparison.status)}

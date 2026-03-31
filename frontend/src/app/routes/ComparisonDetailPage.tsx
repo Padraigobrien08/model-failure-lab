@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
 import { loadComparisonDetail } from "@/lib/artifacts/load";
 import type {
   ComparisonCaseDeltaRecord,
@@ -34,6 +35,7 @@ function selectCasesByOrder(
 
 export function ComparisonDetailPage() {
   const { reportId } = useParams();
+  const location = useLocation();
   const { artifactState, comparisonInventoryState } = useAppRouteContext();
   const [detailState, setDetailState] = useState<ComparisonDetailState>({
     status: "idle",
@@ -45,6 +47,10 @@ export function ComparisonDetailPage() {
   const inventory =
     comparisonInventoryState.status === "ready" ? comparisonInventoryState.inventory : null;
   const comparison = inventory?.comparisons.find((item) => item.reportId === reportId);
+  const returnHref = useMemo(
+    () => resolveArtifactReturnHref(location.state, "/comparisons"),
+    [location.state],
+  );
 
   useEffect(() => {
     if (!reportId || comparison === undefined) {
@@ -189,7 +195,7 @@ export function ComparisonDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link className="text-sm font-semibold text-primary no-underline" to="/comparisons">
+            <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
               Back to comparisons
             </Link>
           </CardContent>
@@ -242,7 +248,7 @@ export function ComparisonDetailPage() {
 
   return (
     <section className="space-y-8">
-      <ComparisonDetailHeader comparison={detail.comparison} />
+      <ComparisonDetailHeader comparison={detail.comparison} inventoryHref={returnHref} />
 
       <ComparisonDeltaStrip metrics={detail.metrics} compatible={detail.comparison.compatible} />
 

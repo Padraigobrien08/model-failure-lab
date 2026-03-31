@@ -1,9 +1,13 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
 import { ComparisonInventoryTable } from "@/components/comparisons/ComparisonInventoryTable";
+import {
+  buildArtifactReturnState,
+  createSearchString,
+} from "@/lib/artifacts/navigation";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -34,6 +38,7 @@ function compareComparisonsNewestFirst(
 
 export function ComparisonsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { artifactState, artifactOverview, comparisonInventoryState } = useAppRouteContext();
 
   const inventory =
@@ -130,7 +135,12 @@ export function ComparisonsPage() {
       <ComparisonInventoryTable
         rows={sortedComparisons}
         onOpenComparison={(selectedReportId) =>
-          navigate(`/comparisons/${encodeURIComponent(selectedReportId)}`)
+          navigate(`/comparisons/${encodeURIComponent(selectedReportId)}`, {
+            state: buildArtifactReturnState(
+              "/comparisons",
+              createSearchString(searchParams),
+            ),
+          })
         }
       />
     </section>

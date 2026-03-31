@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, vi } from "vitest";
 
@@ -275,7 +275,7 @@ describe("comparisons route", () => {
     render(
       <App
         useMemoryRouter
-        initialEntries={["/comparisons"]}
+        initialEntries={["/comparisons?sort=timestamp_desc"]}
         initialArtifactState={buildReadyState(["compare_alpha_to_beta"])}
         initialRunInventoryState={buildReadyInventoryState()}
         initialComparisonInventoryState={buildReadyComparisonInventoryState([
@@ -297,7 +297,12 @@ describe("comparisons route", () => {
     expect(
       await screen.findByRole("heading", { name: "compare_alpha_to_beta" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Comparison breadcrumb" })).toBeInTheDocument();
+    const breadcrumb = screen.getByRole("navigation", { name: "Comparison breadcrumb" });
+    expect(breadcrumb).toBeInTheDocument();
+    expect(within(breadcrumb).getByRole("link", { name: "Comparisons" })).toHaveAttribute(
+      "href",
+      "/comparisons?sort=timestamp_desc",
+    );
     expect(
       screen.getByRole("heading", { name: "Directional change at a glance" }),
     ).toBeInTheDocument();

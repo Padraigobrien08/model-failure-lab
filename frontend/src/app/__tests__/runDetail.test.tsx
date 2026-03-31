@@ -51,7 +51,9 @@ function buildReadyInventoryState(runs: RunInventoryItem[]): RunInventoryState {
   };
 }
 
-function buildReadyComparisonInventoryState(): ComparisonInventoryState {
+function buildReadyComparisonInventoryState(
+  comparisons: ComparisonInventoryState["inventory"]["comparisons"] = [],
+): ComparisonInventoryState {
   return {
     status: "ready",
     inventory: {
@@ -61,7 +63,7 @@ function buildReadyComparisonInventoryState(): ComparisonInventoryState {
         runsPath: "/tmp/model-failure-lab/runs",
         reportsPath: "/tmp/model-failure-lab/reports",
       },
-      comparisons: [],
+      comparisons,
     },
     message: null,
   };
@@ -332,6 +334,39 @@ describe("run detail route", () => {
     );
     expect(screen.getByText("Request timed out")).toBeInTheDocument();
     expect(screen.getAllByText("Emit a structured answer.").length).toBeGreaterThan(0);
+  });
+
+  it("surfaces lightweight related comparison links when saved reports reference the run", async () => {
+    const detail = buildRunDetail(SAMPLE_RUN);
+    mockRunDetail(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/runs/run_gamma"]}
+        initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
+        initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState([
+          {
+            reportId: "compare_alpha_to_gamma",
+            baselineRunId: "run_alpha",
+            candidateRunId: "run_gamma",
+            dataset: "hallucination-failures-v1",
+            createdAt: "2026-03-30T12:30:00Z",
+            status: "improved",
+            compatible: true,
+          },
+        ])}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Saved comparisons touching this run" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "compare_alpha_to_gamma" }),
+    ).toHaveAttribute("href", "/comparisons/compare_alpha_to_gamma");
   });
 
   it("shows an explicit incompatible-detail state when the saved run payload cannot be read", async () => {

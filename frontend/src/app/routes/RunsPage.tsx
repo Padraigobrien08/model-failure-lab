@@ -1,10 +1,14 @@
-import { useDeferredValue, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useDeferredValue, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
 import { RunInventoryFilters } from "@/components/runs/RunInventoryFilters";
 import { RunInventoryTable } from "@/components/runs/RunInventoryTable";
+import {
+  buildArtifactReturnState,
+  createSearchString,
+} from "@/lib/artifacts/navigation";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -30,13 +34,57 @@ function compareRunsNewestFirst(left: RunInventoryItem, right: RunInventoryItem)
   return right.runId.localeCompare(left.runId);
 }
 
+const DEFAULT_SORT = "timestamp_desc";
+
+function readFilterValue(searchParams: URLSearchParams, key: string): string {
+  return searchParams.get(key) ?? "";
+}
+
+function readSort(searchParams: URLSearchParams): string {
+  return searchParams.get("sort") === DEFAULT_SORT ? DEFAULT_SORT : DEFAULT_SORT;
+}
+
+function buildRunsSearchParams(
+  current: URLSearchParams,
+  patch: Partial<{
+    q: string;
+    dataset: string;
+    model: string;
+    status: string;
+    sort: string;
+  }>,
+): URLSearchParams {
+  const next = new URLSearchParams(current);
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    if (typeof value === "string" && value.trim().length > 0) {
+      next.set(key, value);
+    } else {
+      next.delete(key);
+    }
+  }
+
+  const sort = next.get("sort");
+  if (sort === null || sort.length === 0 || sort === DEFAULT_SORT) {
+    next.delete("sort");
+  }
+
+  return next;
+}
+
 export function RunsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { artifactState, artifactOverview, runInventoryState } = useAppRouteContext();
-  const [query, setQuery] = useState("");
-  const [datasetFilter, setDatasetFilter] = useState("");
-  const [modelFilter, setModelFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const query = readFilterValue(searchParams, "q");
+  const datasetFilter = readFilterValue(searchParams, "dataset");
+  const modelFilter = readFilterValue(searchParams, "model");
+  const statusFilter = readFilterValue(searchParams, "status");
+  const sort = readSort(searchParams);
   const deferredQuery = useDeferredValue(query);
   const inventory = runInventoryState.status === "ready" ? runInventoryState.inventory : null;
   const runs = inventory?.runs ?? [];
@@ -82,8 +130,13 @@ export function RunsPage() {
         return true;
       })
       .slice()
-      .sort(compareRunsNewestFirst);
-  }, [datasetFilter, deferredQuery, modelFilter, runs, statusFilter]);
+      .sort((left, right) => {
+        if (sort === DEFAULT_SORT) {
+          return compareRunsNewestFirst(left, right);
+        }
+        return compareRunsNewestFirst(left, right);
+      });
+  }, [datasetFilter, deferredQuery, modelFilter, runs, sort, statusFilter]);
 
   if (artifactState.status !== "ready" || artifactOverview === null) {
     return <ArtifactStatePanel area="Runs" state={artifactState} />;
@@ -176,22 +229,41 @@ export function RunsPage() {
         datasetOptions={datasetOptions}
         modelOptions={modelOptions}
         statusOptions={statusOptions}
-        onSearchChange={setQuery}
-        onDatasetChange={setDatasetFilter}
-        onModelChange={setModelFilter}
-        onStatusChange={setStatusFilter}
+        onSearchChange={(value) =>
+          setSearchParams(buildRunsSearchParams(searchParams, { q: value, sort: DEFAULT_SORT }), {
+            replace: true,
+          })
+        }
+        onDatasetChange={(value) =>
+          setSearchParams(
+            buildRunsSearchParams(searchParams, { dataset: value, sort: DEFAULT_SORT }),
+            { replace: true },
+          )
+        }
+        onModelChange={(value) =>
+          setSearchParams(buildRunsSearchParams(searchParams, { model: value, sort: DEFAULT_SORT }), {
+            replace: true,
+          })
+        }
+        onStatusChange={(value) =>
+          setSearchParams(
+            buildRunsSearchParams(searchParams, { status: value, sort: DEFAULT_SORT }),
+            { replace: true },
+          )
+        }
         onClear={() => {
-          setQuery("");
-          setDatasetFilter("");
-          setModelFilter("");
-          setStatusFilter("");
+          setSearchParams(new URLSearchParams(), { replace: true });
         }}
       />
 
       {filteredRuns.length > 0 ? (
         <RunInventoryTable
           rows={filteredRuns}
-          onOpenRun={(runId) => navigate(`/runs/${encodeURIComponent(runId)}`)}
+          onOpenRun={(runId) =>
+            navigate(`/runs/${encodeURIComponent(runId)}`, {
+              state: buildArtifactReturnState("/", createSearchString(searchParams)),
+            })
+          }
         />
       ) : (
         <Card>

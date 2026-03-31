@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
@@ -18,12 +18,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
 import { loadRunDetail } from "@/lib/artifacts/load";
 import type {
   RunCaseLensKey,
   RunCaseRecord,
   RunDetailState,
 } from "@/lib/artifacts/types";
+import type { ComparisonInventoryItem } from "@/lib/artifacts/types";
 
 function selectCasesById(caseIds: string[], cases: RunCaseRecord[]): RunCaseRecord[] {
   const caseMap = new Map(cases.map((caseRow) => [caseRow.caseId, caseRow]));
@@ -61,7 +63,8 @@ function resolveLensCases(
 
 export function RunDetailPage() {
   const { runId } = useParams();
-  const { artifactState, runInventoryState } = useAppRouteContext();
+  const location = useLocation();
+  const { artifactState, runInventoryState, comparisonInventoryState } = useAppRouteContext();
   const [detailState, setDetailState] = useState<RunDetailState>({
     status: "idle",
     detail: null,
@@ -71,6 +74,10 @@ export function RunDetailPage() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const inventory = runInventoryState.status === "ready" ? runInventoryState.inventory : null;
   const run = inventory?.runs.find((item) => item.runId === runId);
+  const returnHref = useMemo(
+    () => resolveArtifactReturnHref(location.state, "/"),
+    [location.state],
+  );
 
   useEffect(() => {
     if (!runId || run === undefined) {
@@ -155,6 +162,33 @@ export function RunDetailPage() {
     return visibleCases.find((caseRow) => caseRow.caseId === selectedCaseId) ?? null;
   }, [selectedCaseId, visibleCases]);
 
+  const relatedComparisons = useMemo(() => {
+    if (comparisonInventoryState.status !== "ready" || !runId) {
+      return [];
+    }
+
+    return comparisonInventoryState.inventory.comparisons
+      .filter(
+        (comparison) =>
+          comparison.baselineRunId === runId || comparison.candidateRunId === runId,
+      )
+      .slice()
+      .sort((left, right) => {
+        const leftTime = Date.parse(left.createdAt);
+        const rightTime = Date.parse(right.createdAt);
+
+        if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
+          return rightTime - leftTime;
+        }
+
+        if (left.createdAt !== right.createdAt) {
+          return right.createdAt.localeCompare(left.createdAt);
+        }
+
+        return right.reportId.localeCompare(left.reportId);
+      });
+  }, [comparisonInventoryState, runId]);
+
   useEffect(() => {
     if (detailState.status !== "ready") {
       startTransition(() => {
@@ -235,7 +269,7 @@ export function RunDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link className="text-sm font-semibold text-primary no-underline" to="/">
+            <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
               Back to runs
             </Link>
           </CardContent>
@@ -295,6 +329,7 @@ export function RunDetailPage() {
         model={detail.run.model}
         status={detail.run.status}
         createdAt={detail.run.createdAt}
+        inventoryHref={returnHref}
       />
 
       <RunSummaryMetricStrip metrics={detail.metrics} />
@@ -306,6 +341,51 @@ export function RunDetailPage() {
       />
 
       <RunNotableCases cases={notableCases} />
+
+      {relatedComparisons.length > 0 ? (
+        <section className="space-y-3" aria-label="Related comparisons">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Related comparisons
+            </p>
+            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
+              Saved comparisons touching this run
+            </h2>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Jump directly into saved baseline-to-candidate reports that reference this run.
+            </p>
+          </div>
+
+          <Card>
+            <CardContent className="space-y-3 pt-6">
+              {relatedComparisons.map((comparison: ComparisonInventoryItem) => (
+                <div
+                  key={comparison.reportId}
+                  className="flex flex-col gap-2 border-b border-border/55 pb-3 last:border-b-0 last:pb-0 md:flex-row md:items-center md:justify-between"
+                >
+                  <div className="space-y-1">
+                    <Link
+                      className="font-mono text-sm font-semibold text-primary no-underline"
+                      to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
+                    >
+                      {comparison.reportId}
+                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                      {comparison.baselineRunId} vs {comparison.candidateRunId}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Badge tone="muted">{comparison.dataset ?? "Multiple datasets"}</Badge>
+                    <Badge tone={comparison.compatible ? "accent" : "default"}>
+                      {comparison.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="space-y-3" aria-label="Case inspection">
         <div className="space-y-3">
@@ -351,7 +431,7 @@ export function RunDetailPage() {
         )}
       </section>
 
-      <Link className="text-sm font-semibold text-primary no-underline" to="/">
+      <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
         Back to runs
       </Link>
     </section>

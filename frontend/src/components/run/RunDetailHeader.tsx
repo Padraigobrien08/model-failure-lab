@@ -8,6 +8,7 @@ type RunDetailHeaderProps = {
   model: string;
   status: string;
   createdAt: string;
+  inventoryHref: string;
 };
 
 function formatTimestamp(createdAt: string): string {
@@ -43,6 +44,7 @@ export function RunDetailHeader({
   model,
   status,
   createdAt,
+  inventoryHref,
 }: RunDetailHeaderProps) {
   return (
     <header className="space-y-4 border-b border-border/60 pb-5">
@@ -50,7 +52,7 @@ export function RunDetailHeader({
         aria-label="Run breadcrumb"
         className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
       >
-        <Link className="font-semibold text-foreground no-underline" to="/">
+        <Link className="font-semibold text-foreground no-underline" to={inventoryHref}>
           Runs
         </Link>
         <span aria-hidden="true">/</span>

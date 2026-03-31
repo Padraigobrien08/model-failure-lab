@@ -52,7 +52,9 @@ function buildReadyInventoryState(runs: RunInventoryItem[]): RunInventoryState {
   };
 }
 
-function buildReadyComparisonInventoryState(): ComparisonInventoryState {
+function buildReadyComparisonInventoryState(
+  comparisons: ComparisonInventoryState["inventory"]["comparisons"] = [],
+): ComparisonInventoryState {
   return {
     status: "ready",
     inventory: {
@@ -62,7 +64,7 @@ function buildReadyComparisonInventoryState(): ComparisonInventoryState {
         runsPath: "/tmp/model-failure-lab/runs",
         reportsPath: "/tmp/model-failure-lab/reports",
       },
-      comparisons: [],
+      comparisons,
     },
     message: null,
   };
@@ -275,6 +277,31 @@ describe("runs route", () => {
     expect(screen.getAllByRole("link", { name: /Open run /i })).toHaveLength(3);
   });
 
+  it("restores the runs inventory state from URL query params on first render", () => {
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={[
+          "/?q=gamma&dataset=hallucination-failures-v1&model=gpt-4.1-mini&status=completed_with_errors&sort=timestamp_desc",
+        ]}
+        initialArtifactState={buildReadyArtifactState(SAMPLE_RUNS.map((run) => run.runId))}
+        initialRunInventoryState={buildReadyInventoryState(SAMPLE_RUNS)}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(screen.getByRole("searchbox", { name: "Run id search" })).toHaveValue("gamma");
+    expect(screen.getByRole("combobox", { name: "Dataset" })).toHaveValue(
+      "hallucination-failures-v1",
+    );
+    expect(screen.getByRole("combobox", { name: "Model" })).toHaveValue("gpt-4.1-mini");
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue(
+      "completed_with_errors",
+    );
+    expect(screen.getAllByRole("link", { name: /Open run /i })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Open run run_gamma" })).toBeInTheDocument();
+  });
+
   it("opens the dedicated run route from both row activation and the explicit affordance", async () => {
     const user = userEvent.setup();
     mockRunDetail([SAMPLE_RUNS[1], SAMPLE_RUNS[2]]);
@@ -282,7 +309,9 @@ describe("runs route", () => {
     render(
       <App
         useMemoryRouter
-        initialEntries={["/"]}
+        initialEntries={[
+          "/?q=gamma&dataset=hallucination-failures-v1&model=gpt-4.1-mini&status=completed_with_errors&sort=timestamp_desc",
+        ]}
         initialArtifactState={buildReadyArtifactState(SAMPLE_RUNS.map((run) => run.runId))}
         initialRunInventoryState={buildReadyInventoryState(SAMPLE_RUNS)}
         initialComparisonInventoryState={buildReadyComparisonInventoryState()}
@@ -300,10 +329,13 @@ describe("runs route", () => {
     const backToRuns = screen.getAllByRole("link", { name: "Back to runs" })[0];
     await user.click(backToRuns);
 
-    const row = screen.getByRole("link", { name: "Open run run_beta" });
-    await user.click(within(row).getByRole("button", { name: "Open run_beta" }));
+    expect(screen.getByRole("searchbox", { name: "Run id search" })).toHaveValue("gamma");
+    expect(screen.getAllByRole("link", { name: /Open run /i })).toHaveLength(1);
+
+    const row = screen.getByRole("link", { name: "Open run run_gamma" });
+    await user.click(within(row).getByRole("button", { name: "Open run_gamma" }));
     expect(
-      await screen.findByRole("heading", { name: "run_beta" }),
+      await screen.findByRole("heading", { name: "run_gamma" }),
     ).toBeInTheDocument();
   });
 

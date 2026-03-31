@@ -4,6 +4,7 @@ import { afterEach, vi } from "vitest";
 import { App } from "@/app/App";
 import type {
   ArtifactShellState,
+  RunDetail,
   ComparisonDetail,
   ComparisonInventoryState,
   RunInventoryState,
@@ -306,6 +307,120 @@ function mockComparisonDetail(detail: ComparisonDetail) {
   );
 }
 
+function buildLinkedRunDetail(runId: string, dataset: string): RunDetail {
+  return {
+    source: {
+      label: "Repo root artifact store",
+      path: "/tmp/model-failure-lab",
+      runsPath: "/tmp/model-failure-lab/runs",
+      reportsPath: "/tmp/model-failure-lab/reports",
+    },
+    run: {
+      runId,
+      dataset,
+      model: "demo",
+      createdAt: "2026-03-30T12:10:00Z",
+      status: "completed",
+      reportId: `${runId}_report`,
+      adapterId: "demo",
+      classifierId: "heuristic_v1",
+      runSeed: 17,
+    },
+    metrics: {
+      attemptedCaseCount: 4,
+      classifiedCaseCount: 4,
+      executionErrorCount: 0,
+      unclassifiedCount: 0,
+      successfulModelInvocationCount: 4,
+      failureCaseCount: 1,
+      failureRate: 0.25,
+      classificationCoverage: 1,
+      executionSuccessRate: 1,
+    },
+    summary: {
+      failureTypes: [
+        { label: "hallucination", count: 1, share: 0.25, caseIds: ["case-002"] },
+      ],
+      expectationVerdicts: [
+        { label: "unexpected_failure", count: 1, share: 0.25, caseIds: ["case-002"] },
+      ],
+      tagSlices: [
+        {
+          tag: "core",
+          attemptedCaseCount: 4,
+          classifiedCaseCount: 4,
+          failureCaseCount: 1,
+          failureRate: 0.25,
+          expectationVerdictCounts: { unexpected_failure: 1 },
+        },
+      ],
+    },
+    lenses: {
+      mismatchCaseIds: ["case-002"],
+      notableCaseIds: ["case-002"],
+      allCaseIds: ["case-001", "case-002"],
+      errorCaseIds: [],
+    },
+    cases: [
+      {
+        caseId: "case-002",
+        promptId: "case-002",
+        prompt: "Answer using only the supplied source snippet.",
+        tags: ["core", "factuality"],
+        outputText: "Invented unsupported detail.",
+        expectation: {
+          expectedFailure: { failureType: "no_failure", failureSubtype: null },
+          observedFailure: { failureType: "hallucination", failureSubtype: null },
+          verdict: "unexpected_failure",
+        },
+        classification: {
+          failure: { failureType: "hallucination", failureSubtype: null },
+          confidence: 0.91,
+          explanation: "Unsupported factual framing detected.",
+        },
+        error: null,
+      },
+    ],
+  };
+}
+
+function mockComparisonAndRunDetails(detail: ComparisonDetail) {
+  const linkedRuns = new Map([
+    ["run_alpha", buildLinkedRunDetail("run_alpha", "reasoning-failures-v1")],
+    ["run_beta", buildLinkedRunDetail("run_beta", "reasoning-failures-v1")],
+  ]);
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes(`/__failure_lab__/artifacts/comparison-detail.json?reportId=${detail.comparison.reportId}`)) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => detail,
+        } as Response;
+      }
+
+      for (const [runId, runDetail] of linkedRuns) {
+        if (url.includes(`/__failure_lab__/artifacts/run-detail.json?runId=${runId}`)) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => runDetail,
+          } as Response;
+        }
+      }
+
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ message: `Unexpected request: ${url}` }),
+      } as Response;
+    }),
+  );
+}
+
 describe("comparison detail route", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -375,5 +490,30 @@ describe("comparison detail route", () => {
     expect(screen.getByText("case-001")).toBeInTheDocument();
     expect(screen.getByText("case-101")).toBeInTheDocument();
     expect(screen.getByText("No grouped transition changes are available.")).toBeInTheDocument();
+  });
+
+  it("links baseline and candidate identifiers directly into run detail routes", async () => {
+    mockComparisonAndRunDetails(buildCompatibleDetail());
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "compare_alpha_to_beta" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("link", { name: "run_alpha" }));
+
+    expect(await screen.findByRole("heading", { name: "run_alpha" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Failure types, verdicts, and tag slices" }),
+    ).toBeInTheDocument();
   });
 });
