@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
-    "preview": "vite preview",
+    "dev": "vite --config vite.config.ts",
+    "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts",
     "test": "vitest",
     "smoke:real-artifacts": "node scripts/smoke-real-artifacts.mjs"
   },

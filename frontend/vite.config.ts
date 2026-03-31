@@ -1542,7 +1542,6 @@ function failureLabArtifactsPlugin(): Plugin {
   function registerArtifactMiddleware(
     middlewares: {
       use: (
-        path: string,
         handler: (
           req: IncomingMessage,
           res: ServerResponse,
@@ -1551,20 +1550,35 @@ function failureLabArtifactsPlugin(): Plugin {
       ) => void;
     },
   ) {
-    middlewares.use(ARTIFACT_OVERVIEW_PATH, (req, res, next) => {
-      void handleArtifactOverview(req, res).catch(next);
-    });
-    middlewares.use(RUNS_INDEX_PATH, (req, res, next) => {
-      void handleRunsIndex(req, res).catch(next);
-    });
-    middlewares.use(COMPARISONS_INDEX_PATH, (req, res, next) => {
-      void handleComparisonsIndex(req, res).catch(next);
-    });
-    middlewares.use(COMPARISON_DETAIL_PATH, (req, res, next) => {
-      void handleComparisonDetail(req, res).catch(next);
-    });
-    middlewares.use(RUN_DETAIL_PATH, (req, res, next) => {
-      void handleRunDetail(req, res).catch(next);
+    middlewares.use((req, res, next) => {
+      const pathname = new URL(req.url ?? "/", "http://failure-lab.local").pathname;
+
+      if (pathname === ARTIFACT_OVERVIEW_PATH) {
+        void handleArtifactOverview(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === RUNS_INDEX_PATH) {
+        void handleRunsIndex(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === COMPARISONS_INDEX_PATH) {
+        void handleComparisonsIndex(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === COMPARISON_DETAIL_PATH) {
+        void handleComparisonDetail(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === RUN_DETAIL_PATH) {
+        void handleRunDetail(req, res).catch(next);
+        return;
+      }
+
+      next();
     });
   }
 
@@ -1573,7 +1587,6 @@ function failureLabArtifactsPlugin(): Plugin {
     configureServer(server: {
       middlewares: {
         use: (
-          path: string,
           handler: (
             req: IncomingMessage,
             res: ServerResponse,
@@ -1587,7 +1600,6 @@ function failureLabArtifactsPlugin(): Plugin {
     configurePreviewServer(server: {
       middlewares: {
         use: (
-          path: string,
           handler: (
             req: IncomingMessage,
             res: ServerResponse,
