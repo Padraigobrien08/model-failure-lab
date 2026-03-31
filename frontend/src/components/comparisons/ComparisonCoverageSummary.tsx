@@ -31,11 +31,15 @@ export function ComparisonCoverageSummary({
     <section className="space-y-4" aria-label="Comparison coverage">
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Coverage
+          Stage 2 · Coverage
         </p>
         <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-          Compatibility and shared-case scope
+          Scope and compatibility
         </h2>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          Keep the shared subset and missing-case context explicit so the transition evidence below
+          is read in the right scope.
+        </p>
       </div>
 
       <Card className="rounded-[24px] bg-card/75">
@@ -55,7 +59,7 @@ export function ComparisonCoverageSummary({
           <CardTitle className="text-lg">
             {comparison.compatible
               ? "Metrics and transitions are scoped explicitly."
-              : "The comparison is still readable even though the datasets do not align."}
+              : "The comparison stays readable even though the saved runs do not align cleanly."}
           </CardTitle>
         </CardHeader>
 

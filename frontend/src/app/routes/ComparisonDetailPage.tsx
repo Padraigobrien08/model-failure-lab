@@ -248,19 +248,123 @@ export function ComparisonDetailPage() {
 
   return (
     <section className="space-y-8">
-      <ComparisonDetailHeader comparison={detail.comparison} inventoryHref={returnHref} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] xl:items-start">
+        <div className="space-y-8">
+          <ComparisonDetailHeader comparison={detail.comparison} inventoryHref={returnHref} />
 
-      <ComparisonDeltaStrip metrics={detail.metrics} compatible={detail.comparison.compatible} />
+          <ComparisonDeltaStrip
+            metrics={detail.metrics}
+            compatible={detail.comparison.compatible}
+          />
 
-      <ComparisonCoverageSummary
-        comparison={detail.comparison}
-        coverage={detail.coverage}
-      />
+          <ComparisonCoverageSummary
+            comparison={detail.comparison}
+            coverage={detail.coverage}
+          />
+        </div>
+
+        <aside className="space-y-4 xl:sticky xl:top-28">
+          <Card className="rounded-[24px] border border-border/70 bg-card/75">
+            <CardHeader className="space-y-1 pb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Comparison context
+              </p>
+              <CardTitle className="text-lg">Keep the artifact graph visible</CardTitle>
+              <CardDescription>
+                Preserve the baseline/candidate lineage and scope while you inspect grouped
+                transition evidence below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3">
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Source root
+                  </p>
+                  <p className="mt-2 break-all font-mono text-xs text-foreground">
+                    {detail.source.path}
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Compare mode
+                    </p>
+                    <p className="mt-2 text-sm text-foreground">
+                      {detail.comparison.comparisonMode ?? "n/a"}
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Metrics scope
+                    </p>
+                    <p className="mt-2 text-sm text-foreground">
+                      {detail.comparison.metricsComputedOn ?? "n/a"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <Link
+                  className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
+                  to={`/runs/${encodeURIComponent(detail.comparison.baselineRunId)}`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Open baseline
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-foreground">
+                    {detail.comparison.baselineRunId}
+                  </p>
+                </Link>
+                <Link
+                  className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
+                  to={`/runs/${encodeURIComponent(detail.comparison.candidateRunId)}`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Open candidate
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-foreground">
+                    {detail.comparison.candidateRunId}
+                  </p>
+                </Link>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Shared cases
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                    {detail.coverage.sharedCaseCount}
+                  </p>
+                </div>
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Baseline only
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                    {detail.coverage.baselineOnlyCaseCount}
+                  </p>
+                </div>
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Candidate only
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                    {detail.coverage.candidateOnlyCaseCount}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
 
       <section className="space-y-4" aria-label="Case transitions">
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Transitions
+            Stage 3 · Transition evidence
           </p>
           <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
             Grouped case transitions
@@ -283,6 +387,10 @@ export function ComparisonDetailPage() {
           </div>
         </div>
       </section>
+
+      <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
+        Back to comparisons
+      </Link>
     </section>
   );
 }

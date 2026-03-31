@@ -447,12 +447,13 @@ describe("comparison detail route", () => {
       screen.getByRole("heading", { name: "Directional change at a glance" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Compatibility and shared-case scope" }),
+      screen.getByRole("heading", { name: "Scope and compatibility" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Shared-case analysis only")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Grouped case transitions" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Keep the artifact graph visible" })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "failure -> no_failure" }),
     ).toBeInTheDocument();
@@ -486,7 +487,11 @@ describe("comparison detail route", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Incompatible comparison: Dataset Mismatch")).toBeInTheDocument();
     expect(screen.getByText("reasoning-failures-v1 vs hallucination-failures-v1")).toBeInTheDocument();
-    expect(screen.getByText("The comparison is still readable even though the datasets do not align.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The comparison stays readable even though the saved runs do not align cleanly.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("case-001")).toBeInTheDocument();
     expect(screen.getByText("case-101")).toBeInTheDocument();
     expect(screen.getByText("No grouped transition changes are available.")).toBeInTheDocument();
@@ -512,8 +517,6 @@ describe("comparison detail route", () => {
     fireEvent.click(screen.getByRole("link", { name: "run_alpha" }));
 
     expect(await screen.findByRole("heading", { name: "run_alpha" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Failure types, verdicts, and tag slices" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
   });
 });

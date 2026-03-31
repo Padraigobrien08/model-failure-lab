@@ -20,7 +20,10 @@ export function ComparisonCaseDetailPanel({
   if (!caseDelta) {
     return (
       <Card className="rounded-[24px] border border-border/70 bg-card/70 shadow-panel">
-        <CardHeader>
+        <CardHeader className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Stage 4 · Selected evidence
+          </p>
           <CardTitle>Select a changed case</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
@@ -35,7 +38,8 @@ export function ComparisonCaseDetailPanel({
     <Card className="rounded-[24px] border border-border/70 bg-card/70 shadow-panel">
       <CardHeader className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="accent">Selected transition</Badge>
+          <Badge tone="accent">Stage 4</Badge>
+          <Badge tone="default">Selected transition evidence</Badge>
           <Badge tone="muted">{caseDelta.caseId}</Badge>
           {caseDelta.tags.map((tag) => (
             <Badge key={`${caseDelta.caseId}-${tag}`} tone="muted">
@@ -48,6 +52,10 @@ export function ComparisonCaseDetailPanel({
             Prompt
           </p>
           <CardTitle className="text-xl leading-8">{caseDelta.prompt}</CardTitle>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Compare the saved baseline and candidate explanations, verdicts, and failure labels in
+            one place before you move to the next transition.
+          </p>
         </div>
       </CardHeader>
 
