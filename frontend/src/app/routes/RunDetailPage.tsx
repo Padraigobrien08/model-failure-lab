@@ -420,13 +420,15 @@ export function RunDetailPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)] lg:items-start">
             <RunCaseTable
               cases={visibleCases}
               selectedCaseId={selectedCaseId}
               onSelectCase={setSelectedCaseId}
             />
-            <RunCaseDetailPanel caseRow={selectedCase} />
+            <div className="lg:sticky lg:top-6">
+              <RunCaseDetailPanel caseRow={selectedCase} />
+            </div>
           </div>
         )}
       </section>

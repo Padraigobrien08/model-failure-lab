@@ -9,6 +9,14 @@ type RunCaseTableProps = {
   onSelectCase: (caseId: string) => void;
 };
 
+function MobileLabel({ children }: { children: string }) {
+  return (
+    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:hidden">
+      {children}
+    </span>
+  );
+}
+
 function describeObservedFailure(caseRow: RunCaseRecord) {
   if (caseRow.error) {
     return formatLabel(caseRow.error.stage);
@@ -51,9 +59,12 @@ export function RunCaseTable({
 }: RunCaseTableProps) {
   return (
     <div className="overflow-hidden rounded-[24px] border border-border/70 bg-card/75 shadow-panel">
-      <div className="overflow-x-auto">
-        <table aria-label="Run cases" className="min-w-full border-collapse text-sm">
-          <thead className="bg-background/55">
+      <div className="md:overflow-x-auto">
+        <table
+          aria-label="Run cases"
+          className="block min-w-full border-collapse text-sm md:table"
+        >
+          <thead className="hidden bg-background/55 md:table-header-group">
             <tr className="border-b border-border/70 text-left">
               <th className="px-4 py-3 font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Case
@@ -69,7 +80,7 @@ export function RunCaseTable({
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="block md:table-row-group">
             {cases.map((caseRow) => {
               const isSelected = caseRow.caseId === selectedCaseId;
 
@@ -81,8 +92,8 @@ export function RunCaseTable({
                   aria-label={`Inspect case ${caseRow.caseId}`}
                   aria-pressed={isSelected}
                   className={cn(
-                    "cursor-pointer border-b border-border/55 align-top transition-colors last:border-b-0 hover:bg-background/50 focus-visible:bg-background/50 focus-visible:outline-none",
-                    isSelected ? "bg-background/60" : "",
+                    "mb-3 block cursor-pointer rounded-[20px] border border-border/55 bg-background/25 p-4 align-top transition-colors last:mb-0 hover:bg-background/50 focus-visible:bg-background/50 focus-visible:outline-none md:mb-0 md:table-row md:rounded-none md:border-x-0 md:border-b md:border-t-0 md:bg-transparent md:p-0",
+                    isSelected ? "border-primary/35 bg-background/60" : "",
                   )}
                   onClick={() => onSelectCase(caseRow.caseId)}
                   onKeyDown={(event) => {
@@ -92,7 +103,8 @@ export function RunCaseTable({
                     }
                   }}
                 >
-                  <td className="px-4 py-3">
+                  <td className="block px-0 py-2 md:table-cell md:px-4 md:py-3">
+                    <MobileLabel>Case</MobileLabel>
                     <div className="space-y-1">
                       <p className="font-mono text-xs text-foreground">{caseRow.caseId}</p>
                       <p className="max-w-[28rem] text-sm text-muted-foreground">
@@ -100,17 +112,20 @@ export function RunCaseTable({
                       </p>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="block px-0 py-2 md:table-cell md:px-4 md:py-3">
+                    <MobileLabel>Verdict</MobileLabel>
                     <Badge tone={verdictTone(caseRow)}>
                       {caseRow.error
                         ? "Execution Error"
                         : formatLabel(caseRow.expectation.verdict ?? "unknown")}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-foreground">
+                  <td className="block px-0 py-2 text-foreground md:table-cell md:px-4 md:py-3">
+                    <MobileLabel>Observed</MobileLabel>
                     {describeObservedFailure(caseRow)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="block px-0 py-2 md:table-cell md:px-4 md:py-3">
+                    <MobileLabel>Tags</MobileLabel>
                     <div className="flex flex-wrap gap-2">
                       {caseRow.tags.length > 0 ? (
                         caseRow.tags.map((tag) => (

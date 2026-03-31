@@ -271,14 +271,16 @@ export function ComparisonDetailPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.9fr)] xl:items-start">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.9fr)] lg:items-start">
           <ComparisonTransitionGroups
             summary={detail.transitions.summary}
             caseDeltas={detail.caseDeltas}
             selectedCaseId={selectedCaseId}
             onSelectCase={setSelectedCaseId}
           />
-          <ComparisonCaseDetailPanel caseDelta={selectedCase} />
+          <div className="lg:sticky lg:top-6">
+            <ComparisonCaseDetailPanel caseDelta={selectedCase} />
+          </div>
         </div>
       </section>
     </section>

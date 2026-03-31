@@ -52,7 +52,7 @@ function buildReadyInventoryState(runs: RunInventoryItem[]): RunInventoryState {
 }
 
 function buildReadyComparisonInventoryState(
-  comparisons: ComparisonInventoryState["inventory"]["comparisons"] = [],
+  comparisons: NonNullable<ComparisonInventoryState["inventory"]>["comparisons"] = [],
 ): ComparisonInventoryState {
   return {
     status: "ready",

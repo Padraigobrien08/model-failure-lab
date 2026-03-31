@@ -9,10 +9,19 @@ const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
 const COMPARISONS_INDEX_PATH = "/__failure_lab__/artifacts/comparisons.json";
 const COMPARISON_DETAIL_PATH = "/__failure_lab__/artifacts/comparison-detail.json";
 const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
+const ARTIFACT_ROOT_ENV = "FAILURE_LAB_ARTIFACT_ROOT";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
 const REPORT_FILENAME = "report.json";
 const REPORT_DETAILS_FILENAME = "report_details.json";
+
+type ArtifactSourceConfig = {
+  label: string;
+  path: string;
+  runsPath: string;
+  reportsPath: string;
+  isDefault: boolean;
+};
 
 type RunInventoryRow = {
   run_id: string;
@@ -202,6 +211,29 @@ type RunDetailPayload = {
 
 function failureLabArtifactsPlugin(): Plugin {
   const repoRoot = path.resolve(__dirname, "..");
+  const artifactSource = resolveArtifactSource(repoRoot);
+
+  function resolveArtifactSource(rootPath: string): ArtifactSourceConfig {
+    const override = process.env[ARTIFACT_ROOT_ENV]?.trim();
+    const artifactRoot =
+      override && override.length > 0 ? path.resolve(rootPath, override) : rootPath;
+    return {
+      label: override ? "Configured artifact store" : "Repo root artifact store",
+      path: artifactRoot,
+      runsPath: path.join(artifactRoot, "runs"),
+      reportsPath: path.join(artifactRoot, "reports"),
+      isDefault: !override,
+    };
+  }
+
+  function sourcePayload(source: ArtifactSourceConfig) {
+    return {
+      label: source.label,
+      path: source.path,
+      runsPath: source.runsPath,
+      reportsPath: source.reportsPath,
+    };
+  }
 
   function requireStringField(
     payload: Record<string, unknown>,
@@ -1292,12 +1324,9 @@ function failureLabArtifactsPlugin(): Plugin {
   }
 
   async function buildArtifactOverview() {
-    const runsPath = path.join(repoRoot, "runs");
-    const reportsPath = path.join(repoRoot, "reports");
-
     const [runInventory, comparisonInventory] = await Promise.all([
-      collectRunInventory(runsPath),
-      collectComparisonInventory(reportsPath),
+      collectRunInventory(artifactSource.runsPath),
+      collectComparisonInventory(artifactSource.reportsPath),
     ]);
 
     const issues = [...runInventory.issues, ...comparisonInventory.issues];
@@ -1310,12 +1339,7 @@ function failureLabArtifactsPlugin(): Plugin {
 
     return {
       status,
-      source: {
-        label: "Repo root artifact store",
-        path: repoRoot,
-        runsPath,
-        reportsPath,
-      },
+      source: sourcePayload(artifactSource),
       runs: {
         count: runInventory.rows.length,
         ids: runInventory.rows.map((row) => row.run_id),
@@ -1327,7 +1351,9 @@ function failureLabArtifactsPlugin(): Plugin {
       issues,
       message:
         status === "empty"
-          ? "No saved engine artifacts were found in the default local root."
+          ? artifactSource.isDefault
+            ? "No saved engine artifacts were found in the default local root."
+            : "No saved engine artifacts were found in the configured artifact root."
           : status === "incompatible"
             ? "One or more saved artifact directories do not match the supported run/report contract."
             : null,
@@ -1349,12 +1375,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.end(
         JSON.stringify({
           status: "incompatible",
-          source: {
-            label: "Repo root artifact store",
-            path: repoRoot,
-            runsPath: path.join(repoRoot, "runs"),
-            reportsPath: path.join(repoRoot, "reports"),
-          },
+          source: sourcePayload(artifactSource),
           runs: { count: 0, ids: [] },
           comparisons: { count: 0, ids: [] },
           issues: [error instanceof Error ? error.message : "artifact overview failed"],
@@ -1368,22 +1389,14 @@ function failureLabArtifactsPlugin(): Plugin {
     _req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    const runsPath = path.join(repoRoot, "runs");
-    const reportsPath = path.join(repoRoot, "reports");
-
     try {
-      const runInventory = await collectRunInventory(runsPath);
+      const runInventory = await collectRunInventory(artifactSource.runsPath);
       if (runInventory.issues.length > 0) {
         res.statusCode = 500;
         res.setHeader("Content-Type", "application/json");
         res.end(
           JSON.stringify({
-            source: {
-              label: "Repo root artifact store",
-              path: repoRoot,
-              runsPath,
-              reportsPath,
-            },
+            source: sourcePayload(artifactSource),
             runs: [],
             issues: runInventory.issues,
           }),
@@ -1395,12 +1408,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify({
-          source: {
-            label: "Repo root artifact store",
-            path: repoRoot,
-            runsPath,
-            reportsPath,
-          },
+          source: sourcePayload(artifactSource),
           runs: runInventory.rows,
         }),
       );
@@ -1409,12 +1417,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify({
-          source: {
-            label: "Repo root artifact store",
-            path: repoRoot,
-            runsPath,
-            reportsPath,
-          },
+          source: sourcePayload(artifactSource),
           runs: [],
           issues: [error instanceof Error ? error.message : "run inventory failed"],
         }),
@@ -1426,22 +1429,14 @@ function failureLabArtifactsPlugin(): Plugin {
     _req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    const runsPath = path.join(repoRoot, "runs");
-    const reportsPath = path.join(repoRoot, "reports");
-
     try {
-      const comparisonInventory = await collectComparisonInventory(reportsPath);
+      const comparisonInventory = await collectComparisonInventory(artifactSource.reportsPath);
       if (comparisonInventory.issues.length > 0) {
         res.statusCode = 500;
         res.setHeader("Content-Type", "application/json");
         res.end(
           JSON.stringify({
-            source: {
-              label: "Repo root artifact store",
-              path: repoRoot,
-              runsPath,
-              reportsPath,
-            },
+            source: sourcePayload(artifactSource),
             comparisons: [],
             message: comparisonInventory.issues[0],
             issues: comparisonInventory.issues,
@@ -1454,12 +1449,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify({
-          source: {
-            label: "Repo root artifact store",
-            path: repoRoot,
-            runsPath,
-            reportsPath,
-          },
+          source: sourcePayload(artifactSource),
           comparisons: comparisonInventory.rows,
         }),
       );
@@ -1470,12 +1460,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify({
-          source: {
-            label: "Repo root artifact store",
-            path: repoRoot,
-            runsPath,
-            reportsPath,
-          },
+          source: sourcePayload(artifactSource),
           comparisons: [],
           message,
           issues: [message],
@@ -1488,9 +1473,6 @@ function failureLabArtifactsPlugin(): Plugin {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    const runsPath = path.join(repoRoot, "runs");
-    const reportsPath = path.join(repoRoot, "reports");
-
     const requestUrl = new URL(req.url ?? COMPARISON_DETAIL_PATH, "http://failure-lab.local");
     const reportId = requestUrl.searchParams.get("reportId");
     if (!reportId) {
@@ -1501,7 +1483,11 @@ function failureLabArtifactsPlugin(): Plugin {
     }
 
     try {
-      const payload = await collectComparisonDetail(reportId, reportsPath, runsPath);
+      const payload = await collectComparisonDetail(
+        reportId,
+        artifactSource.reportsPath,
+        artifactSource.runsPath,
+      );
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
@@ -1523,9 +1509,6 @@ function failureLabArtifactsPlugin(): Plugin {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    const runsPath = path.join(repoRoot, "runs");
-    const reportsPath = path.join(repoRoot, "reports");
-
     const requestUrl = new URL(req.url ?? RUN_DETAIL_PATH, "http://failure-lab.local");
     const runId = requestUrl.searchParams.get("runId");
     if (!runId) {
@@ -1536,7 +1519,11 @@ function failureLabArtifactsPlugin(): Plugin {
     }
 
     try {
-      const payload = await collectRunDetail(runId, runsPath, reportsPath);
+      const payload = await collectRunDetail(
+        runId,
+        artifactSource.runsPath,
+        artifactSource.reportsPath,
+      );
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
