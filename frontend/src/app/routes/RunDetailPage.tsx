@@ -61,6 +61,33 @@ function resolveLensCases(
   return selectCasesById(detail.lenses.allCaseIds, detail.cases);
 }
 
+function resolvePreferredLens(detail: {
+  lenses: {
+    mismatchCaseIds: string[];
+    notableCaseIds: string[];
+    allCaseIds: string[];
+    errorCaseIds: string[];
+  };
+}): RunCaseLensKey {
+  if (detail.lenses.mismatchCaseIds.length > 0) {
+    return "mismatches";
+  }
+
+  if (detail.lenses.notableCaseIds.length > 0) {
+    return "notable";
+  }
+
+  if (detail.lenses.allCaseIds.length > 0) {
+    return "all";
+  }
+
+  if (detail.lenses.errorCaseIds.length > 0) {
+    return "errors";
+  }
+
+  return "mismatches";
+}
+
 function formatOptionalValue(value: string | number | null): string {
   if (value === null || value === "") {
     return "n/a";
@@ -116,6 +143,8 @@ export function RunDetailPage() {
             detail,
             message: null,
           });
+          setActiveLens(resolvePreferredLens(detail));
+          setSelectedCaseId(null);
         });
       })
       .catch((error: unknown) => {
@@ -337,8 +366,8 @@ export function RunDetailPage() {
 
   return (
     <section className="space-y-8">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] xl:items-start">
-        <div className="space-y-8">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(15rem,0.55fr)] xl:items-start">
+        <div className="min-w-0 space-y-8">
           <RunDetailHeader
             runId={detail.run.runId}
             dataset={detail.run.dataset}
@@ -454,24 +483,33 @@ export function RunDetailPage() {
                 </p>
                 <CardTitle className="text-lg">Saved comparisons touching this run</CardTitle>
                 <CardDescription>
-                  Jump directly into saved baseline-to-candidate reports that reference this run.
+                  Jump directly into saved reports that reference this run.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {relatedComparisons.map((comparison: ComparisonInventoryItem) => (
                   <div
                     key={comparison.reportId}
-                    className="flex flex-col gap-2 border-b border-border/55 pb-3 last:border-b-0 last:pb-0"
+                    className="space-y-2 rounded-[18px] border border-border/55 bg-background/60 px-3 py-3"
                   >
                     <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        {comparison.baselineRunId === runId ? "Candidate report" : "Baseline report"}
+                      </p>
                       <Link
-                        className="font-mono text-sm font-semibold text-primary no-underline"
+                        className="block break-all font-mono text-sm font-semibold text-primary no-underline"
                         to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
                       >
                         {comparison.reportId}
                       </Link>
                       <p className="text-sm text-muted-foreground">
-                        {comparison.baselineRunId} vs {comparison.candidateRunId}
+                        {comparison.baselineRunId === runId ? "Baseline" : "Candidate"}{" "}
+                        counterpart:{" "}
+                        <span className="break-all font-mono text-xs text-foreground">
+                          {comparison.baselineRunId === runId
+                            ? comparison.candidateRunId
+                            : comparison.baselineRunId}
+                        </span>
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

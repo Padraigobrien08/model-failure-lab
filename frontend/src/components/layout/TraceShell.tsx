@@ -99,23 +99,23 @@ export function TraceShell({ routeContext }: TraceShellProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <NavLink
-                  to="/"
-                  className="text-lg font-semibold tracking-[-0.04em] text-foreground no-underline"
-                >
-                  Failure Lab
-                </NavLink>
-                <Badge tone="accent">Engine artifacts</Badge>
-              </div>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                The React debugger now opens on saved run artifacts and comparison
-                reports from the real `failure-lab` contract.
-              </p>
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/92 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[92rem] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <NavLink
+                to="/"
+                className="text-lg font-semibold tracking-[-0.04em] text-foreground no-underline"
+              >
+                Failure Lab
+              </NavLink>
+              <Badge tone="accent">Engine artifacts</Badge>
+              <Badge tone="muted">
+                Runs {artifactOverview?.runs.count ?? 0}
+              </Badge>
+              <Badge tone="muted">
+                Comparisons {artifactOverview?.comparisons.count ?? 0}
+              </Badge>
             </div>
 
             <nav
@@ -141,9 +141,20 @@ export function TraceShell({ routeContext }: TraceShellProps) {
               ))}
             </nav>
           </div>
+        </div>
+      </header>
+
+      <section className="border-b border-border/50 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(255,255,255,0.58))]">
+        <div className="mx-auto flex w-full max-w-[92rem] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="space-y-2">
+            <p className="text-sm leading-6 text-muted-foreground">
+              The React debugger now opens on saved run artifacts and comparison reports from the
+              real `failure-lab` contract.
+            </p>
+          </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
-            <div className="rounded-[28px] border border-border/60 bg-card/75 px-5 py-5">
+            <div className="rounded-[28px] border border-border/60 bg-card/75 px-5 py-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
               <div className="space-y-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                   {routeMeta.eyebrow}
@@ -172,8 +183,8 @@ export function TraceShell({ routeContext }: TraceShellProps) {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-border/60 bg-card/75 px-5 py-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between xl:flex-col xl:justify-start">
+            <div className="rounded-[28px] border border-border/60 bg-card/75 px-5 py-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+              <div className="space-y-1">
                 <div className="space-y-1">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     Artifact source
@@ -182,14 +193,6 @@ export function TraceShell({ routeContext }: TraceShellProps) {
                   <p className="break-all font-mono text-xs text-muted-foreground">
                     {sourcePath}
                   </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge tone="muted">
-                    Runs {artifactOverview?.runs.count ?? 0}
-                  </Badge>
-                  <Badge tone="muted">
-                    Comparisons {artifactOverview?.comparisons.count ?? 0}
-                  </Badge>
                 </div>
               </div>
 
@@ -207,14 +210,15 @@ export function TraceShell({ routeContext }: TraceShellProps) {
             </div>
           </div>
         </div>
-      </header>
-      <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_17rem] xl:items-start">
+      </section>
+
+      <main className="mx-auto w-full max-w-[92rem] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_15rem] xl:items-start">
           <div className="min-w-0">
             <Outlet context={routeContext} />
           </div>
           <aside className="hidden xl:block">
-            <div className="sticky top-[16.5rem] space-y-4">
+            <div className="sticky top-24 space-y-4">
               <div className="rounded-[24px] border border-border/60 bg-card/75 px-4 py-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Pathway checkpoints

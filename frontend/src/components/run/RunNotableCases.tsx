@@ -34,13 +34,13 @@ export function RunNotableCases({
           Notable cases worth opening first
         </h2>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          These are the quickest entry points into the run. Open one to jump straight into the
-          evidence panel without losing the broader run context.
+          These are the fastest entry points into the run. Open one to jump into the evidence
+          panel without losing the broader context.
         </p>
       </div>
 
       {cases.length > 0 ? (
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
           {cases.map((caseRow) => (
             <Card
               key={caseRow.caseId}

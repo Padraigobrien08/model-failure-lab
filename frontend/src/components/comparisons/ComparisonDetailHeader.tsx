@@ -66,7 +66,9 @@ export function ComparisonDetailHeader({
           Comparisons
         </Link>
         <span aria-hidden="true">/</span>
-        <span className="font-mono text-xs text-foreground">{comparison.reportId}</span>
+        <span className="min-w-0 break-all font-mono text-xs text-foreground">
+          {comparison.reportId}
+        </span>
       </nav>
 
       <div className="space-y-4">
@@ -94,7 +96,7 @@ export function ComparisonDetailHeader({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Orient first
           </p>
-          <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground sm:text-4xl">
+          <h1 className="break-all text-3xl font-semibold leading-tight tracking-[-0.04em] text-foreground sm:text-4xl">
             {comparison.reportId}
           </h1>
           <p className="max-w-3xl text-base leading-7 text-muted-foreground">
@@ -108,7 +110,9 @@ export function ComparisonDetailHeader({
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Baseline
             </p>
-            <p className="mt-2 text-sm font-semibold text-foreground">{comparison.baselineRunId}</p>
+            <p className="mt-2 break-all text-sm font-semibold text-foreground">
+              {comparison.baselineRunId}
+            </p>
           </div>
           <div className="flex items-center justify-center">
             <span className="rounded-full border border-border/60 bg-card/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -119,7 +123,7 @@ export function ComparisonDetailHeader({
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Candidate
             </p>
-            <p className="mt-2 text-sm font-semibold text-foreground">
+            <p className="mt-2 break-all text-sm font-semibold text-foreground">
               {comparison.candidateRunId}
             </p>
           </div>

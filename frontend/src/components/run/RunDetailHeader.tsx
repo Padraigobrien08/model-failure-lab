@@ -73,11 +73,11 @@ export function RunDetailHeader({
           Runs
         </Link>
         <span aria-hidden="true">/</span>
-        <span className="font-mono text-xs text-foreground">{runId}</span>
+        <span className="min-w-0 break-all font-mono text-xs text-foreground">{runId}</span>
       </nav>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-        <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(16rem,0.65fr)]">
+        <div className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <Badge tone="accent">Run detail</Badge>
             <Badge tone="muted">{dataset}</Badge>
@@ -88,7 +88,7 @@ export function RunDetailHeader({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Stage 1 · Run identity
             </p>
-            <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground sm:text-4xl">
+            <h1 className="break-all text-3xl font-semibold leading-tight tracking-[-0.04em] text-foreground sm:text-4xl">
               {runId}
             </h1>
             <p className="max-w-3xl text-base leading-7 text-muted-foreground">

@@ -440,9 +440,11 @@ describe("comparison detail route", () => {
       />,
     );
 
-    expect(
-      await screen.findByRole("heading", { name: "compare_alpha_to_beta" }),
-    ).toBeInTheDocument();
+    const comparisonHeading = await screen.findByRole("heading", {
+      name: "compare_alpha_to_beta",
+    });
+    expect(comparisonHeading).toBeInTheDocument();
+    expect(comparisonHeading).toHaveClass("break-all");
     expect(
       screen.getByRole("heading", { name: "Directional change at a glance" }),
     ).toBeInTheDocument();

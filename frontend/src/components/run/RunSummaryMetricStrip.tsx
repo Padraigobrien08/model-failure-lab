@@ -44,13 +44,13 @@ export function RunSummaryMetricStrip({ metrics }: RunSummaryMetricStripProps) {
           Overall failure shape
         </h2>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Read the operational profile before diving into causes: run volume, saved failure rate,
-          execution quality, and classification coverage.
+          Read the operating profile first: run volume, failure rate, execution quality, and
+          classification coverage.
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <Card className="rounded-[24px] bg-card/80 md:col-span-2 xl:col-span-1">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+        <Card className="rounded-[24px] bg-card/80 md:col-span-2 xl:col-span-2 2xl:col-span-1">
           <CardContent className="space-y-3 px-5 py-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Failure rate

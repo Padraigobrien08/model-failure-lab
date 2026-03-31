@@ -249,7 +249,7 @@ export function ComparisonDetailPage() {
   return (
     <section className="space-y-8">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] xl:items-start">
-        <div className="space-y-8">
+        <div className="min-w-0 space-y-8">
           <ComparisonDetailHeader comparison={detail.comparison} inventoryHref={returnHref} />
 
           <ComparisonDeltaStrip
@@ -313,7 +313,7 @@ export function ComparisonDetailPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Open baseline
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-foreground">
+                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
                     {detail.comparison.baselineRunId}
                   </p>
                 </Link>
@@ -324,7 +324,7 @@ export function ComparisonDetailPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Open candidate
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-foreground">
+                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
                     {detail.comparison.candidateRunId}
                   </p>
                 </Link>

@@ -283,7 +283,9 @@ describe("run detail route", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+    const runHeading = await screen.findByRole("heading", { name: "run_gamma" });
+    expect(runHeading).toBeInTheDocument();
+    expect(runHeading).toHaveClass("break-all");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Stage 1 · Run identity")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Overall failure shape" })).toBeInTheDocument();
@@ -306,6 +308,29 @@ describe("run detail route", () => {
     expect(screen.getByText("Failure rate")).toBeInTheDocument();
     expect(screen.getByText("Unsupported factual framing detected.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Persistent run provenance" })).toBeInTheDocument();
+  });
+
+  it("falls back to the first non-empty evidence lens when mismatches are absent", async () => {
+    const detail = buildRunDetail(SAMPLE_RUN);
+    detail.lenses.mismatchCaseIds = [];
+    mockRunDetail(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/runs/run_gamma"]}
+        initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
+        initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Notable (2)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.queryByText("No cases match this lens.")).not.toBeInTheDocument();
   });
 
   it("switches case lenses and keeps inspection inside the run route", async () => {
