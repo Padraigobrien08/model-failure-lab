@@ -285,9 +285,15 @@ describe("run detail route", () => {
 
     expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("heading", { name: "Failure types, verdicts, and tag slices" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Notable cases" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Case inspection" })).toBeInTheDocument();
+    expect(screen.getByText("Stage 1 · Run identity")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Overall failure shape" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Notable cases worth opening first" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Selected case evidence" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Mismatches (3)" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -299,6 +305,7 @@ describe("run detail route", () => {
     expect(screen.getByText("Attempted")).toBeInTheDocument();
     expect(screen.getByText("Failure rate")).toBeInTheDocument();
     expect(screen.getByText("Unsupported factual framing detected.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Persistent run provenance" })).toBeInTheDocument();
   });
 
   it("switches case lenses and keeps inspection inside the run route", async () => {
@@ -334,6 +341,34 @@ describe("run detail route", () => {
     );
     expect(screen.getByText("Request timed out")).toBeInTheDocument();
     expect(screen.getAllByText("Emit a structured answer.").length).toBeGreaterThan(0);
+  });
+
+  it("opens a notable case directly into the selected evidence flow", async () => {
+    const detail = buildRunDetail(SAMPLE_RUN);
+    mockRunDetail(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/runs/run_gamma"]}
+        initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
+        initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Inspect notable case case-004" }));
+
+    expect(screen.getByRole("tab", { name: "Notable (2)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getAllByText("Answer went beyond supplied context.").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Use only the provided evidence bullets.").length,
+    ).toBeGreaterThan(0);
   });
 
   it("surfaces lightweight related comparison links when saved reports reference the run", async () => {

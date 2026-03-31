@@ -31,12 +31,15 @@ export function RunCaseDetailPanel({ caseRow }: RunCaseDetailPanelProps) {
   if (!caseRow) {
     return (
       <Card className="rounded-[24px] border border-border/70 bg-card/70 shadow-panel">
-        <CardHeader>
+        <CardHeader className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Stage 5 · Selected evidence
+          </p>
           <CardTitle>Select a case</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Pick a case from the table to inspect its prompt, output, and saved classification
-          detail without leaving this run.
+          Pick a case from the active lens to inspect its prompt, output, expectation, and saved
+          classifier rationale without leaving this run.
         </CardContent>
       </Card>
     );
@@ -46,7 +49,8 @@ export function RunCaseDetailPanel({ caseRow }: RunCaseDetailPanelProps) {
     <Card className="rounded-[24px] border border-border/70 bg-card/70 shadow-panel">
       <CardHeader className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="accent">Selected case</Badge>
+          <Badge tone="accent">Stage 5</Badge>
+          <Badge tone="default">Selected case evidence</Badge>
           <Badge tone="muted">{caseRow.caseId}</Badge>
           {caseRow.tags.map((tag) => (
             <Badge key={`${caseRow.caseId}-${tag}`} tone="muted">
@@ -59,6 +63,10 @@ export function RunCaseDetailPanel({ caseRow }: RunCaseDetailPanelProps) {
             Prompt
           </p>
           <CardTitle className="text-xl leading-8">{caseRow.prompt}</CardTitle>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Read the saved expectation, output, classifier rationale, and execution issues together
+            before moving to the next case.
+          </p>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">

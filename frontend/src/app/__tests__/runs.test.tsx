@@ -324,7 +324,7 @@ describe("runs route", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Run breadcrumb" })).toBeInTheDocument();
     expect(screen.getByText("hallucination-failures-v1")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Failure types, verdicts, and tag slices" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
 
     const backToRuns = screen.getAllByRole("link", { name: "Back to runs" })[0];
     await user.click(backToRuns);

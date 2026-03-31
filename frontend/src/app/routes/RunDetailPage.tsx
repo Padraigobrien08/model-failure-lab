@@ -61,6 +61,13 @@ function resolveLensCases(
   return selectCasesById(detail.lenses.allCaseIds, detail.cases);
 }
 
+function formatOptionalValue(value: string | number | null): string {
+  if (value === null || value === "") {
+    return "n/a";
+  }
+  return String(value);
+}
+
 export function RunDetailPage() {
   const { runId } = useParams();
   const location = useLocation();
@@ -188,6 +195,13 @@ export function RunDetailPage() {
         return right.reportId.localeCompare(left.reportId);
       });
   }, [comparisonInventoryState, runId]);
+
+  const handleSelectNotableCase = (caseId: string) => {
+    startTransition(() => {
+      setActiveLens("notable");
+      setSelectedCaseId(caseId);
+    });
+  };
 
   useEffect(() => {
     if (detailState.status !== "ready") {
@@ -323,82 +337,170 @@ export function RunDetailPage() {
 
   return (
     <section className="space-y-8">
-      <RunDetailHeader
-        runId={detail.run.runId}
-        dataset={detail.run.dataset}
-        model={detail.run.model}
-        status={detail.run.status}
-        createdAt={detail.run.createdAt}
-        inventoryHref={returnHref}
-      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] xl:items-start">
+        <div className="space-y-8">
+          <RunDetailHeader
+            runId={detail.run.runId}
+            dataset={detail.run.dataset}
+            model={detail.run.model}
+            status={detail.run.status}
+            createdAt={detail.run.createdAt}
+            inventoryHref={returnHref}
+            reportId={detail.run.reportId}
+            adapterId={detail.run.adapterId}
+            classifierId={detail.run.classifierId}
+            runSeed={detail.run.runSeed}
+          />
 
-      <RunSummaryMetricStrip metrics={detail.metrics} />
+          <RunSummaryMetricStrip metrics={detail.metrics} />
 
-      <RunSummarySections
-        failureTypes={detail.summary.failureTypes}
-        expectationVerdicts={detail.summary.expectationVerdicts}
-        tagSlices={detail.summary.tagSlices}
-      />
+          <RunSummarySections
+            failureTypes={detail.summary.failureTypes}
+            expectationVerdicts={detail.summary.expectationVerdicts}
+            tagSlices={detail.summary.tagSlices}
+          />
 
-      <RunNotableCases cases={notableCases} />
+          <RunNotableCases
+            cases={notableCases}
+            selectedCaseId={selectedCaseId}
+            onSelectCase={handleSelectNotableCase}
+          />
+        </div>
 
-      {relatedComparisons.length > 0 ? (
-        <section className="space-y-3" aria-label="Related comparisons">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Related comparisons
-            </p>
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-              Saved comparisons touching this run
-            </h2>
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              Jump directly into saved baseline-to-candidate reports that reference this run.
-            </p>
-          </div>
-
-          <Card>
-            <CardContent className="space-y-3 pt-6">
-              {relatedComparisons.map((comparison: ComparisonInventoryItem) => (
-                <div
-                  key={comparison.reportId}
-                  className="flex flex-col gap-2 border-b border-border/55 pb-3 last:border-b-0 last:pb-0 md:flex-row md:items-center md:justify-between"
-                >
-                  <div className="space-y-1">
-                    <Link
-                      className="font-mono text-sm font-semibold text-primary no-underline"
-                      to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
-                    >
-                      {comparison.reportId}
-                    </Link>
-                    <p className="text-sm text-muted-foreground">
-                      {comparison.baselineRunId} vs {comparison.candidateRunId}
+        <aside className="space-y-4 xl:sticky xl:top-28">
+          <Card className="rounded-[24px] border border-border/70 bg-card/75">
+            <CardHeader className="space-y-1 pb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Debugger context
+              </p>
+              <CardTitle className="text-lg">Persistent run provenance</CardTitle>
+              <CardDescription>
+                Keep the saved lineage and source root visible while you move through failures and
+                evidence.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3">
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Source root
+                  </p>
+                  <p className="mt-2 break-all font-mono text-xs text-foreground">
+                    {detail.source.path}
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Report id
+                    </p>
+                    <p className="mt-2 break-all font-mono text-sm text-foreground">
+                      {detail.run.reportId}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <Badge tone="muted">{comparison.dataset ?? "Multiple datasets"}</Badge>
-                    <Badge tone={comparison.compatible ? "accent" : "default"}>
-                      {comparison.status}
-                    </Badge>
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Adapter
+                    </p>
+                    <p className="mt-2 text-sm text-foreground">
+                      {formatOptionalValue(detail.run.adapterId)}
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Classifier
+                    </p>
+                    <p className="mt-2 text-sm text-foreground">
+                      {formatOptionalValue(detail.run.classifierId)}
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Run seed
+                    </p>
+                    <p className="mt-2 text-sm text-foreground">
+                      {formatOptionalValue(detail.run.runSeed)}
+                    </p>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Mismatch cases
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                    {detail.lenses.mismatchCaseIds.length}
+                  </p>
+                </div>
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Notable cases
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                    {detail.lenses.notableCaseIds.length}
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        </section>
-      ) : null}
+
+          {relatedComparisons.length > 0 ? (
+            <Card className="rounded-[24px] border border-border/70 bg-card/75">
+              <CardHeader className="space-y-1 pb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Related comparisons
+                </p>
+                <CardTitle className="text-lg">Saved comparisons touching this run</CardTitle>
+                <CardDescription>
+                  Jump directly into saved baseline-to-candidate reports that reference this run.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {relatedComparisons.map((comparison: ComparisonInventoryItem) => (
+                  <div
+                    key={comparison.reportId}
+                    className="flex flex-col gap-2 border-b border-border/55 pb-3 last:border-b-0 last:pb-0"
+                  >
+                    <div className="space-y-1">
+                      <Link
+                        className="font-mono text-sm font-semibold text-primary no-underline"
+                        to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
+                      >
+                        {comparison.reportId}
+                      </Link>
+                      <p className="text-sm text-muted-foreground">
+                        {comparison.baselineRunId} vs {comparison.candidateRunId}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <Badge tone="muted">{comparison.dataset ?? "Multiple datasets"}</Badge>
+                      <Badge tone={comparison.compatible ? "accent" : "default"}>
+                        {comparison.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+        </aside>
+      </div>
 
       <section className="space-y-3" aria-label="Case inspection">
         <div className="space-y-3">
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Inspection
+              Stage 5 · Selected evidence
             </p>
             <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-              Case inspection
+              Selected case evidence
             </h2>
             <p className="text-sm text-muted-foreground">
               Stay inside the run flow while you move between mismatches, notable examples, saved
-              errors, and the full case set.
+              errors, and the full case set. The evidence panel keeps the selected case grounded in
+              the same route.
             </p>
           </div>
 
