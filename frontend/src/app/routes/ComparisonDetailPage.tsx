@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
@@ -16,6 +16,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  buildComparisonDetailSearchParams,
+  parseComparisonDetailSearch,
+  resolveComparisonCaseForTransition,
+  resolveComparisonDetailSection,
+  searchParamsEqual,
+} from "@/lib/artifacts/detailRouteState";
 import { resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
 import { loadComparisonDetail } from "@/lib/artifacts/load";
 import type {
@@ -36,17 +43,21 @@ function selectCasesByOrder(
 export function ComparisonDetailPage() {
   const { reportId } = useParams();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { artifactState, comparisonInventoryState } = useAppRouteContext();
   const [detailState, setDetailState] = useState<ComparisonDetailState>({
     status: "idle",
     detail: null,
     message: null,
   });
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
 
   const inventory =
     comparisonInventoryState.status === "ready" ? comparisonInventoryState.inventory : null;
   const comparison = inventory?.comparisons.find((item) => item.reportId === reportId);
+  const requestedState = useMemo(
+    () => parseComparisonDetailSearch(searchParams),
+    [searchParams],
+  );
   const returnHref = useMemo(
     () => resolveArtifactReturnHref(location.state, "/comparisons"),
     [location.state],
@@ -60,7 +71,6 @@ export function ComparisonDetailPage() {
           detail: null,
           message: null,
         });
-        setSelectedCaseId(null);
       });
       return;
     }
@@ -105,36 +115,105 @@ export function ComparisonDetailPage() {
     return selectCasesByOrder(orderedIds, detailState.detail.caseDeltas);
   }, [detailState]);
 
+  const resolvedSelection = useMemo(() => {
+    if (detailState.status !== "ready") {
+      return {
+        caseId: null as string | null,
+        transition: null as string | null,
+      };
+    }
+
+    const caseMap = new Map(
+      detailState.detail.caseDeltas.map((caseRow) => [caseRow.caseId, caseRow]),
+    );
+    const requestedCase =
+      requestedState.caseId !== null ? caseMap.get(requestedState.caseId) ?? null : null;
+    const requestedTransitionCase = resolveComparisonCaseForTransition(
+      detailState.detail.transitions.summary,
+      detailState.detail.caseDeltas,
+      requestedState.transition,
+    );
+
+    if (requestedCase) {
+      if (
+        requestedState.transition === null ||
+        requestedCase.transitionType === requestedState.transition
+      ) {
+        return {
+          caseId: requestedCase.caseId,
+          transition: requestedCase.transitionType,
+        };
+      }
+
+      if (requestedTransitionCase) {
+        return {
+          caseId: requestedTransitionCase.caseId,
+          transition: requestedTransitionCase.transitionType,
+        };
+      }
+    }
+
+    if (requestedTransitionCase) {
+      return {
+        caseId: requestedTransitionCase.caseId,
+        transition: requestedTransitionCase.transitionType,
+      };
+    }
+
+    return {
+      caseId: orderedCases[0]?.caseId ?? null,
+      transition: orderedCases[0]?.transitionType ?? null,
+    };
+  }, [detailState, orderedCases, requestedState.caseId, requestedState.transition]);
+
   const selectedCase = useMemo(() => {
-    if (selectedCaseId === null) {
+    if (resolvedSelection.caseId === null) {
       return null;
     }
 
-    return orderedCases.find((caseRow) => caseRow.caseId === selectedCaseId) ?? null;
-  }, [orderedCases, selectedCaseId]);
+    return orderedCases.find((caseRow) => caseRow.caseId === resolvedSelection.caseId) ?? null;
+  }, [orderedCases, resolvedSelection.caseId]);
+
+  const selectedCaseId = resolvedSelection.caseId;
+
+  const resolvedSection = useMemo(
+    () =>
+      resolveComparisonDetailSection(
+        requestedState.section,
+        requestedState.caseId,
+        requestedState.transition,
+      ),
+    [requestedState.caseId, requestedState.section, requestedState.transition],
+  );
 
   useEffect(() => {
     if (detailState.status !== "ready") {
-      startTransition(() => {
-        setSelectedCaseId(null);
-      });
       return;
     }
 
-    startTransition(() => {
-      setSelectedCaseId((current) => {
-        if (orderedCases.length === 0) {
-          return null;
-        }
-
-        if (current && orderedCases.some((caseRow) => caseRow.caseId === current)) {
-          return current;
-        }
-
-        return orderedCases[0]?.caseId ?? null;
-      });
+    const nextSearchParams = buildComparisonDetailSearchParams(searchParams, {
+      section: resolvedSection,
+      caseId: resolvedSelection.caseId,
+      transition: resolvedSelection.transition,
     });
-  }, [detailState.status, orderedCases]);
+
+    if (searchParamsEqual(searchParams, nextSearchParams)) {
+      return;
+    }
+
+    setSearchParams(nextSearchParams, {
+      replace: true,
+      state: location.state,
+    });
+  }, [
+    detailState.status,
+    location.state,
+    resolvedSection,
+    resolvedSelection.caseId,
+    resolvedSelection.transition,
+    searchParams,
+    setSearchParams,
+  ]);
 
   if (artifactState.status !== "ready") {
     return <ArtifactStatePanel area="Comparisons" state={artifactState} />;
@@ -245,12 +324,23 @@ export function ComparisonDetailPage() {
   }
 
   const detail = detailState.detail;
+  const detailReturnState = {
+    returnTo: {
+      pathname: location.pathname,
+      search: location.search,
+    },
+  };
 
   return (
     <section className="space-y-8">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] xl:items-start">
         <div className="min-w-0 space-y-8">
-          <ComparisonDetailHeader comparison={detail.comparison} inventoryHref={returnHref} />
+          <ComparisonDetailHeader
+            comparison={detail.comparison}
+            inventoryHref={returnHref}
+            baselineRunState={detailReturnState}
+            candidateRunState={detailReturnState}
+          />
 
           <ComparisonDeltaStrip
             metrics={detail.metrics}
@@ -309,6 +399,7 @@ export function ComparisonDetailPage() {
                 <Link
                   className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
                   to={`/runs/${encodeURIComponent(detail.comparison.baselineRunId)}`}
+                  state={detailReturnState}
                 >
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Open baseline
@@ -320,6 +411,7 @@ export function ComparisonDetailPage() {
                 <Link
                   className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
                   to={`/runs/${encodeURIComponent(detail.comparison.candidateRunId)}`}
+                  state={detailReturnState}
                 >
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Open candidate
@@ -380,7 +472,21 @@ export function ComparisonDetailPage() {
             summary={detail.transitions.summary}
             caseDeltas={detail.caseDeltas}
             selectedCaseId={selectedCaseId}
-            onSelectCase={setSelectedCaseId}
+            onSelectCase={(caseId) => {
+              const caseRow =
+                detail.caseDeltas.find((candidate) => candidate.caseId === caseId) ?? null;
+              setSearchParams(
+                buildComparisonDetailSearchParams(searchParams, {
+                  section: "transitions",
+                  caseId,
+                  transition: caseRow?.transitionType ?? null,
+                }),
+                {
+                  replace: true,
+                  state: location.state,
+                },
+              );
+            }}
           />
           <div className="lg:sticky lg:top-6">
             <ComparisonCaseDetailPanel caseDelta={selectedCase} />

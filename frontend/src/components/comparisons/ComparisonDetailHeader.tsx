@@ -7,6 +7,8 @@ import { formatLabel } from "@/lib/formatters";
 type ComparisonDetailHeaderProps = {
   comparison: ComparisonDetail["comparison"];
   inventoryHref: string;
+  baselineRunState?: unknown;
+  candidateRunState?: unknown;
 };
 
 function formatTimestamp(createdAt: string): string {
@@ -55,6 +57,8 @@ function datasetBadgeText(comparison: ComparisonDetail["comparison"]): string {
 export function ComparisonDetailHeader({
   comparison,
   inventoryHref,
+  baselineRunState,
+  candidateRunState,
 }: ComparisonDetailHeaderProps) {
   const datasetLabel = formatLabel(datasetBadgeText(comparison));
 
@@ -77,12 +81,14 @@ export function ComparisonDetailHeader({
           <Link
             className="rounded-full text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             to={`/runs/${encodeURIComponent(comparison.baselineRunId)}`}
+            state={baselineRunState}
           >
             <Badge tone="muted">Baseline</Badge>
           </Link>
           <Link
             className="rounded-full text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             to={`/runs/${encodeURIComponent(comparison.candidateRunId)}`}
+            state={candidateRunState}
           >
             <Badge tone="muted">Candidate</Badge>
           </Link>

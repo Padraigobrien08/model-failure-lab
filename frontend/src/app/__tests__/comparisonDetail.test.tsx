@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 import { App } from "@/app/App";
@@ -425,6 +425,7 @@ describe("comparison detail route", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
   });
 
   it("renders the summary-first comparison explorer and supports in-page case inspection", async () => {
@@ -525,5 +526,70 @@ describe("comparison detail route", () => {
     expect(await screen.findByRole("heading", { name: "Reasoning Failures V1" })).toBeInTheDocument();
     expect(screen.getByText("run_alpha")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
+  });
+
+  it("restores explicit comparison URL state and canonicalizes mismatched transition context", async () => {
+    mockComparisonDetail(buildCompatibleDetail());
+    window.history.replaceState(
+      {},
+      "",
+      "/comparisons/compare_alpha_to_beta?case=case-002&transition=no_failure_to_failure",
+    );
+
+    render(
+      <App
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Reasoning chain diverged from the rubric.")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get("section")).toBe("transitions");
+      expect(params.get("case")).toBe("case-004");
+      expect(params.get("transition")).toBe("no_failure_to_failure");
+    });
+  });
+
+  it("preserves comparison detail as the return target when opening a linked run", async () => {
+    mockComparisonAndRunDetails(buildCompatibleDetail());
+    window.history.replaceState(
+      {},
+      "",
+      "/comparisons/compare_alpha_to_beta?case=case-004&transition=no_failure_to_failure",
+    );
+
+    render(
+      <App
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get("section")).toBe("transitions");
+    });
+
+    fireEvent.click(screen.getByRole("link", { name: "Open baseline run_alpha" }));
+
+    expect(await screen.findByRole("heading", { name: "Reasoning Failures V1" })).toBeInTheDocument();
+    expect(screen.getByText("run_alpha")).toBeInTheDocument();
+    const returnLink = screen.getByRole("link", { name: "Back to runs" });
+    const returnUrl = new URL(returnLink.getAttribute("href") ?? "", "https://example.test");
+    expect(returnUrl.pathname).toBe("/comparisons/compare_alpha_to_beta");
+    expect(returnUrl.searchParams.get("section")).toBe("transitions");
+    expect(returnUrl.searchParams.get("case")).toBe("case-004");
+    expect(returnUrl.searchParams.get("transition")).toBe("no_failure_to_failure");
   });
 });

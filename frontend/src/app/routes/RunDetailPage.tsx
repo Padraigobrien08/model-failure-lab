@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
@@ -18,6 +18,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  buildRunDetailSearchParams,
+  parseRunDetailSearch,
+  resolveRunDetailSection,
+  resolveRunLensForCase,
+  searchParamsEqual,
+} from "@/lib/artifacts/detailRouteState";
 import { resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
 import { loadRunDetail } from "@/lib/artifacts/load";
 import type {
@@ -98,16 +105,16 @@ function formatOptionalValue(value: string | number | null): string {
 export function RunDetailPage() {
   const { runId } = useParams();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { artifactState, runInventoryState, comparisonInventoryState } = useAppRouteContext();
   const [detailState, setDetailState] = useState<RunDetailState>({
     status: "idle",
     detail: null,
     message: null,
   });
-  const [activeLens, setActiveLens] = useState<RunCaseLensKey>("mismatches");
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const inventory = runInventoryState.status === "ready" ? runInventoryState.inventory : null;
   const run = inventory?.runs.find((item) => item.runId === runId);
+  const requestedState = useMemo(() => parseRunDetailSearch(searchParams), [searchParams]);
   const returnHref = useMemo(
     () => resolveArtifactReturnHref(location.state, "/"),
     [location.state],
@@ -121,8 +128,6 @@ export function RunDetailPage() {
           detail: null,
           message: null,
         });
-        setActiveLens("mismatches");
-        setSelectedCaseId(null);
       });
       return;
     }
@@ -143,8 +148,6 @@ export function RunDetailPage() {
             detail,
             message: null,
           });
-          setActiveLens(resolvePreferredLens(detail));
-          setSelectedCaseId(null);
         });
       })
       .catch((error: unknown) => {
@@ -159,6 +162,18 @@ export function RunDetailPage() {
         });
       });
   }, [run, runId]);
+
+  const activeLens = useMemo<RunCaseLensKey>(() => {
+    if (detailState.status !== "ready") {
+      return "mismatches";
+    }
+
+    return (
+      requestedState.lens ??
+      resolveRunLensForCase(detailState.detail, requestedState.caseId) ??
+      resolvePreferredLens(detailState.detail)
+    );
+  }, [detailState, requestedState.caseId, requestedState.lens]);
 
   const notableCases = useMemo(() => {
     if (detailState.status !== "ready") {
@@ -191,12 +206,30 @@ export function RunDetailPage() {
   }, [activeLens, detailState]);
 
   const selectedCase = useMemo(() => {
+    const selectedCaseId =
+      requestedState.caseId &&
+      visibleCases.some((caseRow) => caseRow.caseId === requestedState.caseId)
+        ? requestedState.caseId
+        : visibleCases[0]?.caseId ?? null;
+
     if (selectedCaseId === null) {
       return null;
     }
 
     return visibleCases.find((caseRow) => caseRow.caseId === selectedCaseId) ?? null;
-  }, [selectedCaseId, visibleCases]);
+  }, [requestedState.caseId, visibleCases]);
+
+  const selectedCaseId = selectedCase?.caseId ?? null;
+
+  const resolvedSection = useMemo(
+    () =>
+      resolveRunDetailSection(
+        requestedState.section,
+        requestedState.lens,
+        requestedState.caseId,
+      ),
+    [requestedState.caseId, requestedState.lens, requestedState.section],
+  );
 
   const relatedComparisons = useMemo(() => {
     if (comparisonInventoryState.status !== "ready" || !runId) {
@@ -226,35 +259,47 @@ export function RunDetailPage() {
   }, [comparisonInventoryState, runId]);
 
   const handleSelectNotableCase = (caseId: string) => {
-    startTransition(() => {
-      setActiveLens("notable");
-      setSelectedCaseId(caseId);
-    });
+    setSearchParams(
+      buildRunDetailSearchParams(searchParams, {
+        section: "evidence",
+        lens: "notable",
+        caseId,
+      }),
+      {
+        replace: true,
+        state: location.state,
+      },
+    );
   };
 
   useEffect(() => {
     if (detailState.status !== "ready") {
-      startTransition(() => {
-        setActiveLens("mismatches");
-        setSelectedCaseId(null);
-      });
       return;
     }
 
-    startTransition(() => {
-      setSelectedCaseId((current) => {
-        if (visibleCases.length === 0) {
-          return null;
-        }
-
-        if (current && visibleCases.some((caseRow) => caseRow.caseId === current)) {
-          return current;
-        }
-
-        return visibleCases[0]?.caseId ?? null;
-      });
+    const nextSearchParams = buildRunDetailSearchParams(searchParams, {
+      section: resolvedSection,
+      lens: activeLens,
+      caseId: selectedCaseId,
     });
-  }, [detailState.status, visibleCases]);
+
+    if (searchParamsEqual(searchParams, nextSearchParams)) {
+      return;
+    }
+
+    setSearchParams(nextSearchParams, {
+      replace: true,
+      state: location.state,
+    });
+  }, [
+    activeLens,
+    detailState.status,
+    location.state,
+    resolvedSection,
+    searchParams,
+    selectedCaseId,
+    setSearchParams,
+  ]);
 
   if (artifactState.status !== "ready") {
     return <ArtifactStatePanel area="Runs" state={artifactState} />;
@@ -497,6 +542,12 @@ export function RunDetailPage() {
                           <Link
                             className="block break-all font-mono text-sm font-semibold text-primary no-underline"
                             to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
+                            state={{
+                              returnTo: {
+                                pathname: location.pathname,
+                                search: location.search,
+                              },
+                            }}
                           >
                             {comparison.reportId}
                           </Link>
@@ -544,7 +595,19 @@ export function RunDetailPage() {
           <RunCaseLensTabs
             value={activeLens}
             counts={caseLensCounts}
-            onValueChange={setActiveLens}
+            onValueChange={(lens) =>
+              setSearchParams(
+                buildRunDetailSearchParams(searchParams, {
+                  section: "evidence",
+                  lens,
+                  caseId: null,
+                }),
+                {
+                  replace: true,
+                  state: location.state,
+                },
+              )
+            }
           />
         </div>
 
@@ -564,7 +627,19 @@ export function RunDetailPage() {
               <RunCaseTable
                 cases={visibleCases}
                 selectedCaseId={selectedCaseId}
-                onSelectCase={setSelectedCaseId}
+                onSelectCase={(caseId) =>
+                  setSearchParams(
+                    buildRunDetailSearchParams(searchParams, {
+                      section: "evidence",
+                      lens: activeLens,
+                      caseId,
+                    }),
+                    {
+                      replace: true,
+                      state: location.state,
+                    },
+                  )
+                }
               />
             </div>
             <div className="lg:sticky lg:top-24">

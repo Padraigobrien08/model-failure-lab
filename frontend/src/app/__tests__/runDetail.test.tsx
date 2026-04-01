@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 import { App } from "@/app/App";
@@ -267,6 +267,7 @@ describe("run detail route", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
   });
 
   it("renders the summary-first run detail hierarchy from saved artifact payloads", async () => {
@@ -310,7 +311,7 @@ describe("run detail route", () => {
     ).toBeGreaterThan(0);
     expect(screen.getByText("Attempted")).toBeInTheDocument();
     expect(screen.getByText("Failure rate")).toBeInTheDocument();
-    expect(screen.getByText("Unsupported factual framing detected.")).toBeInTheDocument();
+    expect(screen.getAllByText("Unsupported factual framing detected.").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Persistent run provenance" })).toBeInTheDocument();
   });
 
@@ -439,6 +440,36 @@ describe("run detail route", () => {
     expect(
       screen.getByRole("link", { name: "compare_alpha_to_gamma" }),
     ).toHaveAttribute("href", "/comparisons/compare_alpha_to_gamma");
+  });
+
+  it("restores explicit run-detail URL state and canonicalizes invalid case selection", async () => {
+    const detail = buildRunDetail(SAMPLE_RUN);
+    mockRunDetail(detail);
+    window.history.replaceState({}, "", "/runs/run_gamma?lens=errors&case=case-002");
+
+    render(
+      <App
+        initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
+        initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Errors (1)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Request timed out")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get("section")).toBe("evidence");
+      expect(params.get("lens")).toBe("errors");
+      expect(params.get("case")).toBe("case-006");
+    });
   });
 
   it("shows an explicit incompatible-detail state when the saved run payload cannot be read", async () => {
