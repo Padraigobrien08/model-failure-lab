@@ -295,8 +295,9 @@ describe("comparisons route", () => {
     await user.click(screen.getByRole("link", { name: "Open comparison compare_alpha_to_beta" }));
 
     expect(
-      await screen.findByRole("heading", { name: "compare_alpha_to_beta" }),
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
     const breadcrumb = screen.getByRole("navigation", { name: "Comparison breadcrumb" });
     expect(breadcrumb).toBeInTheDocument();
     expect(within(breadcrumb).getByRole("link", { name: "Comparisons" })).toHaveAttribute(

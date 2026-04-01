@@ -46,8 +46,8 @@ export function RunCaseDetailPanel({ caseRow }: RunCaseDetailPanelProps) {
   }
 
   return (
-    <Card className="rounded-[24px] border border-border/70 bg-card/70 shadow-panel">
-      <CardHeader className="space-y-4">
+    <Card className="rounded-[24px] border border-primary/15 bg-primary/[0.045] shadow-panel">
+      <CardHeader className="space-y-4 pb-5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">Stage 5</Badge>
           <Badge tone="default">Selected case evidence</Badge>
@@ -62,14 +62,25 @@ export function RunCaseDetailPanel({ caseRow }: RunCaseDetailPanelProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Prompt
           </p>
-          <CardTitle className="text-xl leading-8">{caseRow.prompt}</CardTitle>
+          <CardTitle className="text-2xl leading-9">{caseRow.prompt}</CardTitle>
           <p className="text-sm leading-6 text-muted-foreground">
-            Read the saved expectation, output, classifier rationale, and execution issues together
-            before moving to the next case.
+            Stay here long enough to read the saved expectation, output, and classifier rationale
+            together before moving to the next case.
           </p>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        <section className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Output
+          </p>
+          <div className="rounded-[20px] border border-primary/15 bg-background/85 p-4">
+            <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
+              {caseRow.outputText ?? "No output was captured for this case."}
+            </p>
+          </div>
+        </section>
+
         <section className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Expectation
@@ -99,17 +110,6 @@ export function RunCaseDetailPanel({ caseRow }: RunCaseDetailPanelProps) {
                 {formatLabel(caseRow.expectation.verdict ?? "unknown")}
               </p>
             </div>
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Output
-          </p>
-          <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
-            <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
-              {caseRow.outputText ?? "No output was captured for this case."}
-            </p>
           </div>
         </section>
 

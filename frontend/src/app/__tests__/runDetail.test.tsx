@@ -283,11 +283,15 @@ describe("run detail route", () => {
       />,
     );
 
-    const runHeading = await screen.findByRole("heading", { name: "run_gamma" });
+    const runHeading = await screen.findByRole("heading", {
+      name: "Hallucination Failures V1",
+    });
     expect(runHeading).toBeInTheDocument();
-    expect(runHeading).toHaveClass("break-all");
+    expect(screen.getByText("run_gamma")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Stage 1 · Run identity")).toBeInTheDocument();
+    expect(screen.queryByText("Pathway checkpoints")).not.toBeInTheDocument();
+    expect(screen.queryByText("Follow the run from identity to evidence.")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Overall failure shape" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
     expect(
@@ -325,7 +329,9 @@ describe("run detail route", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Notable (2)" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -347,7 +353,9 @@ describe("run detail route", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "All (5)" }));
     fireEvent.click(screen.getByRole("button", { name: "Inspect case case-001" }));
@@ -382,7 +390,9 @@ describe("run detail route", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Inspect notable case case-004" }));
 
@@ -420,7 +430,9 @@ describe("run detail route", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "run_gamma" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Saved comparisons touching this run" }),
     ).toBeInTheDocument();

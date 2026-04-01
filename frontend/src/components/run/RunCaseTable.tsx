@@ -106,8 +106,8 @@ export function RunCaseTable({
                   <td className="block px-0 py-2 md:table-cell md:px-4 md:py-3">
                     <MobileLabel>Case</MobileLabel>
                     <div className="space-y-1">
-                      <p className="font-mono text-xs text-foreground">{caseRow.caseId}</p>
-                      <p className="max-w-[28rem] text-sm text-muted-foreground">
+                      <p className="font-mono text-[11px] text-foreground">{caseRow.caseId}</p>
+                      <p className="max-w-[24rem] text-sm text-muted-foreground">
                         {caseRow.prompt}
                       </p>
                     </div>

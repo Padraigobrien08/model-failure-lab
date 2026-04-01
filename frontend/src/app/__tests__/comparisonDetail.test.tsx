@@ -441,10 +441,12 @@ describe("comparison detail route", () => {
     );
 
     const comparisonHeading = await screen.findByRole("heading", {
-      name: "compare_alpha_to_beta",
+      name: "Reasoning Failures V1",
     });
     expect(comparisonHeading).toBeInTheDocument();
-    expect(comparisonHeading).toHaveClass("break-all");
+    expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
+    expect(screen.queryByText("Pathway checkpoints")).not.toBeInTheDocument();
+    expect(screen.queryByText("Orient first, then compare hard.")).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Directional change at a glance" }),
     ).toBeInTheDocument();
@@ -485,10 +487,12 @@ describe("comparison detail route", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: "compare_dataset_mismatch" }),
+      await screen.findByRole("heading", {
+        name: "Reasoning Failures V1 Vs Hallucination Failures V1",
+      }),
     ).toBeInTheDocument();
     expect(screen.getByText("Incompatible comparison: Dataset Mismatch")).toBeInTheDocument();
-    expect(screen.getByText("reasoning-failures-v1 vs hallucination-failures-v1")).toBeInTheDocument();
+    expect(screen.getByText("compare_dataset_mismatch")).toBeInTheDocument();
     expect(
       screen.getByText(
         "The comparison stays readable even though the saved runs do not align cleanly.",
@@ -513,12 +517,13 @@ describe("comparison detail route", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: "compare_alpha_to_beta" }),
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("link", { name: "run_alpha" }));
+    fireEvent.click(screen.getByRole("link", { name: "Open baseline run_alpha" }));
 
-    expect(await screen.findByRole("heading", { name: "run_alpha" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Reasoning Failures V1" })).toBeInTheDocument();
+    expect(screen.getByText("run_alpha")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
   });
 });

@@ -56,8 +56,10 @@ export function ComparisonDetailHeader({
   comparison,
   inventoryHref,
 }: ComparisonDetailHeaderProps) {
+  const datasetLabel = formatLabel(datasetBadgeText(comparison));
+
   return (
-    <header className="space-y-5 border-b border-border/60 pb-6">
+    <header className="space-y-4 border-b border-border/60 pb-5">
       <nav
         aria-label="Comparison breadcrumb"
         className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
@@ -66,9 +68,7 @@ export function ComparisonDetailHeader({
           Comparisons
         </Link>
         <span aria-hidden="true">/</span>
-        <span className="min-w-0 break-all font-mono text-xs text-foreground">
-          {comparison.reportId}
-        </span>
+        <span className="text-sm text-foreground">{datasetLabel}</span>
       </nav>
 
       <div className="space-y-4">
@@ -78,15 +78,15 @@ export function ComparisonDetailHeader({
             className="rounded-full text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             to={`/runs/${encodeURIComponent(comparison.baselineRunId)}`}
           >
-            <Badge tone="muted">{comparison.baselineRunId}</Badge>
+            <Badge tone="muted">Baseline</Badge>
           </Link>
           <Link
             className="rounded-full text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             to={`/runs/${encodeURIComponent(comparison.candidateRunId)}`}
           >
-            <Badge tone="muted">{comparison.candidateRunId}</Badge>
+            <Badge tone="muted">Candidate</Badge>
           </Link>
-          <Badge tone="muted">{datasetBadgeText(comparison)}</Badge>
+          <Badge tone="muted">{datasetLabel}</Badge>
           <Badge tone={statusTone(comparison.compatible, comparison.status)}>
             {formatLabel(comparison.status)}
           </Badge>
@@ -96,64 +96,47 @@ export function ComparisonDetailHeader({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Orient first
           </p>
-          <h1 className="break-all text-3xl font-semibold leading-tight tracking-[-0.04em] text-foreground sm:text-4xl">
-            {comparison.reportId}
+          <h1 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-foreground sm:text-4xl">
+            {datasetLabel}
           </h1>
-          <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-            Frame the comparison before reading the transitions: baseline versus candidate, saved
-            dataset scope, compatibility, and the delta that explains what changed overall.
+          <p className="max-w-4xl text-base leading-7 text-muted-foreground">
+            Frame the comparison first: baseline versus candidate, shared-case scope, and the delta
+            that explains what changed overall.
           </p>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
-          <div className="rounded-[20px] border border-border/60 bg-background/70 px-4 py-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Baseline
+              Baseline run
             </p>
-            <p className="mt-2 break-all text-sm font-semibold text-foreground">
+            <p className="mt-2 break-all font-mono text-xs text-foreground">
               {comparison.baselineRunId}
             </p>
           </div>
-          <div className="flex items-center justify-center">
-            <span className="rounded-full border border-border/60 bg-card/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              vs
-            </span>
-          </div>
-          <div className="rounded-[20px] border border-border/60 bg-background/70 px-4 py-4">
+          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Candidate
+              Candidate run
             </p>
-            <p className="mt-2 break-all text-sm font-semibold text-foreground">
+            <p className="mt-2 break-all font-mono text-xs text-foreground">
               {comparison.candidateRunId}
             </p>
           </div>
+          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Report ID
+            </p>
+            <p className="mt-2 break-all font-mono text-xs text-foreground">
+              {comparison.reportId}
+            </p>
+          </div>
+          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Saved at
+            </p>
+            <p className="mt-2 text-sm text-foreground">{formatTimestamp(comparison.createdAt)}</p>
+          </div>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          {[
-            "Directional delta",
-            "Coverage scope",
-            "Grouped transitions",
-            "Selected evidence",
-          ].map((step, index) => (
-            <span
-              key={step}
-              className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground"
-            >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 text-[10px] text-primary">
-                {index + 1}
-              </span>
-              {step}
-            </span>
-          ))}
-        </div>
-
-        <p className="text-sm text-muted-foreground">
-          Saved at{" "}
-          <span className="font-medium text-foreground">
-            {formatTimestamp(comparison.createdAt)}
-          </span>
-        </p>
       </div>
     </header>
   );

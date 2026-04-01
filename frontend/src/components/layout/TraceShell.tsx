@@ -96,6 +96,8 @@ export function TraceShell({ routeContext }: TraceShellProps) {
   const sourceLabel = artifactOverview?.source.label ?? "Local artifact root";
   const sourcePath = artifactOverview?.source.path ?? "Scanning repo-root runs/ and reports/…";
   const routeMeta = resolveRouteMeta(location.pathname);
+  const isDetailRoute =
+    location.pathname.startsWith("/runs/") || location.pathname.startsWith("/comparisons/");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -144,123 +146,151 @@ export function TraceShell({ routeContext }: TraceShellProps) {
         </div>
       </header>
 
-      <section className="border-b border-border/50 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(255,255,255,0.58))]">
-        <div className="mx-auto flex w-full max-w-[92rem] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="space-y-2">
-            <p className="text-sm leading-6 text-muted-foreground">
-              The React debugger now opens on saved run artifacts and comparison reports from the
-              real `failure-lab` contract.
-            </p>
+      {isDetailRoute ? (
+        <section className="border-b border-border/50 bg-background/72">
+          <div className="mx-auto flex w-full max-w-[92rem] flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                {routeMeta.eyebrow}
+              </p>
+              <p className="text-sm leading-6 text-muted-foreground">
+                {routeMeta.focusDescription}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="muted">{sourceLabel}</Badge>
+              <Badge tone="muted">{routeMeta.pathway.length} stages</Badge>
+            </div>
           </div>
+        </section>
+      ) : (
+        <section className="border-b border-border/50 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(255,255,255,0.58))]">
+          <div className="mx-auto flex w-full max-w-[92rem] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
+            <div className="space-y-2">
+              <p className="text-sm leading-6 text-muted-foreground">
+                The React debugger now opens on saved run artifacts and comparison reports from the
+                real `failure-lab` contract.
+              </p>
+            </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
-            <div className="rounded-[28px] border border-border/60 bg-card/75 px-5 py-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-              <div className="space-y-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  {routeMeta.eyebrow}
-                </p>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-semibold tracking-[-0.05em] text-foreground sm:text-[2rem]">
-                    {routeMeta.title}
-                  </h2>
-                  <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                    {routeMeta.description}
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
+              <div className="rounded-[28px] border border-border/60 bg-card/75 px-5 py-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                <div className="space-y-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                    {routeMeta.eyebrow}
                   </p>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {routeMeta.pathway.map((step, index) => (
-                    <span
-                      key={`${routeMeta.title}-${step}`}
-                      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground"
-                    >
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 text-[10px] text-primary">
-                        {index + 1}
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-semibold tracking-[-0.05em] text-foreground sm:text-[2rem]">
+                      {routeMeta.title}
+                    </h2>
+                    <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                      {routeMeta.description}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {routeMeta.pathway.map((step, index) => (
+                      <span
+                        key={`${routeMeta.title}-${step}`}
+                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground"
+                      >
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 text-[10px] text-primary">
+                          {index + 1}
+                        </span>
+                        {step}
                       </span>
-                      {step}
-                    </span>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="rounded-[28px] border border-border/60 bg-card/75 px-5 py-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-              <div className="space-y-1">
+              <div className="rounded-[28px] border border-border/60 bg-card/75 px-5 py-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
                 <div className="space-y-1">
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Artifact source
+                    </p>
+                    <p className="text-sm font-medium text-foreground">{sourceLabel}</p>
+                    <p className="break-all font-mono text-xs text-muted-foreground">
+                      {sourcePath}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-[22px] border border-border/60 bg-background/70 px-4 py-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Artifact source
+                    Focus now
                   </p>
-                  <p className="text-sm font-medium text-foreground">{sourceLabel}</p>
-                  <p className="break-all font-mono text-xs text-muted-foreground">
-                    {sourcePath}
+                  <p className="mt-2 text-sm font-semibold text-foreground">
+                    {routeMeta.focusTitle}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {routeMeta.focusDescription}
                   </p>
                 </div>
-              </div>
-
-              <div className="mt-4 rounded-[22px] border border-border/60 bg-background/70 px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Focus now
-                </p>
-                <p className="mt-2 text-sm font-semibold text-foreground">
-                  {routeMeta.focusTitle}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {routeMeta.focusDescription}
-                </p>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <main className="mx-auto w-full max-w-[92rem] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_15rem] xl:items-start">
+        <div
+          className={cn(
+            "gap-6",
+            isDetailRoute
+              ? "block"
+              : "grid xl:grid-cols-[minmax(0,1fr)_15rem] xl:items-start",
+          )}
+        >
           <div className="min-w-0">
             <Outlet context={routeContext} />
           </div>
-          <aside className="hidden xl:block">
-            <div className="sticky top-24 space-y-4">
-              <div className="rounded-[24px] border border-border/60 bg-card/75 px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Pathway checkpoints
-                </p>
-                <div className="mt-3 space-y-3">
-                  {routeMeta.pathway.map((step, index) => (
-                    <div
-                      key={`${routeMeta.focusTitle}-${step}`}
-                      className="flex gap-3 rounded-[18px] border border-border/60 bg-background/70 px-3 py-3"
-                    >
-                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[11px] font-semibold text-primary">
-                        {index + 1}
-                      </span>
-                      <p className="text-sm leading-5 text-foreground">{step}</p>
-                    </div>
-                  ))}
+          {!isDetailRoute ? (
+            <aside className="hidden xl:block">
+              <div className="sticky top-24 space-y-4">
+                <div className="rounded-[24px] border border-border/60 bg-card/75 px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Pathway checkpoints
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    {routeMeta.pathway.map((step, index) => (
+                      <div
+                        key={`${routeMeta.focusTitle}-${step}`}
+                        className="flex gap-3 rounded-[18px] border border-border/60 bg-background/70 px-3 py-3"
+                      >
+                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[11px] font-semibold text-primary">
+                          {index + 1}
+                        </span>
+                        <p className="text-sm leading-5 text-foreground">{step}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="rounded-[24px] border border-border/60 bg-card/75 px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Artifact graph
-                </p>
-                <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-3 py-3">
-                    <p className="font-semibold text-foreground">
-                      {artifactOverview?.runs.count ?? 0} saved runs
-                    </p>
-                    <p className="mt-1">Primary debugging route through engine-native artifacts.</p>
-                  </div>
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-3 py-3">
-                    <p className="font-semibold text-foreground">
-                      {artifactOverview?.comparisons.count ?? 0} comparison reports
-                    </p>
-                    <p className="mt-1">
-                      Baseline-versus-candidate evidence stays linked back to runs.
-                    </p>
+                <div className="rounded-[24px] border border-border/60 bg-card/75 px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Artifact graph
+                  </p>
+                  <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                    <div className="rounded-[18px] border border-border/60 bg-background/70 px-3 py-3">
+                      <p className="font-semibold text-foreground">
+                        {artifactOverview?.runs.count ?? 0} saved runs
+                      </p>
+                      <p className="mt-1">Primary debugging route through engine-native artifacts.</p>
+                    </div>
+                    <div className="rounded-[18px] border border-border/60 bg-background/70 px-3 py-3">
+                      <p className="font-semibold text-foreground">
+                        {artifactOverview?.comparisons.count ?? 0} comparison reports
+                      </p>
+                      <p className="mt-1">
+                        Baseline-versus-candidate evidence stays linked back to runs.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </aside>
+            </aside>
+          ) : null}
         </div>
       </main>
     </div>

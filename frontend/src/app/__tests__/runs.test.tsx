@@ -320,10 +320,10 @@ describe("runs route", () => {
 
     await user.click(screen.getByRole("link", { name: "Open run run_gamma" }));
     expect(
-      await screen.findByRole("heading", { name: "run_gamma" }),
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Run breadcrumb" })).toBeInTheDocument();
-    expect(screen.getByText("hallucination-failures-v1")).toBeInTheDocument();
+    expect(screen.getByText("run_gamma")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
 
     const backToRuns = screen.getAllByRole("link", { name: "Back to runs" })[0];
@@ -335,7 +335,7 @@ describe("runs route", () => {
     const row = screen.getByRole("link", { name: "Open run run_gamma" });
     await user.click(within(row).getByRole("button", { name: "Open run_gamma" }));
     expect(
-      await screen.findByRole("heading", { name: "run_gamma" }),
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
     ).toBeInTheDocument();
   });
 
