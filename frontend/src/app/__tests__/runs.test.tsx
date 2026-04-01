@@ -323,7 +323,7 @@ describe("runs route", () => {
       await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Run breadcrumb" })).toBeInTheDocument();
-    expect(screen.getByText("run_gamma")).toBeInTheDocument();
+    expect(screen.getAllByText("run_gamma").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
 
     const backToRuns = screen.getAllByRole("link", { name: "Back to runs" })[0];

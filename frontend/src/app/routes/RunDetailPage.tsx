@@ -886,7 +886,14 @@ export function RunDetailPage() {
               />
             </div>
             <div className="lg:sticky lg:top-24">
-              <RunCaseDetailPanel caseRow={selectedCase} />
+              <RunCaseDetailPanel
+                artifactContext={{
+                  runId: detail.run.runId,
+                  reportId: detail.run.reportId,
+                  sourcePath: detail.source.path,
+                }}
+                caseRow={selectedCase}
+              />
             </div>
           </div>
         )}

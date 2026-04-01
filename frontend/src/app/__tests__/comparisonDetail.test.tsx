@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 import { App } from "@/app/App";
@@ -37,7 +37,24 @@ function buildReadyArtifactState(comparisonIds: string[]): ArtifactShellState {
   };
 }
 
-function buildReadyRunInventoryState(): RunInventoryState {
+function buildReadyRunInventoryState(
+  runs: NonNullable<RunInventoryState["inventory"]>["runs"] = [
+    {
+      runId: "run_alpha",
+      dataset: "reasoning-failures-v1",
+      model: "demo",
+      createdAt: "2026-03-29T09:00:00Z",
+      status: "completed",
+    },
+    {
+      runId: "run_beta",
+      dataset: "reasoning-failures-v1",
+      model: "demo",
+      createdAt: "2026-03-30T11:30:00Z",
+      status: "completed",
+    },
+  ],
+): RunInventoryState {
   return {
     status: "ready",
     inventory: {
@@ -47,22 +64,7 @@ function buildReadyRunInventoryState(): RunInventoryState {
         runsPath: "/tmp/model-failure-lab/runs",
         reportsPath: "/tmp/model-failure-lab/reports",
       },
-      runs: [
-        {
-          runId: "run_alpha",
-          dataset: "reasoning-failures-v1",
-          model: "demo",
-          createdAt: "2026-03-29T09:00:00Z",
-          status: "completed",
-        },
-        {
-          runId: "run_beta",
-          dataset: "reasoning-failures-v1",
-          model: "demo",
-          createdAt: "2026-03-30T11:30:00Z",
-          status: "completed",
-        },
-      ],
+      runs,
     },
     message: null,
   };
@@ -185,6 +187,7 @@ function buildCompatibleDetail(): ComparisonDetail {
     caseDeltas: [
       {
         caseId: "case-002",
+        promptId: "case-002",
         prompt: "Answer using only the supplied source snippet.",
         tags: ["core", "factuality"],
         transitionType: "failure_to_no_failure",
@@ -200,6 +203,7 @@ function buildCompatibleDetail(): ComparisonDetail {
       },
       {
         caseId: "case-004",
+        promptId: "case-004",
         prompt: "Use only the provided evidence bullets.",
         tags: ["extended"],
         transitionType: "no_failure_to_failure",
@@ -386,11 +390,86 @@ function buildLinkedRunDetail(runId: string, dataset: string): RunDetail {
   };
 }
 
-function mockComparisonAndRunDetails(detail: ComparisonDetail) {
-  const linkedRuns = new Map([
+function buildFallbackLinkedRunDetail(runId: string, dataset: string): RunDetail {
+  return {
+    source: {
+      label: "Repo root artifact store",
+      path: "/tmp/model-failure-lab",
+      runsPath: "/tmp/model-failure-lab/runs",
+      reportsPath: "/tmp/model-failure-lab/reports",
+    },
+    run: {
+      runId,
+      dataset,
+      model: "demo",
+      createdAt: "2026-03-30T12:10:00Z",
+      status: "completed",
+      reportId: `${runId}_report`,
+      adapterId: "demo",
+      classifierId: "heuristic_v1",
+      runSeed: 17,
+    },
+    metrics: {
+      attemptedCaseCount: 1,
+      classifiedCaseCount: 1,
+      executionErrorCount: 0,
+      unclassifiedCount: 0,
+      successfulModelInvocationCount: 1,
+      failureCaseCount: 0,
+      failureRate: 0,
+      classificationCoverage: 1,
+      executionSuccessRate: 1,
+    },
+    summary: {
+      failureTypes: [],
+      expectationVerdicts: [],
+      tagSlices: [
+        {
+          tag: "core",
+          attemptedCaseCount: 1,
+          classifiedCaseCount: 1,
+          failureCaseCount: 0,
+          failureRate: 0,
+          expectationVerdictCounts: { no_failure_as_expected: 1 },
+        },
+      ],
+    },
+    lenses: {
+      mismatchCaseIds: [],
+      notableCaseIds: ["case-001"],
+      allCaseIds: ["case-001"],
+      errorCaseIds: [],
+    },
+    cases: [
+      {
+        caseId: "case-001",
+        promptId: "case-001",
+        prompt: "Ground the answer in the supplied source.",
+        tags: ["core"],
+        outputText: "Grounded answer.",
+        expectation: {
+          expectedFailure: { failureType: "no_failure", failureSubtype: null },
+          observedFailure: { failureType: "no_failure", failureSubtype: null },
+          verdict: "no_failure_as_expected",
+        },
+        classification: {
+          failure: { failureType: "no_failure", failureSubtype: null },
+          confidence: 0.2,
+          explanation: "No heuristic failure signal detected.",
+        },
+        error: null,
+      },
+    ],
+  };
+}
+
+function mockComparisonAndRunDetails(
+  detail: ComparisonDetail,
+  linkedRuns: Map<string, RunDetail> = new Map([
     ["run_alpha", buildLinkedRunDetail("run_alpha", "reasoning-failures-v1")],
     ["run_beta", buildLinkedRunDetail("run_beta", "reasoning-failures-v1")],
-  ]);
+  ]),
+) {
 
   vi.stubGlobal(
     "fetch",
@@ -451,7 +530,7 @@ describe("comparison detail route", () => {
       name: "Reasoning Failures V1",
     });
     expect(comparisonHeading).toBeInTheDocument();
-    expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
+    expect(screen.getAllByText("compare_alpha_to_beta").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("navigation", { name: "Detail section jumps" }),
     ).toBeInTheDocument();
@@ -536,7 +615,7 @@ describe("comparison detail route", () => {
     fireEvent.click(screen.getByRole("link", { name: "Open baseline run_alpha" }));
 
     expect(await screen.findByRole("heading", { name: "Reasoning Failures V1" })).toBeInTheDocument();
-    expect(screen.getByText("run_alpha")).toBeInTheDocument();
+    expect(screen.getAllByText("run_alpha").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
   });
 
@@ -576,7 +655,7 @@ describe("comparison detail route", () => {
     expect(
       await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("run_alpha")).toBeInTheDocument();
+    expect(screen.getAllByText("run_alpha").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Selected case evidence" })).toBeInTheDocument();
     expect(screen.getByText("Invented unsupported detail.")).toBeInTheDocument();
 
@@ -626,8 +705,49 @@ describe("comparison detail route", () => {
     expect(
       await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("run_beta")).toBeInTheDocument();
+    expect(screen.getAllByText("run_beta").length).toBeGreaterThan(0);
     expect(screen.getByText("Invented unsupported detail.")).toBeInTheDocument();
+  });
+
+  it("disables selected-case drillthrough when the target run is already unavailable", async () => {
+    mockComparisonDetail(buildCompatibleDetail());
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta?section=transitions&case=case-002&transition=failure_to_no_failure"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState([
+          {
+            runId: "run_beta",
+            dataset: "reasoning-failures-v1",
+            model: "demo",
+            createdAt: "2026-03-30T11:30:00Z",
+            status: "completed",
+          },
+        ])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", {
+        name: "Open case case-002 in baseline run run_alpha",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Saved baseline run run_alpha is unavailable in the active run inventory.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: "Open case case-002 in candidate run run_beta",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("restores explicit comparison URL state and canonicalizes mismatched transition context", async () => {
@@ -705,12 +825,78 @@ describe("comparison detail route", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Reasoning Failures V1" })).toBeInTheDocument();
-    expect(screen.getByText("run_alpha")).toBeInTheDocument();
+    expect(screen.getAllByText("run_alpha").length).toBeGreaterThan(0);
     const returnLink = screen.getByRole("link", { name: "Back to runs" });
     const returnUrl = new URL(returnLink.getAttribute("href") ?? "", "https://example.test");
     expect(returnUrl.pathname).toBe("/comparisons/compare_alpha_to_beta");
     expect(returnUrl.searchParams.get("section")).toBe("transitions");
     expect(returnUrl.searchParams.get("case")).toBe("case-002");
     expect(returnUrl.searchParams.get("transition")).toBe("failure_to_no_failure");
+  });
+
+  it("shows focused artifact context on the selected comparison case surface", async () => {
+    mockComparisonDetail(buildCompatibleDetail());
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta?section=transitions&case=case-002&transition=failure_to_no_failure"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+
+    const artifactContext = screen.getByRole("region", { name: "Artifact context" });
+    expect(within(artifactContext).getAllByText("compare_alpha_to_beta").length).toBeGreaterThan(0);
+    expect(within(artifactContext).getAllByText("case-002").length).toBeGreaterThan(0);
+    expect(within(artifactContext).getByText("/tmp/model-failure-lab")).toBeInTheDocument();
+  });
+
+  it("falls back with an explicit notice when exact baseline evidence cannot be resolved after navigation", async () => {
+    mockComparisonAndRunDetails(
+      buildCompatibleDetail(),
+      new Map([
+        ["run_alpha", buildFallbackLinkedRunDetail("run_alpha", "reasoning-failures-v1")],
+        ["run_beta", buildLinkedRunDetail("run_beta", "reasoning-failures-v1")],
+      ]),
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/comparisons/compare_alpha_to_beta?section=transitions&case=case-002&transition=failure_to_no_failure",
+    );
+
+    render(
+      <App
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("link", {
+        name: "Open case case-002 in baseline run run_alpha",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("run_alpha").length).toBeGreaterThan(0);
+    expect(
+      await screen.findByText(
+        "Requested case case-002 is unavailable in this evidence state. Showing case-001 instead.",
+      ),
+    ).toBeInTheDocument();
   });
 });

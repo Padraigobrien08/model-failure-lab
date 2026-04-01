@@ -5,6 +5,11 @@ import { formatCount, formatLabel, formatMetric } from "@/lib/formatters";
 
 type RunCaseDetailPanelProps = {
   caseRow: RunCaseRecord | null;
+  artifactContext?: {
+    runId: string;
+    reportId: string;
+    sourcePath: string;
+  } | null;
 };
 
 function formatFailureLabel(
@@ -27,7 +32,10 @@ function formatFailureLabel(
   return formatLabel(failure.failureType);
 }
 
-export function RunCaseDetailPanel({ caseRow }: RunCaseDetailPanelProps) {
+export function RunCaseDetailPanel({
+  caseRow,
+  artifactContext = null,
+}: RunCaseDetailPanelProps) {
   if (!caseRow) {
     return (
       <Card className="rounded-[24px] border border-border/70 bg-card/70 shadow-panel">
@@ -178,15 +186,58 @@ export function RunCaseDetailPanel({ caseRow }: RunCaseDetailPanelProps) {
           </section>
         ) : null}
 
-        <section className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Saved identifiers
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Badge tone="muted">Prompt ID {caseRow.promptId}</Badge>
-            <Badge tone="muted">Tags {formatCount(caseRow.tags.length)}</Badge>
-          </div>
-        </section>
+        {artifactContext ? (
+          <section aria-label="Artifact context" className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Artifact context
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Run ID
+                </p>
+                <p className="mt-2 break-all font-mono text-xs text-foreground">
+                  {artifactContext.runId}
+                </p>
+              </div>
+              <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Report ID
+                </p>
+                <p className="mt-2 break-all font-mono text-xs text-foreground">
+                  {artifactContext.reportId}
+                </p>
+              </div>
+              <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Case ID
+                </p>
+                <p className="mt-2 break-all font-mono text-xs text-foreground">
+                  {caseRow.caseId}
+                </p>
+              </div>
+              <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Prompt ID
+                </p>
+                <p className="mt-2 break-all font-mono text-xs text-foreground">
+                  {caseRow.promptId}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge tone="muted">Tags {formatCount(caseRow.tags.length)}</Badge>
+            </div>
+            <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Source root
+              </p>
+              <p className="mt-2 break-all font-mono text-xs text-foreground">
+                {artifactContext.sourcePath}
+              </p>
+            </div>
+          </section>
+        ) : null}
       </CardContent>
     </Card>
   );

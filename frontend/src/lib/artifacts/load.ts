@@ -492,6 +492,7 @@ function requireComparisonCaseDeltas(
     const row = requireObject(entry, `${field}[${index}]`);
     return {
       caseId: requireString(row.caseId, `${field}[${index}].caseId`),
+      promptId: requireString(row.promptId, `${field}[${index}].promptId`),
       prompt: requireString(row.prompt, `${field}[${index}].prompt`),
       tags: requireStringArray(row.tags, `${field}[${index}].tags`),
       transitionType: requireString(row.transitionType, `${field}[${index}].transitionType`),

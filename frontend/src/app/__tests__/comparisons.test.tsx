@@ -161,6 +161,7 @@ function buildComparisonDetail(reportId: string): ComparisonDetail {
     caseDeltas: [
       {
         caseId: "case-002",
+        promptId: "case-002",
         prompt: "Answer using only the supplied source snippet.",
         tags: ["core", "factuality"],
         transitionType: "failure_to_no_failure",
@@ -297,7 +298,7 @@ describe("comparisons route", () => {
     expect(
       await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
+    expect(screen.getAllByText("compare_alpha_to_beta").length).toBeGreaterThan(0);
     const breadcrumb = screen.getByRole("navigation", { name: "Comparison breadcrumb" });
     expect(breadcrumb).toBeInTheDocument();
     expect(within(breadcrumb).getByRole("link", { name: "Comparisons" })).toHaveAttribute(

@@ -75,7 +75,8 @@ export function ComparisonDetailPage() {
   const { reportId } = useParams();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { artifactState, comparisonInventoryState } = useAppRouteContext();
+  const { artifactState, comparisonInventoryState, runInventoryState } =
+    useAppRouteContext();
   const [detailState, setDetailState] = useState<ComparisonDetailState>({
     status: "idle",
     detail: null,
@@ -509,6 +510,24 @@ export function ComparisonDetailPage() {
       search: location.search,
     },
   };
+  const baselineUnavailableReason =
+    runInventoryState.status === "incompatible"
+      ? "Saved runs are unavailable under the active artifact contract."
+      : runInventoryState.status === "ready" &&
+          !runInventoryState.inventory.runs.some(
+            (candidate) => candidate.runId === detail.comparison.baselineRunId,
+          )
+        ? `Saved baseline run ${detail.comparison.baselineRunId} is unavailable in the active run inventory.`
+        : null;
+  const candidateUnavailableReason =
+    runInventoryState.status === "incompatible"
+      ? "Saved runs are unavailable under the active artifact contract."
+      : runInventoryState.status === "ready" &&
+          !runInventoryState.inventory.runs.some(
+            (candidate) => candidate.runId === detail.comparison.candidateRunId,
+          )
+        ? `Saved candidate run ${detail.comparison.candidateRunId} is unavailable in the active run inventory.`
+        : null;
   const baselineCaseHref =
     selectedCase !== null
       ? buildRunCaseDrillthroughHref(
@@ -779,9 +798,10 @@ export function ComparisonDetailPage() {
                   ? {
                       label: "Open baseline evidence",
                       ariaLabel: `Open case ${selectedCase.caseId} in baseline run ${detail.comparison.baselineRunId}`,
-                      href: baselineCaseHref,
+                      href: baselineUnavailableReason ? null : baselineCaseHref,
                       runId: detail.comparison.baselineRunId,
                       state: detailReturnState,
+                      disabledReason: baselineUnavailableReason,
                     }
                   : null
               }
@@ -790,9 +810,20 @@ export function ComparisonDetailPage() {
                   ? {
                       label: "Open candidate evidence",
                       ariaLabel: `Open case ${selectedCase.caseId} in candidate run ${detail.comparison.candidateRunId}`,
-                      href: candidateCaseHref,
+                      href: candidateUnavailableReason ? null : candidateCaseHref,
                       runId: detail.comparison.candidateRunId,
                       state: detailReturnState,
+                      disabledReason: candidateUnavailableReason,
+                    }
+                  : null
+              }
+              artifactContext={
+                selectedCase
+                  ? {
+                      reportId: detail.comparison.reportId,
+                      baselineRunId: detail.comparison.baselineRunId,
+                      candidateRunId: detail.comparison.candidateRunId,
+                      sourcePath: detail.source.path,
                     }
                   : null
               }

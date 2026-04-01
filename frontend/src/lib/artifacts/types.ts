@@ -125,6 +125,7 @@ export type ComparisonTransitionSummaryRow = {
 
 export type ComparisonCaseDeltaRecord = {
   caseId: string;
+  promptId: string;
   prompt: string;
   tags: string[];
   transitionType: string;

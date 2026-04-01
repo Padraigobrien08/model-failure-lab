@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 import { App } from "@/app/App";
@@ -294,7 +294,7 @@ describe("run detail route", () => {
       name: "Hallucination Failures V1",
     });
     expect(runHeading).toBeInTheDocument();
-    expect(screen.getByText("run_gamma")).toBeInTheDocument();
+    expect(screen.getAllByText("run_gamma").length).toBeGreaterThan(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole("navigation", { name: "Detail section jumps" }),
@@ -415,6 +415,30 @@ describe("run detail route", () => {
     expect(
       screen.getAllByText("Use only the provided evidence bullets.").length,
     ).toBeGreaterThan(0);
+  });
+
+  it("shows focused artifact context on the selected run case surface", async () => {
+    const detail = buildRunDetail(SAMPLE_RUN);
+    mockRunDetail(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/runs/run_gamma?section=evidence&case=case-002"]}
+        initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId])}
+        initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
+    ).toBeInTheDocument();
+
+    const artifactContext = screen.getByRole("region", { name: "Artifact context" });
+    expect(within(artifactContext).getAllByText("run_gamma").length).toBeGreaterThan(0);
+    expect(within(artifactContext).getByText("run_gamma_report")).toBeInTheDocument();
+    expect(within(artifactContext).getByText("/tmp/model-failure-lab")).toBeInTheDocument();
   });
 
   it("surfaces lightweight related comparison links when saved reports reference the run", async () => {

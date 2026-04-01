@@ -18,6 +18,12 @@ type ComparisonCaseDetailPanelProps = {
   caseDelta: ComparisonCaseDeltaRecord | null;
   baselineAction?: ComparisonCaseDrillthroughAction | null;
   candidateAction?: ComparisonCaseDrillthroughAction | null;
+  artifactContext?: {
+    reportId: string;
+    baselineRunId: string;
+    candidateRunId: string;
+    sourcePath: string;
+  } | null;
 };
 
 function formatValue(value: string | null): string {
@@ -31,6 +37,7 @@ export function ComparisonCaseDetailPanel({
   caseDelta,
   baselineAction = null,
   candidateAction = null,
+  artifactContext = null,
 }: ComparisonCaseDetailPanelProps) {
   if (!caseDelta) {
     return (
@@ -117,6 +124,56 @@ export function ComparisonCaseDetailPanel({
                     </div>
                   ),
                 )}
+            </div>
+          </section>
+        ) : null}
+
+        {artifactContext ? (
+          <section aria-label="Artifact context" className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Artifact context
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Report ID
+                </p>
+                <p className="mt-2 break-all font-mono text-xs text-foreground">
+                  {artifactContext.reportId}
+                </p>
+              </div>
+              <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Case ID
+                </p>
+                <p className="mt-2 break-all font-mono text-xs text-foreground">
+                  {caseDelta.caseId}
+                </p>
+              </div>
+              <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Prompt ID
+                </p>
+                <p className="mt-2 break-all font-mono text-xs text-foreground">
+                  {caseDelta.promptId}
+                </p>
+              </div>
+              <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Baseline / Candidate
+                </p>
+                <p className="mt-2 break-all font-mono text-xs text-foreground">
+                  {artifactContext.baselineRunId} / {artifactContext.candidateRunId}
+                </p>
+              </div>
+            </div>
+            <div className="rounded-[18px] border border-border/70 bg-background/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Source root
+              </p>
+              <p className="mt-2 break-all font-mono text-xs text-foreground">
+                {artifactContext.sourcePath}
+              </p>
             </div>
           </section>
         ) : null}
