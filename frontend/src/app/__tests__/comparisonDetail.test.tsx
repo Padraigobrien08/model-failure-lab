@@ -530,6 +530,15 @@ describe("comparison detail route", () => {
       name: "Reasoning Failures V1",
     });
     expect(comparisonHeading).toBeInTheDocument();
+    const comparisonHeader = comparisonHeading.closest("header");
+    expect(comparisonHeader).not.toBeNull();
+    expect(within(comparisonHeader as HTMLElement).queryByText("Baseline run")).not.toBeInTheDocument();
+    expect(within(comparisonHeader as HTMLElement).queryByText("Candidate run")).not.toBeInTheDocument();
+    expect(within(comparisonHeader as HTMLElement).queryByText("Report ID")).not.toBeInTheDocument();
+    expect(within(comparisonHeader as HTMLElement).getByText("Baseline")).toBeInTheDocument();
+    expect(within(comparisonHeader as HTMLElement).getByText("Candidate")).toBeInTheDocument();
+    expect(within(comparisonHeader as HTMLElement).getByText("Status")).toBeInTheDocument();
+    expect(within(comparisonHeader as HTMLElement).getByText("Saved at")).toBeInTheDocument();
     expect(screen.getAllByText("compare_alpha_to_beta").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("navigation", { name: "Detail section jumps" }),
@@ -584,7 +593,6 @@ describe("comparison detail route", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("Incompatible comparison: Dataset Mismatch")).toBeInTheDocument();
-    expect(screen.getByText("compare_dataset_mismatch")).toBeInTheDocument();
     expect(
       screen.getByText(
         "The comparison stays readable even though the saved runs do not align cleanly.",

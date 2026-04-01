@@ -57,10 +57,12 @@ function datasetBadgeText(comparison: ComparisonDetail["comparison"]): string {
 export function ComparisonDetailHeader({
   comparison,
   inventoryHref,
-  baselineRunState,
-  candidateRunState,
+  baselineRunState: _baselineRunState,
+  candidateRunState: _candidateRunState,
 }: ComparisonDetailHeaderProps) {
   const datasetLabel = formatLabel(datasetBadgeText(comparison));
+  const savedAtLabel = formatTimestamp(comparison.createdAt);
+  const statusLabel = formatLabel(comparison.status);
 
   return (
     <header className="space-y-4 border-b border-border/60 pb-5">
@@ -78,24 +80,6 @@ export function ComparisonDetailHeader({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Comparison detail</Badge>
-          <Link
-            className="rounded-full text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-            to={`/runs/${encodeURIComponent(comparison.baselineRunId)}`}
-            state={baselineRunState}
-          >
-            <Badge tone="muted">Baseline</Badge>
-          </Link>
-          <Link
-            className="rounded-full text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-            to={`/runs/${encodeURIComponent(comparison.candidateRunId)}`}
-            state={candidateRunState}
-          >
-            <Badge tone="muted">Candidate</Badge>
-          </Link>
-          <Badge tone="muted">{datasetLabel}</Badge>
-          <Badge tone={statusTone(comparison.compatible, comparison.status)}>
-            {formatLabel(comparison.status)}
-          </Badge>
         </div>
 
         <div className="space-y-3">
@@ -106,41 +90,43 @@ export function ComparisonDetailHeader({
             {datasetLabel}
           </h1>
           <p className="max-w-4xl text-base leading-7 text-muted-foreground">
-            Frame the comparison first: baseline versus candidate, shared-case scope, and the delta
-            that explains what changed overall.
+            Frame the comparison first, then move into shared-case scope and grouped transition
+            evidence without repeating the full provenance block in the header.
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Baseline run
-            </p>
-            <p className="mt-2 break-all font-mono text-xs text-foreground">
-              {comparison.baselineRunId}
-            </p>
-          </div>
-          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Candidate run
-            </p>
-            <p className="mt-2 break-all font-mono text-xs text-foreground">
-              {comparison.candidateRunId}
-            </p>
-          </div>
-          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Report ID
-            </p>
-            <p className="mt-2 break-all font-mono text-xs text-foreground">
-              {comparison.reportId}
-            </p>
-          </div>
-          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Saved at
-            </p>
-            <p className="mt-2 text-sm text-foreground">{formatTimestamp(comparison.createdAt)}</p>
+        <div className="rounded-[22px] border border-border/60 bg-card/55 px-4 py-4">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Baseline
+              </p>
+              <p className="break-all text-sm font-semibold text-foreground">
+                {comparison.baselineRunId}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Candidate
+              </p>
+              <p className="break-all text-sm font-semibold text-foreground">
+                {comparison.candidateRunId}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Status
+              </p>
+              <Badge tone={statusTone(comparison.compatible, comparison.status)}>
+                {statusLabel}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Saved at
+              </p>
+              <p className="text-sm font-semibold text-foreground">{savedAtLabel}</p>
+            </div>
           </div>
         </div>
       </div>

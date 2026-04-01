@@ -294,6 +294,13 @@ describe("run detail route", () => {
       name: "Hallucination Failures V1",
     });
     expect(runHeading).toBeInTheDocument();
+    const runHeader = runHeading.closest("header");
+    expect(runHeader).not.toBeNull();
+    expect(within(runHeader as HTMLElement).queryByText("Run ID")).not.toBeInTheDocument();
+    expect(within(runHeader as HTMLElement).queryByText("Report ID")).not.toBeInTheDocument();
+    expect(within(runHeader as HTMLElement).getByText("Status")).toBeInTheDocument();
+    expect(within(runHeader as HTMLElement).getByText("Model")).toBeInTheDocument();
+    expect(within(runHeader as HTMLElement).getByText("Saved at")).toBeInTheDocument();
     expect(screen.getAllByText("run_gamma").length).toBeGreaterThan(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(

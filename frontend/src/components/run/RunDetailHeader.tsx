@@ -43,29 +43,22 @@ function statusTone(status: string): "accent" | "default" | "muted" {
   return "muted";
 }
 
-function formatOptionalValue(value: string | number | null): string {
-  if (value === null || value === "") {
-    return "n/a";
-  }
-
-  return String(value);
-}
-
 export function RunDetailHeader({
-  runId,
+  runId: _runId,
   dataset,
   model,
   status,
   createdAt,
   inventoryHref,
-  reportId,
-  adapterId,
-  classifierId,
-  runSeed,
+  reportId: _reportId,
+  adapterId: _adapterId,
+  classifierId: _classifierId,
+  runSeed: _runSeed,
 }: RunDetailHeaderProps) {
   const datasetLabel = formatLabel(dataset);
   const modelLabel = formatLabel(model);
   const statusLabel = formatLabel(status);
+  const savedAtLabel = formatTimestamp(createdAt);
 
   return (
     <header className="space-y-4 border-b border-border/60 pb-5">
@@ -83,8 +76,6 @@ export function RunDetailHeader({
       <div className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Run detail</Badge>
-          <Badge tone={statusTone(status)}>{statusLabel}</Badge>
-          <Badge tone="muted">{modelLabel}</Badge>
         </div>
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -94,36 +85,30 @@ export function RunDetailHeader({
             {datasetLabel}
           </h1>
           <p className="max-w-4xl text-base leading-7 text-muted-foreground">
-            {modelLabel} run, saved {formatTimestamp(createdAt)}. Lock the run identity first, then
-            move into failure shape, diagnosis, notable cases, and selected evidence.
+            Lock the route identity first, then move into failure shape, diagnosis, notable cases,
+            and selected evidence without re-reading a dense provenance block.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Run ID
-            </p>
-            <p className="mt-2 break-all font-mono text-xs text-foreground">{runId}</p>
-          </div>
-          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Report ID
-            </p>
-            <p className="mt-2 break-all font-mono text-xs text-foreground">{reportId}</p>
-          </div>
-          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Adapter
-            </p>
-            <p className="mt-2 text-sm text-foreground">{formatOptionalValue(adapterId)}</p>
-          </div>
-          <div className="rounded-[18px] border border-border/60 bg-card/55 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Classifier / Seed
-            </p>
-            <p className="mt-2 text-sm text-foreground">
-              {formatOptionalValue(classifierId)} / {formatOptionalValue(runSeed)}
-            </p>
+        <div className="rounded-[22px] border border-border/60 bg-card/55 px-4 py-4">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Status
+              </p>
+              <Badge tone={statusTone(status)}>{statusLabel}</Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Model
+              </p>
+              <p className="text-sm font-semibold text-foreground">{modelLabel}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Saved at
+              </p>
+              <p className="text-sm font-semibold text-foreground">{savedAtLabel}</p>
+            </div>
           </div>
         </div>
       </div>
