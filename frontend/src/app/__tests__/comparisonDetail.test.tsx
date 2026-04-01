@@ -540,6 +540,96 @@ describe("comparison detail route", () => {
     expect(screen.getByRole("heading", { name: "Why it failed" })).toBeInTheDocument();
   });
 
+  it("opens the selected comparison case directly into baseline and candidate run evidence", async () => {
+    mockComparisonAndRunDetails(buildCompatibleDetail());
+    window.history.replaceState(
+      {},
+      "",
+      "/comparisons/compare_alpha_to_beta?section=transitions&case=case-002&transition=failure_to_no_failure",
+    );
+
+    const firstRender = render(
+      <App
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get("section")).toBe("transitions");
+      expect(params.get("case")).toBe("case-002");
+      expect(params.get("transition")).toBe("failure_to_no_failure");
+    });
+
+    fireEvent.click(
+      screen.getByRole("link", {
+        name: "Open case case-002 in baseline run run_alpha",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("run_alpha")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Selected case evidence" })).toBeInTheDocument();
+    expect(screen.getByText("Invented unsupported detail.")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get("section")).toBe("evidence");
+      expect(params.get("lens")).toBe("mismatches");
+      expect(params.get("case")).toBe("case-002");
+    });
+
+    const baselineReturnLink = screen.getByRole("link", { name: "Back to runs" });
+    const baselineReturnUrl = new URL(
+      baselineReturnLink.getAttribute("href") ?? "",
+      "https://example.test",
+    );
+    expect(baselineReturnUrl.pathname).toBe("/comparisons/compare_alpha_to_beta");
+    expect(baselineReturnUrl.searchParams.get("section")).toBe("transitions");
+    expect(baselineReturnUrl.searchParams.get("case")).toBe("case-002");
+    expect(baselineReturnUrl.searchParams.get("transition")).toBe("failure_to_no_failure");
+
+    firstRender.unmount();
+
+    window.history.replaceState(
+      {},
+      "",
+      "/comparisons/compare_alpha_to_beta?section=transitions&case=case-002&transition=failure_to_no_failure",
+    );
+
+    render(
+      <App
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("link", {
+        name: "Open case case-002 in candidate run run_beta",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("run_beta")).toBeInTheDocument();
+    expect(screen.getByText("Invented unsupported detail.")).toBeInTheDocument();
+  });
+
   it("restores explicit comparison URL state and canonicalizes mismatched transition context", async () => {
     mockComparisonDetail(buildCompatibleDetail());
     const scrolledIds: string[] = [];
@@ -568,7 +658,7 @@ describe("comparison detail route", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Reasoning chain diverged from the rubric.")).toBeInTheDocument();
     expect(
-      screen.getByText(
+      await screen.findByText(
         "Requested case case-002 is unavailable in this transition context. Showing case-004 instead.",
       ),
     ).toBeInTheDocument();
@@ -589,7 +679,7 @@ describe("comparison detail route", () => {
     window.history.replaceState(
       {},
       "",
-      "/comparisons/compare_alpha_to_beta?case=case-004&transition=no_failure_to_failure",
+      "/comparisons/compare_alpha_to_beta?section=transitions&case=case-002&transition=failure_to_no_failure",
     );
 
     render(
@@ -608,7 +698,11 @@ describe("comparison detail route", () => {
       expect(new URLSearchParams(window.location.search).get("section")).toBe("transitions");
     });
 
-    fireEvent.click(screen.getByRole("link", { name: "Open baseline run_alpha" }));
+    fireEvent.click(
+      screen.getByRole("link", {
+        name: "Open case case-002 in baseline run run_alpha",
+      }),
+    );
 
     expect(await screen.findByRole("heading", { name: "Reasoning Failures V1" })).toBeInTheDocument();
     expect(screen.getByText("run_alpha")).toBeInTheDocument();
@@ -616,7 +710,7 @@ describe("comparison detail route", () => {
     const returnUrl = new URL(returnLink.getAttribute("href") ?? "", "https://example.test");
     expect(returnUrl.pathname).toBe("/comparisons/compare_alpha_to_beta");
     expect(returnUrl.searchParams.get("section")).toBe("transitions");
-    expect(returnUrl.searchParams.get("case")).toBe("case-004");
-    expect(returnUrl.searchParams.get("transition")).toBe("no_failure_to_failure");
+    expect(returnUrl.searchParams.get("case")).toBe("case-002");
+    expect(returnUrl.searchParams.get("transition")).toBe("failure_to_no_failure");
   });
 });

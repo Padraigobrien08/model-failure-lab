@@ -254,6 +254,7 @@ export function RunDetailPage() {
     useState<RunDetailSectionKey>(resolvedSection);
   const [highlightedSectionId, setHighlightedSectionId] =
     useState<RunDetailSectionKey | null>(null);
+  const [landingNotice, setLandingNotice] = useState<string | null>(null);
   const sectionRefs = useRef<Record<RunDetailSectionKey, HTMLElement | null>>({
     identity: null,
     shape: null,
@@ -267,7 +268,7 @@ export function RunDetailPage() {
       sectionRefs.current[sectionId] = element;
     };
 
-  const landingNotice = useMemo(() => {
+  const resolvedLandingNotice = useMemo(() => {
     if (requestedState.caseId === null || requestedState.caseId === selectedCaseId) {
       return null;
     }
@@ -278,6 +279,23 @@ export function RunDetailPage() {
 
     return `Requested case ${requestedState.caseId} is unavailable in this evidence state. Showing ${selectedCaseId} instead.`;
   }, [requestedState.caseId, selectedCaseId]);
+
+  useEffect(() => {
+    if (resolvedLandingNotice === null) {
+      return;
+    }
+
+    setLandingNotice(resolvedLandingNotice);
+    const timeout = window.setTimeout(() => {
+      setLandingNotice((current) =>
+        current === resolvedLandingNotice ? null : current,
+      );
+    }, 2400);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [resolvedLandingNotice]);
 
   const relatedComparisons = useMemo(() => {
     if (comparisonInventoryState.status !== "ready" || !runId) {

@@ -1,10 +1,23 @@
+import { Link } from "react-router-dom";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ComparisonCaseDeltaRecord } from "@/lib/artifacts/types";
 import { formatLabel } from "@/lib/formatters";
 
+type ComparisonCaseDrillthroughAction = {
+  label: string;
+  ariaLabel: string;
+  href: string | null;
+  runId: string;
+  state?: unknown;
+  disabledReason?: string | null;
+};
+
 type ComparisonCaseDetailPanelProps = {
   caseDelta: ComparisonCaseDeltaRecord | null;
+  baselineAction?: ComparisonCaseDrillthroughAction | null;
+  candidateAction?: ComparisonCaseDrillthroughAction | null;
 };
 
 function formatValue(value: string | null): string {
@@ -16,6 +29,8 @@ function formatValue(value: string | null): string {
 
 export function ComparisonCaseDetailPanel({
   caseDelta,
+  baselineAction = null,
+  candidateAction = null,
 }: ComparisonCaseDetailPanelProps) {
   if (!caseDelta) {
     return (
@@ -60,6 +75,52 @@ export function ComparisonCaseDetailPanel({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {baselineAction || candidateAction ? (
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Open matching evidence
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[baselineAction, candidateAction]
+                .filter((action): action is ComparisonCaseDrillthroughAction => action !== null)
+                .map((action) =>
+                  action.href ? (
+                    <Link
+                      key={action.label}
+                      aria-label={action.ariaLabel}
+                      className="rounded-[18px] border border-border/70 bg-background/70 p-4 text-inherit no-underline transition-colors hover:bg-background"
+                      state={action.state}
+                      to={action.href}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        {action.label}
+                      </p>
+                      <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                        {action.runId}
+                      </p>
+                    </Link>
+                  ) : (
+                    <div
+                      key={action.label}
+                      aria-disabled="true"
+                      className="rounded-[18px] border border-border/60 bg-background/55 p-4 text-muted-foreground"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em]">
+                        {action.label}
+                      </p>
+                      <p className="mt-2 break-all text-sm font-semibold text-foreground/75">
+                        {action.runId}
+                      </p>
+                      {action.disabledReason ? (
+                        <p className="mt-2 text-sm leading-6">{action.disabledReason}</p>
+                      ) : null}
+                    </div>
+                  ),
+                )}
+            </div>
+          </section>
+        ) : null}
+
         <section className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Transition

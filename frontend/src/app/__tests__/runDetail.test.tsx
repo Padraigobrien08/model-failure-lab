@@ -481,7 +481,7 @@ describe("run detail route", () => {
     );
     expect(screen.getByText("Request timed out")).toBeInTheDocument();
     expect(
-      screen.getByText(
+      await screen.findByText(
         "Requested case case-002 is unavailable in this evidence state. Showing case-006 instead.",
       ),
     ).toBeInTheDocument();

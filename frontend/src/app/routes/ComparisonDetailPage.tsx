@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import {
   buildComparisonDetailSearchParams,
+  buildRunDetailSearchParams,
   COMPARISON_DETAIL_SECTIONS,
   parseComparisonDetailSearch,
   resolveComparisonCaseForTransition,
@@ -25,7 +26,7 @@ import {
   searchParamsEqual,
   type ComparisonDetailSectionKey,
 } from "@/lib/artifacts/detailRouteState";
-import { resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
+import { createSearchString, resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
 import { loadComparisonDetail } from "@/lib/artifacts/load";
 import type {
   ComparisonCaseDeltaRecord,
@@ -58,6 +59,16 @@ function resolveObservedSection<SectionKey extends string>(
 
   const sectionId = closestEntry.target.getAttribute("data-section-id");
   return sectionId as SectionKey | null;
+}
+
+function buildRunCaseDrillthroughHref(runId: string, caseId: string): string {
+  const search = buildRunDetailSearchParams(new URLSearchParams(), {
+    section: "evidence",
+    caseId,
+    lens: null,
+  });
+
+  return `/runs/${encodeURIComponent(runId)}${createSearchString(search)}`;
 }
 
 export function ComparisonDetailPage() {
@@ -212,6 +223,7 @@ export function ComparisonDetailPage() {
   const [highlightedTransitionType, setHighlightedTransitionType] = useState<string | null>(
     null,
   );
+  const [landingNotice, setLandingNotice] = useState<string | null>(null);
   const sectionRefs = useRef<Record<ComparisonDetailSectionKey, HTMLElement | null>>({
     framing: null,
     coverage: null,
@@ -227,7 +239,7 @@ export function ComparisonDetailPage() {
     groupRefs.current[transitionType] = element;
   };
 
-  const landingNotice = useMemo(() => {
+  const resolvedLandingNotice = useMemo(() => {
     const notices: string[] = [];
 
     if (
@@ -254,6 +266,23 @@ export function ComparisonDetailPage() {
     resolvedSelection.caseId,
     resolvedSelection.transition,
   ]);
+
+  useEffect(() => {
+    if (resolvedLandingNotice === null) {
+      return;
+    }
+
+    setLandingNotice(resolvedLandingNotice);
+    const timeout = window.setTimeout(() => {
+      setLandingNotice((current) =>
+        current === resolvedLandingNotice ? null : current,
+      );
+    }, 2400);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [resolvedLandingNotice]);
 
   useEffect(() => {
     if (detailState.status !== "ready") {
@@ -480,6 +509,20 @@ export function ComparisonDetailPage() {
       search: location.search,
     },
   };
+  const baselineCaseHref =
+    selectedCase !== null
+      ? buildRunCaseDrillthroughHref(
+          detail.comparison.baselineRunId,
+          selectedCase.caseId,
+        )
+      : null;
+  const candidateCaseHref =
+    selectedCase !== null
+      ? buildRunCaseDrillthroughHref(
+          detail.comparison.candidateRunId,
+          selectedCase.caseId,
+        )
+      : null;
 
   return (
     <section className="space-y-8">
@@ -730,7 +773,31 @@ export function ComparisonDetailPage() {
             }}
           />
           <div className="lg:sticky lg:top-6">
-            <ComparisonCaseDetailPanel caseDelta={selectedCase} />
+            <ComparisonCaseDetailPanel
+              baselineAction={
+                selectedCase
+                  ? {
+                      label: "Open baseline evidence",
+                      ariaLabel: `Open case ${selectedCase.caseId} in baseline run ${detail.comparison.baselineRunId}`,
+                      href: baselineCaseHref,
+                      runId: detail.comparison.baselineRunId,
+                      state: detailReturnState,
+                    }
+                  : null
+              }
+              candidateAction={
+                selectedCase
+                  ? {
+                      label: "Open candidate evidence",
+                      ariaLabel: `Open case ${selectedCase.caseId} in candidate run ${detail.comparison.candidateRunId}`,
+                      href: candidateCaseHref,
+                      runId: detail.comparison.candidateRunId,
+                      state: detailReturnState,
+                    }
+                  : null
+              }
+              caseDelta={selectedCase}
+            />
           </div>
         </div>
       </section>
