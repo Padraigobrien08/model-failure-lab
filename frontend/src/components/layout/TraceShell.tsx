@@ -1,7 +1,17 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { NAVIGATION_ITEMS, type AppRouteContext } from "@/app/router";
 import { Badge } from "@/components/ui/badge";
+import {
+  buildComparisonDetailSearchParams,
+  buildRunDetailSearchParams,
+  COMPARISON_DETAIL_SECTIONS,
+  parseComparisonDetailSearch,
+  parseRunDetailSearch,
+  resolveComparisonDetailSection,
+  resolveRunDetailSection,
+  RUN_DETAIL_SECTIONS,
+} from "@/lib/artifacts/detailRouteState";
 import { cn } from "@/lib/utils";
 
 type TraceShellProps = {
@@ -98,6 +108,65 @@ export function TraceShell({ routeContext }: TraceShellProps) {
   const routeMeta = resolveRouteMeta(location.pathname);
   const isDetailRoute =
     location.pathname.startsWith("/runs/") || location.pathname.startsWith("/comparisons/");
+  const detailJumpContext = (() => {
+    const currentSearchParams = new URLSearchParams(location.search);
+
+    if (location.pathname.startsWith("/runs/")) {
+      const requestedState = parseRunDetailSearch(currentSearchParams);
+      const activeSection = resolveRunDetailSection(
+        requestedState.section,
+        requestedState.lens,
+        requestedState.caseId,
+      );
+
+      return {
+        activeSection,
+        jumps: RUN_DETAIL_SECTIONS.map((section) => {
+          const nextSearch = buildRunDetailSearchParams(currentSearchParams, {
+            section: section.id,
+          }).toString();
+
+          return {
+            id: section.id,
+            label: section.label,
+            to: {
+              pathname: location.pathname,
+              search: nextSearch.length > 0 ? `?${nextSearch}` : "",
+            },
+          };
+        }),
+      };
+    }
+
+    if (location.pathname.startsWith("/comparisons/")) {
+      const requestedState = parseComparisonDetailSearch(currentSearchParams);
+      const activeSection = resolveComparisonDetailSection(
+        requestedState.section,
+        requestedState.caseId,
+        requestedState.transition,
+      );
+
+      return {
+        activeSection,
+        jumps: COMPARISON_DETAIL_SECTIONS.map((section) => {
+          const nextSearch = buildComparisonDetailSearchParams(currentSearchParams, {
+            section: section.id,
+          }).toString();
+
+          return {
+            id: section.id,
+            label: section.label,
+            to: {
+              pathname: location.pathname,
+              search: nextSearch.length > 0 ? `?${nextSearch}` : "",
+            },
+          };
+        }),
+      };
+    }
+
+    return null;
+  })();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -148,19 +217,47 @@ export function TraceShell({ routeContext }: TraceShellProps) {
 
       {isDetailRoute ? (
         <section className="border-b border-border/50 bg-background/72">
-          <div className="mx-auto flex w-full max-w-[92rem] flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                {routeMeta.eyebrow}
-              </p>
-              <p className="text-sm leading-6 text-muted-foreground">
-                {routeMeta.focusDescription}
-              </p>
+          <div className="mx-auto flex w-full max-w-[92rem] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                  {routeMeta.eyebrow}
+                </p>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {routeMeta.focusDescription}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="muted">{sourceLabel}</Badge>
+                <Badge tone="muted">{routeMeta.pathway.length} stages</Badge>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="muted">{sourceLabel}</Badge>
-              <Badge tone="muted">{routeMeta.pathway.length} stages</Badge>
-            </div>
+
+            {detailJumpContext ? (
+              <nav
+                aria-label="Detail section jumps"
+                className="flex flex-wrap items-center gap-2"
+              >
+                {detailJumpContext.jumps.map((jump, index) => (
+                  <Link
+                    key={`${location.pathname}-${jump.id}`}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold no-underline transition-colors",
+                      detailJumpContext.activeSection === jump.id
+                        ? "border-primary/35 bg-primary/12 text-primary"
+                        : "border-border/70 bg-card/70 text-muted-foreground hover:text-foreground",
+                    )}
+                    to={jump.to}
+                    state={location.state}
+                  >
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-background/85 text-[10px] text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    {jump.label}
+                  </Link>
+                ))}
+              </nav>
+            ) : null}
           </div>
         </section>
       ) : (

@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/card";
 import {
   buildComparisonDetailSearchParams,
+  COMPARISON_DETAIL_SECTIONS,
   parseComparisonDetailSearch,
   resolveComparisonCaseForTransition,
   resolveComparisonDetailSection,
   searchParamsEqual,
+  type ComparisonDetailSectionKey,
 } from "@/lib/artifacts/detailRouteState";
 import { resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
 import { loadComparisonDetail } from "@/lib/artifacts/load";
@@ -29,6 +31,7 @@ import type {
   ComparisonCaseDeltaRecord,
   ComparisonDetailState,
 } from "@/lib/artifacts/types";
+import { cn } from "@/lib/utils";
 
 function selectCasesByOrder(
   orderedCaseIds: string[],
@@ -38,6 +41,23 @@ function selectCasesByOrder(
   return orderedCaseIds
     .map((caseId) => caseMap.get(caseId))
     .filter((caseRow): caseRow is ComparisonCaseDeltaRecord => caseRow !== undefined);
+}
+
+function resolveObservedSection<SectionKey extends string>(
+  entries: IntersectionObserverEntry[],
+): SectionKey | null {
+  const visibleEntries = entries.filter((entry) => entry.isIntersecting);
+  if (visibleEntries.length === 0) {
+    return null;
+  }
+
+  const closestEntry = visibleEntries.sort(
+    (left, right) =>
+      Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top),
+  )[0];
+
+  const sectionId = closestEntry.target.getAttribute("data-section-id");
+  return sectionId as SectionKey | null;
 }
 
 export function ComparisonDetailPage() {
@@ -185,6 +205,55 @@ export function ComparisonDetailPage() {
       ),
     [requestedState.caseId, requestedState.section, requestedState.transition],
   );
+  const [activeSectionId, setActiveSectionId] =
+    useState<ComparisonDetailSectionKey>(resolvedSection);
+  const [highlightedSectionId, setHighlightedSectionId] =
+    useState<ComparisonDetailSectionKey | null>(null);
+  const [highlightedTransitionType, setHighlightedTransitionType] = useState<string | null>(
+    null,
+  );
+  const sectionRefs = useRef<Record<ComparisonDetailSectionKey, HTMLElement | null>>({
+    framing: null,
+    coverage: null,
+    transitions: null,
+  });
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const setSectionRef =
+    (sectionId: ComparisonDetailSectionKey) => (element: HTMLElement | null) => {
+      sectionRefs.current[sectionId] = element;
+    };
+  const setGroupRef = (transitionType: string) => (element: HTMLDivElement | null) => {
+    groupRefs.current[transitionType] = element;
+  };
+
+  const landingNotice = useMemo(() => {
+    const notices: string[] = [];
+
+    if (
+      requestedState.transition !== null &&
+      requestedState.transition !== resolvedSelection.transition
+    ) {
+      notices.push(
+        `Requested transition ${requestedState.transition} is unavailable. Showing ${resolvedSelection.transition ?? "the nearest available transition section"} instead.`,
+      );
+    }
+
+    if (requestedState.caseId !== null && requestedState.caseId !== resolvedSelection.caseId) {
+      notices.push(
+        resolvedSelection.caseId
+          ? `Requested case ${requestedState.caseId} is unavailable in this transition context. Showing ${resolvedSelection.caseId} instead.`
+          : `Requested case ${requestedState.caseId} is unavailable in this transition context.`,
+      );
+    }
+
+    return notices.length > 0 ? notices.join(" ") : null;
+  }, [
+    requestedState.caseId,
+    requestedState.transition,
+    resolvedSelection.caseId,
+    resolvedSelection.transition,
+  ]);
 
   useEffect(() => {
     if (detailState.status !== "ready") {
@@ -213,6 +282,87 @@ export function ComparisonDetailPage() {
     resolvedSelection.transition,
     searchParams,
     setSearchParams,
+  ]);
+
+  useEffect(() => {
+    setActiveSectionId(resolvedSection);
+  }, [resolvedSection]);
+
+  useEffect(() => {
+    if (detailState.status !== "ready" || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const observedSection =
+          resolveObservedSection<ComparisonDetailSectionKey>(entries);
+        if (observedSection) {
+          setActiveSectionId(observedSection);
+        }
+      },
+      {
+        rootMargin: "-18% 0px -58% 0px",
+        threshold: [0.2, 0.35, 0.5, 0.7],
+      },
+    );
+
+    for (const sectionRef of Object.values(sectionRefs.current)) {
+      if (sectionRef) {
+        observer.observe(sectionRef);
+      }
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [detailState.status]);
+
+  useEffect(() => {
+    if (detailState.status !== "ready") {
+      return;
+    }
+
+    const transitionTarget =
+      resolvedSection === "transitions" && resolvedSelection.transition
+        ? groupRefs.current[resolvedSelection.transition] ?? null
+        : null;
+    const targetElement = transitionTarget ?? sectionRefs.current[resolvedSection];
+    if (!targetElement) {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      if (typeof targetElement.scrollIntoView === "function") {
+        targetElement.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+
+      setActiveSectionId(resolvedSection);
+      setHighlightedSectionId(resolvedSection);
+      setHighlightedTransitionType(transitionTarget ? resolvedSelection.transition : null);
+    });
+
+    const timeout = window.setTimeout(() => {
+      setHighlightedSectionId((current) =>
+        current === resolvedSection ? null : current,
+      );
+      setHighlightedTransitionType((current) =>
+        current === resolvedSelection.transition ? null : current,
+      );
+    }, 1800);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(timeout);
+    };
+  }, [
+    detailState.status,
+    resolvedSection,
+    resolvedSelection.caseId,
+    resolvedSelection.transition,
   ]);
 
   if (artifactState.status !== "ready") {
@@ -335,25 +485,97 @@ export function ComparisonDetailPage() {
     <section className="space-y-8">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] xl:items-start">
         <div className="min-w-0 space-y-8">
-          <ComparisonDetailHeader
-            comparison={detail.comparison}
-            inventoryHref={returnHref}
-            baselineRunState={detailReturnState}
-            candidateRunState={detailReturnState}
-          />
+          <section
+            id="comparison-detail-framing"
+            ref={setSectionRef("framing")}
+            data-section-id="framing"
+            className={cn(
+              "scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
+              highlightedSectionId === "framing"
+                ? "border-primary/25 bg-primary/[0.035]"
+                : "",
+            )}
+          >
+            <div className="space-y-8">
+              <ComparisonDetailHeader
+                comparison={detail.comparison}
+                inventoryHref={returnHref}
+                baselineRunState={detailReturnState}
+                candidateRunState={detailReturnState}
+              />
 
-          <ComparisonDeltaStrip
-            metrics={detail.metrics}
-            compatible={detail.comparison.compatible}
-          />
+              <ComparisonDeltaStrip
+                metrics={detail.metrics}
+                compatible={detail.comparison.compatible}
+              />
+            </div>
+          </section>
 
-          <ComparisonCoverageSummary
-            comparison={detail.comparison}
-            coverage={detail.coverage}
-          />
+          <section
+            id="comparison-detail-coverage"
+            ref={setSectionRef("coverage")}
+            data-section-id="coverage"
+            className={cn(
+              "scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
+              highlightedSectionId === "coverage"
+                ? "border-primary/25 bg-primary/[0.035]"
+                : "",
+            )}
+          >
+            <ComparisonCoverageSummary
+              comparison={detail.comparison}
+              coverage={detail.coverage}
+            />
+          </section>
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-28">
+          <Card className="rounded-[24px] border border-border/70 bg-card/75">
+            <CardHeader className="space-y-1 pb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Section jumps
+              </p>
+              <CardTitle className="text-lg">Traverse comparison evidence</CardTitle>
+              <CardDescription>
+                Move between framing, shared-case scope, and grouped transition evidence without
+                dropping the current selection.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {COMPARISON_DETAIL_SECTIONS.map((section, index) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  aria-pressed={activeSectionId === section.id}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 text-left transition-colors",
+                    activeSectionId === section.id
+                      ? "border-primary/35 bg-primary/10 text-primary"
+                      : "border-border/60 bg-background/70 text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() =>
+                    setSearchParams(
+                      buildComparisonDetailSearchParams(searchParams, {
+                        section: section.id,
+                        caseId: resolvedSelection.caseId,
+                        transition: resolvedSelection.transition,
+                      }),
+                      {
+                        replace: true,
+                        state: location.state,
+                      },
+                    )
+                  }
+                >
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/85 text-[11px] font-semibold text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  <span className="text-sm font-semibold">{section.label}</span>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
           <Card className="rounded-[24px] border border-border/70 bg-card/75">
             <CardHeader className="space-y-1 pb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -453,7 +675,18 @@ export function ComparisonDetailPage() {
         </aside>
       </div>
 
-      <section className="space-y-4" aria-label="Case transitions">
+      <section
+        id="comparison-detail-transitions"
+        ref={setSectionRef("transitions")}
+        data-section-id="transitions"
+        aria-label="Case transitions"
+        className={cn(
+          "space-y-4 scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
+          highlightedSectionId === "transitions"
+            ? "border-primary/25 bg-primary/[0.035]"
+            : "",
+        )}
+      >
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Stage 3 · Transition evidence
@@ -467,11 +700,19 @@ export function ComparisonDetailPage() {
           </p>
         </div>
 
+        {landingNotice ? (
+          <div className="rounded-[18px] border border-border/60 bg-background/75 px-4 py-3 text-sm text-muted-foreground">
+            {landingNotice}
+          </div>
+        ) : null}
+
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.9fr)] lg:items-start">
           <ComparisonTransitionGroups
             summary={detail.transitions.summary}
             caseDeltas={detail.caseDeltas}
             selectedCaseId={selectedCaseId}
+            highlightedTransitionType={highlightedTransitionType}
+            setGroupRef={setGroupRef}
             onSelectCase={(caseId) => {
               const caseRow =
                 detail.caseDeltas.find((candidate) => candidate.caseId === caseId) ?? null;

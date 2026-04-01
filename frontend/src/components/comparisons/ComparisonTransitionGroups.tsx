@@ -10,6 +10,8 @@ type ComparisonTransitionGroupsProps = {
   summary: ComparisonTransitionSummaryRow[];
   caseDeltas: ComparisonCaseDeltaRecord[];
   selectedCaseId: string | null;
+  highlightedTransitionType?: string | null;
+  setGroupRef?: (transitionType: string) => (element: HTMLDivElement | null) => void;
   onSelectCase: (caseId: string) => void;
 };
 
@@ -21,6 +23,8 @@ export function ComparisonTransitionGroups({
   summary,
   caseDeltas,
   selectedCaseId,
+  highlightedTransitionType = null,
+  setGroupRef,
   onSelectCase,
 }: ComparisonTransitionGroupsProps) {
   const caseMap = new Map(caseDeltas.map((caseRow) => [caseRow.caseId, caseRow]));
@@ -49,7 +53,15 @@ export function ComparisonTransitionGroups({
         return (
           <Card
             key={group.transitionType}
-            className="rounded-[24px] border border-border/70 bg-card/70 shadow-panel"
+            ref={setGroupRef?.(group.transitionType)}
+            id={`comparison-transition-${group.transitionType}`}
+            data-transition-group={group.transitionType}
+            className={cn(
+              "rounded-[24px] border border-border/70 bg-card/70 shadow-panel transition-colors duration-300",
+              highlightedTransitionType === group.transitionType
+                ? "border-primary/35 bg-primary/[0.05]"
+                : "",
+            )}
           >
             <CardHeader className="space-y-3 pb-4">
               <div className="flex flex-wrap items-center gap-3">

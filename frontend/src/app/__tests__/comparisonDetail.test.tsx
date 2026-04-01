@@ -10,6 +10,8 @@ import type {
   RunInventoryState,
 } from "@/lib/artifacts/types";
 
+const nativeScrollIntoView = HTMLElement.prototype.scrollIntoView;
+
 function buildReadyArtifactState(comparisonIds: string[]): ArtifactShellState {
   return {
     status: "ready",
@@ -425,6 +427,10 @@ describe("comparison detail route", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: nativeScrollIntoView,
+    });
     window.history.replaceState({}, "", "/");
   });
 
@@ -446,6 +452,12 @@ describe("comparison detail route", () => {
     });
     expect(comparisonHeading).toBeInTheDocument();
     expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Detail section jumps" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Traverse comparison evidence" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Pathway checkpoints")).not.toBeInTheDocument();
     expect(screen.queryByText("Orient first, then compare hard.")).not.toBeInTheDocument();
     expect(
@@ -530,6 +542,13 @@ describe("comparison detail route", () => {
 
   it("restores explicit comparison URL state and canonicalizes mismatched transition context", async () => {
     mockComparisonDetail(buildCompatibleDetail());
+    const scrolledIds: string[] = [];
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: function mockScrollIntoView() {
+        scrolledIds.push((this as HTMLElement).id);
+      },
+    });
     window.history.replaceState(
       {},
       "",
@@ -548,12 +567,20 @@ describe("comparison detail route", () => {
       await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Reasoning chain diverged from the rubric.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Requested case case-002 is unavailable in this transition context. Showing case-004 instead.",
+      ),
+    ).toBeInTheDocument();
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
       expect(params.get("section")).toBe("transitions");
       expect(params.get("case")).toBe("case-004");
       expect(params.get("transition")).toBe("no_failure_to_failure");
+      expect(scrolledIds).toContain(
+        "comparison-transition-no_failure_to_failure",
+      );
     });
   });
 

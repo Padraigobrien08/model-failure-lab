@@ -10,6 +10,8 @@ import type {
   RunInventoryState,
 } from "@/lib/artifacts/types";
 
+const nativeScrollIntoView = HTMLElement.prototype.scrollIntoView;
+
 function buildReadyArtifactState(runIds: string[]): ArtifactShellState {
   return {
     status: "ready",
@@ -267,6 +269,10 @@ describe("run detail route", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: nativeScrollIntoView,
+    });
     window.history.replaceState({}, "", "/");
   });
 
@@ -290,6 +296,10 @@ describe("run detail route", () => {
     expect(runHeading).toBeInTheDocument();
     expect(screen.getByText("run_gamma")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("navigation", { name: "Detail section jumps" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Stay inside the run flow" })).toBeInTheDocument();
     expect(screen.getByText("Stage 1 · Run identity")).toBeInTheDocument();
     expect(screen.queryByText("Pathway checkpoints")).not.toBeInTheDocument();
     expect(screen.queryByText("Follow the run from identity to evidence.")).not.toBeInTheDocument();
@@ -445,6 +455,13 @@ describe("run detail route", () => {
   it("restores explicit run-detail URL state and canonicalizes invalid case selection", async () => {
     const detail = buildRunDetail(SAMPLE_RUN);
     mockRunDetail(detail);
+    const scrolledIds: string[] = [];
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: function mockScrollIntoView() {
+        scrolledIds.push((this as HTMLElement).id);
+      },
+    });
     window.history.replaceState({}, "", "/runs/run_gamma?lens=errors&case=case-002");
 
     render(
@@ -463,12 +480,18 @@ describe("run detail route", () => {
       "true",
     );
     expect(screen.getByText("Request timed out")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Requested case case-002 is unavailable in this evidence state. Showing case-006 instead.",
+      ),
+    ).toBeInTheDocument();
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
       expect(params.get("section")).toBe("evidence");
       expect(params.get("lens")).toBe("errors");
       expect(params.get("case")).toBe("case-006");
+      expect(scrolledIds).toContain("run-detail-evidence");
     });
   });
 
