@@ -671,12 +671,12 @@ export function RunDetailPage() {
           <Card className="rounded-[24px] border border-border/70 bg-card/75">
             <CardHeader className="space-y-1 pb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Debugger context
+                Execution frame
               </p>
-              <CardTitle className="text-lg">Persistent run provenance</CardTitle>
+              <CardTitle className="text-lg">Route provenance</CardTitle>
               <CardDescription>
-                Keep the saved lineage visible while you read the failure shape, diagnosis, and
-                case evidence.
+                Keep the durable run lineage visible while you read the failure shape, diagnosis,
+                and selected evidence.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -692,7 +692,15 @@ export function RunDetailPage() {
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Report id
+                    Run ID
+                  </p>
+                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                    {detail.run.runId}
+                  </p>
+                </div>
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Report ID
                   </p>
                   <p className="mt-2 break-all text-sm font-semibold text-foreground">
                     {detail.run.reportId}
@@ -723,83 +731,44 @@ export function RunDetailPage() {
                   </p>
                 </div>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Mismatch cases
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    {detail.lenses.mismatchCaseIds.length}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Notable cases
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    {detail.lenses.notableCaseIds.length}
-                  </p>
-                </div>
-              </div>
-              {relatedComparisons.length > 0 ? (
-                <div className="space-y-3 border-t border-border/60 pt-4">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Related comparisons
-                    </p>
-                    <h3 className="text-lg font-semibold tracking-[-0.03em] text-foreground">
-                      Saved comparisons touching this run
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Jump directly into saved reports that reference this run.
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    {relatedComparisons.map((comparison: ComparisonInventoryItem) => (
-                      <div
-                        key={comparison.reportId}
-                        className="space-y-2 rounded-[18px] border border-border/55 bg-background/60 px-3 py-3"
-                      >
-                        <div className="space-y-1">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            {comparison.baselineRunId === runId ? "Candidate report" : "Baseline report"}
-                          </p>
-                          <Link
-                            className="block break-all font-mono text-sm font-semibold text-primary no-underline"
-                            to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
-                            state={{
-                              returnTo: {
-                                pathname: location.pathname,
-                                search: location.search,
-                              },
-                            }}
-                          >
-                            {comparison.reportId}
-                          </Link>
-                          <p className="text-sm text-muted-foreground">
-                            {comparison.baselineRunId === runId ? "Baseline" : "Candidate"}{" "}
-                            counterpart:{" "}
-                            <span className="break-all font-mono text-xs text-foreground">
-                              {comparison.baselineRunId === runId
-                                ? comparison.candidateRunId
-                                : comparison.baselineRunId}
-                            </span>
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <Badge tone="muted">{comparison.dataset ?? "Multiple datasets"}</Badge>
-                          <Badge tone={comparison.compatible ? "accent" : "default"}>
-                            {comparison.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </CardContent>
           </Card>
+
+          {relatedComparisons.length > 0 ? (
+            <Card className="rounded-[24px] border border-border/70 bg-card/75">
+              <CardHeader className="space-y-1 pb-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Route helper
+                </p>
+                <CardTitle className="text-lg">Related comparisons</CardTitle>
+                <CardDescription>
+                  Jump straight into the saved reports that already reference this run.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {relatedComparisons.slice(0, 2).map((comparison: ComparisonInventoryItem) => (
+                  <Link
+                    key={comparison.reportId}
+                    className="block rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
+                    to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
+                    state={{
+                      returnTo: {
+                        pathname: location.pathname,
+                        search: location.search,
+                      },
+                    }}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {comparison.baselineRunId === runId ? "Candidate report" : "Baseline report"}
+                    </p>
+                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                      {comparison.reportId}
+                    </p>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
         </aside>
       </div>
 
@@ -898,6 +867,63 @@ export function RunDetailPage() {
           </div>
         )}
       </section>
+
+      {relatedComparisons.length > 0 ? (
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Related comparisons
+            </p>
+            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
+              Saved comparisons touching this run
+            </h2>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Open the fuller saved-comparison list here once you have the current run evidence in
+              view.
+            </p>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {relatedComparisons.map((comparison: ComparisonInventoryItem) => (
+              <div
+                key={comparison.reportId}
+                className="space-y-2 rounded-[18px] border border-border/55 bg-card/70 px-4 py-4"
+              >
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {comparison.baselineRunId === runId ? "Candidate report" : "Baseline report"}
+                  </p>
+                  <Link
+                    className="block break-all font-mono text-sm font-semibold text-primary no-underline"
+                    to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
+                    state={{
+                      returnTo: {
+                        pathname: location.pathname,
+                        search: location.search,
+                      },
+                    }}
+                  >
+                    {comparison.reportId}
+                  </Link>
+                  <p className="text-sm text-muted-foreground">
+                    {comparison.baselineRunId === runId ? "Baseline" : "Candidate"} counterpart:{" "}
+                    <span className="break-all font-mono text-xs text-foreground">
+                      {comparison.baselineRunId === runId
+                        ? comparison.candidateRunId
+                        : comparison.baselineRunId}
+                    </span>
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge tone="muted">{comparison.dataset ?? "Multiple datasets"}</Badge>
+                  <Badge tone={comparison.compatible ? "accent" : "default"}>
+                    {comparison.status}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
         Back to runs

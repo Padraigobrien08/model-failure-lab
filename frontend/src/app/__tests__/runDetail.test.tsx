@@ -329,7 +329,20 @@ describe("run detail route", () => {
     expect(screen.getByText("Attempted")).toBeInTheDocument();
     expect(screen.getByText("Failure rate")).toBeInTheDocument();
     expect(screen.getAllByText("Unsupported factual framing detected.").length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "Persistent run provenance" })).toBeInTheDocument();
+    const routeProvenanceHeading = screen.getByRole("heading", {
+      name: "Route provenance",
+    });
+    const runRail = routeProvenanceHeading.closest("aside");
+    const runProvenanceCard = routeProvenanceHeading.parentElement?.parentElement ?? null;
+    expect(runRail).not.toBeNull();
+    expect(runProvenanceCard).not.toBeNull();
+    expect(within(runProvenanceCard as HTMLElement).getByText("Run ID")).toBeInTheDocument();
+    expect(within(runProvenanceCard as HTMLElement).getByText("Report ID")).toBeInTheDocument();
+    expect(within(runProvenanceCard as HTMLElement).getByText("Adapter")).toBeInTheDocument();
+    expect(within(runProvenanceCard as HTMLElement).getByText("Classifier")).toBeInTheDocument();
+    expect(within(runProvenanceCard as HTMLElement).getByText("Run seed")).toBeInTheDocument();
+    expect(within(runProvenanceCard as HTMLElement).queryByText("Mismatch cases")).not.toBeInTheDocument();
+    expect(within(runProvenanceCard as HTMLElement).queryByText("Notable cases")).not.toBeInTheDocument();
   });
 
   it("falls back to the first non-empty evidence lens when mismatches are absent", async () => {
@@ -475,9 +488,11 @@ describe("run detail route", () => {
     expect(
       await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Saved comparisons touching this run" }),
-    ).toBeInTheDocument();
+    const relatedComparisonsHeading = screen.getByRole("heading", {
+      name: "Saved comparisons touching this run",
+    });
+    expect(relatedComparisonsHeading).toBeInTheDocument();
+    expect(relatedComparisonsHeading.closest("aside")).toBeNull();
     expect(
       screen.getByRole("link", { name: "compare_alpha_to_gamma" }),
     ).toHaveAttribute("href", "/comparisons/compare_alpha_to_gamma");

@@ -641,12 +641,12 @@ export function ComparisonDetailPage() {
           <Card className="rounded-[24px] border border-border/70 bg-card/75">
             <CardHeader className="space-y-1 pb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Comparison context
+                Execution frame
               </p>
-              <CardTitle className="text-lg">Keep the artifact graph visible</CardTitle>
+              <CardTitle className="text-lg">Route provenance</CardTitle>
               <CardDescription>
-                Preserve the baseline/candidate lineage and scope while you inspect grouped
-                transition evidence below.
+                Keep the durable comparison lineage and evaluation scope visible while you inspect
+                grouped transition evidence below.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -660,6 +660,30 @@ export function ComparisonDetailPage() {
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Report ID
+                    </p>
+                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                      {detail.comparison.reportId}
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Baseline run
+                    </p>
+                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                      {detail.comparison.baselineRunId}
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Candidate run
+                    </p>
+                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                      {detail.comparison.candidateRunId}
+                    </p>
+                  </div>
                   <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Compare mode
@@ -678,10 +702,37 @@ export function ComparisonDetailPage() {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <Card className="rounded-[24px] border border-border/70 bg-card/75">
+            <CardHeader className="space-y-1 pb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Route helper
+              </p>
+              <CardTitle className="text-lg">Open linked runs</CardTitle>
+              <CardDescription>
+                Switch straight to the saved baseline or candidate route without losing the current
+                comparison state.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {baselineUnavailableReason ? (
+                <div
+                  aria-disabled="true"
+                  className="rounded-[18px] border border-border/60 bg-background/55 px-4 py-3 text-muted-foreground"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">
+                    Open baseline
+                  </p>
+                  <p className="mt-2 break-all text-sm font-semibold text-foreground/75">
+                    {detail.comparison.baselineRunId}
+                  </p>
+                  <p className="mt-2 text-sm leading-6">{baselineUnavailableReason}</p>
+                </div>
+              ) : (
                 <Link
-                  className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
+                  className="block rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
                   to={`/runs/${encodeURIComponent(detail.comparison.baselineRunId)}`}
                   state={detailReturnState}
                 >
@@ -692,8 +743,24 @@ export function ComparisonDetailPage() {
                     {detail.comparison.baselineRunId}
                   </p>
                 </Link>
+              )}
+
+              {candidateUnavailableReason ? (
+                <div
+                  aria-disabled="true"
+                  className="rounded-[18px] border border-border/60 bg-background/55 px-4 py-3 text-muted-foreground"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">
+                    Open candidate
+                  </p>
+                  <p className="mt-2 break-all text-sm font-semibold text-foreground/75">
+                    {detail.comparison.candidateRunId}
+                  </p>
+                  <p className="mt-2 text-sm leading-6">{candidateUnavailableReason}</p>
+                </div>
+              ) : (
                 <Link
-                  className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
+                  className="block rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
                   to={`/runs/${encodeURIComponent(detail.comparison.candidateRunId)}`}
                   state={detailReturnState}
                 >
@@ -704,34 +771,7 @@ export function ComparisonDetailPage() {
                     {detail.comparison.candidateRunId}
                   </p>
                 </Link>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Shared cases
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    {detail.coverage.sharedCaseCount}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Baseline only
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    {detail.coverage.baselineOnlyCaseCount}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Candidate only
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    {detail.coverage.candidateOnlyCaseCount}
-                  </p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </aside>

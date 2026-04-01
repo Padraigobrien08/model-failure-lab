@@ -558,7 +558,19 @@ describe("comparison detail route", () => {
     expect(
       screen.getByRole("heading", { name: "Grouped case transitions" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Keep the artifact graph visible" })).toBeInTheDocument();
+    const routeProvenanceHeading = screen.getByRole("heading", {
+      name: "Route provenance",
+    });
+    const comparisonRail = routeProvenanceHeading.closest("aside");
+    expect(comparisonRail).not.toBeNull();
+    expect(within(comparisonRail as HTMLElement).getByText("Report ID")).toBeInTheDocument();
+    expect(within(comparisonRail as HTMLElement).getByText("Baseline run")).toBeInTheDocument();
+    expect(within(comparisonRail as HTMLElement).getByText("Candidate run")).toBeInTheDocument();
+    expect(within(comparisonRail as HTMLElement).getByText("Compare mode")).toBeInTheDocument();
+    expect(within(comparisonRail as HTMLElement).getByText("Metrics scope")).toBeInTheDocument();
+    expect(within(comparisonRail as HTMLElement).queryByText("Shared cases")).not.toBeInTheDocument();
+    expect(within(comparisonRail as HTMLElement).queryByText("Baseline only")).not.toBeInTheDocument();
+    expect(within(comparisonRail as HTMLElement).queryByText("Candidate only")).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "failure -> no_failure" }),
     ).toBeInTheDocument();
@@ -747,10 +759,10 @@ describe("comparison detail route", () => {
       }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText(
+      screen.getAllByText(
         "Saved baseline run run_alpha is unavailable in the active run inventory.",
-      ),
-    ).toBeInTheDocument();
+      ).length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByRole("link", {
         name: "Open case case-002 in candidate run run_beta",
