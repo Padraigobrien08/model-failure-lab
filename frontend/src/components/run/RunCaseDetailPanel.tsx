@@ -54,11 +54,15 @@ export function RunCaseDetailPanel({
   }
 
   return (
-    <Card className="rounded-[24px] border border-primary/15 bg-primary/[0.045] shadow-panel">
+    <Card
+      data-active-case="true"
+      className="rounded-[24px] border border-primary/15 bg-primary/[0.045] shadow-panel"
+    >
       <CardHeader className="space-y-4 pb-5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">Stage 5</Badge>
           <Badge tone="default">Selected case evidence</Badge>
+          <Badge tone="accent">Active case</Badge>
           <Badge tone="muted">{caseRow.caseId}</Badge>
           {caseRow.tags.map((tag) => (
             <Badge key={`${caseRow.caseId}-${tag}`} tone="muted">

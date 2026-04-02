@@ -80,15 +80,27 @@ export function ComparisonTransitionGroups({
                   <button
                     key={caseRow.caseId}
                     type="button"
+                    data-active-case={isSelected ? "true" : undefined}
                     aria-label={`Inspect transition case ${caseRow.caseId}`}
                     className={cn(
                       "flex w-full flex-col gap-2 rounded-[18px] border border-border/60 bg-background/60 px-4 py-3 text-left transition-colors hover:bg-background focus-visible:bg-background focus-visible:outline-none",
-                      isSelected ? "border-primary/40 bg-background" : "",
+                      isSelected ? "border-primary/45 bg-primary/[0.08]" : "",
                     )}
                     onClick={() => onSelectCase(caseRow.caseId)}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="font-mono text-xs text-foreground">{caseRow.caseId}</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs text-foreground">{caseRow.caseId}</span>
+                        {isSelected ? (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="h-1.5 w-8 rounded-full bg-primary/80"
+                            />
+                            <Badge tone="accent">Active case</Badge>
+                          </>
+                        ) : null}
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {caseRow.tags.map((tag) => (
                           <Badge key={`${caseRow.caseId}-${tag}`} tone="muted">

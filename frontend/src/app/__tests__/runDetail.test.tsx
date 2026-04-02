@@ -318,6 +318,16 @@ describe("run detail route", () => {
     expect(
       screen.getByRole("heading", { name: "Selected case evidence" }),
     ).toBeInTheDocument();
+    expect(screen.getAllByText("Active case").length).toBeGreaterThanOrEqual(3);
+    expect(
+      screen.getByRole("button", { name: "Inspect case case-002" }),
+    ).toHaveAttribute("data-active-case", "true");
+    expect(
+      screen
+        .getByRole("button", { name: "Inspect notable case case-002" })
+        .closest('[data-active-case="true"]'),
+    ).not.toBeNull();
+    expect(document.querySelectorAll('[data-active-case="true"]')).toHaveLength(3);
     expect(screen.getByRole("tab", { name: "Mismatches (3)" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -431,6 +441,12 @@ describe("run detail route", () => {
       "aria-selected",
       "true",
     );
+    expect(screen.getAllByText("Active case").length).toBeGreaterThanOrEqual(3);
+    expect(
+      screen
+        .getByRole("button", { name: "Inspect notable case case-004" })
+        .closest('[data-active-case="true"]'),
+    ).not.toBeNull();
     expect(screen.getAllByText("Answer went beyond supplied context.").length).toBeGreaterThan(0);
     expect(
       screen.getAllByText("Use only the provided evidence bullets.").length,

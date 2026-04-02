@@ -574,12 +574,20 @@ describe("comparison detail route", () => {
     expect(
       screen.getByRole("heading", { name: "failure -> no_failure" }),
     ).toBeInTheDocument();
+    expect(screen.getAllByText("Active case").length).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.getByRole("button", { name: "Inspect transition case case-002" }),
+    ).toHaveAttribute("data-active-case", "true");
+    expect(document.querySelectorAll('[data-active-case="true"]')).toHaveLength(2);
     expect(
       await screen.findByText("Unsupported factual framing detected."),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Inspect transition case case-004" }));
 
+    expect(
+      screen.getByRole("button", { name: "Inspect transition case case-004" }),
+    ).toHaveAttribute("data-active-case", "true");
     expect(screen.getByText("Reasoning chain diverged from the rubric.")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Use only the provided evidence bullets." }),

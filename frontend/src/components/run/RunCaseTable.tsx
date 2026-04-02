@@ -89,11 +89,12 @@ export function RunCaseTable({
                   key={caseRow.caseId}
                   tabIndex={0}
                   role="button"
+                  data-active-case={isSelected ? "true" : undefined}
                   aria-label={`Inspect case ${caseRow.caseId}`}
                   aria-pressed={isSelected}
                   className={cn(
                     "mb-3 block cursor-pointer rounded-[20px] border border-border/55 bg-background/25 p-4 align-top transition-colors last:mb-0 hover:bg-background/50 focus-visible:bg-background/50 focus-visible:outline-none md:mb-0 md:table-row md:rounded-none md:border-x-0 md:border-b md:border-t-0 md:bg-transparent md:p-0",
-                    isSelected ? "border-primary/35 bg-background/60" : "",
+                    isSelected ? "border-primary/45 bg-primary/[0.08] md:bg-primary/[0.05]" : "",
                   )}
                   onClick={() => onSelectCase(caseRow.caseId)}
                   onKeyDown={(event) => {
@@ -106,7 +107,18 @@ export function RunCaseTable({
                   <td className="block px-0 py-2 md:table-cell md:px-4 md:py-3">
                     <MobileLabel>Case</MobileLabel>
                     <div className="space-y-1">
-                      <p className="font-mono text-[11px] text-foreground">{caseRow.caseId}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-mono text-[11px] text-foreground">{caseRow.caseId}</p>
+                        {isSelected ? (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="h-1.5 w-8 rounded-full bg-primary/80"
+                            />
+                            <Badge tone="accent">Active case</Badge>
+                          </>
+                        ) : null}
+                      </div>
                       <p className="max-w-[24rem] text-sm text-muted-foreground">
                         {caseRow.prompt}
                       </p>

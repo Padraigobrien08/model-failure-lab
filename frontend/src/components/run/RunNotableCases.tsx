@@ -44,9 +44,12 @@ export function RunNotableCases({
           {cases.map((caseRow) => (
             <Card
               key={caseRow.caseId}
+              data-active-case={selectedCaseId === caseRow.caseId ? "true" : undefined}
               className={cn(
                 "rounded-[24px] bg-card/75 transition-colors",
-                selectedCaseId === caseRow.caseId ? "border-primary/35 bg-primary/5" : "",
+                selectedCaseId === caseRow.caseId
+                  ? "border-primary/45 bg-primary/[0.08]"
+                  : "",
               )}
             >
               <button
@@ -58,6 +61,15 @@ export function RunNotableCases({
                 <CardHeader className="space-y-3 pb-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone="accent">{caseRow.caseId}</Badge>
+                    {selectedCaseId === caseRow.caseId ? (
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-8 rounded-full bg-primary/80"
+                        />
+                        <Badge tone="accent">Active case</Badge>
+                      </>
+                    ) : null}
                     {caseRow.expectation.verdict ? (
                       <Badge tone="default">{formatLabel(caseRow.expectation.verdict)}</Badge>
                     ) : null}
@@ -83,7 +95,7 @@ export function RunNotableCases({
                   ) : null}
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     {selectedCaseId === caseRow.caseId
-                      ? "Currently open in the evidence panel"
+                      ? "Active case in the evidence panel"
                       : "Open in the evidence panel"}
                   </p>
                 </CardContent>

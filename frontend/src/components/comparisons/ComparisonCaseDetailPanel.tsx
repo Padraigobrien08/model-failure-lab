@@ -57,11 +57,15 @@ export function ComparisonCaseDetailPanel({
   }
 
   return (
-    <Card className="rounded-[24px] border border-border/70 bg-card/70 shadow-panel">
+    <Card
+      data-active-case="true"
+      className="rounded-[24px] border border-primary/15 bg-primary/[0.04] shadow-panel"
+    >
       <CardHeader className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">Stage 4</Badge>
           <Badge tone="default">Selected transition evidence</Badge>
+          <Badge tone="accent">Active case</Badge>
           <Badge tone="muted">{caseDelta.caseId}</Badge>
           {caseDelta.tags.map((tag) => (
             <Badge key={`${caseDelta.caseId}-${tag}`} tone="muted">
