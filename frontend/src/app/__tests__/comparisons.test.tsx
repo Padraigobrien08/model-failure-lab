@@ -8,6 +8,7 @@ import type {
   ComparisonDetail,
   ComparisonInventoryItem,
   ComparisonInventoryState,
+  RunDetail,
   RunInventoryState,
 } from "@/lib/artifacts/types";
 
@@ -201,6 +202,135 @@ function mockComparisonDetail(detail: ComparisonDetail) {
   );
 }
 
+function buildLinkedRunDetail(runId: string, dataset: string): RunDetail {
+  return {
+    source: {
+      label: "Repo root artifact store",
+      path: "/tmp/model-failure-lab",
+      runsPath: "/tmp/model-failure-lab/runs",
+      reportsPath: "/tmp/model-failure-lab/reports",
+    },
+    run: {
+      runId,
+      dataset,
+      model: "demo",
+      createdAt: "2026-03-30T12:10:00Z",
+      status: "completed",
+      reportId: `${runId}_report`,
+      adapterId: "demo",
+      classifierId: "heuristic_v1",
+      runSeed: 17,
+    },
+    metrics: {
+      attemptedCaseCount: 4,
+      classifiedCaseCount: 4,
+      executionErrorCount: 0,
+      unclassifiedCount: 0,
+      successfulModelInvocationCount: 4,
+      failureCaseCount: 1,
+      failureRate: 0.25,
+      classificationCoverage: 1,
+      executionSuccessRate: 1,
+    },
+    summary: {
+      failureTypes: [
+        { label: "hallucination", count: 1, share: 0.25, caseIds: ["case-002"] },
+      ],
+      expectationVerdicts: [
+        { label: "unexpected_failure", count: 1, share: 0.25, caseIds: ["case-002"] },
+      ],
+      tagSlices: [
+        {
+          tag: "core",
+          attemptedCaseCount: 4,
+          classifiedCaseCount: 4,
+          failureCaseCount: 1,
+          failureRate: 0.25,
+          expectationVerdictCounts: { unexpected_failure: 1 },
+        },
+      ],
+    },
+    lenses: {
+      mismatchCaseIds: ["case-002"],
+      notableCaseIds: ["case-002"],
+      allCaseIds: ["case-001", "case-002"],
+      errorCaseIds: [],
+    },
+    cases: [
+      {
+        caseId: "case-002",
+        promptId: "case-002",
+        prompt: "Answer using only the supplied source snippet.",
+        tags: ["core", "factuality"],
+        outputText: "Invented unsupported detail.",
+        expectation: {
+          expectedFailure: { failureType: "no_failure", failureSubtype: null },
+          observedFailure: { failureType: "hallucination", failureSubtype: null },
+          verdict: "unexpected_failure",
+        },
+        classification: {
+          failure: { failureType: "hallucination", failureSubtype: null },
+          confidence: 0.91,
+          explanation: "Unsupported factual framing detected.",
+        },
+        error: null,
+      },
+    ],
+  };
+}
+
+function mockComparisonAndRunDetails(detail: ComparisonDetail) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (
+        url.includes(
+          `/__failure_lab__/artifacts/comparison-detail.json?reportId=${detail.comparison.reportId}`,
+        )
+      ) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => detail,
+        } as Response;
+      }
+
+      if (
+        url.includes(
+          `/__failure_lab__/artifacts/run-detail.json?runId=${detail.comparison.baselineRunId}`,
+        )
+      ) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () =>
+            buildLinkedRunDetail(detail.comparison.baselineRunId, "reasoning-failures-v1"),
+        } as Response;
+      }
+
+      if (
+        url.includes(
+          `/__failure_lab__/artifacts/run-detail.json?runId=${detail.comparison.candidateRunId}`,
+        )
+      ) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () =>
+            buildLinkedRunDetail(detail.comparison.candidateRunId, "reasoning-failures-v1"),
+        } as Response;
+      }
+
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ message: `Unexpected request: ${url}` }),
+      } as Response;
+    }),
+  );
+}
+
 describe("comparisons route", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -308,5 +438,57 @@ describe("comparisons route", () => {
     expect(
       screen.getByRole("heading", { name: "Directional change at a glance" }),
     ).toBeInTheDocument();
+  });
+
+  it("proves the comparison-led investigation story from inventory into run evidence artifact context", async () => {
+    const user = userEvent.setup();
+    const detail = buildComparisonDetail("compare_alpha_to_beta");
+    mockComparisonAndRunDetails(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons"]}
+        initialArtifactState={buildReadyState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState([
+          {
+            reportId: "compare_alpha_to_beta",
+            baselineRunId: "run_alpha",
+            candidateRunId: "run_beta",
+            dataset: "reasoning-failures-v1",
+            createdAt: "2026-03-30T12:00:00Z",
+            status: "improved",
+            compatible: true,
+          },
+        ])}
+      />,
+    );
+
+    await user.click(screen.getByRole("link", { name: "Open comparison compare_alpha_to_beta" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Inspect transition case case-002" }),
+    ).toHaveAttribute("data-active-case", "true");
+
+    await user.click(
+      screen.getByRole("link", {
+        name: "Open case case-002 in baseline run run_alpha",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Selected case evidence" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Inspect case case-002" }),
+    ).toHaveAttribute("data-active-case", "true");
+    const artifactContext = screen.getByRole("region", { name: "Artifact context" });
+    expect(within(artifactContext).getAllByText("run_alpha").length).toBeGreaterThan(0);
+    expect(within(artifactContext).getByText("run_alpha_report")).toBeInTheDocument();
+    expect(within(artifactContext).getByText("/tmp/model-failure-lab")).toBeInTheDocument();
   });
 });

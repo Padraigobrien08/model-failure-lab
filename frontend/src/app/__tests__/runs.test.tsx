@@ -5,6 +5,7 @@ import { afterEach, vi } from "vitest";
 import { App } from "@/app/App";
 import type {
   ArtifactShellState,
+  ComparisonDetail,
   ComparisonInventoryState,
   RunDetail,
   RunInventoryItem,
@@ -189,6 +190,105 @@ function buildRunDetail(run: RunInventoryItem): RunDetail {
   };
 }
 
+function buildComparisonDetail(
+  reportId: string,
+  baselineRunId: string,
+  candidateRunId: string,
+  dataset: string,
+): ComparisonDetail {
+  return {
+    source: {
+      label: "Repo root artifact store",
+      path: "/tmp/model-failure-lab",
+      runsPath: "/tmp/model-failure-lab/runs",
+      reportsPath: "/tmp/model-failure-lab/reports",
+    },
+    comparison: {
+      reportId,
+      createdAt: "2026-03-30T12:30:00Z",
+      status: "improved",
+      baselineRunId,
+      candidateRunId,
+      dataset,
+      baselineDataset: null,
+      candidateDataset: null,
+      compatible: true,
+      reason: null,
+      comparisonMode: "baseline_to_candidate",
+      metricsComputedOn: "shared_cases_only",
+    },
+    metrics: {
+      baseline: {
+        attemptedCaseCount: 4,
+        classifiedCaseCount: 4,
+        executionErrorCount: 0,
+        unclassifiedCount: 0,
+        successfulModelInvocationCount: 4,
+        failureRate: 0.5,
+        classificationCoverage: 1,
+        executionSuccessRate: 1,
+      },
+      candidate: {
+        attemptedCaseCount: 4,
+        classifiedCaseCount: 4,
+        executionErrorCount: 0,
+        unclassifiedCount: 0,
+        successfulModelInvocationCount: 4,
+        failureRate: 0.25,
+        classificationCoverage: 1,
+        executionSuccessRate: 1,
+      },
+      delta: {
+        failureRate: -0.25,
+        classificationCoverage: 0,
+        executionSuccessRate: 0,
+      },
+    },
+    coverage: {
+      sharedCaseCount: 4,
+      baselineOnlyCaseCount: 0,
+      candidateOnlyCaseCount: 0,
+      sharedCaseIds: ["case-002"],
+      baselineOnlyCaseIds: [],
+      candidateOnlyCaseIds: [],
+    },
+    transitions: {
+      counts: {
+        improvements: 1,
+        regressions: 0,
+        failureTypeSwaps: 0,
+        errorChanges: 0,
+      },
+      summary: [
+        {
+          transitionType: "failure_to_no_failure",
+          label: "failure -> no_failure",
+          count: 1,
+          caseIds: ["case-002"],
+        },
+      ],
+    },
+    caseDeltas: [
+      {
+        caseId: "case-002",
+        promptId: "case-002",
+        prompt: "Answer using only the supplied source snippet.",
+        tags: ["core", "factuality"],
+        transitionType: "failure_to_no_failure",
+        transitionLabel: "failure -> no_failure",
+        baselineFailureType: "hallucination",
+        candidateFailureType: "no_failure",
+        baselineExpectationVerdict: "unexpected_failure",
+        candidateExpectationVerdict: "no_failure_as_expected",
+        baselineErrorStage: null,
+        candidateErrorStage: null,
+        baselineExplanation: "Unsupported factual framing detected.",
+        candidateExplanation: "No heuristic failure signal detected.",
+      },
+    ],
+  };
+}
+
 function mockRunDetail(runs: RunInventoryItem[]) {
   vi.stubGlobal(
     "fetch",
@@ -204,6 +304,47 @@ function mockRunDetail(runs: RunInventoryItem[]) {
           json: async () => buildRunDetail(matchedRun),
         } as Response;
       }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ message: `Unexpected request: ${url}` }),
+      } as Response;
+    }),
+  );
+}
+
+function mockRunAndComparisonDetails(
+  runs: RunInventoryItem[],
+  comparisons: ComparisonDetail[],
+) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      const matchedRun = runs.find((run) =>
+        url.includes(`/__failure_lab__/artifacts/run-detail.json?runId=${run.runId}`),
+      );
+      if (matchedRun) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => buildRunDetail(matchedRun),
+        } as Response;
+      }
+
+      const matchedComparison = comparisons.find((comparison) =>
+        url.includes(
+          `/__failure_lab__/artifacts/comparison-detail.json?reportId=${comparison.comparison.reportId}`,
+        ),
+      );
+      if (matchedComparison) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => matchedComparison,
+        } as Response;
+      }
+
       return {
         ok: false,
         status: 404,
@@ -337,6 +478,62 @@ describe("runs route", () => {
     expect(
       await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
     ).toBeInTheDocument();
+  });
+
+  it("proves the run-led investigation story from inventory into related comparison artifact context", async () => {
+    const user = userEvent.setup();
+    const comparisons = [
+      buildComparisonDetail(
+        "compare_alpha_to_gamma",
+        "run_alpha",
+        "run_gamma",
+        "hallucination-failures-v1",
+      ),
+    ];
+    mockRunAndComparisonDetails([SAMPLE_RUNS[0], SAMPLE_RUNS[1]], comparisons);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/"]}
+        initialArtifactState={buildReadyArtifactState(["run_alpha", "run_gamma"])}
+        initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUNS[0], SAMPLE_RUNS[1]])}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState([
+          {
+            reportId: "compare_alpha_to_gamma",
+            baselineRunId: "run_alpha",
+            candidateRunId: "run_gamma",
+            dataset: "hallucination-failures-v1",
+            createdAt: "2026-03-30T12:30:00Z",
+            status: "improved",
+            compatible: true,
+          },
+        ])}
+      />,
+    );
+
+    await user.click(screen.getByRole("link", { name: "Open run run_gamma" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Inspect case case-002" }),
+    ).toHaveAttribute("data-active-case", "true");
+
+    await user.click(screen.getByRole("link", { name: "compare_alpha_to_gamma" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Grouped case transitions" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Inspect transition case case-002" }),
+    ).toHaveAttribute("data-active-case", "true");
+
+    const artifactContext = screen.getByRole("region", { name: "Artifact context" });
+    expect(within(artifactContext).getByText("compare_alpha_to_gamma")).toBeInTheDocument();
+    expect(within(artifactContext).getAllByText("case-002").length).toBeGreaterThan(0);
+    expect(within(artifactContext).getByText("run_alpha / run_gamma")).toBeInTheDocument();
   });
 
   it("shows a route-level empty state when the shell is ready but no runs exist", () => {
