@@ -1,7 +1,95 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { App } from "@/app/App";
+import type {
+  ArtifactShellState,
+  ComparisonInventoryState,
+  RunInventoryState,
+} from "@/lib/artifacts/types";
+
+function buildReadyState(overrides?: Partial<ArtifactShellState & { status: "ready" }>): ArtifactShellState {
+  return {
+    status: "ready",
+    overview: {
+      status: "ready",
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      runs: {
+        count: 2,
+        ids: ["run_alpha", "run_beta"],
+      },
+      comparisons: {
+        count: 1,
+        ids: ["compare_alpha_to_beta"],
+      },
+      issues: [],
+      message: null,
+    },
+    ...overrides,
+  };
+}
+
+function buildReadyInventoryState(): RunInventoryState {
+  return {
+    status: "ready",
+    inventory: {
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      runs: [
+        {
+          runId: "run_alpha",
+          dataset: "reasoning-failures-v1",
+          model: "demo",
+          createdAt: "2026-03-29T09:00:00Z",
+          status: "completed",
+        },
+        {
+          runId: "run_beta",
+          dataset: "hallucination-failures-v1",
+          model: "gpt-4.1-mini",
+          createdAt: "2026-03-30T11:30:00Z",
+          status: "completed",
+        },
+      ],
+    },
+    message: null,
+  };
+}
+
+function buildReadyComparisonInventoryState(): ComparisonInventoryState {
+  return {
+    status: "ready",
+    inventory: {
+      source: {
+        label: "Repo root artifact store",
+        path: "/tmp/model-failure-lab",
+        runsPath: "/tmp/model-failure-lab/runs",
+        reportsPath: "/tmp/model-failure-lab/reports",
+      },
+      comparisons: [
+        {
+          reportId: "compare_alpha_to_beta",
+          baselineRunId: "run_alpha",
+          candidateRunId: "run_beta",
+          dataset: "reasoning-failures-v1",
+          createdAt: "2026-03-30T11:40:00Z",
+          status: "improved",
+          compatible: true,
+        },
+      ],
+    },
+    message: null,
+  };
+}
 
 describe("App shell", () => {
   afterEach(() => {
@@ -9,161 +97,124 @@ describe("App shell", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("renders a sticky-header scaffold with the trace chain and scope controls", () => {
-    const { container } = render(
-      <App useMemoryRouter initialEntries={["/lane/robustness/reweighting?scope=all"]} />,
+  it("renders compact top navigation with the active artifact source", () => {
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/"]}
+        initialArtifactState={buildReadyState()}
+        initialRunInventoryState={buildReadyInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
     );
 
-    const traceChain = screen.getByLabelText("Trace chain");
-
-    expect(screen.getByRole("link", { name: "Failure Debugger" })).toBeInTheDocument();
-    expect(traceChain).toBeInTheDocument();
-    expect(within(traceChain).getByRole("link", { name: "Verdict" })).toHaveAttribute(
-      "href",
-      "/?scope=all",
-    );
-    expect(within(traceChain).getByRole("link", { name: "Lane" })).toHaveAttribute(
-      "href",
-      "/lane/robustness?scope=all",
-    );
-    expect(within(traceChain).getByText("Method")).toHaveAttribute("aria-current", "page");
-    expect(within(traceChain).getByRole("link", { name: "Run" })).toHaveAttribute(
-      "href",
-      "/run/distilbert_reweighting_seed_13?scope=all&lane=robustness&method=reweighting",
-    );
-    expect(within(traceChain).getByRole("link", { name: "Artifact" })).toHaveAttribute(
-      "href",
-      "/debug/raw/run_distilbert_reweighting_seed_13?scope=all",
-    );
-    expect(screen.getByRole("button", { name: "Official" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("Why is this method judged this way?")).toBeInTheDocument();
-    expect(screen.getByLabelText("Method breadcrumb")).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "Reweighting runs" })).toBeInTheDocument();
-    expect(screen.getByText("Method explanation")).toBeInTheDocument();
-    expect(screen.getByText("Lineage")).toBeInTheDocument();
-    expect(container.querySelector("main")).not.toBeNull();
-    expect(screen.getByTestId("method-inspector")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Failure Lab" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Comparisons" })).toBeInTheDocument();
+    expect(screen.getByText("Artifact source")).toBeInTheDocument();
+    expect(screen.getByText("/tmp/model-failure-lab")).toBeInTheDocument();
+    expect(screen.getByText("Runs 2")).toBeInTheDocument();
+    expect(screen.getByText("Comparisons 1")).toBeInTheDocument();
   });
 
-  it("lets users navigate backward through the trace chain without losing scope", async () => {
+  it("lands on runs at / and lets users switch to comparisons from the top nav", async () => {
     const user = userEvent.setup();
 
-    render(<App useMemoryRouter initialEntries={["/lane/robustness/reweighting?scope=all"]} />);
-
-    const traceChain = screen.getByLabelText("Trace chain");
-
-    await user.click(within(traceChain).getByRole("link", { name: "Lane" }));
-
-    expect(await screen.findByRole("heading", { name: "Robustness" })).toBeInTheDocument();
-    expect(screen.getByText("What is happening in this lane?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-
-    await user.click(within(screen.getByLabelText("Trace chain")).getByRole("link", { name: "Verdict" }));
-
-    expect(await screen.findByRole("heading", { name: "Where should I look?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("lets users move forward from verdict to lane and method through the trace chain", async () => {
-    const user = userEvent.setup();
-
-    render(<App useMemoryRouter initialEntries={["/?scope=all"]} />);
-
-    const traceChain = screen.getByLabelText("Trace chain");
-
-    expect(within(traceChain).getByText("Verdict")).toHaveAttribute("aria-current", "page");
-    expect(within(traceChain).getByRole("link", { name: "Lane" })).toHaveAttribute(
-      "href",
-      "/lane/robustness?scope=all",
-    );
-    expect(within(traceChain).getByRole("link", { name: "Method" })).toHaveAttribute(
-      "href",
-      "/lane/robustness/reweighting?scope=all",
-    );
-    expect(within(traceChain).getByRole("link", { name: "Run" })).toHaveAttribute(
-      "href",
-      "/run/distilbert_reweighting_seed_13?scope=all&lane=robustness&method=reweighting",
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/"]}
+        initialArtifactState={buildReadyState()}
+        initialRunInventoryState={buildReadyInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
     );
 
-    await user.click(within(traceChain).getByRole("link", { name: "Lane" }));
+    expect(
+      screen.getByRole("heading", { name: "Saved runs inventory." }),
+    ).toBeInTheDocument();
 
-    expect(await screen.findByRole("heading", { name: "Robustness" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-
-    await user.click(within(screen.getByLabelText("Trace chain")).getByRole("link", { name: "Method" }));
-
-    expect(await screen.findByText("Why is this method judged this way?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("keeps the same inspector contract visible through lane to method to run traversal", async () => {
-    const user = userEvent.setup();
-
-    render(<App useMemoryRouter initialEntries={["/lane/robustness?scope=all"]} />);
-
-    const laneInspector = screen.getByTestId("lane-inspector");
-    expect(within(laneInspector).getByText("Evidence")).toBeInTheDocument();
-    expect(within(laneInspector).getByText("Provenance preview")).toBeInTheDocument();
-    expect(within(laneInspector).getByRole("link", { name: "Open raw" })).toHaveAttribute(
-      "href",
-      "/debug/raw/method_baseline_robustness?scope=all",
-    );
-
-    await user.click(screen.getByRole("link", { name: "Reweighting" }));
-
-    const methodInspector = await screen.findByTestId("method-inspector");
-    expect(within(methodInspector).getByText("Evidence")).toBeInTheDocument();
-    expect(within(methodInspector).getByText("Provenance preview")).toBeInTheDocument();
-    expect(within(methodInspector).getByRole("link", { name: "Open raw" })).toHaveAttribute(
-      "href",
-      "/debug/raw/run_distilbert_reweighting_seed_13?scope=all",
-    );
-
-    await user.click(screen.getByRole("link", { name: "distilbert_reweighting_seed_13" }));
-
-    const runInspector = await screen.findByTestId("run-inspector");
-    expect(within(runInspector).getByText("Evidence")).toBeInTheDocument();
-    expect(within(runInspector).getByText("Provenance preview")).toBeInTheDocument();
-    expect(within(runInspector).getByRole("link", { name: "Open raw" })).toHaveAttribute(
-      "href",
-      "/debug/raw/run_distilbert_reweighting_seed_13?scope=all",
-    );
-  });
-
-  it("keeps the trace chain aligned to a scope-hidden exploratory method instead of switching to an official default", () => {
-    render(<App useMemoryRouter initialEntries={["/lane/robustness/group_dro?scope=official"]} />);
-
-    const traceChain = screen.getByLabelText("Trace chain");
-
-    expect(within(traceChain).getByText("Method")).toHaveAttribute("aria-current", "page");
-    expect(within(traceChain).getByRole("link", { name: "Run" })).toHaveAttribute(
-      "href",
-      "/run/distilbert_group_dro_seed_13?scope=official&lane=robustness&method=group_dro",
-    );
-    expect(within(traceChain).getByRole("link", { name: "Artifact" })).toHaveAttribute(
-      "href",
-      "/debug/raw/run_distilbert_group_dro_seed_13?scope=official",
-    );
-  });
-
-  it("normalizes invalid browser scope params back to official", async () => {
-    window.history.replaceState({}, "", "/run/demo-run?scope=exploratory");
-
-    render(<App />);
+    await user.click(screen.getByRole("link", { name: "Comparisons" }));
 
     expect(
       await screen.findByRole("heading", {
-        name: "distilbert_baseline_seed_13",
-        level: 1,
+        name: "Saved comparisons inventory.",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Official" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    expect(screen.getByRole("link", { name: "Comparisons" })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
-    await waitFor(() => {
-      expect(window.location.search).toBe("?scope=official");
-    });
+  });
+
+  it("shows an explicit loading state before artifacts are available", () => {
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/"]}
+        initialArtifactState={{ status: "loading", overview: null }}
+        initialRunInventoryState={{
+          status: "idle",
+          inventory: null,
+          message: null,
+        }}
+        initialComparisonInventoryState={{
+          status: "idle",
+          inventory: null,
+          message: null,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Loading saved engine artifacts." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/scanning the default local artifact root/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows an explicit incompatible-artifact state instead of falling back to legacy data", () => {
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons"]}
+        initialArtifactState={{
+          status: "incompatible",
+          overview: {
+            status: "incompatible",
+            source: {
+              label: "Repo root artifact store",
+              path: "/tmp/model-failure-lab",
+              runsPath: "/tmp/model-failure-lab/runs",
+              reportsPath: "/tmp/model-failure-lab/reports",
+            },
+            runs: { count: 0, ids: [] },
+            comparisons: { count: 0, ids: [] },
+            issues: ["run demo_run is missing run.json or results.json"],
+            message: "Saved artifacts do not match the supported contract.",
+          },
+        }}
+        initialRunInventoryState={{
+          status: "idle",
+          inventory: null,
+          message: null,
+        }}
+        initialComparisonInventoryState={{
+          status: "idle",
+          inventory: null,
+          message: null,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        name: "The saved artifacts do not match the supported shell contract.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Saved artifacts do not match the supported contract.")).toBeInTheDocument();
+    expect(screen.getByText("run demo_run is missing run.json or results.json")).toBeInTheDocument();
   });
 });

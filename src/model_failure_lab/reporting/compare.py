@@ -254,6 +254,7 @@ def _case_deltas(
         rows.append(
             {
                 "case_id": case_id,
+                "prompt_id": baseline_case.prompt.id,
                 "prompt": _prompt_text(baseline_case),
                 "tags": _tags(baseline_case),
                 "transition_type": transition_type,

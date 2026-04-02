@@ -122,6 +122,7 @@ def test_build_comparison_report_surfaces_shared_and_missing_case_accounting(tmp
     assert built.details["case_deltas"] == [
         {
             "case_id": "case-002",
+            "prompt_id": "case-002",
             "prompt": "shared improvement",
             "tags": [],
             "transition_type": "failure_to_no_failure",
@@ -137,6 +138,7 @@ def test_build_comparison_report_surfaces_shared_and_missing_case_accounting(tmp
             "changed": True,
         }
     ]
+    assert built.details["case_deltas"][0]["prompt_id"] == "case-002"
 
 
 def test_build_comparison_report_surfaces_error_state_changes(tmp_path) -> None:
@@ -191,6 +193,7 @@ def test_build_comparison_report_surfaces_error_state_changes(tmp_path) -> None:
         }
     ]
     assert built.details["case_deltas"][0]["transition_type"] == "error_cleared"
+    assert built.details["case_deltas"][0]["prompt_id"] == "case-001"
     assert built.details["case_deltas"][0]["baseline_error_stage"] == "model_invoke"
     assert built.details["case_deltas"][0]["candidate_error_stage"] is None
 

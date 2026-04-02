@@ -1,219 +1,147 @@
 import { useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
-import { RankedComparisonCanvas } from "@/components/comparisons/RankedComparisonCanvas";
-import { FailureExplorerTabs } from "@/components/failure/FailureExplorerTabs";
-import { ScopeStateBanner } from "@/components/layout/ScopeStateBanner";
-import { WorkbenchHeader } from "@/components/layout/WorkbenchHeader";
-import { WorkbenchSection } from "@/components/layout/WorkbenchSection";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
+import { ComparisonInventoryTable } from "@/components/comparisons/ComparisonInventoryTable";
 import {
-  buildComparisonCards,
-  buildFailureDomainModels,
-  getRepresentativeRunIdForMethod,
-} from "@/lib/manifest/selectors";
+  buildArtifactReturnState,
+  createSearchString,
+} from "@/lib/artifacts/navigation";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import type { ComparisonInventoryItem } from "@/lib/artifacts/types";
 
-const LANE_OPTIONS = [
-  {
-    key: "robustness",
-    label: "Robustness",
-    description: "Worst-group, OOD, and ID tradeoffs that keep the final verdict mixed.",
-  },
-  {
-    key: "calibration",
-    label: "Calibration",
-    description: "ECE and Brier shifts that explain why temperature scaling remains the stable win.",
-  },
-] as const;
+function compareComparisonsNewestFirst(
+  left: ComparisonInventoryItem,
+  right: ComparisonInventoryItem,
+): number {
+  const leftTime = Date.parse(left.createdAt);
+  const rightTime = Date.parse(right.createdAt);
+
+  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
+    return rightTime - leftTime;
+  }
+
+  if (left.createdAt !== right.createdAt) {
+    return right.createdAt.localeCompare(left.createdAt);
+  }
+
+  return right.reportId.localeCompare(left.reportId);
+}
 
 export function ComparisonsPage() {
-  const {
-    index,
-    isLoading,
-    error,
-    includeExploratory,
-    setIncludeExploratory,
-    finalRobustnessBundle,
-    finalRobustnessBundleError,
-    isFinalRobustnessBundleLoading,
-    selection,
-    selectedLane,
-    setSelectedLane,
-    selectedMethod,
-    selectedDomain,
-    setSelectedMethod,
-    setSelectedDomain,
-    openEvidenceDrawer,
-  } = useAppRouteContext();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { artifactState, artifactOverview, comparisonInventoryState } = useAppRouteContext();
 
-  if (isLoading || isFinalRobustnessBundleLoading) {
+  const inventory =
+    comparisonInventoryState.status === "ready" ? comparisonInventoryState.inventory : null;
+  const comparisons = inventory?.comparisons ?? [];
+  const sortedComparisons = useMemo(
+    () => comparisons.slice().sort(compareComparisonsNewestFirst),
+    [comparisons],
+  );
+
+  if (artifactState.status !== "ready" || artifactOverview === null) {
+    return <ArtifactStatePanel area="Comparisons" state={artifactState} />;
+  }
+
+  const readyOverview = artifactOverview;
+
+  if (
+    comparisonInventoryState.status === "idle" ||
+    comparisonInventoryState.status === "loading"
+  ) {
     return (
       <section className="space-y-4">
-        <Badge tone="accent">Lanes</Badge>
-        <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-          Loading lane workspace.
-        </h2>
+        <Badge tone="accent">Comparisons</Badge>
+        <Card>
+          <CardHeader>
+            <CardTitle>Loading saved comparisons inventory.</CardTitle>
+            <CardDescription>
+              The shell is resolving the browser-facing comparison index from the default local
+              artifact root.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </section>
     );
   }
 
-  if (error || finalRobustnessBundleError || index === null || finalRobustnessBundle === null) {
+  if (comparisonInventoryState.status === "incompatible") {
     return (
       <section className="space-y-4">
-        <Badge tone="default">Lanes</Badge>
-        <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-          The lane workspace is unavailable.
-        </h2>
-        <Card className="bg-background/60">
-          <CardContent className="px-6 py-6 font-mono text-sm text-foreground">
-            {finalRobustnessBundleError ?? error ?? "Missing saved lane payload."}
+        <Badge tone="default">Comparisons</Badge>
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle>The comparisons inventory could not be read.</CardTitle>
+            <CardDescription>
+              The shell found report artifacts, but the saved comparison inventory does not match
+              the supported contract.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {comparisonInventoryState.message}
           </CardContent>
         </Card>
       </section>
     );
   }
 
-  const manifestIndex = index;
-  const comparisonCards = buildComparisonCards(index, finalRobustnessBundle, includeExploratory);
-  const failureDomains = buildFailureDomainModels(index, finalRobustnessBundle, includeExploratory);
-  const activeLane = selectedLane ?? "robustness";
-  const activeDomain =
-    selectedDomain ?? (activeLane === "calibration" ? "calibration" : "worst_group");
-
-  function buildDomainTracePath(domain: "worst_group" | "ood" | "id" | "calibration") {
-    const searchParams = new URLSearchParams();
-
-    if (selection.scope === "exploratory") {
-      searchParams.set("scope", "exploratory");
-    }
-    if (selection.verdict) {
-      searchParams.set("verdict", selection.verdict);
-    }
-    if (selection.method) {
-      searchParams.set("method", selection.method);
-    }
-    if (selection.run) {
-      searchParams.set("run", selection.run);
-    }
-    if (selection.artifact) {
-      searchParams.set("artifact", selection.artifact);
-    }
-
-    searchParams.set("lane", domain === "calibration" ? "calibration" : "robustness");
-    searchParams.set("domain", domain);
-
-    return `/failure-explorer?${searchParams.toString()}`;
+  if (inventory === null || inventory.comparisons.length === 0) {
+    return (
+      <section className="space-y-4">
+        <Badge tone="accent">Comparisons</Badge>
+        <Card>
+          <CardHeader>
+            <CardTitle>No comparison reports are available yet.</CardTitle>
+            <CardDescription>
+              The shell is reading the right artifact root, but there are no saved comparison
+              reports to index yet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p className="font-mono text-foreground">{readyOverview.source.reportsPath}</p>
+            <p>Generate a comparison with `failure-lab compare` to populate the inventory.</p>
+          </CardContent>
+        </Card>
+      </section>
+    );
   }
-
-  const orderedDomains = useMemo(() => {
-    if (activeLane === "calibration") {
-      return [
-        ...failureDomains.filter((domain) => domain.domain === "calibration"),
-        ...failureDomains.filter((domain) => domain.domain !== "calibration"),
-      ];
-    }
-
-    return [
-      ...failureDomains.filter((domain) => domain.domain !== "calibration"),
-      ...failureDomains.filter((domain) => domain.domain === "calibration"),
-    ];
-  }, [activeLane, failureDomains]);
-
-  function handleSelectLane(lane: "robustness" | "calibration") {
-    setSelectedLane(lane);
-    setSelectedDomain(lane === "calibration" ? "calibration" : "worst_group");
-  }
-
-  function handleSelectMethod(methodName: string) {
-    setSelectedMethod(methodName);
-  }
-
-  function handleInspectMethod(methodName: string) {
-    handleSelectMethod(methodName);
-
-    const runId = getRepresentativeRunIdForMethod(manifestIndex, methodName, true);
-    if (runId) {
-      openEvidenceDrawer(runId);
-    }
-  }
-
-  const laneMeta =
-    LANE_OPTIONS.find((option) => option.key === activeLane) ?? LANE_OPTIONS[0];
 
   return (
-    <section className="space-y-8">
-      <WorkbenchHeader
-        meta={
-          <>
-            <Badge tone="accent">Lanes</Badge>
-            {includeExploratory ? <Badge tone="exploratory">Exploratory scope active</Badge> : null}
-            <Badge tone="default">{laneMeta.label}</Badge>
-          </>
-        }
-        title={`${laneMeta.label} lane workspace.`}
-        description={laneMeta.description}
-        supportingText="The lane route absorbs the old comparison and failure-explorer posture into one lineage-aware workspace."
-        aside={
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
-                Active lane
-              </p>
-              <p className="mt-1 text-foreground">{laneMeta.label}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
-                Active domain
-              </p>
-              <p className="mt-1 text-foreground">{activeDomain}</p>
-            </div>
-          </div>
-        }
-      />
-
-      <ScopeStateBanner
-        includeExploratory={includeExploratory}
-        onChange={setIncludeExploratory}
-      />
-
-      <WorkbenchSection
-        eyebrow="Lane selector"
-        title="Choose the lane that explains the verdict"
-        description="Switch between robustness and calibration without leaving the route. Method focus and domain focus stay in the same workspace."
-      >
-        <div className="flex flex-wrap gap-3">
-          {LANE_OPTIONS.map((lane) => (
-            <Button
-              key={lane.key}
-              variant={activeLane === lane.key ? "default" : "outline"}
-              onClick={() => handleSelectLane(lane.key)}
-            >
-              {lane.label}
-            </Button>
-          ))}
+    <section className="space-y-6">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge tone="accent">Comparisons</Badge>
+          <Badge tone="muted">{sortedComparisons.length} detected</Badge>
         </div>
-      </WorkbenchSection>
+        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+          Saved comparisons inventory.
+        </h1>
+        <p className="max-w-3xl text-base leading-7 text-muted-foreground">
+          The comparisons route reads saved baseline-to-candidate reports from the engine contract
+          and renders them as a dense newest-first inventory you can scan and open.
+        </p>
+      </div>
 
-      <RankedComparisonCanvas
-        items={comparisonCards}
-        domains={orderedDomains}
-        selectedMethod={selectedMethod}
-        selectedDomain={activeDomain}
-        onSelectMethod={handleSelectMethod}
-        onSelectDomain={setSelectedDomain}
-        onInspectMethod={handleInspectMethod}
-        buildDomainTracePath={buildDomainTracePath}
-      />
-
-      <FailureExplorerTabs
-        domains={orderedDomains}
-        selectedDomain={activeDomain}
-        selectedMethod={selectedMethod}
-        onSelectDomain={setSelectedDomain}
-        onSelectMethod={handleSelectMethod}
-        onInspectMethod={handleInspectMethod}
+      <ComparisonInventoryTable
+        rows={sortedComparisons}
+        onOpenComparison={(selectedReportId) =>
+          navigate(`/comparisons/${encodeURIComponent(selectedReportId)}`, {
+            state: buildArtifactReturnState(
+              "/comparisons",
+              createSearchString(searchParams),
+            ),
+          })
+        }
       />
     </section>
   );

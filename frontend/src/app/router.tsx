@@ -1,6 +1,12 @@
 import { useOutletContext } from "react-router-dom";
 
 import type {
+  ArtifactOverview,
+  ArtifactShellState,
+  ComparisonInventoryState,
+  RunInventoryState,
+} from "@/lib/artifacts/types";
+import type {
   ArtifactIndex,
   FailureDomainKey,
   FinalRobustnessBundle,
@@ -15,33 +21,25 @@ export type NavigationItem = {
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
-    label: "Verdict",
+    label: "Runs",
     path: "/",
-    description: "Starting point for the trace-first scaffold",
+    description: "Saved run artifacts from the local engine contract",
   },
   {
-    label: "Lane",
-    path: "/lane/:laneId",
-    description: "Focused lane route for one trace branch",
-  },
-  {
-    label: "Method",
-    path: "/lane/:laneId/:methodId",
-    description: "Method drilldown inside a selected lane",
-  },
-  {
-    label: "Run",
-    path: "/run/:runId",
-    description: "Single-run trace route",
-  },
-  {
-    label: "Artifact",
-    path: "/debug/raw/:entityId",
-    description: "Raw debug route for a trace entity",
+    label: "Comparisons",
+    path: "/comparisons",
+    description: "Baseline-to-candidate comparison artifacts",
   },
 ];
 
 export type AppRouteContext = {
+  artifactState: ArtifactShellState;
+  artifactOverview: ArtifactOverview | null;
+  reloadArtifacts: () => void;
+  runInventoryState: RunInventoryState;
+  reloadRunInventory: () => void;
+  comparisonInventoryState: ComparisonInventoryState;
+  reloadComparisonInventory: () => void;
   index: ArtifactIndex | null;
   isLoading: boolean;
   error: string | null;

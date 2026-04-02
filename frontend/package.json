@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "python3 ../scripts/sync_react_ui_manifest.py && vite",
-    "build": "python3 ../scripts/sync_react_ui_manifest.py && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
-    "preview": "vite preview",
-    "test": "vitest"
+    "dev": "vite --config vite.config.ts",
+    "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts",
+    "test": "vitest",
+    "smoke:real-artifacts": "node scripts/smoke-real-artifacts.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

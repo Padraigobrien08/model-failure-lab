@@ -20,3 +20,4 @@ frontend/public/artifacts/
 frontend/*.config.d.ts
 frontend/*.config.js
 frontend/*.tsbuildinfo
+screenshots/
