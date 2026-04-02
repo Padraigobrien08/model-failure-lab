@@ -94,7 +94,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--root",
         type=Path,
-        help="Override the dataset/run/report root for this invocation.",
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
     run_parser.add_argument(
         "--full",
@@ -116,7 +119,10 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument(
         "--root",
         type=Path,
-        help="Override the dataset/run/report root for this invocation.",
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
     report_parser.set_defaults(handler=_handle_report)
 
@@ -135,7 +141,10 @@ def build_parser() -> argparse.ArgumentParser:
     compare_parser.add_argument(
         "--root",
         type=Path,
-        help="Override the dataset/run/report root for this invocation.",
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
     compare_parser.set_defaults(handler=_handle_compare)
 
@@ -146,7 +155,10 @@ def build_parser() -> argparse.ArgumentParser:
     demo_parser.add_argument(
         "--root",
         type=Path,
-        help="Override the dataset/run/report root for this invocation.",
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
     demo_parser.set_defaults(handler=_handle_demo)
 

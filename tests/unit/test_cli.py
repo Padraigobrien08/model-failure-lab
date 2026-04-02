@@ -65,6 +65,20 @@ def test_python_module_entrypoint_prints_new_help_surface_without_args() -> None
     assert "run-baseline" not in result.stdout
 
 
+def test_run_help_describes_current_working_directory_default() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "run", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "Defaults to the current working directory." in result.stdout
+
+
 def test_cli_module_import_does_not_load_matplotlib() -> None:
     _purge_modules("model_failure_lab.cli", "model_failure_lab.reporting", "matplotlib")
 
@@ -107,6 +121,32 @@ def test_run_command_supports_direct_dataset_paths_and_writes_artifacts(tmp_path
     assert "Failure Lab Run" in captured.out
     assert "Dataset: reasoning-basics-v1" in captured.out
     assert "Failure rate:" in captured.out
+    run_dirs = sorted((tmp_path / "runs").iterdir())
+    assert len(run_dirs) == 1
+    assert (run_dirs[0] / "run.json").exists()
+    assert (run_dirs[0] / "results.json").exists()
+
+
+def test_run_command_uses_current_working_directory_when_root_is_omitted(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            name="Reasoning Basics",
+            cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        ),
+    )
+    monkeypatch.chdir(tmp_path)
+
+    exit_code = main(["run", "--dataset", "reasoning-basics-v1", "--model", "demo"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Failure Lab Run" in captured.out
     run_dirs = sorted((tmp_path / "runs").iterdir())
     assert len(run_dirs) == 1
     assert (run_dirs[0] / "run.json").exists()
