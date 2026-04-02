@@ -8,6 +8,7 @@ import sys
 import tomllib
 from pathlib import Path
 
+import model_failure_lab.datasets as datasets_module
 from model_failure_lab.cli import main
 from model_failure_lab.datasets import FailureDataset
 from model_failure_lab.schemas import PromptCase, PromptExpectations
@@ -370,3 +371,17 @@ def test_datasets_list_command_shows_compact_bundled_catalog(capsys) -> None:
     assert "rag-failures-v1" in captured.out
     assert "core" in captured.out
     assert "full" in captured.out
+
+
+def test_demo_command_surfaces_packaged_install_error_when_asset_is_missing(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    missing_path = tmp_path / "missing-demo-dataset.json"
+    monkeypatch.setattr(datasets_module, "demo_dataset_path", lambda: missing_path)
+
+    exit_code = main(["demo"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "installed `model-failure-lab` package" in captured.err
+    assert str(missing_path) not in captured.err

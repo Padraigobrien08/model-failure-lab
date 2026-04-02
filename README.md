@@ -11,12 +11,20 @@ infrastructure.
 Use Python 3.11 or newer.
 
 ```bash
-python3 -m pip install -e '.[dev]'
+python3 -m pip install .
 failure-lab demo
+failure-lab run --dataset reasoning-failures-v1 --model demo
+failure-lab report --run <run-id>
+failure-lab compare <baseline-run-id> <candidate-run-id>
 ```
 
-That zero-config demo runs the bundled deterministic dataset, writes normal artifacts, and prints a
-compact summary.
+That standard install path exercises the real `failure-lab` console script: the demo writes a
+bundled dataset snapshot plus one run and report, the bundled `run` command gives you a second run
+to inspect, `report` rebuilds summaries from saved artifacts, and `compare` writes a directional
+comparison once you have two run IDs from the earlier commands.
+
+By default, `failure-lab` writes `datasets/`, `runs/`, and `reports/` under your current working
+directory. Pass `--root /path/to/workspace` when you want the artifacts somewhere else.
 
 If your shell does not expose the console script on `PATH`, use the module entrypoint instead:
 
@@ -26,32 +34,14 @@ python3 -m model_failure_lab demo
 
 ## What You Can Do
 
-Run the built-in dataset discovery first:
+List bundled datasets shipped with the installed package:
 
 ```bash
 failure-lab datasets list
 ```
 
-Run one bundled dataset:
-
-```bash
-failure-lab run --dataset reasoning-failures-v1 --model demo
-```
-
-Build a report from a saved run:
-
-```bash
-failure-lab report --run <run-id>
-```
-
-Compare two runs directionally:
-
-```bash
-failure-lab compare <baseline-run-id> <candidate-run-id>
-```
-
-All commands also accept explicit paths and `--root` so you can keep datasets, runs, and reports in
-an isolated workspace.
+All commands accept explicit paths and `--root` as well, so you can keep datasets, runs, and
+reports in an isolated workspace instead of the current directory.
 
 ## Bundled Datasets
 
