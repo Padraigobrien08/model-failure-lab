@@ -18,10 +18,16 @@ failure-lab report --run <run-id>
 failure-lab compare <baseline-run-id> <candidate-run-id>
 ```
 
+Use the Run ID from `failure-lab demo` as `<baseline-run-id>` and the Run ID from the bundled
+`run` command as `<candidate-run-id>` in the later commands.
+
 That standard install path exercises the real `failure-lab` console script: the demo writes a
 bundled dataset snapshot plus one run and report, the bundled `run` command gives you a second run
-to inspect, `report` rebuilds summaries from saved artifacts, and `compare` writes a directional
-comparison once you have two run IDs from the earlier commands.
+to inspect, `report` rebuilds summaries from saved artifacts, and `compare` writes a saved
+comparison artifact for those two run IDs. Because the demo dataset and the reasoning dataset are
+different, that final quickstart comparison is expected to report `incompatible_dataset` while
+still writing the comparison files; rerun `failure-lab run` against the same dataset twice when
+you want a fully compatible comparison.
 
 By default, `failure-lab` writes `datasets/`, `runs/`, and `reports/` under your current working
 directory. Pass `--root /path/to/workspace` when you want the artifacts somewhere else.

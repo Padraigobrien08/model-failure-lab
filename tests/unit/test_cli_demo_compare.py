@@ -33,6 +33,18 @@ def _module_env() -> dict[str, str]:
     return env
 
 
+def _entry_names(root: Path) -> set[str]:
+    if not root.exists():
+        return set()
+    return {entry.name for entry in root.iterdir()}
+
+
+def _new_entry_name(*, before: set[str], after: set[str]) -> str:
+    names = sorted(after - before)
+    assert len(names) == 1
+    return names[0]
+
+
 class CompareCliAdapter:
     def generate(self, request: ModelRequest) -> ModelResult:
         return ModelResult(
@@ -118,6 +130,83 @@ def test_demo_module_entrypoint_stays_quiet_on_normal_flow(tmp_path) -> None:
     assert "Failure Lab Demo" in result.stdout
     assert "font cache" not in combined_output
     assert "fontManager" not in combined_output
+
+
+def test_quickstart_flow_without_root_matches_installed_smoke_contract(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    demo_exit = main(["demo"])
+    demo_output = capsys.readouterr().out
+
+    assert demo_exit == 0
+    assert "Failure Lab Demo" in demo_output
+    assert "Dataset: demo-failure-cases-v1" in demo_output
+    assert (tmp_path / "datasets" / "demo-failure-cases-v1.json").exists()
+
+    baseline_run_id = _new_entry_name(
+        before=set(),
+        after=_entry_names(tmp_path / "runs"),
+    )
+    demo_report_id = _new_entry_name(
+        before=set(),
+        after=_entry_names(tmp_path / "reports"),
+    )
+
+    run_dirs_before = _entry_names(tmp_path / "runs")
+    report_dirs_before = _entry_names(tmp_path / "reports")
+
+    run_exit = main(["run", "--dataset", "reasoning-failures-v1", "--model", "demo"])
+    run_output = capsys.readouterr().out
+
+    candidate_run_id = _new_entry_name(
+        before=run_dirs_before,
+        after=_entry_names(tmp_path / "runs"),
+    )
+
+    report_exit = main(["report", "--run", candidate_run_id])
+    report_output = capsys.readouterr().out
+
+    rebuilt_report_id = _new_entry_name(
+        before=report_dirs_before,
+        after=_entry_names(tmp_path / "reports"),
+    )
+    report_dirs_before = _entry_names(tmp_path / "reports")
+
+    compare_exit = main(["compare", baseline_run_id, candidate_run_id])
+    compare_output = capsys.readouterr().out
+
+    comparison_report_id = _new_entry_name(
+        before=report_dirs_before,
+        after=_entry_names(tmp_path / "reports"),
+    )
+
+    assert run_exit == 0
+    assert report_exit == 0
+    assert compare_exit == 0
+    assert "Failure Lab Run" in run_output
+    assert "Dataset: reasoning-failures-v1" in run_output
+    assert "Dataset scope: core" in run_output
+    assert "Failure Lab Report" in report_output
+    assert f"Run ID: {candidate_run_id}" in report_output
+    assert "Failure Lab Compare" in compare_output
+    assert "Status: incompatible_dataset" in compare_output
+    assert "Compatible: False" in compare_output
+    assert "Warning: comparison is incompatible" in compare_output
+
+    assert (tmp_path / "runs" / baseline_run_id / "run.json").exists()
+    assert (tmp_path / "runs" / baseline_run_id / "results.json").exists()
+    assert (tmp_path / "runs" / candidate_run_id / "run.json").exists()
+    assert (tmp_path / "runs" / candidate_run_id / "results.json").exists()
+    assert (tmp_path / "reports" / demo_report_id / "report.json").exists()
+    assert (tmp_path / "reports" / demo_report_id / "report_details.json").exists()
+    assert (tmp_path / "reports" / rebuilt_report_id / "report.json").exists()
+    assert (tmp_path / "reports" / rebuilt_report_id / "report_details.json").exists()
+    assert (tmp_path / "reports" / comparison_report_id / "report.json").exists()
+    assert (tmp_path / "reports" / comparison_report_id / "report_details.json").exists()
 
 
 def test_compare_command_writes_artifacts_and_keeps_incompatible_results_non_fatal(
