@@ -9,6 +9,7 @@ from .contracts import (
     ModelUsage,
 )
 from .demo import DemoAdapter
+from .ollama_adapter import OllamaAdapter
 from .openai_adapter import OpenAIAdapter
 from .registry import (
     UnknownModelAdapterError,
@@ -25,6 +26,7 @@ __all__ = [
     "ModelResult",
     "ModelUsage",
     "DemoAdapter",
+    "OllamaAdapter",
     "OpenAIAdapter",
     "UnknownModelAdapterError",
     "available_models",

@@ -11,12 +11,26 @@ infrastructure.
 Use Python 3.11 or newer.
 
 ```bash
-python3 -m pip install -e '.[dev]'
+python3 -m pip install .
 failure-lab demo
+failure-lab run --dataset reasoning-failures-v1 --model demo
+failure-lab report --run <run-id>
+failure-lab compare <baseline-run-id> <candidate-run-id>
 ```
 
-That zero-config demo runs the bundled deterministic dataset, writes normal artifacts, and prints a
-compact summary.
+Use the Run ID from `failure-lab demo` as `<baseline-run-id>` and the Run ID from the bundled
+`run` command as `<candidate-run-id>` in the later commands.
+
+That standard install path exercises the real `failure-lab` console script: the demo writes a
+bundled dataset snapshot plus one run and report, the bundled `run` command gives you a second run
+to inspect, `report` rebuilds summaries from saved artifacts, and `compare` writes a saved
+comparison artifact for those two run IDs. Because the demo dataset and the reasoning dataset are
+different, that final quickstart comparison is expected to report `incompatible_dataset` while
+still writing the comparison files; rerun `failure-lab run` against the same dataset twice when
+you want a fully compatible comparison.
+
+By default, `failure-lab` writes `datasets/`, `runs/`, and `reports/` under your current working
+directory. Pass `--root /path/to/workspace` when you want the artifacts somewhere else.
 
 If your shell does not expose the console script on `PATH`, use the module entrypoint instead:
 
@@ -26,32 +40,14 @@ python3 -m model_failure_lab demo
 
 ## What You Can Do
 
-Run the built-in dataset discovery first:
+List bundled datasets shipped with the installed package:
 
 ```bash
 failure-lab datasets list
 ```
 
-Run one bundled dataset:
-
-```bash
-failure-lab run --dataset reasoning-failures-v1 --model demo
-```
-
-Build a report from a saved run:
-
-```bash
-failure-lab report --run <run-id>
-```
-
-Compare two runs directionally:
-
-```bash
-failure-lab compare <baseline-run-id> <candidate-run-id>
-```
-
-All commands also accept explicit paths and `--root` so you can keep datasets, runs, and reports in
-an isolated workspace.
+All commands accept explicit paths and `--root` as well, so you can keep datasets, runs, and
+reports in an isolated workspace instead of the current directory.
 
 ## Bundled Datasets
 
@@ -91,13 +87,50 @@ The main contracts are:
 
 Everything stays inspectable by hand. There is no database layer.
 
+## React Debugger Handoff
+
+The React debugger reads an existing artifact workspace through one supported seam:
+`FAILURE_LAB_ARTIFACT_ROOT`.
+
+Point it at the directory that contains `runs/`, `reports/`, and optional `datasets/`:
+
+```bash
+export FAILURE_LAB_ARTIFACT_ROOT=/path/to/failure-lab-workspace
+npm --prefix frontend run dev
+```
+
+That contract is the same whether the artifacts were written from this repo checkout, from a normal
+installed-package workflow, or from an Ollama-backed run. The debugger does not have an in-app
+artifact-root picker; the server-side environment variable is the supported handoff.
+
 ## Model Surface
 
 `failure-lab run` supports:
 
 - `demo` for deterministic local execution
 - OpenAI model names such as `gpt-4.1-mini`
+- Ollama models through explicit routing such as `ollama:llama3.2`
 - explicit adapter routing with `<adapter>:<model>`
+
+One explicit local Ollama example:
+
+```bash
+failure-lab run \
+  --dataset reasoning-failures-v1 \
+  --model ollama:llama3.2 \
+  --ollama-host http://localhost:11434 \
+  --system-prompt "Be concise." \
+  --model-option temperature=0
+```
+
+That same surface supports the normal saved-artifact loop:
+
+```bash
+failure-lab run --dataset reasoning-failures-v1 --model ollama:baseline-model --ollama-host http://localhost:11434 --system-prompt "Be concise." --model-option temperature=0
+failure-lab run --dataset reasoning-failures-v1 --model ollama:candidate-model --ollama-host http://localhost:11434 --system-prompt "Be concise." --model-option temperature=0
+failure-lab report --run <baseline-run-id>
+failure-lab compare <baseline-run-id> <candidate-run-id>
+```
 
 The package also exposes simple registration seams for future extension:
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from model_failure_lab.schemas import Run
 from model_failure_lab.storage import (
     dataset_file,
+    project_root,
     read_json,
     report_directory,
     report_file,
@@ -35,6 +36,15 @@ def test_storage_roots_and_run_paths_can_create_directories(tmp_path) -> None:
 
     assert run_path.parent.is_dir()
     assert report_path.parent.is_dir()
+
+
+def test_storage_defaults_to_current_working_directory(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    assert project_root() == tmp_path
+    assert dataset_file("Reasoning Failures") == tmp_path / "datasets" / "reasoning_failures.json"
+    assert runs_root() == tmp_path / "runs"
+    assert reports_root() == tmp_path / "reports"
 
 
 def test_json_artifacts_round_trip_canonical_run_payload(tmp_path) -> None:

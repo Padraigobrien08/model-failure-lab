@@ -4,7 +4,9 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import model_failure_lab.runner.execute as runner_execute_module
@@ -14,9 +16,12 @@ from model_failure_lab.cli import main
 from model_failure_lab.datasets import FailureDataset, demo_dataset_path
 from model_failure_lab.runner import execute_dataset_run, write_run_artifacts
 from model_failure_lab.schemas import PromptCase
+from model_failure_lab.storage import read_json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
+OLLAMA_SYSTEM_PROMPT = "Be concise."
+OLLAMA_MODEL_OPTION = "temperature=0"
 
 
 def _write_dataset(path: Path, dataset: FailureDataset) -> None:
@@ -31,6 +36,18 @@ def _module_env() -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC_ROOT)
     return env
+
+
+def _entry_names(root: Path) -> set[str]:
+    if not root.exists():
+        return set()
+    return {entry.name for entry in root.iterdir()}
+
+
+def _new_entry_name(*, before: set[str], after: set[str]) -> str:
+    names = sorted(after - before)
+    assert len(names) == 1
+    return names[0]
 
 
 class CompareCliAdapter:
@@ -49,6 +66,72 @@ class CompareCliClassifier:
         if "shared stable failure" in output:
             return ClassifierResult(failure_type="hallucination", confidence=0.7)
         return ClassifierResult(failure_type="no_failure", confidence=0.2)
+
+
+class OllamaStubServer:
+    def __init__(self, *, error_status: int | None = None, error_body: str = "stubbed failure"):
+        self.requests: list[dict[str, object]] = []
+        self._error_status = error_status
+        self._error_body = error_body
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._build_handler())
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+
+    @property
+    def base_url(self) -> str:
+        host, port = self._server.server_address
+        return f"http://{host}:{port}"
+
+    def __enter__(self) -> "OllamaStubServer":
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=5)
+
+    def _build_handler(self):
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:  # noqa: N802
+                if self.path != "/api/generate":
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+
+                length = int(self.headers.get("Content-Length", "0"))
+                raw_body = self.rfile.read(length).decode("utf-8")
+                payload = json.loads(raw_body)
+                outer.requests.append(payload)
+
+                if outer._error_status is not None:
+                    response_body = outer._error_body.encode("utf-8")
+                    self.send_response(outer._error_status)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.send_header("Content-Length", str(len(response_body)))
+                    self.end_headers()
+                    self.wfile.write(response_body)
+                    return
+
+                response_payload = {
+                    "model": str(payload["model"]),
+                    "response": f"model:{payload['model']}::{payload['prompt']}",
+                    "done": True,
+                    "prompt_eval_count": 7,
+                    "eval_count": 5,
+                }
+                response_body = json.dumps(response_payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(response_body)))
+                self.end_headers()
+                self.wfile.write(response_body)
+
+            def log_message(self, format: str, *args: object) -> None:
+                del format, args
+
+        return Handler
 
 
 def _write_saved_run(
@@ -118,6 +201,83 @@ def test_demo_module_entrypoint_stays_quiet_on_normal_flow(tmp_path) -> None:
     assert "Failure Lab Demo" in result.stdout
     assert "font cache" not in combined_output
     assert "fontManager" not in combined_output
+
+
+def test_quickstart_flow_without_root_matches_installed_smoke_contract(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    demo_exit = main(["demo"])
+    demo_output = capsys.readouterr().out
+
+    assert demo_exit == 0
+    assert "Failure Lab Demo" in demo_output
+    assert "Dataset: demo-failure-cases-v1" in demo_output
+    assert (tmp_path / "datasets" / "demo-failure-cases-v1.json").exists()
+
+    baseline_run_id = _new_entry_name(
+        before=set(),
+        after=_entry_names(tmp_path / "runs"),
+    )
+    demo_report_id = _new_entry_name(
+        before=set(),
+        after=_entry_names(tmp_path / "reports"),
+    )
+
+    run_dirs_before = _entry_names(tmp_path / "runs")
+    report_dirs_before = _entry_names(tmp_path / "reports")
+
+    run_exit = main(["run", "--dataset", "reasoning-failures-v1", "--model", "demo"])
+    run_output = capsys.readouterr().out
+
+    candidate_run_id = _new_entry_name(
+        before=run_dirs_before,
+        after=_entry_names(tmp_path / "runs"),
+    )
+
+    report_exit = main(["report", "--run", candidate_run_id])
+    report_output = capsys.readouterr().out
+
+    rebuilt_report_id = _new_entry_name(
+        before=report_dirs_before,
+        after=_entry_names(tmp_path / "reports"),
+    )
+    report_dirs_before = _entry_names(tmp_path / "reports")
+
+    compare_exit = main(["compare", baseline_run_id, candidate_run_id])
+    compare_output = capsys.readouterr().out
+
+    comparison_report_id = _new_entry_name(
+        before=report_dirs_before,
+        after=_entry_names(tmp_path / "reports"),
+    )
+
+    assert run_exit == 0
+    assert report_exit == 0
+    assert compare_exit == 0
+    assert "Failure Lab Run" in run_output
+    assert "Dataset: reasoning-failures-v1" in run_output
+    assert "Dataset scope: core" in run_output
+    assert "Failure Lab Report" in report_output
+    assert f"Run ID: {candidate_run_id}" in report_output
+    assert "Failure Lab Compare" in compare_output
+    assert "Status: incompatible_dataset" in compare_output
+    assert "Compatible: False" in compare_output
+    assert "Warning: comparison is incompatible" in compare_output
+
+    assert (tmp_path / "runs" / baseline_run_id / "run.json").exists()
+    assert (tmp_path / "runs" / baseline_run_id / "results.json").exists()
+    assert (tmp_path / "runs" / candidate_run_id / "run.json").exists()
+    assert (tmp_path / "runs" / candidate_run_id / "results.json").exists()
+    assert (tmp_path / "reports" / demo_report_id / "report.json").exists()
+    assert (tmp_path / "reports" / demo_report_id / "report_details.json").exists()
+    assert (tmp_path / "reports" / rebuilt_report_id / "report.json").exists()
+    assert (tmp_path / "reports" / rebuilt_report_id / "report_details.json").exists()
+    assert (tmp_path / "reports" / comparison_report_id / "report.json").exists()
+    assert (tmp_path / "reports" / comparison_report_id / "report_details.json").exists()
 
 
 def test_compare_command_writes_artifacts_and_keeps_incompatible_results_non_fatal(
@@ -331,3 +491,143 @@ def test_compare_command_surfaces_directional_transition_summary(tmp_path, capsy
     assert "Status: improved" in captured.out
     assert "Compatible: True" in captured.out
     assert "Case changes: improvements=1" in captured.out
+
+
+def test_cli_ollama_stub_loop_runs_report_and_compare(tmp_path, capsys) -> None:
+    classifier_id = "unit-cli-ollama-compare-classifier"
+    register_classifier(classifier_id, CompareCliClassifier())
+
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+    )
+
+    with OllamaStubServer() as stub:
+        baseline_exit = main(
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--model",
+                "ollama:baseline-model",
+                "--classifier",
+                classifier_id,
+                "--ollama-host",
+                stub.base_url,
+                "--system-prompt",
+                OLLAMA_SYSTEM_PROMPT,
+                "--model-option",
+                OLLAMA_MODEL_OPTION,
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        baseline_output = capsys.readouterr().out
+
+        candidate_exit = main(
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--model",
+                "ollama:candidate-model",
+                "--classifier",
+                classifier_id,
+                "--ollama-host",
+                stub.base_url,
+                "--system-prompt",
+                OLLAMA_SYSTEM_PROMPT,
+                "--model-option",
+                OLLAMA_MODEL_OPTION,
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        candidate_output = capsys.readouterr().out
+
+        run_dirs = sorted((tmp_path / "runs").iterdir())
+        baseline_run_id = run_dirs[0].name
+        candidate_run_id = run_dirs[1].name
+
+        report_exit = main(["report", "--run", baseline_run_id, "--root", str(tmp_path)])
+        report_output = capsys.readouterr().out
+
+        compare_exit = main(
+            [
+                "compare",
+                baseline_run_id,
+                candidate_run_id,
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        compare_output = capsys.readouterr().out
+
+    report_dirs = sorted((tmp_path / "reports").iterdir())
+    report_payloads = [read_json(report_dir / "report.json") for report_dir in report_dirs]
+    compare_payload = next(
+        payload for payload in report_payloads if payload["metadata"]["report_kind"] == "comparison"
+    )
+
+    assert baseline_exit == 0
+    assert candidate_exit == 0
+    assert report_exit == 0
+    assert compare_exit == 0
+    assert "Adapter: ollama" in baseline_output
+    assert "Adapter: ollama" in candidate_output
+    assert "Failure Lab Report" in report_output
+    assert "Failure Lab Compare" in compare_output
+    assert "Status: improved" in compare_output
+    assert "Compatible: True" in compare_output
+    assert "Case changes: improvements=1" in compare_output
+    assert len(run_dirs) == 2
+    assert len(report_dirs) == 2
+    assert all(request["system"] == OLLAMA_SYSTEM_PROMPT for request in stub.requests)
+    assert all(request["stream"] is False for request in stub.requests)
+    assert all(request["options"]["temperature"] == 0 for request in stub.requests)
+    assert compare_payload["status"]["overall"] == "improved"
+    assert compare_payload["comparison"]["compatible"] is True
+    assert read_json(run_dirs[0] / "run.json")["metadata"]["adapter_id"] == "ollama"
+    assert read_json(run_dirs[1] / "run.json")["metadata"]["adapter_id"] == "ollama"
+
+
+def test_run_command_surfaces_ollama_http_failures_in_summary(tmp_path, capsys) -> None:
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        ),
+    )
+
+    with OllamaStubServer(error_status=500, error_body="stubbed failure") as stub:
+        exit_code = main(
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--model",
+                "ollama:llama3.2",
+                "--ollama-host",
+                stub.base_url,
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Status: completed_with_errors" in captured.out
+    assert "Warning: run completed with per-case errors." in captured.out
+    assert (
+        f"First error: model_invoke: Ollama request to {stub.base_url} failed with HTTP 500: "
+        "stubbed failure"
+    ) in captured.out

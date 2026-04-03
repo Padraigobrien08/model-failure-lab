@@ -14,11 +14,11 @@ _INVALID_SEGMENT_PATTERN = re.compile(r"[^a-zA-Z0-9._-]+")
 
 
 def project_root(root: str | Path | None = None) -> Path:
-    """Return the repository root or an explicit storage root for tests."""
+    """Return the active artifact root for this invocation."""
 
     if root is not None:
         return Path(root)
-    return Path(__file__).resolve().parents[3]
+    return Path.cwd().resolve()
 
 
 def _normalize_segment(value: str) -> str:

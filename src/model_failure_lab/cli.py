@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
@@ -94,12 +95,33 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--root",
         type=Path,
-        help="Override the dataset/run/report root for this invocation.",
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
     run_parser.add_argument(
         "--full",
         action="store_true",
         help="For bundled datasets, include the extended tail instead of the default core slice.",
+    )
+    run_parser.add_argument(
+        "--system-prompt",
+        help="Attach a system prompt to each model request in this run.",
+    )
+    run_parser.add_argument(
+        "--model-option",
+        action="append",
+        default=[],
+        metavar="KEY=JSON_VALUE",
+        help=(
+            "Attach one JSON-valued model option such as `temperature=0` or "
+            "`stop=[\"DONE\"]`. Repeat as needed."
+        ),
+    )
+    run_parser.add_argument(
+        "--ollama-host",
+        help="Override the Ollama host URL when using `--model ollama:<model>`.",
     )
     run_parser.set_defaults(handler=_handle_run)
 
@@ -116,7 +138,10 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument(
         "--root",
         type=Path,
-        help="Override the dataset/run/report root for this invocation.",
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
     report_parser.set_defaults(handler=_handle_report)
 
@@ -135,7 +160,10 @@ def build_parser() -> argparse.ArgumentParser:
     compare_parser.add_argument(
         "--root",
         type=Path,
-        help="Override the dataset/run/report root for this invocation.",
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
     compare_parser.set_defaults(handler=_handle_compare)
 
@@ -146,7 +174,10 @@ def build_parser() -> argparse.ArgumentParser:
     demo_parser.add_argument(
         "--root",
         type=Path,
-        help="Override the dataset/run/report root for this invocation.",
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
     demo_parser.set_defaults(handler=_handle_demo)
 
@@ -173,7 +204,14 @@ def _handle_run(args: argparse.Namespace) -> int:
         include_full=args.full,
     )
     adapter_id, model_name = _resolve_model_target(args.model)
-    run_config = _build_run_config(dataset_source=dataset_source, include_full=args.full)
+    run_config = _build_run_config(
+        dataset_source=dataset_source,
+        include_full=args.full,
+        adapter_id=adapter_id,
+        system_prompt=args.system_prompt,
+        model_options=_parse_model_options(args.model_option),
+        ollama_host=args.ollama_host,
+    )
     execution = execute_dataset_run(
         dataset=dataset,
         adapter_id=adapter_id,
@@ -295,13 +333,49 @@ def _load_dataset_reference(
     )
 
 
-def _build_run_config(*, dataset_source: str, include_full: bool) -> dict[str, object]:
-    if dataset_source != "bundled":
-        return {}
-    return {
-        "dataset_source": "bundled",
-        "dataset_scope": "full" if include_full else "core",
-    }
+def _build_run_config(
+    *,
+    dataset_source: str,
+    include_full: bool,
+    adapter_id: str,
+    system_prompt: str | None = None,
+    model_options: dict[str, object] | None = None,
+    ollama_host: str | None = None,
+) -> dict[str, object]:
+    config: dict[str, object] = {}
+    if dataset_source == "bundled":
+        config["dataset_source"] = "bundled"
+        config["dataset_scope"] = "full" if include_full else "core"
+
+    if isinstance(system_prompt, str) and system_prompt.strip():
+        config["system_prompt"] = system_prompt.strip()
+
+    parsed_model_options = dict(model_options or {})
+    if ollama_host is not None:
+        if adapter_id != "ollama":
+            raise ValueError("`--ollama-host` requires `--model ollama:<model>`")
+        if not ollama_host.strip():
+            raise ValueError("`--ollama-host` must be a non-empty URL")
+        parsed_model_options["base_url"] = ollama_host.strip()
+
+    if parsed_model_options:
+        config["model_options"] = parsed_model_options
+
+    return config
+
+
+def _parse_model_options(values: Sequence[str]) -> dict[str, object]:
+    parsed: dict[str, object] = {}
+    for raw_option in values:
+        key, separator, raw_value = raw_option.partition("=")
+        if separator != "=" or not key.strip() or not raw_value.strip():
+            raise ValueError(f"model option must use `key=json-value`: {raw_option}")
+        try:
+            value = json.loads(raw_value)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"model option must use `key=json-value`: {raw_option}") from exc
+        parsed[key.strip()] = value
+    return parsed
 
 
 def _load_saved_run_reference(reference: str, *, root: Path | None) -> SavedRunArtifacts:
@@ -473,6 +547,9 @@ def _render_run_summary(
         lines.insert(6, f"Dataset scope: {dataset_scope}")
     if execution.status == "completed_with_errors":
         lines.append("Warning: run completed with per-case errors.")
+        first_error = next((case.error for case in execution.case_results if case.error), None)
+        if first_error is not None:
+            lines.append(f"First error: {first_error.stage}: {first_error.message}")
     return "\n".join(lines)
 
 

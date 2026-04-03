@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.error import URLError
+
 import pytest
 
 from model_failure_lab.adapters import (
@@ -8,8 +10,10 @@ from model_failure_lab.adapters import (
     ModelRequest,
     ModelResult,
     ModelUsage,
+    OllamaAdapter,
     OpenAIAdapter,
     UnknownModelAdapterError,
+    available_models,
     register_model,
     resolve_model,
 )
@@ -78,6 +82,27 @@ class FakeOpenAIClient:
         self.responses = FakeResponsesAPI()
 
 
+class CapturingOllamaTransport:
+    def __init__(self, response: dict[str, object]) -> None:
+        self._response = response
+        self.calls: list[dict[str, object]] = []
+
+    def __call__(
+        self,
+        base_url: str,
+        payload: dict[str, object],
+        timeout_seconds: float | None,
+    ) -> dict[str, object]:
+        self.calls.append(
+            {
+                "base_url": base_url,
+                "payload": payload,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        return dict(self._response)
+
+
 def test_model_result_round_trips_with_optional_metadata() -> None:
     result = ModelResult(
         text="Answer",
@@ -115,6 +140,13 @@ def test_demo_adapter_is_registered_by_default() -> None:
     adapter = resolve_model("demo")
 
     assert isinstance(adapter, DemoAdapter)
+
+
+def test_ollama_adapter_is_registered_by_default() -> None:
+    adapter = resolve_model("ollama")
+
+    assert "ollama" in available_models()
+    assert isinstance(adapter, OllamaAdapter)
 
 
 def test_demo_adapter_returns_deterministic_results_for_repeat_inputs() -> None:
@@ -190,6 +222,103 @@ def test_openai_adapter_shapes_provider_response_without_network() -> None:
             "total_tokens": 18,
         },
     }
+
+
+def test_ollama_adapter_shapes_non_streaming_request_and_maps_usage() -> None:
+    transport = CapturingOllamaTransport(
+        {
+            "model": "llama3.2",
+            "created_at": "2026-04-03T07:20:00Z",
+            "response": "Provider answer",
+            "done": True,
+            "done_reason": "stop",
+            "total_duration": 1000,
+            "load_duration": 200,
+            "prompt_eval_count": 11,
+            "prompt_eval_duration": 300,
+            "eval_count": 7,
+            "eval_duration": 400,
+            "ignored": "trim me",
+        }
+    )
+    adapter = OllamaAdapter(post_json=transport, clock=FakeClock(1.0, 1.125))
+
+    result = adapter.generate(
+        ModelRequest(
+            model="llama3.2",
+            prompt="Answer the question.",
+            system_prompt="Be concise.",
+            seed=7,
+            options={
+                "temperature": 0,
+                "top_p": 0.8,
+                "keep_alive": "10m",
+                "base_url": "http://ollama.local:11434/api",
+                "timeout_seconds": 9.5,
+            },
+        )
+    )
+
+    assert transport.calls == [
+        {
+            "base_url": "http://ollama.local:11434",
+            "payload": {
+                "model": "llama3.2",
+                "prompt": "Answer the question.",
+                "system": "Be concise.",
+                "stream": False,
+                "keep_alive": "10m",
+                "options": {
+                    "temperature": 0,
+                    "top_p": 0.8,
+                    "seed": 7,
+                },
+            },
+            "timeout_seconds": 9.5,
+        }
+    ]
+    assert result.text == "Provider answer"
+    assert result.metadata is not None
+    assert result.metadata.model == "llama3.2"
+    assert result.metadata.latency_ms == 125.0
+    assert result.metadata.usage == ModelUsage(
+        prompt_tokens=11,
+        completion_tokens=7,
+        total_tokens=18,
+    )
+    assert result.metadata.raw == {
+        "model": "llama3.2",
+        "created_at": "2026-04-03T07:20:00Z",
+        "done": True,
+        "done_reason": "stop",
+        "total_duration": 1000,
+        "load_duration": 200,
+        "prompt_eval_count": 11,
+        "prompt_eval_duration": 300,
+        "eval_count": 7,
+        "eval_duration": 400,
+    }
+
+
+def test_ollama_adapter_wraps_transport_failures_with_base_url() -> None:
+    adapter = OllamaAdapter(
+        post_json=lambda base_url, payload, timeout_seconds: (_ for _ in ()).throw(
+            URLError("connection refused")
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="Ollama request to http://localhost:11434 failed"):
+        adapter.generate(ModelRequest(model="llama3.2", prompt="Answer the question."))
+
+
+def test_ollama_adapter_rejects_malformed_payloads() -> None:
+    adapter = OllamaAdapter(post_json=lambda base_url, payload, timeout_seconds: {"done": True})
+
+    with pytest.raises(
+        RuntimeError,
+        match="Ollama response from http://localhost:11434 missing non-empty `response`",
+    ):
+        adapter.generate(ModelRequest(model="llama3.2", prompt="Answer the question."))
 
 
 def test_resolve_model_rejects_unknown_adapter() -> None:

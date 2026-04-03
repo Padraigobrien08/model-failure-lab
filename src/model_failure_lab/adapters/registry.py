@@ -47,6 +47,14 @@ def ensure_builtin_models() -> None:
     if OpenAIAdapter is not None:
         _register_model("openai", OpenAIAdapter)
 
+    try:
+        from .ollama_adapter import OllamaAdapter
+    except ModuleNotFoundError:
+        OllamaAdapter = None
+
+    if OllamaAdapter is not None:
+        _register_model("ollama", OllamaAdapter)
+
     _BUILTINS_REGISTERED = True
 
 

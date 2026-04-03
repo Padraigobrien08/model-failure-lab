@@ -80,9 +80,7 @@ def load_bundled_dataset(
     """Load one bundled dataset, defaulting to the core subset when tagged."""
 
     spec = _resolve_bundled_dataset(dataset_id)
-    resource = resources.files("model_failure_lab.datasets").joinpath(spec.resource_name)
-    payload = json.loads(resource.read_text(encoding="utf-8"))
-    dataset = parse_dataset_payload(payload, fallback_dataset_id=spec.dataset_id)
+    dataset = _load_bundled_dataset_payload(spec)
     return _select_case_subset(dataset, include_extended=include_extended)
 
 
@@ -135,5 +133,13 @@ def _select_case_subset(
 
 def _load_bundled_dataset_payload(spec: BundledDatasetSpec) -> FailureDataset:
     resource = resources.files("model_failure_lab.datasets").joinpath(spec.resource_name)
-    payload = json.loads(resource.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(resource.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            "Bundled dataset asset "
+            f"`{spec.resource_name}` for `{spec.dataset_id}` is missing from the installed "
+            "`model-failure-lab` package. Reinstall `model-failure-lab` or rebuild the package "
+            "so `model_failure_lab/datasets/*.json` is included."
+        ) from exc
     return parse_dataset_payload(payload, fallback_dataset_id=spec.dataset_id)

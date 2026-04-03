@@ -11,18 +11,28 @@ import type {
 } from "@/lib/artifacts/types";
 
 const nativeScrollIntoView = HTMLElement.prototype.scrollIntoView;
+const DEFAULT_SOURCE = {
+  label: "Repo root artifact store",
+  path: "/tmp/model-failure-lab",
+  runsPath: "/tmp/model-failure-lab/runs",
+  reportsPath: "/tmp/model-failure-lab/reports",
+};
+const CONFIGURED_SOURCE = {
+  label: "Configured artifact store",
+  path: "/tmp/external-artifacts",
+  runsPath: "/tmp/external-artifacts/runs",
+  reportsPath: "/tmp/external-artifacts/reports",
+};
 
-function buildReadyArtifactState(runIds: string[]): ArtifactShellState {
+function buildReadyArtifactState(
+  runIds: string[],
+  source = DEFAULT_SOURCE,
+): ArtifactShellState {
   return {
     status: "ready",
     overview: {
       status: "ready",
-      source: {
-        label: "Repo root artifact store",
-        path: "/tmp/model-failure-lab",
-        runsPath: "/tmp/model-failure-lab/runs",
-        reportsPath: "/tmp/model-failure-lab/reports",
-      },
+      source,
       runs: {
         count: runIds.length,
         ids: runIds,
@@ -37,16 +47,14 @@ function buildReadyArtifactState(runIds: string[]): ArtifactShellState {
   };
 }
 
-function buildReadyInventoryState(runs: RunInventoryItem[]): RunInventoryState {
+function buildReadyInventoryState(
+  runs: RunInventoryItem[],
+  source = DEFAULT_SOURCE,
+): RunInventoryState {
   return {
     status: "ready",
     inventory: {
-      source: {
-        label: "Repo root artifact store",
-        path: "/tmp/model-failure-lab",
-        runsPath: "/tmp/model-failure-lab/runs",
-        reportsPath: "/tmp/model-failure-lab/reports",
-      },
+      source,
       runs,
     },
     message: null,
@@ -71,14 +79,12 @@ function buildReadyComparisonInventoryState(
   };
 }
 
-function buildRunDetail(run: RunInventoryItem): RunDetail {
+function buildRunDetail(
+  run: RunInventoryItem,
+  source = DEFAULT_SOURCE,
+): RunDetail {
   return {
-    source: {
-      label: "Repo root artifact store",
-      path: "/tmp/model-failure-lab",
-      runsPath: "/tmp/model-failure-lab/runs",
-      reportsPath: "/tmp/model-failure-lab/reports",
-    },
+    source,
     run: {
       runId: run.runId,
       dataset: run.dataset,
@@ -475,6 +481,30 @@ describe("run detail route", () => {
     expect(within(artifactContext).getAllByText("run_gamma").length).toBeGreaterThan(0);
     expect(within(artifactContext).getByText("run_gamma_report")).toBeInTheDocument();
     expect(within(artifactContext).getByText("/tmp/model-failure-lab")).toBeInTheDocument();
+  });
+
+  it("preserves configured artifact-source metadata on the run detail route", async () => {
+    const detail = buildRunDetail(SAMPLE_RUN, CONFIGURED_SOURCE);
+    mockRunDetail(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/runs/run_gamma?section=evidence&case=case-002"]}
+        initialArtifactState={buildReadyArtifactState([SAMPLE_RUN.runId], CONFIGURED_SOURCE)}
+        initialRunInventoryState={buildReadyInventoryState([SAMPLE_RUN], CONFIGURED_SOURCE)}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Configured artifact store")).toBeInTheDocument();
+    expect(screen.getAllByText("/tmp/external-artifacts").length).toBeGreaterThan(0);
+
+    const artifactContext = screen.getByRole("region", { name: "Artifact context" });
+    expect(within(artifactContext).getByText("/tmp/external-artifacts")).toBeInTheDocument();
   });
 
   it("surfaces lightweight related comparison links when saved reports reference the run", async () => {

@@ -739,12 +739,7 @@ function failureLabArtifactsPlugin(): Plugin {
     );
 
     return {
-      source: {
-        label: "Repo root artifact store",
-        path: repoRoot,
-        runsPath,
-        reportsPath,
-      },
+      source: sourcePayload(artifactSource),
       comparison: {
         reportId: requireStringField(reportPayload, "report_id", `${reportId}.report_id`),
         createdAt: requireStringField(reportPayload, "created_at", `${reportId}.created_at`),
@@ -1231,12 +1226,7 @@ function failureLabArtifactsPlugin(): Plugin {
         : null;
 
     return {
-      source: {
-        label: "Repo root artifact store",
-        path: repoRoot,
-        runsPath,
-        reportsPath,
-      },
+      source: sourcePayload(artifactSource),
       run: {
         runId: requireStringField(runPayload, "run_id", `${runId}.run.run_id`),
         dataset: requireStringField(runPayload, "dataset", `${runId}.run.dataset`),

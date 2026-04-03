@@ -26,7 +26,21 @@ def demo_dataset_path() -> Path:
 def load_demo_dataset() -> FailureDataset:
     """Load the bundled deterministic demo dataset."""
 
-    return load_dataset(demo_dataset_path())
+    path = demo_dataset_path()
+    if not path.is_file():
+        raise FileNotFoundError(
+            "Bundled demo dataset asset `demo_dataset.json` is missing from the installed "
+            "`model-failure-lab` package. Reinstall `model-failure-lab` or rebuild the package "
+            "so `model_failure_lab/datasets/*.json` is included."
+        )
+    try:
+        return load_dataset(path)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            "Bundled demo dataset asset `demo_dataset.json` is missing from the installed "
+            "`model-failure-lab` package. Reinstall `model-failure-lab` or rebuild the package "
+            "so `model_failure_lab/datasets/*.json` is included."
+        ) from exc
 
 
 __all__ = [

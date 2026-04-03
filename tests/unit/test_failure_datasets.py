@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+import model_failure_lab.datasets as datasets_module
 from model_failure_lab.datasets import (
     FailureDataset,
     available_bundled_dataset_ids,
@@ -120,3 +121,18 @@ def test_load_bundled_dataset_defaults_to_core_cases_only() -> None:
         for case in dataset.cases
         if case.expectations and case.expectations.expected_failure == "no_failure"
     ) == 2
+
+
+def test_load_demo_dataset_surfaces_packaged_install_error_when_asset_is_missing(
+    monkeypatch, tmp_path
+) -> None:
+    missing_path = tmp_path / "missing-demo-dataset.json"
+    monkeypatch.setattr(datasets_module, "demo_dataset_path", lambda: missing_path)
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        datasets_module.load_demo_dataset()
+
+    message = str(exc_info.value)
+    assert "bundled demo dataset asset `demo_dataset.json`" in message.lower()
+    assert "installed `model-failure-lab` package" in message
+    assert str(missing_path) not in message

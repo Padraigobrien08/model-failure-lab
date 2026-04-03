@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+import model_failure_lab.datasets.bundled as bundled_module
 from model_failure_lab.datasets import (
     available_bundled_dataset_ids,
     available_bundled_datasets,
@@ -88,3 +91,25 @@ def test_rag_pack_authors_grounding_expectations_and_registry_summaries() -> Non
     assert summaries["rag-failures-v1"].target_failure_type == "retrieval"
     assert summaries["rag-failures-v1"].core_case_count == 8
     assert summaries["rag-failures-v1"].full_case_count == 12
+
+
+def test_missing_bundled_asset_surfaces_packaged_install_error(monkeypatch) -> None:
+    raw_error = "/tmp/site-packages/model_failure_lab/datasets/reasoning_failures.json"
+
+    class MissingResource:
+        def joinpath(self, name: str) -> "MissingResource":
+            return self
+
+        def read_text(self, *, encoding: str) -> str:
+            del encoding
+            raise FileNotFoundError(raw_error)
+
+    monkeypatch.setattr(bundled_module.resources, "files", lambda package: MissingResource())
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        load_bundled_dataset("reasoning-failures-v1")
+
+    message = str(exc_info.value)
+    assert "installed `model-failure-lab` package" in message
+    assert "Reinstall `model-failure-lab`" in message
+    assert raw_error not in message
