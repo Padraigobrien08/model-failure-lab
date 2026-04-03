@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createServer as createHttpServer } from "node:http";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
@@ -13,6 +13,8 @@ const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)), "..");
 const frontendRoot = path.join(repoRoot, "frontend");
 const pyPath = path.join(repoRoot, "src");
+const ANTHROPIC_SYSTEM_PROMPT = "Be concise.";
+const ANTHROPIC_MAX_TOKENS = 256;
 const CLI_LABEL = "failure-lab";
 const OLLAMA_SYSTEM_PROMPT = "Be concise.";
 const OLLAMA_TEMPERATURE = 0;
@@ -51,7 +53,7 @@ function parseArgs(argv) {
     throw new Error(`Unknown argument: ${arg}`);
   }
 
-  if (!["demo", "existing", "ollama-stub"].includes(options.mode)) {
+  if (!["demo", "existing", "ollama-stub", "anthropic-stub"].includes(options.mode)) {
     throw new Error(`Unsupported mode: ${options.mode}`);
   }
   if (options.mode === "existing" && !options.artifactRoot) {
@@ -64,23 +66,28 @@ function parseArgs(argv) {
 function printHelp() {
   process.stdout.write(
     [
-      "Usage: node frontend/scripts/smoke-real-artifacts.mjs [--mode demo|existing|ollama-stub] [--artifact-root PATH]",
+      "Usage: node frontend/scripts/smoke-real-artifacts.mjs [--mode demo|existing|ollama-stub|anthropic-stub] [--artifact-root PATH]",
       "",
       "Modes:",
       "  demo         Generate demo artifacts with the repo-local python module and inspect them.",
       "  existing     Inspect an existing artifact root without generating new artifacts.",
       "  ollama-stub  Generate artifacts through the ollama:<model> CLI path against a localhost stub.",
+      "  anthropic-stub  Generate artifacts through the anthropic:<model> CLI path against a localhost stub and shim SDK.",
     ].join("\n") + "\n",
   );
 }
 
-async function runCli(args) {
+async function runCli(args, { pythonPathEntries = [] } = {}) {
   const command = ["-m", "model_failure_lab", ...args];
+  const pythonPath = [pyPath, ...pythonPathEntries];
+  if (process.env.PYTHONPATH) {
+    pythonPath.push(process.env.PYTHONPATH);
+  }
   const { stdout, stderr } = await execFileAsync("python3", command, {
     cwd: repoRoot,
     env: {
       ...process.env,
-      PYTHONPATH: pyPath,
+      PYTHONPATH: pythonPath.join(path.delimiter),
     },
   });
 
@@ -173,6 +180,125 @@ class OllamaStubServer {
       });
     });
   }
+}
+
+class AnthropicStubServer {
+  constructor() {
+    this.requests = [];
+    this.server = createHttpServer(async (request, response) => {
+      if (request.method !== "POST" || request.url !== "/v1/messages") {
+        response.statusCode = 404;
+        response.end();
+        return;
+      }
+
+      try {
+        const rawBody = await new Promise((resolve, reject) => {
+          let body = "";
+          request.setEncoding("utf8");
+          request.on("data", (chunk) => {
+            body += chunk;
+          });
+          request.on("end", () => resolve(body));
+          request.on("error", reject);
+        });
+
+        const payload = JSON.parse(rawBody);
+        this.requests.push(payload);
+
+        const responsePayload = {
+          content: [
+            {
+              text: `model:${payload.model}::${payload.messages[0].content}`,
+              type: "text",
+            },
+          ],
+          id: "msg_123",
+          model: String(payload.model),
+          role: "assistant",
+          stop_reason: "end_turn",
+          type: "message",
+          usage: {
+            input_tokens: 9,
+            output_tokens: 5,
+          },
+        };
+        response.statusCode = 200;
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify(responsePayload));
+      } catch (error) {
+        response.statusCode = 500;
+        response.end(error instanceof Error ? error.message : String(error));
+      }
+    });
+  }
+
+  get baseUrl() {
+    const address = this.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Anthropic stub server is not listening yet");
+    }
+    return `http://127.0.0.1:${address.port}`;
+  }
+
+  async start() {
+    await new Promise((resolve, reject) => {
+      this.server.once("error", reject);
+      this.server.listen(0, "127.0.0.1", () => {
+        this.server.off("error", reject);
+        resolve(undefined);
+      });
+    });
+  }
+
+  async close() {
+    await new Promise((resolve, reject) => {
+      this.server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(undefined);
+      });
+    });
+  }
+}
+
+async function createAnthropicSdkShim(rootDir) {
+  const packageDir = path.join(rootDir, "anthropic");
+  await mkdir(packageDir, { recursive: true });
+  await writeFile(
+    path.join(packageDir, "__init__.py"),
+    [
+      "import json",
+      "from urllib import request",
+      "",
+      "",
+      "class Anthropic:",
+      "    def __init__(self, *, api_key=None, base_url=None, **kwargs):",
+      "        del api_key, kwargs",
+      "        self._base_url = (base_url or 'https://api.anthropic.com').rstrip('/')",
+      "        self.messages = _MessagesAPI(self._base_url)",
+      "",
+      "",
+      "class _MessagesAPI:",
+      "    def __init__(self, base_url):",
+      "        self._base_url = base_url",
+      "",
+      "    def create(self, **kwargs):",
+      "        body = json.dumps(kwargs).encode('utf-8')",
+      "        http_request = request.Request(",
+      "            f\"{self._base_url}/v1/messages\",",
+      "            data=body,",
+      "            headers={'Content-Type': 'application/json'},",
+      "            method='POST',",
+      "        )",
+      "        with request.urlopen(http_request) as response:",
+      "            return json.loads(response.read().decode('utf-8'))",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
 }
 
 async function fetchJsonFromMiddleware(server, pathname) {
@@ -386,6 +512,107 @@ async function prepareOllamaArtifacts(artifactRoot) {
   }
 }
 
+async function prepareAnthropicArtifacts(artifactRoot) {
+  const stub = new AnthropicStubServer();
+  const shimRoot = await mkdtemp(path.join(tmpdir(), "failure-lab-anthropic-shim-"));
+  await createAnthropicSdkShim(shimRoot);
+  await stub.start();
+
+  try {
+    const baselineOutput = await runCli(
+      [
+        "run",
+        "--dataset",
+        "reasoning-failures-v1",
+        "--model",
+        "anthropic:baseline-model",
+        "--anthropic-base-url",
+        stub.baseUrl,
+        "--system-prompt",
+        ANTHROPIC_SYSTEM_PROMPT,
+        "--model-option",
+        `max_tokens=${ANTHROPIC_MAX_TOKENS}`,
+        "--root",
+        artifactRoot,
+      ],
+      { pythonPathEntries: [shimRoot] },
+    );
+    const baselineRunId = parseLabel(baselineOutput, "Run ID");
+    await runCli(["report", "--run", baselineRunId, "--root", artifactRoot], {
+      pythonPathEntries: [shimRoot],
+    });
+
+    const candidateOutput = await runCli(
+      [
+        "run",
+        "--dataset",
+        "reasoning-failures-v1",
+        "--model",
+        "anthropic:candidate-model",
+        "--anthropic-base-url",
+        stub.baseUrl,
+        "--system-prompt",
+        ANTHROPIC_SYSTEM_PROMPT,
+        "--model-option",
+        `max_tokens=${ANTHROPIC_MAX_TOKENS}`,
+        "--root",
+        artifactRoot,
+      ],
+      { pythonPathEntries: [shimRoot] },
+    );
+    const candidateRunId = parseLabel(candidateOutput, "Run ID");
+    await runCli(["report", "--run", candidateRunId, "--root", artifactRoot], {
+      pythonPathEntries: [shimRoot],
+    });
+
+    const compareOutput = await runCli(
+      [
+        "compare",
+        baselineRunId,
+        candidateRunId,
+        "--root",
+        artifactRoot,
+      ],
+      { pythonPathEntries: [shimRoot] },
+    );
+    const comparisonReportId = parseLabel(compareOutput, "Report ID");
+
+    if (stub.requests.length === 0) {
+      throw new Error("Anthropic stub smoke did not receive any requests");
+    }
+    if (!stub.requests.every((payload) => payload.system === ANTHROPIC_SYSTEM_PROMPT)) {
+      throw new Error("Anthropic stub smoke did not preserve the system prompt");
+    }
+    if (!stub.requests.every((payload) => payload.max_tokens === ANTHROPIC_MAX_TOKENS)) {
+      throw new Error("Anthropic stub smoke did not preserve model options");
+    }
+
+    const baselineRun = await readJson(path.join(artifactRoot, "runs", baselineRunId, "run.json"));
+    const candidateRun = await readJson(path.join(artifactRoot, "runs", candidateRunId, "run.json"));
+    const comparisonReport = await readJson(
+      path.join(artifactRoot, "reports", comparisonReportId, "report.json"),
+    );
+    if (baselineRun?.metadata?.adapter_id !== "anthropic") {
+      throw new Error("Baseline run was not written through the anthropic adapter");
+    }
+    if (candidateRun?.metadata?.adapter_id !== "anthropic") {
+      throw new Error("Candidate run was not written through the anthropic adapter");
+    }
+    if (comparisonReport?.comparison?.compatible !== true) {
+      throw new Error("Anthropic stub smoke did not produce a compatible comparison report");
+    }
+
+    return {
+      comparisonReportId,
+      extraLines: [`Anthropic requests: ${stub.requests.length}`],
+      runId: baselineRunId,
+    };
+  } finally {
+    await stub.close();
+    await rm(shimRoot, { force: true, recursive: true });
+  }
+}
+
 async function resolveExistingArtifacts(artifactRoot) {
   const runIds = await listDirectoryIds(path.join(artifactRoot, "runs"));
   if (runIds.length === 0) {
@@ -545,6 +772,8 @@ async function main() {
       selection = await resolveExistingArtifacts(artifactRoot);
     } else if (options.mode === "ollama-stub") {
       selection = await prepareOllamaArtifacts(artifactRoot);
+    } else if (options.mode === "anthropic-stub") {
+      selection = await prepareAnthropicArtifacts(artifactRoot);
     } else {
       selection = await prepareDemoArtifacts(artifactRoot);
     }
