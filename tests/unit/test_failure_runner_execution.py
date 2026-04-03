@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+import model_failure_lab.adapters.anthropic_adapter as anthropic_adapter_module
 import model_failure_lab.adapters.ollama_adapter as ollama_adapter_module
 from model_failure_lab.adapters import ModelMetadata, ModelRequest, ModelResult, register_model
 from model_failure_lab.classifiers import ClassifierInput, ClassifierResult, register_classifier
@@ -309,4 +310,87 @@ def test_execute_dataset_run_persists_builtin_ollama_artifacts(tmp_path, monkeyp
     }
     assert results_payload["cases"][0]["output"] == {
         "text": "ollama:llama3.2::Explain why 2 + 2 = 4."
+    }
+
+
+def test_execute_dataset_run_persists_builtin_anthropic_artifacts(tmp_path, monkeypatch) -> None:
+    register_classifier("unit-anthropic-pass-through-classifier", PassThroughClassifier())
+    anthropic_base_urls: list[str | None] = []
+    anthropic_calls: list[dict[str, object]] = []
+
+    class FakeAnthropicMessagesAPI:
+        def create(self, **kwargs: object) -> dict[str, object]:
+            anthropic_calls.append(dict(kwargs))
+            return {
+                "id": "msg_123",
+                "type": "message",
+                "role": "assistant",
+                "model": str(kwargs["model"]),
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"anthropic:{kwargs['model']}::{kwargs['messages'][0]['content']}",
+                    }
+                ],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 6, "output_tokens": 4},
+            }
+
+    class FakeAnthropicClient:
+        def __init__(self) -> None:
+            self.messages = FakeAnthropicMessagesAPI()
+
+    def fake_client_factory(base_url: str | None):
+        anthropic_base_urls.append(base_url)
+        return FakeAnthropicClient()
+
+    monkeypatch.setattr(anthropic_adapter_module, "_default_client_factory", fake_client_factory)
+
+    dataset = FailureDataset(
+        dataset_id="reasoning-basics-v1",
+        cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+    )
+    run_execution = execute_dataset_run(
+        dataset=dataset,
+        adapter_id="anthropic",
+        classifier_id="unit-anthropic-pass-through-classifier",
+        model="claude-sonnet-4-0",
+        run_seed=13,
+        run_config={
+            "system_prompt": "Be concise.",
+            "model_options": {
+                "max_tokens": 256,
+                "temperature": 0,
+                "base_url": "http://127.0.0.1:8000",
+            },
+        },
+        now=datetime(2026, 4, 3, 11, 45, 0, tzinfo=timezone.utc),
+    )
+
+    run_path, results_path = write_run_artifacts(run_execution, root=tmp_path)
+    run_payload = read_json(run_path)
+    results_payload = read_json(results_path)
+
+    assert run_execution.adapter_id == "anthropic"
+    assert run_execution.status == "completed"
+    assert anthropic_base_urls == ["http://127.0.0.1:8000"]
+    assert anthropic_calls == [
+        {
+            "model": "claude-sonnet-4-0",
+            "messages": [{"role": "user", "content": "Explain why 2 + 2 = 4."}],
+            "system": "Be concise.",
+            "max_tokens": 256,
+            "temperature": 0,
+        }
+    ]
+    assert run_payload["metadata"]["adapter_id"] == "anthropic"
+    assert results_payload["cases"][0]["execution"]["adapter_id"] == "anthropic"
+    assert results_payload["cases"][0]["execution"]["model"] == "claude-sonnet-4-0"
+    assert results_payload["cases"][0]["execution"]["usage"] == {
+        "prompt_tokens": 6,
+        "completion_tokens": 4,
+        "total_tokens": 10,
+    }
+    assert results_payload["cases"][0]["output"] == {
+        "text": "anthropic:claude-sonnet-4-0::Explain why 2 + 2 = 4."
     }

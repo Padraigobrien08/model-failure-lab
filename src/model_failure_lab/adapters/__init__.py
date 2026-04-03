@@ -8,6 +8,7 @@ from .contracts import (
     ModelResult,
     ModelUsage,
 )
+from .anthropic_adapter import AnthropicAdapter
 from .demo import DemoAdapter
 from .ollama_adapter import OllamaAdapter
 from .openai_adapter import OpenAIAdapter
@@ -25,6 +26,7 @@ __all__ = [
     "ModelRequest",
     "ModelResult",
     "ModelUsage",
+    "AnthropicAdapter",
     "DemoAdapter",
     "OllamaAdapter",
     "OpenAIAdapter",

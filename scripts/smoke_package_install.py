@@ -92,6 +92,7 @@ def run_smoke(temp_root: Path, *, verify_debugger: bool) -> None:
     venv.EnvBuilder(with_pip=True, system_site_packages=True).create(env_root)
     env_python = _env_python(env_root)
     cli_path = _install_package(env_python, env_root)
+    _verify_installed_dependency_metadata(env_python)
 
     demo_result = _run_cli(cli_path, ["demo"], workspace_root)
     _require_output(demo_result, "Failure Lab Demo", command_name="demo")
@@ -320,6 +321,80 @@ def _verify_installed_module_path(env_python: Path, env_root: Path) -> None:
             stdout=result.stdout,
             stderr=result.stderr,
         )
+
+
+def _verify_installed_dependency_metadata(env_python: Path) -> None:
+    result = _run_command(
+        (
+            str(env_python),
+            "-c",
+            (
+                "import importlib.metadata as metadata, json; "
+                "dist = metadata.distribution('model-failure-lab'); "
+                "print(json.dumps(dist.metadata.get_all('Requires-Dist') or []))"
+            ),
+        ),
+        cwd=REPO_ROOT,
+        stage="install",
+        label="verify installed dependency metadata",
+    )
+    try:
+        requires_dist = json.loads(result.stdout.strip().splitlines()[-1])
+    except json.JSONDecodeError as exc:
+        raise SmokeFailure(
+            "install",
+            "installed package metadata did not return valid Requires-Dist JSON.",
+            command=result.command,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        ) from exc
+    if not isinstance(requires_dist, list) or not all(
+        isinstance(item, str) for item in requires_dist
+    ):
+        raise SmokeFailure(
+            "install",
+            "installed package metadata did not expose Requires-Dist entries as strings.",
+            command=result.command,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
+
+    base_requirements = [item for item in requires_dist if "extra ==" not in item]
+    optional_requirements = [item for item in requires_dist if "extra ==" in item]
+
+    if base_requirements != ["PyYAML"]:
+        raise SmokeFailure(
+            "install",
+            f"unexpected base Requires-Dist entries: {base_requirements}.",
+            command=result.command,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
+
+    _require_extra_marker(optional_requirements, "anthropic", "anthropic")
+    _require_extra_marker(optional_requirements, "openai", "openai")
+    _require_extra_marker(optional_requirements, "ui", "streamlit")
+    for package_name in (
+        "matplotlib",
+        "pandas",
+        "pyarrow",
+        "scikit-learn",
+        "torch",
+        "transformers",
+        "wilds",
+    ):
+        _require_extra_marker(optional_requirements, "legacy", package_name)
+
+
+def _require_extra_marker(requires_dist: list[str], extra_name: str, package_name: str) -> None:
+    expected_marker = f"extra == '{extra_name}'"
+    for item in requires_dist:
+        if package_name in item and expected_marker in item:
+            return
+    raise SmokeFailure(
+        "install",
+        f"missing optional dependency marker for {package_name!r} under extra {extra_name!r}.",
+    )
 
 
 def _command_env() -> dict[str, str]:

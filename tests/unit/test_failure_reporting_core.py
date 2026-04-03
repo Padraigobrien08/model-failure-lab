@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import model_failure_lab.adapters.anthropic_adapter as anthropic_adapter_module
 import model_failure_lab.adapters.ollama_adapter as ollama_adapter_module
 from model_failure_lab.adapters import ModelMetadata, ModelRequest, ModelResult, register_model
 from model_failure_lab.classifiers import ClassifierInput, ClassifierResult, register_classifier
@@ -331,6 +332,76 @@ def test_build_run_report_supports_saved_builtin_ollama_runs(tmp_path, monkeypat
     assert len(built.details["notable_cases"]) == 1
     assert built.details["notable_cases"][0]["case_id"] == "case-002"
     assert built.details["notable_cases"][0]["output_text"] == "model:llama3.2::hallucination case"
+    assert built.details["notable_cases"][0]["observed_failure"] == {
+        "failure_type": "hallucination"
+    }
+    assert (
+        built.details["notable_cases"][0]["explanation"]
+        == "Unsupported factual framing detected."
+    )
+
+
+def test_build_run_report_supports_saved_builtin_anthropic_runs(tmp_path, monkeypatch) -> None:
+    register_classifier("unit-reporting-classifier-anthropic", ReportingTestClassifier())
+
+    class FakeAnthropicMessagesAPI:
+        def create(self, **kwargs: object) -> dict[str, object]:
+            return {
+                "id": "msg_123",
+                "type": "message",
+                "role": "assistant",
+                "model": str(kwargs["model"]),
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"model:{kwargs['model']}::{kwargs['messages'][0]['content']}",
+                    }
+                ],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 8, "output_tokens": 5},
+            }
+
+    class FakeAnthropicClient:
+        def __init__(self) -> None:
+            self.messages = FakeAnthropicMessagesAPI()
+
+    monkeypatch.setattr(
+        anthropic_adapter_module,
+        "_default_client_factory",
+        lambda base_url: FakeAnthropicClient(),
+    )
+
+    dataset = FailureDataset(
+        dataset_id="reasoning-basics-v1",
+        cases=(
+            PromptCase(id="case-001", prompt="clean success"),
+            PromptCase(id="case-002", prompt="hallucination case"),
+        ),
+    )
+    execution = execute_dataset_run(
+        dataset=dataset,
+        adapter_id="anthropic",
+        classifier_id="unit-reporting-classifier-anthropic",
+        model="claude-sonnet-4-0",
+        run_seed=19,
+        now=datetime(2026, 4, 3, 11, 50, 0, tzinfo=timezone.utc),
+    )
+    write_run_artifacts(execution, root=tmp_path)
+
+    built = build_run_report(
+        load_saved_run_artifacts(execution.run.run_id, root=tmp_path),
+        now=datetime(2026, 4, 3, 11, 51, 0, tzinfo=timezone.utc),
+    )
+
+    assert built.report.metadata["adapter_id"] == "anthropic"
+    assert built.report.metrics["classified_case_count"] == 2
+    assert built.report.failure_counts == {"hallucination": 1}
+    assert len(built.details["notable_cases"]) == 1
+    assert built.details["notable_cases"][0]["case_id"] == "case-002"
+    assert (
+        built.details["notable_cases"][0]["output_text"]
+        == "model:claude-sonnet-4-0::hallucination case"
+    )
     assert built.details["notable_cases"][0]["observed_failure"] == {
         "failure_type": "hallucination"
     }

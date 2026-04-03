@@ -48,6 +48,14 @@ def ensure_builtin_models() -> None:
         _register_model("openai", OpenAIAdapter)
 
     try:
+        from .anthropic_adapter import AnthropicAdapter
+    except ModuleNotFoundError:
+        AnthropicAdapter = None
+
+    if AnthropicAdapter is not None:
+        _register_model("anthropic", AnthropicAdapter)
+
+    try:
         from .ollama_adapter import OllamaAdapter
     except ModuleNotFoundError:
         OllamaAdapter = None

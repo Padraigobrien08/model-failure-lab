@@ -5,6 +5,7 @@ from urllib.error import URLError
 import pytest
 
 from model_failure_lab.adapters import (
+    AnthropicAdapter,
     DemoAdapter,
     ModelMetadata,
     ModelRequest,
@@ -82,6 +83,54 @@ class FakeOpenAIClient:
         self.responses = FakeResponsesAPI()
 
 
+class FakeAnthropicUsage:
+    def __init__(self, input_tokens: int, output_tokens: int) -> None:
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+
+
+class FakeAnthropicResponse:
+    def __init__(self) -> None:
+        self.id = "msg_123"
+        self.type = "message"
+        self.role = "assistant"
+        self.model = "claude-sonnet-4-0"
+        self.stop_reason = "end_turn"
+        self.stop_sequence = None
+        self.content = [{"type": "text", "text": "Anthropic answer"}]
+        self.usage = FakeAnthropicUsage(input_tokens=9, output_tokens=4)
+
+    def model_dump(self) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "type": self.type,
+            "role": self.role,
+            "model": self.model,
+            "stop_reason": self.stop_reason,
+            "stop_sequence": self.stop_sequence,
+            "content": self.content,
+            "usage": {
+                "input_tokens": self.usage.input_tokens,
+                "output_tokens": self.usage.output_tokens,
+            },
+            "ignored": "trim me",
+        }
+
+
+class FakeAnthropicMessagesAPI:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def create(self, **kwargs: object) -> FakeAnthropicResponse:
+        self.calls.append(kwargs)
+        return FakeAnthropicResponse()
+
+
+class FakeAnthropicClient:
+    def __init__(self) -> None:
+        self.messages = FakeAnthropicMessagesAPI()
+
+
 class CapturingOllamaTransport:
     def __init__(self, response: dict[str, object]) -> None:
         self._response = response
@@ -147,6 +196,13 @@ def test_ollama_adapter_is_registered_by_default() -> None:
 
     assert "ollama" in available_models()
     assert isinstance(adapter, OllamaAdapter)
+
+
+def test_anthropic_adapter_is_registered_by_default() -> None:
+    adapter = resolve_model("anthropic")
+
+    assert "anthropic" in available_models()
+    assert isinstance(adapter, AnthropicAdapter)
 
 
 def test_demo_adapter_returns_deterministic_results_for_repeat_inputs() -> None:
@@ -222,6 +278,98 @@ def test_openai_adapter_shapes_provider_response_without_network() -> None:
             "total_tokens": 18,
         },
     }
+
+
+def test_anthropic_adapter_shapes_messages_request_and_maps_usage() -> None:
+    client = FakeAnthropicClient()
+    adapter = AnthropicAdapter(client=client, clock=FakeClock(2.0, 2.15))
+
+    result = adapter.generate(
+        ModelRequest(
+            model="claude-sonnet-4-0",
+            prompt="Answer the question.",
+            system_prompt="Be concise.",
+            seed=7,
+            options={
+                "max_tokens": 256,
+                "temperature": 0,
+                "base_url": "http://anthropic.local:8000",
+            },
+        )
+    )
+
+    assert client.messages.calls == [
+        {
+            "model": "claude-sonnet-4-0",
+            "messages": [{"role": "user", "content": "Answer the question."}],
+            "system": "Be concise.",
+            "max_tokens": 256,
+            "temperature": 0,
+        }
+    ]
+    assert result.text == "Anthropic answer"
+    assert result.metadata is not None
+    assert result.metadata.model == "claude-sonnet-4-0"
+    assert result.metadata.latency_ms == pytest.approx(150.0)
+    assert result.metadata.usage == ModelUsage(
+        prompt_tokens=9,
+        completion_tokens=4,
+        total_tokens=13,
+    )
+    assert result.metadata.raw == {
+        "id": "msg_123",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-4-0",
+        "stop_reason": "end_turn",
+        "usage": {
+            "input_tokens": 9,
+            "output_tokens": 4,
+        },
+    }
+
+
+def test_anthropic_adapter_wraps_transport_failures_with_base_url() -> None:
+    class BrokenMessagesAPI:
+        @staticmethod
+        def create(**kwargs: object) -> object:
+            del kwargs
+            raise ConnectionError("connection refused")
+
+    class BrokenAnthropicClient:
+        def __init__(self) -> None:
+            self.messages = BrokenMessagesAPI()
+
+    adapter = AnthropicAdapter(client_factory=lambda base_url: BrokenAnthropicClient())
+
+    with pytest.raises(
+        RuntimeError,
+        match="Anthropic request to http://localhost:8000 failed: connection refused",
+    ):
+        adapter.generate(
+            ModelRequest(
+                model="claude-sonnet-4-0",
+                prompt="Answer the question.",
+                options={"base_url": "http://localhost:8000"},
+            )
+        )
+
+
+def test_anthropic_adapter_rejects_malformed_payloads() -> None:
+    class MalformedMessagesAPI:
+        @staticmethod
+        def create(**kwargs: object) -> dict[str, object]:
+            del kwargs
+            return {}
+
+    class MalformedAnthropicClient:
+        def __init__(self) -> None:
+            self.messages = MalformedMessagesAPI()
+
+    adapter = AnthropicAdapter(client=MalformedAnthropicClient())
+
+    with pytest.raises(RuntimeError, match="Anthropic response did not include text content"):
+        adapter.generate(ModelRequest(model="claude-sonnet-4-0", prompt="Answer the question."))
 
 
 def test_ollama_adapter_shapes_non_streaming_request_and_maps_usage() -> None:
