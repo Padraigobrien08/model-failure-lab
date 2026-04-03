@@ -44,7 +44,8 @@ def _default_client_factory() -> Any:
         from openai import OpenAI
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised indirectly by runtime users
         raise RuntimeError(
-            "OpenAI support is not installed. Install with `pip install model-failure-lab[openai]`."
+            "OpenAI support is not installed. Install with "
+            "`pip install 'model-failure-lab[openai]'`."
         ) from exc
     return OpenAI()
 

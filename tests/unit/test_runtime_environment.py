@@ -89,7 +89,7 @@ def test_check_environment_human_output_includes_install_and_prefetch_guidance(
 
     captured = capsys.readouterr()
     assert payload["overall_ok"] is False
-    assert "python -m pip install -e .[dev]" in captured.out
+    assert "python -m pip install -e '.[dev,legacy]'" in captured.out
     assert "AutoTokenizer.from_pretrained('distilbert-base-uncased')" in captured.out
     assert "network access" in captured.out
 
@@ -101,6 +101,8 @@ def test_missing_wilds_message_points_to_check_environment(monkeypatch):
     monkeypatch.setattr("model_failure_lab.data.civilcomments.import_module", fake_import_module)
 
     with pytest.raises(DataDependencyError, match="python scripts/check_environment.py"):
+        _resolve_get_dataset()
+    with pytest.raises(DataDependencyError, match="\\[legacy\\]"):
         _resolve_get_dataset()
 
 

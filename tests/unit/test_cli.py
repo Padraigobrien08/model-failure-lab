@@ -47,6 +47,32 @@ def test_pyproject_exposes_canonical_and_compatibility_entrypoints() -> None:
     assert scripts["model-failure-lab"] == "model_failure_lab.cli:main"
 
 
+def test_pyproject_core_dependencies_match_the_shipped_engine_loop() -> None:
+    payload = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    dependencies = payload["project"]["dependencies"]
+
+    assert dependencies == ["PyYAML"]
+
+
+def test_pyproject_optional_dependencies_expose_explicit_provider_and_legacy_groups() -> None:
+    payload = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    optional_dependencies = payload["project"]["optional-dependencies"]
+
+    assert set(optional_dependencies) == {"dev", "legacy", "openai", "ui"}
+    assert optional_dependencies["openai"] == ["openai>=1.0.0"]
+    assert optional_dependencies["ui"] == ["streamlit"]
+    assert optional_dependencies["dev"] == ["pytest", "ruff"]
+    assert optional_dependencies["legacy"] == [
+        "matplotlib",
+        "pandas",
+        "pyarrow",
+        "scikit-learn",
+        "torch",
+        "transformers",
+        "wilds",
+    ]
+
+
 def test_python_module_entrypoint_prints_new_help_surface_without_args() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "model_failure_lab"],
@@ -85,11 +111,27 @@ def test_run_help_describes_current_working_directory_default() -> None:
 
 
 def test_cli_module_import_does_not_load_matplotlib() -> None:
-    _purge_modules("model_failure_lab.cli", "model_failure_lab.reporting", "matplotlib")
+    _purge_modules(
+        "model_failure_lab.cli",
+        "model_failure_lab.reporting",
+        "matplotlib",
+        "pandas",
+        "pyarrow",
+        "torch",
+        "transformers",
+        "wilds",
+        "sklearn",
+    )
 
     importlib.import_module("model_failure_lab.cli")
 
     assert "matplotlib" not in sys.modules
+    assert "pandas" not in sys.modules
+    assert "pyarrow" not in sys.modules
+    assert "torch" not in sys.modules
+    assert "transformers" not in sys.modules
+    assert "wilds" not in sys.modules
+    assert "sklearn" not in sys.modules
     assert not any(
         name == "model_failure_lab.reporting"
         or name.startswith("model_failure_lab.reporting.")

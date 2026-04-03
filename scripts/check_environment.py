@@ -21,7 +21,7 @@ from model_failure_lab.utils.runtime import (
 
 _DEPENDENCIES = ("matplotlib", "wilds", "torch", "transformers")
 _DISTILBERT_PRESET = "civilcomments_distilbert_baseline"
-_INSTALL_COMMAND = "python -m pip install -e .[dev]"
+_INSTALL_COMMAND = "python -m pip install -e '.[dev,legacy]'"
 
 
 def _distilbert_prefetch_command(pretrained_name: str) -> str:

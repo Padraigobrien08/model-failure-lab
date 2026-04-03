@@ -9,20 +9,22 @@ description = "Reproducible experiment scaffold for distribution-shift failure a
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "matplotlib",
-  "torch",
-  "scikit-learn",
-  "transformers",
-  "wilds",
   "PyYAML",
-  "pandas",
-  "pyarrow",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest",
   "ruff",
+]
+legacy = [
+  "matplotlib",
+  "pandas",
+  "pyarrow",
+  "scikit-learn",
+  "torch",
+  "transformers",
+  "wilds",
 ]
 openai = [
   "openai>=1.0.0",
