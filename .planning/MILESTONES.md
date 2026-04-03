@@ -18,3 +18,122 @@
 **Archive basis:** No standalone `v3.0` milestone audit file was present. Closeout used `roadmap analyze` (`100%`, `6/6` plans complete) plus the verification artifacts from Phases 67-69.
 
 ---
+
+## v2.1 Cross-Artifact Drillthrough And Debugger Operability (Shipped: 2026-04-02)
+
+**Phases completed:** 3 phases, 6 plans, 12 tasks
+
+**Key accomplishments:**
+
+- Made run and comparison detail URLs shareable and reload-safe with exact section, lens, and
+  case restoration.
+- Added lightweight section jumps and mount-aware deep-link landing across both detail routes.
+- Added exact comparison-case drillthrough into baseline and candidate run evidence with preserved
+  return context.
+- Made degraded drillthrough explicit and surfaced compact artifact context on focused evidence
+  panels.
+- Consolidated route provenance, unified `Active case` cues, and closed the milestone with route
+  regressions, build, smoke, and `66-VERIFICATION.md`.
+
+---
+
+## v2.0 React Debugger On Real Artifacts (Shipped: 2026-03-31)
+
+**Phases completed:** 7 phases, 14 plans, 29 tasks
+
+**Key accomplishments:**
+
+- Replaced the legacy manifest-first frontend shell with a runs-first artifact-backed React app
+  over real engine outputs.
+- Shipped saved runs inventory plus run-detail drilldown with failure shape, notable cases, and
+  selected evidence over real report artifacts.
+- Shipped saved comparison inventory and comparison-detail exploration with grouped directional
+  deltas and run-linked context.
+- Recovered richer debugger guidance and detail density without reopening the old benchmark route
+  model.
+- Closed missing planning evidence and validation gaps so the milestone audit passed cleanly with
+  all requirements satisfied.
+
+---
+
+## v1.9 Failure Dataset Packs And Report Quality (Shipped: 2026-03-30)
+
+**Phases completed:** 5 phases, 10 plans, 20 tasks
+
+**Key accomplishments:**
+
+- Canonicalized prompt expectations and failure taxonomy so authored datasets, classifiers, runner
+  artifacts, and reports all speak one contract.
+- Shipped bundled reasoning, hallucination, and RAG dataset packs plus registry-driven dataset
+  discovery through `failure-lab datasets list`.
+- Made single-run reports explain themselves with mismatch-aware summaries, tag slices, and bounded
+  notable examples.
+- Made directional comparisons surface grouped case-transition deltas instead of only aggregate
+  metric movement.
+- Rewrote the repo entrypoint around the engine-first quickstart so users can install, demo,
+  discover datasets, run one, and inspect the output quickly.
+
+---
+
+## v1.8 Core Failure Analysis Engine (Shipped: 2026-03-30)
+
+**Phases completed:** 8 phases, 16 plans, 26 tasks
+
+**Key accomplishments:**
+
+- Turned the repo into a real CLI-first failure analysis engine with canonical schemas, local JSON
+  artifact storage, and deterministic runner/reporting contracts.
+- Added deterministic demo and OpenAI adapter seams, one heuristic classifier path, and explicit
+  model/classifier registries.
+- Shipped `failure-lab demo`, `failure-lab run`, `failure-lab report`, and
+  `failure-lab compare`, all backed by the same saved artifact model.
+- Closed post-audit cleanup around validation hygiene, reporting import weight, runtime warning
+  noise, and run identity collisions.
+
+---
+
+## v1.7 Trace-First Failure Debugger Rebuild (Shipped: 2026-03-27)
+
+**Phases completed:** 8 phases, 16 plans, 32 tasks
+
+**Key accomplishments:**
+
+- Reset the React frontend around a strict trace chain with dedicated `Summary`, `Lane`, `Method`,
+  `Run`, and `Raw` routes plus shared `Official` / `All` scope state.
+- Built a compact verdict-first summary page and a table-first lane workspace that preserve
+  baseline anchoring, grouped runs, and deterministic inspector-driven drilldown.
+- Added focused method and run detail routes with structured explanation, lineage, artifact
+  summaries, and explicit forward handoff into raw evidence.
+- Added a real raw-debug route with monospaced payload tabs, related-entity traversal, copy
+  support, and one shared inspector contract across lane, method, and run.
+- Completed trustworthy official-versus-exploratory scope semantics and a final audit pass that
+  reduced dashboard drift without reopening the route architecture.
+
+---
+
+## v1.5 React Failure Debugger UI (Shipped: 2026-03-25)
+
+**Phases completed:** 4 phases, 8 plans, 16 tasks
+
+**Key accomplishments:**
+
+- Built a dedicated React workspace with Vite, TypeScript, Tailwind, shadcn, and a deterministic
+  manifest sync bridge over the existing artifact index.
+- Added a real Overview launchpad, ranked `Comparisons`, and four-tab `Failure Explorer` routes
+  backed by saved report payloads rather than client-side recomputation.
+- Added grouped `Runs`, reusable evidence-drawer drillthrough, and an official-first `Evidence`
+  browser so users can inspect lineage, summaries, and raw artifacts in one connected workflow.
+- Preserved official-versus-exploratory scope boundaries across the React shell with explicit
+  controls and warnings.
+- Handed the repo off to React as the primary UI with a root-level launcher, updated README, and a
+  documented Streamlit fallback/parity path.
+
+---
+
+## Earlier Milestones
+
+- `v1.4` Final Robustness Attempt Before Expansion
+- `v1.3` Artifact-Driven Results UI And Robustness Consolidation
+- `v1.2` Seed Stability And Reweighting Validation
+- `v1.1` Live Benchmark Validation And Research Packaging
+- `v1.0` MVP
