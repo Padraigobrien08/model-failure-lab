@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 
 import { App } from "@/app/App";
 import type {
@@ -105,6 +106,7 @@ function buildReadyComparisonInventoryState(): ComparisonInventoryState {
 describe("App shell", () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     window.history.replaceState({}, "", "/");
   });
 
@@ -138,6 +140,7 @@ describe("App shell", () => {
 
     expect(screen.getByRole("link", { name: "Failure Lab" })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Analysis" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Comparisons" })).toBeInTheDocument();
     expect(screen.getByText("Artifact source")).toBeInTheDocument();
@@ -149,6 +152,39 @@ describe("App shell", () => {
 
   it("lands on runs at / and lets users switch to comparisons from the top nav", async () => {
     const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          source: DEFAULT_SOURCE,
+          mode: "cases",
+          filters: {
+            failureType: null,
+            model: null,
+            dataset: null,
+            runId: null,
+            reportId: null,
+            baselineRunId: null,
+            candidateRunId: null,
+            delta: null,
+            aggregateBy: null,
+            lastN: null,
+            since: null,
+            until: null,
+            limit: 20,
+          },
+          facets: {
+            models: ["demo", "gpt-4.1-mini"],
+            datasets: ["reasoning-failures-v1", "hallucination-failures-v1"],
+            failureTypes: ["hallucination"],
+            deltaTypes: ["regression", "improvement"],
+          },
+          rows: [],
+        }),
+      })),
+    );
 
     render(
       <App
@@ -162,6 +198,14 @@ describe("App shell", () => {
 
     expect(
       screen.getByRole("heading", { name: "Saved runs inventory." }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Analysis" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Cross-run artifact analysis.",
+      }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("link", { name: "Comparisons" }));

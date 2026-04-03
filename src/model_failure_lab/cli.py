@@ -16,6 +16,13 @@ from model_failure_lab.datasets import (
     load_dataset,
     load_demo_dataset,
 )
+from model_failure_lab.index import (
+    QueryFilters,
+    aggregate_case_query,
+    query_case_deltas,
+    query_cases,
+    rebuild_query_index,
+)
 from model_failure_lab.runner.artifacts import write_run_artifacts
 from model_failure_lab.runner.execute import DatasetRunExecution, execute_dataset_run
 from model_failure_lab.schemas import Run
@@ -198,6 +205,55 @@ def build_parser() -> argparse.ArgumentParser:
     )
     datasets_list_parser.set_defaults(handler=_handle_datasets_list)
 
+    index_parser = subparsers.add_parser(
+        "index",
+        help="Manage the derived local query index over saved artifacts.",
+    )
+    index_subparsers = index_parser.add_subparsers(dest="index_command")
+
+    index_rebuild_parser = index_subparsers.add_parser(
+        "rebuild",
+        help="Rebuild the derived local query index from saved artifacts.",
+        description="Rebuild the derived local query index from saved artifacts.",
+    )
+    index_rebuild_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    index_rebuild_parser.set_defaults(handler=_handle_index_rebuild)
+
+    query_parser = subparsers.add_parser(
+        "query",
+        help="Run structured cross-run queries over the derived local index.",
+    )
+    query_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    query_parser.add_argument("--failure-type", dest="failure_type")
+    query_parser.add_argument("--model")
+    query_parser.add_argument("--dataset")
+    query_parser.add_argument("--run", dest="run_id")
+    query_parser.add_argument("--report-id")
+    query_parser.add_argument("--baseline-run")
+    query_parser.add_argument("--candidate-run")
+    query_parser.add_argument("--delta")
+    query_parser.add_argument("--aggregate-by", choices=["failure_type", "model", "dataset", "prompt_id"])
+    query_parser.add_argument("--last-n", type=int)
+    query_parser.add_argument("--since")
+    query_parser.add_argument("--until")
+    query_parser.add_argument("--limit", type=int, default=20)
+    query_parser.add_argument("--json", action="store_true", dest="as_json")
+    query_parser.set_defaults(handler=_handle_query)
+
     return parser
 
 
@@ -302,6 +358,63 @@ def _handle_demo(args: argparse.Namespace) -> int:
 def _handle_datasets_list(args: argparse.Namespace) -> int:
     del args
     print(_render_bundled_dataset_list())
+    return 0
+
+
+def _handle_index_rebuild(args: argparse.Namespace) -> int:
+    root = _normalized_root(args.root)
+    summary = rebuild_query_index(root=root)
+    print(_render_index_rebuild_summary(summary))
+    return 0
+
+
+def _handle_query(args: argparse.Namespace) -> int:
+    if args.delta and args.aggregate_by:
+        raise ValueError("`--delta` and `--aggregate-by` cannot be combined in one query")
+
+    root = _normalized_root(args.root)
+    filters = QueryFilters(
+        failure_type=args.failure_type,
+        model=args.model,
+        dataset=args.dataset,
+        run_id=args.run_id,
+        report_id=args.report_id,
+        baseline_run_id=args.baseline_run,
+        candidate_run_id=args.candidate_run,
+        delta=args.delta,
+        last_n=args.last_n,
+        since=args.since,
+        until=args.until,
+        limit=args.limit,
+    )
+    if args.aggregate_by:
+        rows = aggregate_case_query(args.aggregate_by, filters, root=root)
+        query_kind = "aggregate"
+    elif args.delta:
+        rows = query_case_deltas(filters, root=root)
+        query_kind = "delta"
+    else:
+        rows = query_cases(filters, root=root)
+        query_kind = "cases"
+
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": query_kind,
+                    "filters": _query_filters_payload(filters, aggregate_by=args.aggregate_by),
+                    "rows": rows,
+                }
+            )
+        )
+        return 0
+
+    if query_kind == "aggregate":
+        print(_render_aggregate_rows(rows))
+    elif query_kind == "delta":
+        print(_render_delta_rows(rows))
+    else:
+        print(_render_case_rows(rows))
     return 0
 
 
@@ -496,6 +609,108 @@ def _render_bundled_dataset_list() -> str:
             )
 
     return "\n".join(["Failure Lab Datasets", *rendered_rows])
+
+
+def _render_index_rebuild_summary(summary) -> str:
+    return "\n".join(
+        [
+            "Failure Lab Index",
+            f"Path: {summary.path}",
+            f"Runs: {summary.run_count}",
+            f"Cases: {summary.case_count}",
+            f"Comparisons: {summary.comparison_count}",
+            f"Case deltas: {summary.case_delta_count}",
+        ]
+    )
+
+
+def _render_case_rows(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return "Failure Lab Query\nNo matching cross-run cases."
+    table_rows = [("run_id", "dataset", "model", "case_id", "failure_type", "prompt")]
+    for row in rows:
+        table_rows.append(
+            (
+                str(row.get("run_id", "")),
+                str(row.get("dataset", "")),
+                str(row.get("model", "")),
+                str(row.get("case_id", "")),
+                str(row.get("failure_type", "")),
+                _truncate(str(row.get("prompt", "")), 48),
+            )
+        )
+    return "\n".join(["Failure Lab Query", _render_table(table_rows)])
+
+
+def _render_delta_rows(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return "Failure Lab Query\nNo matching saved deltas."
+    table_rows = [("report_id", "delta_kind", "case_id", "baseline_run", "candidate_run", "prompt")]
+    for row in rows:
+        table_rows.append(
+            (
+                str(row.get("report_id", "")),
+                str(row.get("delta_kind", "")),
+                str(row.get("case_id", "")),
+                str(row.get("baseline_run_id", "")),
+                str(row.get("candidate_run_id", "")),
+                _truncate(str(row.get("prompt", "")), 40),
+            )
+        )
+    return "\n".join(["Failure Lab Query", _render_table(table_rows)])
+
+
+def _render_aggregate_rows(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return "Failure Lab Query\nNo aggregate rows matched the current filters."
+    table_rows = [("group", "label", "case_count")]
+    for row in rows:
+        table_rows.append(
+            (
+                str(row.get("group_key", "")),
+                str(row.get("group_label", "")),
+                str(row.get("case_count", "")),
+            )
+        )
+    return "\n".join(["Failure Lab Query", _render_table(table_rows)])
+
+
+def _render_table(rows: list[tuple[str, ...]]) -> str:
+    widths = [max(len(row[index]) for row in rows) for index in range(len(rows[0]))]
+    rendered: list[str] = []
+    for index, row in enumerate(rows):
+        rendered.append(
+            "  ".join(value.ljust(widths[column_index]) for column_index, value in enumerate(row))
+        )
+        if index == 0:
+            rendered.append("  ".join("-" * width for width in widths))
+    return "\n".join(rendered)
+
+
+def _query_filters_payload(
+    filters: QueryFilters,
+    *,
+    aggregate_by: str | None = None,
+) -> dict[str, object]:
+    return {
+        "failure_type": filters.failure_type,
+        "model": filters.model,
+        "dataset": filters.dataset,
+        "run_id": filters.run_id,
+        "report_id": filters.report_id,
+        "baseline_run_id": filters.baseline_run_id,
+        "candidate_run_id": filters.candidate_run_id,
+        "delta": filters.delta,
+        "aggregate_by": aggregate_by,
+        "last_n": filters.last_n,
+        "since": filters.since,
+        "until": filters.until,
+        "limit": filters.limit,
+    }
+
+
+def _render_json_payload(payload: dict[str, object]) -> str:
+    return json.dumps(payload, indent=2, sort_keys=True)
 
 
 def _build_run_report(saved_run: SavedRunArtifacts):

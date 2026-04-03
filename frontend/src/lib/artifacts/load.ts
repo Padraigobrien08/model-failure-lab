@@ -1,4 +1,5 @@
 import {
+  ARTIFACT_QUERY_PATH,
   ARTIFACT_OVERVIEW_PATH,
   COMPARISON_DETAIL_PATH,
   COMPARISONS_INDEX_PATH,
@@ -6,6 +7,12 @@ import {
   RUN_DETAIL_PATH,
   RUNS_INDEX_PATH,
   type ArtifactCollectionSummary,
+  type ArtifactQueryAggregateRow,
+  type ArtifactQueryCaseRow,
+  type ArtifactQueryDeltaRow,
+  type ArtifactQueryFacets,
+  type ArtifactQueryFilters,
+  type ArtifactQueryResponse,
   type ArtifactOverview,
   type ArtifactOverviewStatus,
   type ComparisonCaseDeltaRecord,
@@ -93,6 +100,181 @@ function requireSource(value: unknown, field: string): ArtifactSourceDescriptor 
     runsPath: requireString(source.runsPath, `${field}.runsPath`),
     reportsPath: requireString(source.reportsPath, `${field}.reportsPath`),
   };
+}
+
+export function buildArtifactQueryPath(searchParams: URLSearchParams): string {
+  const query = searchParams.toString();
+  return query.length > 0 ? `${ARTIFACT_QUERY_PATH}?${query}` : ARTIFACT_QUERY_PATH;
+}
+
+function requireQueryFilters(value: unknown, field: string): ArtifactQueryFilters {
+  const filters = requireObject(value, field);
+  return {
+    failureType: requireStringOrNull(filters.failureType, `${field}.failureType`),
+    model: requireStringOrNull(filters.model, `${field}.model`),
+    dataset: requireStringOrNull(filters.dataset, `${field}.dataset`),
+    runId: requireStringOrNull(filters.runId, `${field}.runId`),
+    reportId: requireStringOrNull(filters.reportId, `${field}.reportId`),
+    baselineRunId: requireStringOrNull(filters.baselineRunId, `${field}.baselineRunId`),
+    candidateRunId: requireStringOrNull(filters.candidateRunId, `${field}.candidateRunId`),
+    delta: requireStringOrNull(filters.delta, `${field}.delta`),
+    aggregateBy: requireStringOrNull(filters.aggregateBy, `${field}.aggregateBy`),
+    lastN:
+      filters.lastN == null ? null : requireCount(filters.lastN, `${field}.lastN`),
+    since: requireStringOrNull(filters.since, `${field}.since`),
+    until: requireStringOrNull(filters.until, `${field}.until`),
+    limit: requireCount(filters.limit, `${field}.limit`),
+  };
+}
+
+function requireQueryFacets(value: unknown, field: string): ArtifactQueryFacets {
+  const facets = requireObject(value, field);
+  return {
+    models: requireStringArray(facets.models, `${field}.models`),
+    datasets: requireStringArray(facets.datasets, `${field}.datasets`),
+    failureTypes: requireStringArray(facets.failureTypes, `${field}.failureTypes`),
+    deltaTypes: requireStringArray(facets.deltaTypes, `${field}.deltaTypes`),
+  };
+}
+
+function requireArtifactQueryCaseRows(value: unknown, field: string): ArtifactQueryCaseRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      runId: requireString(row.run_id, `${field}[${index}].run_id`),
+      dataset: requireString(row.dataset, `${field}[${index}].dataset`),
+      model: requireString(row.model, `${field}[${index}].model`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      caseId: requireString(row.case_id, `${field}[${index}].case_id`),
+      promptId: requireString(row.prompt_id, `${field}[${index}].prompt_id`),
+      prompt: requireString(row.prompt, `${field}[${index}].prompt`),
+      tags: requireStringArray(row.tags, `${field}[${index}].tags`),
+      failureType: requireStringOrNull(row.failure_type, `${field}[${index}].failure_type`),
+      expectationVerdict: requireStringOrNull(
+        row.expectation_verdict,
+        `${field}[${index}].expectation_verdict`,
+      ),
+      explanation: requireStringOrNull(row.explanation, `${field}[${index}].explanation`),
+      confidence: requireNumberOrNull(row.confidence, `${field}[${index}].confidence`),
+      errorStage: requireStringOrNull(row.error_stage, `${field}[${index}].error_stage`),
+    };
+  });
+}
+
+function requireArtifactQueryDeltaRows(value: unknown, field: string): ArtifactQueryDeltaRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      reportId: requireString(row.report_id, `${field}[${index}].report_id`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      dataset: requireStringOrNull(row.dataset, `${field}[${index}].dataset`),
+      caseId: requireString(row.case_id, `${field}[${index}].case_id`),
+      promptId: requireString(row.prompt_id, `${field}[${index}].prompt_id`),
+      prompt: requireString(row.prompt, `${field}[${index}].prompt`),
+      tags: requireStringArray(row.tags, `${field}[${index}].tags`),
+      transitionType: requireString(row.transition_type, `${field}[${index}].transition_type`),
+      transitionLabel: requireString(row.transition_label, `${field}[${index}].transition_label`),
+      deltaKind: requireString(row.delta_kind, `${field}[${index}].delta_kind`),
+      baselineRunId: requireString(row.baseline_run_id, `${field}[${index}].baseline_run_id`),
+      candidateRunId: requireString(row.candidate_run_id, `${field}[${index}].candidate_run_id`),
+      baselineModel: requireStringOrNull(row.baseline_model, `${field}[${index}].baseline_model`),
+      candidateModel: requireStringOrNull(
+        row.candidate_model,
+        `${field}[${index}].candidate_model`,
+      ),
+      baselineFailureType: requireStringOrNull(
+        row.baseline_failure_type,
+        `${field}[${index}].baseline_failure_type`,
+      ),
+      candidateFailureType: requireStringOrNull(
+        row.candidate_failure_type,
+        `${field}[${index}].candidate_failure_type`,
+      ),
+      baselineExpectationVerdict: requireStringOrNull(
+        row.baseline_expectation_verdict,
+        `${field}[${index}].baseline_expectation_verdict`,
+      ),
+      candidateExpectationVerdict: requireStringOrNull(
+        row.candidate_expectation_verdict,
+        `${field}[${index}].candidate_expectation_verdict`,
+      ),
+      baselineExplanation: requireStringOrNull(
+        row.baseline_explanation,
+        `${field}[${index}].baseline_explanation`,
+      ),
+      candidateExplanation: requireStringOrNull(
+        row.candidate_explanation,
+        `${field}[${index}].candidate_explanation`,
+      ),
+    };
+  });
+}
+
+function requireArtifactQueryAggregateRows(
+  value: unknown,
+  field: string,
+): ArtifactQueryAggregateRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      groupKey: requireString(row.group_key, `${field}[${index}].group_key`),
+      groupLabel: requireString(row.group_label, `${field}[${index}].group_label`),
+      caseCount: requireCount(row.case_count, `${field}[${index}].case_count`),
+    };
+  });
+}
+
+export function validateArtifactQueryResponse(payload: unknown): ArtifactQueryResponse {
+  const data = requireObject(payload, "query");
+  const mode = requireString(data.mode, "query.mode");
+  const base = {
+    source: requireSource(data.source, "query.source"),
+    filters: requireQueryFilters(data.filters, "query.filters"),
+    facets: requireQueryFacets(data.facets, "query.facets"),
+  };
+  if (mode === "cases") {
+    return {
+      ...base,
+      mode,
+      rows: requireArtifactQueryCaseRows(data.rows, "query.rows"),
+    };
+  }
+  if (mode === "deltas") {
+    return {
+      ...base,
+      mode,
+      rows: requireArtifactQueryDeltaRows(data.rows, "query.rows"),
+    };
+  }
+  if (mode === "aggregates") {
+    return {
+      ...base,
+      mode,
+      rows: requireArtifactQueryAggregateRows(data.rows, "query.rows"),
+    };
+  }
+  throw new Error("query.mode must be cases, deltas, or aggregates");
+}
+
+export async function loadArtifactQuery(
+  searchParams: URLSearchParams,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ArtifactQueryResponse> {
+  const response = await fetchImpl(buildArtifactQueryPath(searchParams));
+  if (!response.ok) {
+    throw new Error(`artifact query request failed with status ${response.status}`);
+  }
+  const payload = await response.json();
+  return validateArtifactQueryResponse(payload);
 }
 
 export function validateArtifactOverview(payload: unknown): ArtifactOverview {

@@ -106,6 +106,8 @@ def test_python_module_entrypoint_prints_new_help_surface_without_args() -> None
     assert "compare" in result.stdout
     assert "demo" in result.stdout
     assert "datasets" in result.stdout
+    assert "index" in result.stdout
+    assert "query" in result.stdout
     assert "run-baseline" not in result.stdout
 
 
@@ -125,6 +127,38 @@ def test_run_help_describes_current_working_directory_default() -> None:
     assert "--model-option" in result.stdout
     assert "--ollama-host" in result.stdout
     assert "--anthropic-base-url" in result.stdout
+
+
+def test_query_help_describes_cross_run_filtering_and_json_output() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "query", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--failure-type" in result.stdout
+    assert "--delta" in result.stdout
+    assert "--aggregate-by" in result.stdout
+    assert "--last-n" in result.stdout
+    assert "--json" in result.stdout
+
+
+def test_index_rebuild_help_is_exposed() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "index", "rebuild", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "Rebuild the derived local query index from saved artifacts." in result.stdout
 
 
 def test_cli_module_import_does_not_load_matplotlib() -> None:

@@ -1,6 +1,8 @@
 import path from "node:path";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { promisify } from "node:util";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -9,11 +11,13 @@ const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
 const COMPARISONS_INDEX_PATH = "/__failure_lab__/artifacts/comparisons.json";
 const COMPARISON_DETAIL_PATH = "/__failure_lab__/artifacts/comparison-detail.json";
 const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
+const ARTIFACT_QUERY_PATH = "/__failure_lab__/artifacts/query.json";
 const ARTIFACT_ROOT_ENV = "FAILURE_LAB_ARTIFACT_ROOT";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
 const REPORT_FILENAME = "report.json";
 const REPORT_DETAILS_FILENAME = "report_details.json";
+const execFileAsync = promisify(execFile);
 
 type ArtifactSourceConfig = {
   label: string;
@@ -212,6 +216,7 @@ type RunDetailPayload = {
 function failureLabArtifactsPlugin(): Plugin {
   const repoRoot = path.resolve(__dirname, "..");
   const artifactSource = resolveArtifactSource(repoRoot);
+  const queryBridgePath = path.join(repoRoot, "scripts", "query_bridge.py");
 
   function resolveArtifactSource(rootPath: string): ArtifactSourceConfig {
     const override = process.env[ARTIFACT_ROOT_ENV]?.trim();
@@ -233,6 +238,34 @@ function failureLabArtifactsPlugin(): Plugin {
       runsPath: source.runsPath,
       reportsPath: source.reportsPath,
     };
+  }
+
+  async function invokeQueryBridge<T>(
+    command: string,
+    args: string[] = [],
+  ): Promise<T> {
+    const pythonPathEntries = [path.join(repoRoot, "src")];
+    if (process.env.PYTHONPATH) {
+      pythonPathEntries.push(process.env.PYTHONPATH);
+    }
+
+    const { stdout, stderr } = await execFileAsync(
+      "python3",
+      [queryBridgePath, command, "--root", artifactSource.path, ...args],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          PYTHONPATH: pythonPathEntries.join(path.delimiter),
+        },
+      },
+    );
+
+    if (stderr.trim().length > 0) {
+      process.stderr.write(stderr);
+    }
+
+    return JSON.parse(stdout) as T;
   }
 
   function requireStringField(
@@ -1314,16 +1347,16 @@ function failureLabArtifactsPlugin(): Plugin {
   }
 
   async function buildArtifactOverview() {
-    const [runInventory, comparisonInventory] = await Promise.all([
-      collectRunInventory(artifactSource.runsPath),
-      collectComparisonInventory(artifactSource.reportsPath),
+    const [overview, runInventory, comparisonInventory] = await Promise.all([
+      invokeQueryBridge<{ comparison_count: number; run_count: number }>("overview"),
+      invokeQueryBridge<RunInventoryRow[]>("runs"),
+      invokeQueryBridge<ComparisonInventoryRow[]>("comparisons"),
     ]);
-
-    const issues = [...runInventory.issues, ...comparisonInventory.issues];
+    const issues: string[] = [];
     const status =
       issues.length > 0
         ? "incompatible"
-        : runInventory.rows.length === 0 && comparisonInventory.rows.length === 0
+        : overview.run_count === 0 && overview.comparison_count === 0
           ? "empty"
           : "ready";
 
@@ -1331,12 +1364,12 @@ function failureLabArtifactsPlugin(): Plugin {
       status,
       source: sourcePayload(artifactSource),
       runs: {
-        count: runInventory.rows.length,
-        ids: runInventory.rows.map((row) => row.run_id),
+        count: overview.run_count,
+        ids: runInventory.map((row) => row.run_id),
       },
       comparisons: {
-        count: comparisonInventory.rows.length,
-        ids: comparisonInventory.rows.map((row) => row.report_id),
+        count: overview.comparison_count,
+        ids: comparisonInventory.map((row) => row.report_id),
       },
       issues,
       message:
@@ -1380,26 +1413,14 @@ function failureLabArtifactsPlugin(): Plugin {
     res: ServerResponse,
   ): Promise<void> {
     try {
-      const runInventory = await collectRunInventory(artifactSource.runsPath);
-      if (runInventory.issues.length > 0) {
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            source: sourcePayload(artifactSource),
-            runs: [],
-            issues: runInventory.issues,
-          }),
-        );
-        return;
-      }
+      const runInventory = await invokeQueryBridge<RunInventoryRow[]>("runs");
 
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify({
           source: sourcePayload(artifactSource),
-          runs: runInventory.rows,
+          runs: runInventory,
         }),
       );
     } catch (error) {
@@ -1420,27 +1441,16 @@ function failureLabArtifactsPlugin(): Plugin {
     res: ServerResponse,
   ): Promise<void> {
     try {
-      const comparisonInventory = await collectComparisonInventory(artifactSource.reportsPath);
-      if (comparisonInventory.issues.length > 0) {
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            source: sourcePayload(artifactSource),
-            comparisons: [],
-            message: comparisonInventory.issues[0],
-            issues: comparisonInventory.issues,
-          }),
-        );
-        return;
-      }
+      const comparisonInventory = await invokeQueryBridge<ComparisonInventoryRow[]>(
+        "comparisons",
+      );
 
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify({
           source: sourcePayload(artifactSource),
-          comparisons: comparisonInventory.rows,
+          comparisons: comparisonInventory,
         }),
       );
     } catch (error) {
@@ -1456,6 +1466,49 @@ function failureLabArtifactsPlugin(): Plugin {
           issues: [message],
         }),
       );
+    }
+  }
+
+  async function handleArtifactQuery(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const requestUrl = new URL(req.url ?? ARTIFACT_QUERY_PATH, "http://failure-lab.local");
+    const mode = requestUrl.searchParams.get("mode") ?? "cases";
+    const args = ["--mode", mode];
+    const optionMap: Array<[string, string]> = [
+      ["failureType", "--failure-type"],
+      ["model", "--model"],
+      ["dataset", "--dataset"],
+      ["runId", "--run-id"],
+      ["reportId", "--report-id"],
+      ["baselineRunId", "--baseline-run-id"],
+      ["candidateRunId", "--candidate-run-id"],
+      ["delta", "--delta"],
+      ["aggregateBy", "--aggregate-by"],
+      ["lastN", "--last-n"],
+      ["since", "--since"],
+      ["until", "--until"],
+      ["limit", "--limit"],
+    ];
+
+    for (const [searchKey, argName] of optionMap) {
+      const value = requestUrl.searchParams.get(searchKey);
+      if (value && value.trim().length > 0) {
+        args.push(argName, value);
+      }
+    }
+
+    try {
+      const payload = await invokeQueryBridge("query", args);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "artifact query failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
     }
   }
 
@@ -1565,6 +1618,11 @@ function failureLabArtifactsPlugin(): Plugin {
 
       if (pathname === RUN_DETAIL_PATH) {
         void handleRunDetail(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_QUERY_PATH) {
+        void handleArtifactQuery(req, res).catch(next);
         return;
       }
 
