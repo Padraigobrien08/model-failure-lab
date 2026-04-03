@@ -174,6 +174,38 @@ The package also exposes simple registration seams for future extension:
 - `register_model(...)`
 - `register_classifier(...)`
 
+## Deterministic Insight Test Data
+
+If you want a reusable local workspace for `/analysis`, comparison explanation, and insight
+drillthrough without depending on external models, generate the checked-in fixture workspace:
+
+```bash
+python3 scripts/generate_insight_fixture.py
+```
+
+By default that writes a deterministic artifact root at
+`artifacts/insight-fixture-workspace` with:
+
+- 1 dataset snapshot
+- 4 compatible runs
+- 4 run reports
+- 3 comparison reports
+- a rebuilt local query index
+
+Then point the debugger at it:
+
+```bash
+export FAILURE_LAB_ARTIFACT_ROOT="$(pwd)/artifacts/insight-fixture-workspace"
+npm --prefix frontend run dev
+```
+
+Useful smoke commands against that workspace:
+
+```bash
+failure-lab query --root artifacts/insight-fixture-workspace --failure-type hallucination --last-n 4 --summarize
+failure-lab compare <baseline-run-id> <candidate-run-id> --root artifacts/insight-fixture-workspace --explain
+```
+
 ## Development Setup
 
 Editable install:
