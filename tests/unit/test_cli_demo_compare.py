@@ -8,7 +8,9 @@ import threading
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib import error, request
 
+import model_failure_lab.adapters.anthropic_adapter as anthropic_adapter_module
 import model_failure_lab.runner.execute as runner_execute_module
 from model_failure_lab.adapters import ModelMetadata, ModelRequest, ModelResult, register_model
 from model_failure_lab.classifiers import ClassifierInput, ClassifierResult, register_classifier
@@ -22,6 +24,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
 OLLAMA_SYSTEM_PROMPT = "Be concise."
 OLLAMA_MODEL_OPTION = "temperature=0"
+ANTHROPIC_SYSTEM_PROMPT = "Be concise."
+ANTHROPIC_MODEL_OPTION = "max_tokens=256"
 
 
 def _write_dataset(path: Path, dataset: FailureDataset) -> None:
@@ -132,6 +136,110 @@ class OllamaStubServer:
                 del format, args
 
         return Handler
+
+
+class AnthropicStubServer:
+    def __init__(self, *, error_status: int | None = None, error_body: str = "stubbed failure"):
+        self.requests: list[dict[str, object]] = []
+        self._error_status = error_status
+        self._error_body = error_body
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._build_handler())
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+
+    @property
+    def base_url(self) -> str:
+        host, port = self._server.server_address
+        return f"http://{host}:{port}"
+
+    def __enter__(self) -> "AnthropicStubServer":
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=5)
+
+    def _build_handler(self):
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:  # noqa: N802
+                if self.path != "/v1/messages":
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+
+                length = int(self.headers.get("Content-Length", "0"))
+                raw_body = self.rfile.read(length).decode("utf-8")
+                payload = json.loads(raw_body)
+                outer.requests.append(payload)
+
+                if outer._error_status is not None:
+                    response_body = outer._error_body.encode("utf-8")
+                    self.send_response(outer._error_status)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.send_header("Content-Length", str(len(response_body)))
+                    self.end_headers()
+                    self.wfile.write(response_body)
+                    return
+
+                response_payload = {
+                    "id": "msg_123",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": str(payload["model"]),
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"model:{payload['model']}::{payload['messages'][0]['content']}",
+                        }
+                    ],
+                    "stop_reason": "end_turn",
+                    "usage": {
+                        "input_tokens": 9,
+                        "output_tokens": 5,
+                    },
+                }
+                response_body = json.dumps(response_payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(response_body)))
+                self.end_headers()
+                self.wfile.write(response_body)
+
+            def log_message(self, format: str, *args: object) -> None:
+                del format, args
+
+        return Handler
+
+
+class AnthropicHttpStubClient:
+    def __init__(self, base_url: str | None) -> None:
+        if base_url is None:
+            raise RuntimeError("Anthropic base URL is required for the local stub client")
+        self._base_url = base_url.rstrip("/")
+        self.messages = self
+
+    def create(self, **kwargs: object) -> dict[str, object]:
+        request_body = json.dumps(kwargs).encode("utf-8")
+        http_request = request.Request(
+            f"{self._base_url}/v1/messages",
+            data=request_body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with request.urlopen(http_request) as http_response:
+                response_body = http_response.read().decode("utf-8")
+        except error.HTTPError as exc:
+            response_body = exc.read().decode("utf-8", errors="replace").strip()
+            message = f"HTTP {exc.code}"
+            if response_body:
+                message = f"{message}: {response_body}"
+            raise ConnectionError(message) from exc
+
+        return json.loads(response_body)
 
 
 def _write_saved_run(
@@ -629,5 +737,158 @@ def test_run_command_surfaces_ollama_http_failures_in_summary(tmp_path, capsys) 
     assert "Warning: run completed with per-case errors." in captured.out
     assert (
         f"First error: model_invoke: Ollama request to {stub.base_url} failed with HTTP 500: "
+        "stubbed failure"
+    ) in captured.out
+
+
+def test_cli_anthropic_stub_loop_runs_report_and_compare(tmp_path, monkeypatch, capsys) -> None:
+    classifier_id = "unit-cli-anthropic-compare-classifier"
+    register_classifier(classifier_id, CompareCliClassifier())
+
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+    )
+
+    monkeypatch.setattr(
+        anthropic_adapter_module,
+        "_default_client_factory",
+        lambda base_url: AnthropicHttpStubClient(base_url),
+    )
+
+    with AnthropicStubServer() as stub:
+        baseline_exit = main(
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--model",
+                "anthropic:baseline-model",
+                "--classifier",
+                classifier_id,
+                "--anthropic-base-url",
+                stub.base_url,
+                "--system-prompt",
+                ANTHROPIC_SYSTEM_PROMPT,
+                "--model-option",
+                ANTHROPIC_MODEL_OPTION,
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        baseline_output = capsys.readouterr().out
+
+        candidate_exit = main(
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--model",
+                "anthropic:candidate-model",
+                "--classifier",
+                classifier_id,
+                "--anthropic-base-url",
+                stub.base_url,
+                "--system-prompt",
+                ANTHROPIC_SYSTEM_PROMPT,
+                "--model-option",
+                ANTHROPIC_MODEL_OPTION,
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        candidate_output = capsys.readouterr().out
+
+        run_dirs = sorted((tmp_path / "runs").iterdir())
+        baseline_run_id = run_dirs[0].name
+        candidate_run_id = run_dirs[1].name
+
+        report_exit = main(["report", "--run", baseline_run_id, "--root", str(tmp_path)])
+        report_output = capsys.readouterr().out
+
+        compare_exit = main(
+            [
+                "compare",
+                baseline_run_id,
+                candidate_run_id,
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        compare_output = capsys.readouterr().out
+
+    report_dirs = sorted((tmp_path / "reports").iterdir())
+    report_payloads = [read_json(report_dir / "report.json") for report_dir in report_dirs]
+    compare_payload = next(
+        payload for payload in report_payloads if payload["metadata"]["report_kind"] == "comparison"
+    )
+
+    assert baseline_exit == 0
+    assert candidate_exit == 0
+    assert report_exit == 0
+    assert compare_exit == 0
+    assert "Adapter: anthropic" in baseline_output
+    assert "Adapter: anthropic" in candidate_output
+    assert "Failure Lab Report" in report_output
+    assert "Failure Lab Compare" in compare_output
+    assert "Status: improved" in compare_output
+    assert "Compatible: True" in compare_output
+    assert "Case changes: improvements=1" in compare_output
+    assert len(run_dirs) == 2
+    assert len(report_dirs) == 2
+    assert all(request["system"] == ANTHROPIC_SYSTEM_PROMPT for request in stub.requests)
+    assert all(request["max_tokens"] == 256 for request in stub.requests)
+    assert compare_payload["status"]["overall"] == "improved"
+    assert compare_payload["comparison"]["compatible"] is True
+    assert read_json(run_dirs[0] / "run.json")["metadata"]["adapter_id"] == "anthropic"
+    assert read_json(run_dirs[1] / "run.json")["metadata"]["adapter_id"] == "anthropic"
+
+
+def test_run_command_surfaces_anthropic_http_failures_in_summary(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        ),
+    )
+
+    monkeypatch.setattr(
+        anthropic_adapter_module,
+        "_default_client_factory",
+        lambda base_url: AnthropicHttpStubClient(base_url),
+    )
+
+    with AnthropicStubServer(error_status=500, error_body="stubbed failure") as stub:
+        exit_code = main(
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--model",
+                "anthropic:claude-sonnet-4-0",
+                "--anthropic-base-url",
+                stub.base_url,
+                "--root",
+                str(tmp_path),
+            ]
+        )
+        captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Status: completed_with_errors" in captured.out
+    assert "Warning: run completed with per-case errors." in captured.out
+    assert (
+        f"First error: model_invoke: Anthropic request to {stub.base_url} failed: HTTP 500: "
         "stubbed failure"
     ) in captured.out

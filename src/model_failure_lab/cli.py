@@ -83,8 +83,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--model",
         required=True,
         help=(
-            "Use `demo` for deterministic local execution or an OpenAI model name "
-            "such as `gpt-4.1-mini`."
+            "Use `demo` for deterministic local execution, an OpenAI model name such as "
+            "`gpt-4.1-mini`, or explicit adapter routing such as `ollama:<model>` or "
+            "`anthropic:<model>`."
         ),
     )
     run_parser.add_argument(
@@ -122,6 +123,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--ollama-host",
         help="Override the Ollama host URL when using `--model ollama:<model>`.",
+    )
+    run_parser.add_argument(
+        "--anthropic-base-url",
+        help="Override the Anthropic base URL when using `--model anthropic:<model>`.",
     )
     run_parser.set_defaults(handler=_handle_run)
 
@@ -211,6 +216,7 @@ def _handle_run(args: argparse.Namespace) -> int:
         system_prompt=args.system_prompt,
         model_options=_parse_model_options(args.model_option),
         ollama_host=args.ollama_host,
+        anthropic_base_url=args.anthropic_base_url,
     )
     execution = execute_dataset_run(
         dataset=dataset,
@@ -341,6 +347,7 @@ def _build_run_config(
     system_prompt: str | None = None,
     model_options: dict[str, object] | None = None,
     ollama_host: str | None = None,
+    anthropic_base_url: str | None = None,
 ) -> dict[str, object]:
     config: dict[str, object] = {}
     if dataset_source == "bundled":
@@ -357,6 +364,13 @@ def _build_run_config(
         if not ollama_host.strip():
             raise ValueError("`--ollama-host` must be a non-empty URL")
         parsed_model_options["base_url"] = ollama_host.strip()
+
+    if anthropic_base_url is not None:
+        if adapter_id != "anthropic":
+            raise ValueError("`--anthropic-base-url` requires `--model anthropic:<model>`")
+        if not anthropic_base_url.strip():
+            raise ValueError("`--anthropic-base-url` must be a non-empty URL")
+        parsed_model_options["base_url"] = anthropic_base_url.strip()
 
     if parsed_model_options:
         config["model_options"] = parsed_model_options

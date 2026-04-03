@@ -8,6 +8,7 @@ import sys
 import tomllib
 from pathlib import Path
 
+import model_failure_lab.adapters.anthropic_adapter as anthropic_adapter_module
 import model_failure_lab.adapters.ollama_adapter as ollama_adapter_module
 import model_failure_lab.datasets as datasets_module
 from model_failure_lab.cli import main
@@ -58,7 +59,8 @@ def test_pyproject_optional_dependencies_expose_explicit_provider_and_legacy_gro
     payload = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     optional_dependencies = payload["project"]["optional-dependencies"]
 
-    assert set(optional_dependencies) == {"dev", "legacy", "openai", "ui"}
+    assert set(optional_dependencies) == {"anthropic", "dev", "legacy", "openai", "ui"}
+    assert optional_dependencies["anthropic"] == ["anthropic"]
     assert optional_dependencies["openai"] == ["openai>=1.0.0"]
     assert optional_dependencies["ui"] == ["streamlit"]
     assert optional_dependencies["dev"] == ["pytest", "ruff"]
@@ -77,9 +79,11 @@ def test_readme_install_surface_maps_base_install_and_optional_extras() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "python3 -m pip install ." in readme
+    assert "python3 -m pip install '.[anthropic]'" in readme
     assert "python3 -m pip install '.[openai]'" in readme
     assert "python3 -m pip install '.[legacy]'" in readme
     assert "python3 -m pip install '.[ui]'" in readme
+    assert "model-failure-lab[anthropic]" in readme
     assert "model-failure-lab[openai]" in readme
     assert "model-failure-lab[legacy]" in readme
     assert "model-failure-lab[ui]" in readme
@@ -120,6 +124,7 @@ def test_run_help_describes_current_working_directory_default() -> None:
     assert "--system-prompt" in result.stdout
     assert "--model-option" in result.stdout
     assert "--ollama-host" in result.stdout
+    assert "--anthropic-base-url" in result.stdout
 
 
 def test_cli_module_import_does_not_load_matplotlib() -> None:
@@ -488,6 +493,127 @@ def test_run_command_threads_explicit_ollama_config_into_run_artifacts(
     assert ollama_calls[0]["payload"]["system"] == "Be concise."
     assert ollama_calls[0]["payload"]["options"]["temperature"] == 0
     assert ollama_calls[0]["payload"]["options"]["stop"] == ["DONE"]
+
+
+def test_run_command_threads_explicit_anthropic_config_into_run_artifacts(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            name="Reasoning Basics",
+            cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        ),
+    )
+    anthropic_base_urls: list[str | None] = []
+    anthropic_calls: list[dict[str, object]] = []
+
+    class FakeAnthropicMessagesAPI:
+        def create(self, **kwargs: object) -> dict[str, object]:
+            anthropic_calls.append(dict(kwargs))
+            return {
+                "id": "msg_123",
+                "type": "message",
+                "role": "assistant",
+                "model": str(kwargs["model"]),
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"model:{kwargs['model']}::{kwargs['messages'][0]['content']}",
+                    }
+                ],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 8, "output_tokens": 5},
+            }
+
+    class FakeAnthropicClient:
+        def __init__(self) -> None:
+            self.messages = FakeAnthropicMessagesAPI()
+
+    def fake_client_factory(base_url: str | None):
+        anthropic_base_urls.append(base_url)
+        return FakeAnthropicClient()
+
+    monkeypatch.setattr(anthropic_adapter_module, "_default_client_factory", fake_client_factory)
+
+    exit_code = main(
+        [
+            "run",
+            "--dataset",
+            str(dataset_path),
+            "--model",
+            "anthropic:claude-sonnet-4-0",
+            "--anthropic-base-url",
+            "http://127.0.0.1:8000",
+            "--system-prompt",
+            "Be concise.",
+            "--model-option",
+            "max_tokens=256",
+            "--model-option",
+            "temperature=0",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    run_dir = sorted((tmp_path / "runs").iterdir())[0]
+    run_payload = read_json(run_dir / "run.json")
+
+    assert exit_code == 0
+    assert "Adapter: anthropic" in captured.out
+    assert run_payload["config"] == {
+        "system_prompt": "Be concise.",
+        "model_options": {
+            "max_tokens": 256,
+            "temperature": 0,
+            "base_url": "http://127.0.0.1:8000",
+        },
+    }
+    assert anthropic_base_urls == ["http://127.0.0.1:8000"]
+    assert anthropic_calls == [
+        {
+            "model": "claude-sonnet-4-0",
+            "messages": [{"role": "user", "content": "Explain why 2 + 2 = 4."}],
+            "system": "Be concise.",
+            "max_tokens": 256,
+            "temperature": 0,
+        }
+    ]
+
+
+def test_run_command_rejects_anthropic_base_url_for_non_anthropic_models(
+    tmp_path, capsys
+) -> None:
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            name="Reasoning Basics",
+            cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        ),
+    )
+
+    exit_code = main(
+        [
+            "run",
+            "--dataset",
+            str(dataset_path),
+            "--model",
+            "demo",
+            "--anthropic-base-url",
+            "http://127.0.0.1:8000",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "`--anthropic-base-url` requires `--model anthropic:<model>`" in captured.err
 
 
 def test_run_command_rejects_malformed_model_option(tmp_path, capsys) -> None:
