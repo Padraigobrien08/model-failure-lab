@@ -93,7 +93,19 @@ Everything stays inspectable by hand. There is no database layer.
 
 - `demo` for deterministic local execution
 - OpenAI model names such as `gpt-4.1-mini`
+- Ollama models through explicit routing such as `ollama:llama3.2`
 - explicit adapter routing with `<adapter>:<model>`
+
+One explicit local Ollama example:
+
+```bash
+failure-lab run \
+  --dataset reasoning-failures-v1 \
+  --model ollama:llama3.2 \
+  --ollama-host http://localhost:11434 \
+  --system-prompt "Be concise." \
+  --model-option temperature=0
+```
 
 The package also exposes simple registration seams for future extension:
 

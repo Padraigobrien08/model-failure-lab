@@ -8,6 +8,7 @@ import sys
 import tomllib
 from pathlib import Path
 
+import model_failure_lab.adapters.ollama_adapter as ollama_adapter_module
 import model_failure_lab.datasets as datasets_module
 from model_failure_lab.cli import main
 from model_failure_lab.datasets import FailureDataset
@@ -78,6 +79,9 @@ def test_run_help_describes_current_working_directory_default() -> None:
 
     assert result.returncode == 0
     assert "Defaults to the current working directory." in result.stdout
+    assert "--system-prompt" in result.stdout
+    assert "--model-option" in result.stdout
+    assert "--ollama-host" in result.stdout
 
 
 def test_cli_module_import_does_not_load_matplotlib() -> None:
@@ -358,6 +362,108 @@ def test_run_command_supports_rag_bundled_dataset_ids(tmp_path, capsys) -> None:
     assert "Dataset: rag-failures-v1" in captured.out
     assert "Dataset scope: core" in captured.out
     assert results_payload["total_cases"] == 8
+
+
+def test_run_command_threads_explicit_ollama_config_into_run_artifacts(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            name="Reasoning Basics",
+            cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        ),
+    )
+    ollama_calls: list[dict[str, object]] = []
+
+    def fake_post_json(base_url: str, payload: dict[str, object], timeout_seconds: float | None):
+        ollama_calls.append(
+            {
+                "base_url": base_url,
+                "payload": dict(payload),
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        return {
+            "model": str(payload["model"]),
+            "response": f"model:{payload['model']}::{payload['prompt']}",
+            "done": True,
+            "prompt_eval_count": 8,
+            "eval_count": 5,
+        }
+
+    monkeypatch.setattr(ollama_adapter_module, "_post_json", fake_post_json)
+
+    exit_code = main(
+        [
+            "run",
+            "--dataset",
+            str(dataset_path),
+            "--model",
+            "ollama:llama3.2",
+            "--ollama-host",
+            "http://127.0.0.1:11434",
+            "--system-prompt",
+            "Be concise.",
+            "--model-option",
+            "temperature=0",
+            "--model-option",
+            'stop=["DONE"]',
+            "--root",
+            str(tmp_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    run_dir = sorted((tmp_path / "runs").iterdir())[0]
+    run_payload = read_json(run_dir / "run.json")
+
+    assert exit_code == 0
+    assert "Adapter: ollama" in captured.out
+    assert run_payload["config"] == {
+        "system_prompt": "Be concise.",
+        "model_options": {
+            "temperature": 0,
+            "stop": ["DONE"],
+            "base_url": "http://127.0.0.1:11434",
+        },
+    }
+    assert ollama_calls[0]["base_url"] == "http://127.0.0.1:11434"
+    assert ollama_calls[0]["payload"]["system"] == "Be concise."
+    assert ollama_calls[0]["payload"]["options"]["temperature"] == 0
+    assert ollama_calls[0]["payload"]["options"]["stop"] == ["DONE"]
+
+
+def test_run_command_rejects_malformed_model_option(tmp_path, capsys) -> None:
+    dataset_path = tmp_path / "datasets" / "reasoning-basics-v1.json"
+    _write_dataset(
+        dataset_path,
+        FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            name="Reasoning Basics",
+            cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+        ),
+    )
+
+    exit_code = main(
+        [
+            "run",
+            "--dataset",
+            str(dataset_path),
+            "--model",
+            "ollama:llama3.2",
+            "--model-option",
+            "temperature=oops",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "model option must use `key=json-value`" in captured.err
 
 
 def test_datasets_list_command_shows_compact_bundled_catalog(capsys) -> None:
