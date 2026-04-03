@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+import model_failure_lab.adapters.ollama_adapter as ollama_adapter_module
 from model_failure_lab.adapters import ModelMetadata, ModelRequest, ModelResult, register_model
 from model_failure_lab.classifiers import ClassifierInput, ClassifierResult, register_classifier
 from model_failure_lab.datasets import FailureDataset
@@ -231,3 +232,81 @@ def test_execute_dataset_run_uses_model_and_config_in_run_identity() -> None:
 
     assert baseline.run.run_id != different_model.run.run_id
     assert baseline.run.run_id != different_config.run.run_id
+
+
+def test_execute_dataset_run_persists_builtin_ollama_artifacts(tmp_path, monkeypatch) -> None:
+    register_classifier("unit-ollama-pass-through-classifier", PassThroughClassifier())
+    ollama_calls: list[dict[str, object]] = []
+
+    def fake_post_json(base_url: str, payload: dict[str, object], timeout_seconds: float | None):
+        ollama_calls.append(
+            {
+                "base_url": base_url,
+                "payload": dict(payload),
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        return {
+            "model": str(payload["model"]),
+            "response": f"ollama:{payload['model']}::{payload['prompt']}",
+            "done": True,
+            "prompt_eval_count": 6,
+            "eval_count": 4,
+        }
+
+    monkeypatch.setattr(ollama_adapter_module, "_post_json", fake_post_json)
+
+    dataset = FailureDataset(
+        dataset_id="reasoning-basics-v1",
+        cases=(PromptCase(id="case-001", prompt="Explain why 2 + 2 = 4."),),
+    )
+    run_execution = execute_dataset_run(
+        dataset=dataset,
+        adapter_id="ollama",
+        classifier_id="unit-ollama-pass-through-classifier",
+        model="llama3.2",
+        run_seed=13,
+        run_config={
+            "system_prompt": "Be concise.",
+            "model_options": {
+                "temperature": 0,
+                "base_url": "http://127.0.0.1:11434",
+                "timeout_seconds": 3,
+            },
+        },
+        now=datetime(2026, 4, 3, 7, 25, 0, tzinfo=timezone.utc),
+    )
+
+    run_path, results_path = write_run_artifacts(run_execution, root=tmp_path)
+    run_payload = read_json(run_path)
+    results_payload = read_json(results_path)
+
+    assert run_execution.adapter_id == "ollama"
+    assert run_execution.status == "completed"
+    assert ollama_calls == [
+        {
+            "base_url": "http://127.0.0.1:11434",
+            "payload": {
+                "model": "llama3.2",
+                "prompt": "Explain why 2 + 2 = 4.",
+                "system": "Be concise.",
+                "stream": False,
+                "options": {
+                    "temperature": 0,
+                    "seed": run_execution.case_results[0].execution.case_seed,
+                },
+            },
+            "timeout_seconds": 3.0,
+        }
+    ]
+    assert run_payload["metadata"]["adapter_id"] == "ollama"
+    assert results_payload["cases"][0]["execution"]["adapter_id"] == "ollama"
+    assert results_payload["cases"][0]["execution"]["model"] == "llama3.2"
+    assert results_payload["cases"][0]["execution"]["usage"] == {
+        "prompt_tokens": 6,
+        "completion_tokens": 4,
+        "total_tokens": 10,
+    }
+    assert results_payload["cases"][0]["output"] == {
+        "text": "ollama:llama3.2::Explain why 2 + 2 = 4."
+    }
