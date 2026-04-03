@@ -11,18 +11,28 @@ import type {
 } from "@/lib/artifacts/types";
 
 const nativeScrollIntoView = HTMLElement.prototype.scrollIntoView;
+const DEFAULT_SOURCE = {
+  label: "Repo root artifact store",
+  path: "/tmp/model-failure-lab",
+  runsPath: "/tmp/model-failure-lab/runs",
+  reportsPath: "/tmp/model-failure-lab/reports",
+};
+const CONFIGURED_SOURCE = {
+  label: "Configured artifact store",
+  path: "/tmp/external-artifacts",
+  runsPath: "/tmp/external-artifacts/runs",
+  reportsPath: "/tmp/external-artifacts/reports",
+};
 
-function buildReadyArtifactState(comparisonIds: string[]): ArtifactShellState {
+function buildReadyArtifactState(
+  comparisonIds: string[],
+  source = DEFAULT_SOURCE,
+): ArtifactShellState {
   return {
     status: "ready",
     overview: {
       status: "ready",
-      source: {
-        label: "Repo root artifact store",
-        path: "/tmp/model-failure-lab",
-        runsPath: "/tmp/model-failure-lab/runs",
-        reportsPath: "/tmp/model-failure-lab/reports",
-      },
+      source,
       runs: {
         count: 2,
         ids: ["run_alpha", "run_beta"],
@@ -54,32 +64,25 @@ function buildReadyRunInventoryState(
       status: "completed",
     },
   ],
+  source = DEFAULT_SOURCE,
 ): RunInventoryState {
   return {
     status: "ready",
     inventory: {
-      source: {
-        label: "Repo root artifact store",
-        path: "/tmp/model-failure-lab",
-        runsPath: "/tmp/model-failure-lab/runs",
-        reportsPath: "/tmp/model-failure-lab/reports",
-      },
+      source,
       runs,
     },
     message: null,
   };
 }
 
-function buildReadyComparisonInventoryState(): ComparisonInventoryState {
+function buildReadyComparisonInventoryState(
+  source = DEFAULT_SOURCE,
+): ComparisonInventoryState {
   return {
     status: "ready",
     inventory: {
-      source: {
-        label: "Repo root artifact store",
-        path: "/tmp/model-failure-lab",
-        runsPath: "/tmp/model-failure-lab/runs",
-        reportsPath: "/tmp/model-failure-lab/reports",
-      },
+      source,
       comparisons: [
         {
           reportId: "compare_alpha_to_beta",
@@ -105,14 +108,9 @@ function buildReadyComparisonInventoryState(): ComparisonInventoryState {
   };
 }
 
-function buildCompatibleDetail(): ComparisonDetail {
+function buildCompatibleDetail(source = DEFAULT_SOURCE): ComparisonDetail {
   return {
-    source: {
-      label: "Repo root artifact store",
-      path: "/tmp/model-failure-lab",
-      runsPath: "/tmp/model-failure-lab/runs",
-      reportsPath: "/tmp/model-failure-lab/reports",
-    },
+    source,
     comparison: {
       reportId: "compare_alpha_to_beta",
       createdAt: "2026-03-30T12:00:00Z",
@@ -883,6 +881,29 @@ describe("comparison detail route", () => {
     expect(within(artifactContext).getAllByText("compare_alpha_to_beta").length).toBeGreaterThan(0);
     expect(within(artifactContext).getAllByText("case-002").length).toBeGreaterThan(0);
     expect(within(artifactContext).getByText("/tmp/model-failure-lab")).toBeInTheDocument();
+  });
+
+  it("preserves configured artifact-source metadata on the comparison detail route", async () => {
+    mockComparisonDetail(buildCompatibleDetail(CONFIGURED_SOURCE));
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta?section=transitions&case=case-002&transition=failure_to_no_failure"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"], CONFIGURED_SOURCE)}
+        initialRunInventoryState={buildReadyRunInventoryState(undefined, CONFIGURED_SOURCE)}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState(CONFIGURED_SOURCE)}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Configured artifact store")).toBeInTheDocument();
+    expect(screen.getAllByText("/tmp/external-artifacts").length).toBeGreaterThan(0);
+
+    const artifactContext = screen.getByRole("region", { name: "Artifact context" });
+    expect(within(artifactContext).getByText("/tmp/external-artifacts")).toBeInTheDocument();
   });
 
   it("falls back with an explicit notice when exact baseline evidence cannot be resolved after navigation", async () => {
