@@ -75,7 +75,7 @@ export function ComparisonDetailPage() {
   const { reportId } = useParams();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { artifactState, comparisonInventoryState, runInventoryState } =
+  const { artifactState, artifactOverview, comparisonInventoryState, runInventoryState } =
     useAppRouteContext();
   const [detailState, setDetailState] = useState<ComparisonDetailState>({
     status: "idle",
@@ -411,7 +411,7 @@ export function ComparisonDetailPage() {
             <CardTitle>Loading selected comparison.</CardTitle>
             <CardDescription>
               The comparisons route is resolving the saved comparison detail payload from the
-              default local artifact root.
+              active artifact root.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -471,7 +471,8 @@ export function ComparisonDetailPage() {
           <CardHeader>
             <CardTitle>Loading comparison report detail.</CardTitle>
             <CardDescription>
-              Reading `report.json` and `report_details.json` for {comparison.reportId}.
+              Reading `report.json` and `report_details.json` for {comparison.reportId} from{" "}
+              {artifactOverview?.source.label ?? "the active artifact root"}.
             </CardDescription>
           </CardHeader>
         </Card>

@@ -126,7 +126,12 @@ export function RunDetailPage() {
   const { runId } = useParams();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { artifactState, runInventoryState, comparisonInventoryState } = useAppRouteContext();
+  const {
+    artifactState,
+    artifactOverview,
+    runInventoryState,
+    comparisonInventoryState,
+  } = useAppRouteContext();
   const [detailState, setDetailState] = useState<RunDetailState>({
     status: "idle",
     detail: null,
@@ -445,8 +450,8 @@ export function RunDetailPage() {
           <CardHeader>
             <CardTitle>Loading selected run.</CardTitle>
             <CardDescription>
-              The inventory route is resolving the saved run detail payload from the default
-              local artifact root.
+              The inventory route is resolving the saved run detail payload from the active
+              artifact root.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -507,7 +512,7 @@ export function RunDetailPage() {
             <CardTitle>Loading run report detail.</CardTitle>
             <CardDescription>
               Reading `run.json`, `results.json`, `report.json`, and `report_details.json` for{" "}
-              {run.runId}.
+              {run.runId} from {artifactOverview?.source.label ?? "the active artifact root"}.
             </CardDescription>
           </CardHeader>
         </Card>

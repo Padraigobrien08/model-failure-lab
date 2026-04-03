@@ -8,17 +8,27 @@ import type {
   RunInventoryState,
 } from "@/lib/artifacts/types";
 
-function buildReadyState(overrides?: Partial<ArtifactShellState & { status: "ready" }>): ArtifactShellState {
+const DEFAULT_SOURCE = {
+  label: "Repo root artifact store",
+  path: "/tmp/model-failure-lab",
+  runsPath: "/tmp/model-failure-lab/runs",
+  reportsPath: "/tmp/model-failure-lab/reports",
+};
+const CONFIGURED_SOURCE = {
+  label: "Configured artifact store",
+  path: "/tmp/external-artifacts",
+  runsPath: "/tmp/external-artifacts/runs",
+  reportsPath: "/tmp/external-artifacts/reports",
+};
+
+function buildReadyState(
+  overrides?: Partial<ArtifactShellState & { status: "ready" }>,
+): ArtifactShellState {
   return {
     status: "ready",
     overview: {
       status: "ready",
-      source: {
-        label: "Repo root artifact store",
-        path: "/tmp/model-failure-lab",
-        runsPath: "/tmp/model-failure-lab/runs",
-        reportsPath: "/tmp/model-failure-lab/reports",
-      },
+      source: DEFAULT_SOURCE,
       runs: {
         count: 2,
         ids: ["run_alpha", "run_beta"],
@@ -102,7 +112,12 @@ describe("App shell", () => {
       <App
         useMemoryRouter
         initialEntries={["/"]}
-        initialArtifactState={buildReadyState()}
+        initialArtifactState={buildReadyState({
+          overview: {
+            ...buildReadyState().overview,
+            source: CONFIGURED_SOURCE,
+          },
+        })}
         initialRunInventoryState={buildReadyInventoryState()}
         initialComparisonInventoryState={buildReadyComparisonInventoryState()}
       />,
@@ -113,7 +128,8 @@ describe("App shell", () => {
     expect(screen.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Comparisons" })).toBeInTheDocument();
     expect(screen.getByText("Artifact source")).toBeInTheDocument();
-    expect(screen.getByText("/tmp/model-failure-lab")).toBeInTheDocument();
+    expect(screen.getByText("Configured artifact store")).toBeInTheDocument();
+    expect(screen.getByText("/tmp/external-artifacts")).toBeInTheDocument();
     expect(screen.getByText("Runs 2")).toBeInTheDocument();
     expect(screen.getByText("Comparisons 1")).toBeInTheDocument();
   });
@@ -170,9 +186,7 @@ describe("App shell", () => {
     expect(
       screen.getByRole("heading", { name: "Loading saved engine artifacts." }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/scanning the default local artifact root/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/scanning the active artifact root/i)).toBeInTheDocument();
   });
 
   it("shows an explicit incompatible-artifact state instead of falling back to legacy data", () => {

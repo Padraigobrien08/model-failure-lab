@@ -27,8 +27,8 @@ export function ArtifactStatePanel({ area, state }: ArtifactStatePanelProps) {
           <CardHeader>
             <CardTitle>Loading saved engine artifacts.</CardTitle>
             <CardDescription>
-              The debugger is scanning the default local artifact root before it
-              mounts the new runs-first shell.
+              The debugger is scanning the active artifact root before it mounts
+              the runs-first shell.
             </CardDescription>
           </CardHeader>
         </Card>

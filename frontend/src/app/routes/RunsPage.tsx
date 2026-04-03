@@ -151,7 +151,7 @@ export function RunsPage() {
           <CardHeader>
             <CardTitle>Loading saved runs inventory.</CardTitle>
             <CardDescription>
-              The shell is resolving the browser-facing runs index from the default local artifact root.
+              The shell is resolving the browser-facing runs index from the active artifact root.
             </CardDescription>
           </CardHeader>
         </Card>
