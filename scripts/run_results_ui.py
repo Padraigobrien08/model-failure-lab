@@ -33,7 +33,8 @@ def _default_runner(app_path: Path, app_args: list[str], server_args: list[str])
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised through user runtime
         raise RuntimeError(
             "streamlit is not installed. Install the optional UI dependency with "
-            "`pip install 'model-failure-lab[ui]'`."
+            "`pip install 'model-failure-lab[ui]'` or, from a checkout, "
+            "`python -m pip install '.[ui]'`."
         ) from exc
 
     previous_argv = list(sys.argv)

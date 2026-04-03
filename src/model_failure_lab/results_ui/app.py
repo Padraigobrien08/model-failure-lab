@@ -51,7 +51,8 @@ def _import_streamlit() -> Any:
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised via script tests
         raise RuntimeError(
             "streamlit is not installed. Install the optional UI dependency with "
-            "`pip install 'model-failure-lab[ui]'`."
+            "`pip install 'model-failure-lab[ui]'` or, from a checkout, "
+            "`python -m pip install '.[ui]'`."
         ) from exc
     return st
 

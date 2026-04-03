@@ -73,6 +73,18 @@ def test_pyproject_optional_dependencies_expose_explicit_provider_and_legacy_gro
     ]
 
 
+def test_readme_install_surface_maps_base_install_and_optional_extras() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "python3 -m pip install ." in readme
+    assert "python3 -m pip install '.[openai]'" in readme
+    assert "python3 -m pip install '.[legacy]'" in readme
+    assert "python3 -m pip install '.[ui]'" in readme
+    assert "model-failure-lab[openai]" in readme
+    assert "model-failure-lab[legacy]" in readme
+    assert "model-failure-lab[ui]" in readme
+
+
 def test_python_module_entrypoint_prints_new_help_surface_without_args() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "model_failure_lab"],

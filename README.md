@@ -49,6 +49,30 @@ failure-lab datasets list
 All commands accept explicit paths and `--root` as well, so you can keep datasets, runs, and
 reports in an isolated workspace instead of the current directory.
 
+## Optional Extras
+
+The base install above is enough for the shipped artifact-backed engine loop:
+
+- bundled datasets
+- `failure-lab demo`
+- `failure-lab run`
+- `failure-lab report`
+- `failure-lab compare`
+- local Ollama routing such as `--model ollama:llama3.2`
+
+Install extras only when you need those optional surfaces from a repo checkout:
+
+| Need | Install |
+|------|---------|
+| OpenAI adapter support | `python3 -m pip install '.[openai]'` |
+| Legacy benchmark, training, and old reporting surfaces | `python3 -m pip install '.[legacy]'` |
+| Legacy Streamlit results explorer | `python3 -m pip install '.[ui]'` |
+| Test and lint tools | `python3 -m pip install '.[dev]'` |
+
+If you are installing from a built wheel or published distribution instead of a local checkout, the
+equivalent package form is `model-failure-lab[openai]`, `model-failure-lab[legacy]`, or
+`model-failure-lab[ui]`.
+
 ## Bundled Datasets
 
 The repo currently ships bundled packs for:
@@ -108,7 +132,7 @@ artifact-root picker; the server-side environment variable is the supported hand
 `failure-lab run` supports:
 
 - `demo` for deterministic local execution
-- OpenAI model names such as `gpt-4.1-mini`
+- OpenAI model names such as `gpt-4.1-mini` after installing `.[openai]`
 - Ollama models through explicit routing such as `ollama:llama3.2`
 - explicit adapter routing with `<adapter>:<model>`
 
@@ -145,10 +169,19 @@ Editable install:
 python3 -m pip install -e '.[dev]'
 ```
 
-Optional OpenAI adapter support:
+Add extras as needed from a checkout:
 
 ```bash
 python3 -m pip install -e '.[openai]'
+python3 -m pip install -e '.[ui]'
+python3 -m pip install -e '.[legacy]'
+```
+
+If you need the old benchmark and research surfaces while developing, install both dev tooling and
+the legacy runtime stack together:
+
+```bash
+python3 -m pip install -e '.[dev,legacy]'
 ```
 
 Focused checks:
