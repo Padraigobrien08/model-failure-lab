@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shlex
@@ -60,11 +61,12 @@ class SmokeFailure(RuntimeError):
         return "\n".join(lines)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
     temp_root = Path(tempfile.mkdtemp(prefix="failure-lab-package-smoke-"))
     keep_temp = False
     try:
-        run_smoke(temp_root)
+        run_smoke(temp_root, verify_debugger=args.verify_debugger)
     except SmokeFailure as exc:
         keep_temp = True
         print(exc.render(temp_root), file=sys.stderr)
@@ -79,7 +81,7 @@ def main() -> int:
     return 0
 
 
-def run_smoke(temp_root: Path) -> None:
+def run_smoke(temp_root: Path, *, verify_debugger: bool) -> None:
     env_root = temp_root / "venv"
     workspace_root = temp_root / "workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
@@ -149,7 +151,13 @@ def run_smoke(temp_root: Path) -> None:
         comparison_report_id=comparison_report_id,
     )
 
-    print("Package install smoke passed.")
+    if verify_debugger:
+        _verify_debugger_handoff(workspace_root)
+
+    if verify_debugger:
+        print("Package install smoke passed with debugger verification.")
+    else:
+        print("Package install smoke passed.")
 
 
 def _install_package(env_python: Path, env_root: Path) -> Path:
@@ -417,6 +425,23 @@ def _verify_artifacts(
         )
 
 
+def _verify_debugger_handoff(workspace_root: Path) -> None:
+    smoke_script = REPO_ROOT / "frontend" / "scripts" / "smoke-real-artifacts.mjs"
+    _run_command(
+        (
+            "node",
+            str(smoke_script),
+            "--mode",
+            "existing",
+            "--artifact-root",
+            str(workspace_root),
+        ),
+        cwd=REPO_ROOT,
+        stage="verify",
+        label="verify debugger handoff",
+    )
+
+
 def _require_run_artifacts(run_dir: Path) -> None:
     _require_file(run_dir / "run.json", "run artifact")
     _require_file(run_dir / "results.json", "results artifact")
@@ -443,6 +468,18 @@ def _read_json(path: Path) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise SmokeFailure("verify", f"expected object payload in {path}.")
     return payload
+
+
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Prove that the installed failure-lab package works end-to-end.",
+    )
+    parser.add_argument(
+        "--verify-debugger",
+        action="store_true",
+        help="Verify that the generated artifact workspace also loads through the debugger contract.",
+    )
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":

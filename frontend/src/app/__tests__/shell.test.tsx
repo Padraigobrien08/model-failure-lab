@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 
 import { App } from "@/app/App";
 import type {
+  ArtifactOverview,
   ArtifactShellState,
   ComparisonInventoryState,
   RunInventoryState,
@@ -108,15 +109,27 @@ describe("App shell", () => {
   });
 
   it("renders compact top navigation with the active artifact source", () => {
+    const configuredOverview: ArtifactOverview = {
+      status: "ready",
+      source: CONFIGURED_SOURCE,
+      runs: {
+        count: 2,
+        ids: ["run_alpha", "run_beta"],
+      },
+      comparisons: {
+        count: 1,
+        ids: ["compare_alpha_to_beta"],
+      },
+      issues: [],
+      message: null,
+    };
+
     render(
       <App
         useMemoryRouter
         initialEntries={["/"]}
         initialArtifactState={buildReadyState({
-          overview: {
-            ...buildReadyState().overview,
-            source: CONFIGURED_SOURCE,
-          },
+          overview: configuredOverview,
         })}
         initialRunInventoryState={buildReadyInventoryState()}
         initialComparisonInventoryState={buildReadyComparisonInventoryState()}

@@ -87,6 +87,22 @@ The main contracts are:
 
 Everything stays inspectable by hand. There is no database layer.
 
+## React Debugger Handoff
+
+The React debugger reads an existing artifact workspace through one supported seam:
+`FAILURE_LAB_ARTIFACT_ROOT`.
+
+Point it at the directory that contains `runs/`, `reports/`, and optional `datasets/`:
+
+```bash
+export FAILURE_LAB_ARTIFACT_ROOT=/path/to/failure-lab-workspace
+npm --prefix frontend run dev
+```
+
+That contract is the same whether the artifacts were written from this repo checkout, from a normal
+installed-package workflow, or from an Ollama-backed run. The debugger does not have an in-app
+artifact-root picker; the server-side environment variable is the supported handoff.
+
 ## Model Surface
 
 `failure-lab run` supports:
