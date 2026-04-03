@@ -371,6 +371,7 @@ def _verify_installed_dependency_metadata(env_python: Path) -> None:
             stderr=result.stderr,
         )
 
+    _require_extra_marker(optional_requirements, "anthropic", "anthropic")
     _require_extra_marker(optional_requirements, "openai", "openai")
     _require_extra_marker(optional_requirements, "ui", "streamlit")
     for package_name in (

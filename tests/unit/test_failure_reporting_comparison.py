@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import model_failure_lab.adapters.anthropic_adapter as anthropic_adapter_module
 import model_failure_lab.adapters.ollama_adapter as ollama_adapter_module
 from model_failure_lab.adapters import ModelMetadata, ModelRequest, ModelResult, register_model
 from model_failure_lab.classifiers import ClassifierInput, ClassifierResult, register_classifier
@@ -353,6 +354,103 @@ def test_build_comparison_report_supports_saved_builtin_ollama_runs(tmp_path, mo
         load_saved_run_artifacts(baseline_run_id, root=tmp_path),
         load_saved_run_artifacts(candidate_run_id, root=tmp_path),
         now=datetime(2026, 4, 3, 7, 40, 0, tzinfo=timezone.utc),
+    )
+
+    assert built.report.comparison["compatible"] is True
+    assert built.report.status == {"overall": "improved"}
+    assert built.details["case_transition_counts"] == {
+        "improvements": 1,
+        "regressions": 0,
+        "failure_type_swaps": 0,
+        "error_changes": 0,
+    }
+    assert built.details["case_deltas"] == [
+        {
+            "case_id": "case-001",
+            "prompt_id": "case-001",
+            "prompt": "shared improvement",
+            "tags": [],
+            "transition_type": "failure_to_no_failure",
+            "transition_label": "failure -> no_failure",
+            "baseline_failure_type": "reasoning",
+            "candidate_failure_type": "no_failure",
+            "baseline_expectation_verdict": None,
+            "candidate_expectation_verdict": None,
+            "baseline_error_stage": None,
+            "candidate_error_stage": None,
+            "baseline_explanation": None,
+            "candidate_explanation": None,
+            "changed": True,
+        }
+    ]
+
+
+def test_build_comparison_report_supports_saved_builtin_anthropic_runs(tmp_path, monkeypatch) -> None:
+    classifier_id = "unit-comparison-classifier-anthropic"
+    register_classifier(classifier_id, ComparisonClassifier())
+
+    class FakeAnthropicMessagesAPI:
+        def create(self, **kwargs: object) -> dict[str, object]:
+            return {
+                "id": "msg_123",
+                "type": "message",
+                "role": "assistant",
+                "model": str(kwargs["model"]),
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"model:{kwargs['model']}::{kwargs['messages'][0]['content']}",
+                    }
+                ],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 7, "output_tokens": 5},
+            }
+
+    class FakeAnthropicClient:
+        def __init__(self) -> None:
+            self.messages = FakeAnthropicMessagesAPI()
+
+    monkeypatch.setattr(
+        anthropic_adapter_module,
+        "_default_client_factory",
+        lambda base_url: FakeAnthropicClient(),
+    )
+
+    baseline_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+        model="baseline-model",
+        seed=81,
+        suffix_minutes=0,
+        adapter_id="anthropic",
+        classifier_id=classifier_id,
+    )
+    candidate_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+        model="candidate-model",
+        seed=82,
+        suffix_minutes=1,
+        adapter_id="anthropic",
+        classifier_id=classifier_id,
+    )
+
+    built = build_comparison_report(
+        load_saved_run_artifacts(baseline_run_id, root=tmp_path),
+        load_saved_run_artifacts(candidate_run_id, root=tmp_path),
+        now=datetime(2026, 4, 3, 11, 55, 0, tzinfo=timezone.utc),
     )
 
     assert built.report.comparison["compatible"] is True

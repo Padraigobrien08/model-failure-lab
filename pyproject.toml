@@ -13,6 +13,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+anthropic = [
+  "anthropic",
+]
 dev = [
   "pytest",
   "ruff",
