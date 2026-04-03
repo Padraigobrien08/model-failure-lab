@@ -14,6 +14,8 @@ const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)), "..
 const frontendRoot = path.join(repoRoot, "frontend");
 const pyPath = path.join(repoRoot, "src");
 const CLI_LABEL = "failure-lab";
+const OLLAMA_SYSTEM_PROMPT = "Be concise.";
+const OLLAMA_TEMPERATURE = 0;
 
 function parseLabel(output, label) {
   const pattern = new RegExp(`^${label}:\\s+(.+)$`, "m");
@@ -310,9 +312,9 @@ async function prepareOllamaArtifacts(artifactRoot) {
       "--ollama-host",
       stub.baseUrl,
       "--system-prompt",
-      "Be concise.",
+      OLLAMA_SYSTEM_PROMPT,
       "--model-option",
-      "temperature=0",
+      `temperature=${OLLAMA_TEMPERATURE}`,
       "--root",
       artifactRoot,
     ]);
@@ -328,9 +330,9 @@ async function prepareOllamaArtifacts(artifactRoot) {
       "--ollama-host",
       stub.baseUrl,
       "--system-prompt",
-      "Be concise.",
+      OLLAMA_SYSTEM_PROMPT,
       "--model-option",
-      "temperature=0",
+      `temperature=${OLLAMA_TEMPERATURE}`,
       "--root",
       artifactRoot,
     ]);
@@ -349,14 +351,29 @@ async function prepareOllamaArtifacts(artifactRoot) {
     if (stub.requests.length === 0) {
       throw new Error("Ollama stub smoke did not receive any requests");
     }
-    if (!stub.requests.every((payload) => payload.system === "Be concise.")) {
+    if (!stub.requests.every((payload) => payload.system === OLLAMA_SYSTEM_PROMPT)) {
       throw new Error("Ollama stub smoke did not preserve the system prompt");
     }
     if (!stub.requests.every((payload) => payload.stream === false)) {
       throw new Error("Ollama stub smoke did not force non-streaming requests");
     }
-    if (!stub.requests.every((payload) => payload.options?.temperature === 0)) {
+    if (!stub.requests.every((payload) => payload.options?.temperature === OLLAMA_TEMPERATURE)) {
       throw new Error("Ollama stub smoke did not preserve model options");
+    }
+
+    const baselineRun = await readJson(path.join(artifactRoot, "runs", baselineRunId, "run.json"));
+    const candidateRun = await readJson(path.join(artifactRoot, "runs", candidateRunId, "run.json"));
+    const comparisonReport = await readJson(
+      path.join(artifactRoot, "reports", comparisonReportId, "report.json"),
+    );
+    if (baselineRun?.metadata?.adapter_id !== "ollama") {
+      throw new Error("Baseline run was not written through the ollama adapter");
+    }
+    if (candidateRun?.metadata?.adapter_id !== "ollama") {
+      throw new Error("Candidate run was not written through the ollama adapter");
+    }
+    if (comparisonReport?.comparison?.compatible !== true) {
+      throw new Error("Ollama stub smoke did not produce a compatible comparison report");
     }
 
     return {

@@ -20,6 +20,8 @@ from model_failure_lab.storage import read_json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
+OLLAMA_SYSTEM_PROMPT = "Be concise."
+OLLAMA_MODEL_OPTION = "temperature=0"
 
 
 def _write_dataset(path: Path, dataset: FailureDataset) -> None:
@@ -520,9 +522,9 @@ def test_cli_ollama_stub_loop_runs_report_and_compare(tmp_path, capsys) -> None:
                 "--ollama-host",
                 stub.base_url,
                 "--system-prompt",
-                "Be concise.",
+                OLLAMA_SYSTEM_PROMPT,
                 "--model-option",
-                "temperature=0",
+                OLLAMA_MODEL_OPTION,
                 "--root",
                 str(tmp_path),
             ]
@@ -541,9 +543,9 @@ def test_cli_ollama_stub_loop_runs_report_and_compare(tmp_path, capsys) -> None:
                 "--ollama-host",
                 stub.base_url,
                 "--system-prompt",
-                "Be concise.",
+                OLLAMA_SYSTEM_PROMPT,
                 "--model-option",
-                "temperature=0",
+                OLLAMA_MODEL_OPTION,
                 "--root",
                 str(tmp_path),
             ]
@@ -587,7 +589,7 @@ def test_cli_ollama_stub_loop_runs_report_and_compare(tmp_path, capsys) -> None:
     assert "Case changes: improvements=1" in compare_output
     assert len(run_dirs) == 2
     assert len(report_dirs) == 2
-    assert all(request["system"] == "Be concise." for request in stub.requests)
+    assert all(request["system"] == OLLAMA_SYSTEM_PROMPT for request in stub.requests)
     assert all(request["stream"] is False for request in stub.requests)
     assert all(request["options"]["temperature"] == 0 for request in stub.requests)
     assert compare_payload["status"]["overall"] == "improved"
