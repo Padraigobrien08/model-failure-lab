@@ -144,7 +144,26 @@ def test_query_help_describes_cross_run_filtering_and_json_output() -> None:
     assert "--delta" in result.stdout
     assert "--aggregate-by" in result.stdout
     assert "--last-n" in result.stdout
+    assert "--summarize" in result.stdout
+    assert "--analysis-mode" in result.stdout
+    assert "--analysis-model" in result.stdout
     assert "--json" in result.stdout
+
+
+def test_compare_help_describes_explain_surface() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "compare", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--explain" in result.stdout
+    assert "--analysis-mode" in result.stdout
+    assert "--analysis-model" in result.stdout
 
 
 def test_index_rebuild_help_is_exposed() -> None:
