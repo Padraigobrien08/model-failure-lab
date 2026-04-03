@@ -107,6 +107,15 @@ failure-lab run \
   --model-option temperature=0
 ```
 
+That same surface supports the normal saved-artifact loop:
+
+```bash
+failure-lab run --dataset reasoning-failures-v1 --model ollama:baseline-model --ollama-host http://localhost:11434 --system-prompt "Be concise." --model-option temperature=0
+failure-lab run --dataset reasoning-failures-v1 --model ollama:candidate-model --ollama-host http://localhost:11434 --system-prompt "Be concise." --model-option temperature=0
+failure-lab report --run <baseline-run-id>
+failure-lab compare <baseline-run-id> <candidate-run-id>
+```
+
 The package also exposes simple registration seams for future extension:
 
 - `register_model(...)`

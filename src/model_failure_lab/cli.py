@@ -547,6 +547,9 @@ def _render_run_summary(
         lines.insert(6, f"Dataset scope: {dataset_scope}")
     if execution.status == "completed_with_errors":
         lines.append("Warning: run completed with per-case errors.")
+        first_error = next((case.error for case in execution.case_results if case.error), None)
+        if first_error is not None:
+            lines.append(f"First error: {first_error.stage}: {first_error.message}")
     return "\n".join(lines)
 
 
