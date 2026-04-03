@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
+import { InsightPanel } from "@/components/insights/InsightPanel";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,7 +15,11 @@ import {
 import { buildComparisonDetailSearchParams, buildRunDetailSearchParams } from "@/lib/artifacts/detailRouteState";
 import { buildArtifactQueryPath, loadArtifactQuery } from "@/lib/artifacts/load";
 import { buildArtifactReturnState, createSearchString } from "@/lib/artifacts/navigation";
-import type { ArtifactQueryMode, ArtifactQueryState } from "@/lib/artifacts/types";
+import type {
+  ArtifactInsightEvidenceRef,
+  ArtifactQueryMode,
+  ArtifactQueryState,
+} from "@/lib/artifacts/types";
 
 type FilterSelectProps = {
   label: string;
@@ -111,6 +116,7 @@ export function AnalysisPage() {
     if (mode === "aggregates" && !requestSearchParams.has("aggregateBy")) {
       requestSearchParams.set("aggregateBy", "failure_type");
     }
+    requestSearchParams.set("summarize", "1");
 
     setQueryState({ status: "loading", response: null, message: null });
     void loadArtifactQuery(requestSearchParams)
@@ -176,6 +182,51 @@ export function AnalysisPage() {
   const aggregateBy = readSearchValue(searchParams, "aggregateBy");
   const since = readSearchValue(searchParams, "since");
   const lastN = readSearchValue(searchParams, "lastN");
+
+  const renderEvidenceLink = (reference: ArtifactInsightEvidenceRef) => {
+    if (reference.kind === "run_case" && reference.runId && reference.caseId) {
+      const runSearch = buildRunDetailSearchParams(new URLSearchParams(), {
+        section: reference.section === "evidence" ? "evidence" : null,
+        caseId: reference.caseId,
+      }).toString();
+      return (
+        <Link
+          key={`${reference.kind}:${reference.runId}:${reference.caseId}`}
+          className="inline-flex rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground no-underline transition-colors hover:bg-background"
+          state={returnState}
+          to={{
+            pathname: `/runs/${encodeURIComponent(reference.runId)}`,
+            search: runSearch.length > 0 ? `?${runSearch}` : "",
+          }}
+        >
+          {reference.label}
+        </Link>
+      );
+    }
+
+    if (reference.kind === "comparison_case" && reference.reportId && reference.caseId) {
+      const comparisonSearch = buildComparisonDetailSearchParams(new URLSearchParams(), {
+        section: reference.section === "transitions" ? "transitions" : null,
+        caseId: reference.caseId,
+        transition: reference.transitionType,
+      }).toString();
+      return (
+        <Link
+          key={`${reference.kind}:${reference.reportId}:${reference.caseId}`}
+          className="inline-flex rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground no-underline transition-colors hover:bg-background"
+          state={returnState}
+          to={{
+            pathname: `/comparisons/${encodeURIComponent(reference.reportId)}`,
+            search: comparisonSearch.length > 0 ? `?${comparisonSearch}` : "",
+          }}
+        >
+          {reference.label}
+        </Link>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <section className="space-y-6">
@@ -320,6 +371,14 @@ export function AnalysisPage() {
           </button>
         </div>
       </div>
+
+      <InsightPanel
+        badgeLabel="Insights"
+        title="Grounded cross-run readout"
+        description="The heuristic insight layer summarizes the current filtered result set and keeps every pattern anchored to drillable saved evidence."
+        report={response.insightReport}
+        renderEvidenceLink={renderEvidenceLink}
+      />
 
       <Card>
         <CardHeader>

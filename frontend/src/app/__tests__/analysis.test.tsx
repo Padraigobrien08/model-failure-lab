@@ -191,6 +191,55 @@ function mockAnalysisQueryAndRunDetail() {
             failureTypes: ["hallucination", "instruction_following", "reasoning"],
             deltaTypes: ["regression", "improvement", "swap"],
           },
+          insight_report: {
+            analysis_mode: "heuristic",
+            source_kind: "cases",
+            title: "Case insight report",
+            summary: "Hallucination remains the dominant recurring failure signal in this filtered result set.",
+            generated_by: "heuristic_v1",
+            sampling: {
+              total_matches: 1,
+              sampled_matches: 1,
+              sample_limit: 20,
+              truncated: false,
+              strategy: "ranked_representative_groups",
+            },
+            patterns: [
+              {
+                kind: "failure_type",
+                label: "hallucination",
+                summary: "Hallucination remains the dominant recurring failure mode across the selected runs.",
+                group_key: "hallucination",
+                count: 1,
+                share: 1,
+                evidence_refs: [
+                  {
+                    kind: "run_case",
+                    label: "run_beta:case-regression",
+                    run_id: "run_beta",
+                    report_id: null,
+                    case_id: "case-regression",
+                    prompt_id: "case-regression",
+                    section: "evidence",
+                    transition_type: null,
+                  },
+                ],
+              },
+            ],
+            anomalies: [],
+            evidence_links: [
+              {
+                kind: "run_case",
+                label: "run_beta:case-regression",
+                run_id: "run_beta",
+                report_id: null,
+                case_id: "case-regression",
+                prompt_id: "case-regression",
+                section: "evidence",
+                transition_type: null,
+              },
+            ],
+          },
           rows: [
             {
               run_id: "run_beta",
@@ -253,10 +302,11 @@ describe("analysis route", () => {
     expect(
       await screen.findByRole("heading", { name: "Cross-run artifact analysis." }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Grounded cross-run readout")).toBeInTheDocument();
     expect(screen.getByText("Regression case")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(
-        "/__failure_lab__/artifacts/query.json?mode=cases&failureType=hallucination&lastN=5",
+        "/__failure_lab__/artifacts/query.json?mode=cases&failureType=hallucination&lastN=5&limit=20&summarize=1",
       ),
     );
   });

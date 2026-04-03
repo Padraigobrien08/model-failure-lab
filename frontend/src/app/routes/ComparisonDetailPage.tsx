@@ -8,6 +8,7 @@ import { ComparisonCoverageSummary } from "@/components/comparisons/ComparisonCo
 import { ComparisonDeltaStrip } from "@/components/comparisons/ComparisonDeltaStrip";
 import { ComparisonDetailHeader } from "@/components/comparisons/ComparisonDetailHeader";
 import { ComparisonTransitionGroups } from "@/components/comparisons/ComparisonTransitionGroups";
+import { InsightPanel } from "@/components/insights/InsightPanel";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -29,6 +30,7 @@ import {
 import { createSearchString, resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
 import { loadComparisonDetail } from "@/lib/artifacts/load";
 import type {
+  ArtifactInsightEvidenceRef,
   ComparisonCaseDeltaRecord,
   ComparisonDetailState,
 } from "@/lib/artifacts/types";
@@ -543,6 +545,29 @@ export function ComparisonDetailPage() {
           selectedCase.caseId,
         )
       : null;
+  const renderInsightEvidenceLink = (reference: ArtifactInsightEvidenceRef) => {
+    if (reference.kind !== "comparison_case" || !reference.caseId) {
+      return null;
+    }
+    const search = buildComparisonDetailSearchParams(new URLSearchParams(searchParams), {
+      section: reference.section === "transitions" ? "transitions" : "transitions",
+      caseId: reference.caseId,
+      transition: reference.transitionType,
+    }).toString();
+    return (
+      <Link
+        key={`${reference.kind}:${reference.reportId ?? "local"}:${reference.caseId}`}
+        className="inline-flex rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground no-underline transition-colors hover:bg-background"
+        to={{
+          pathname: location.pathname,
+          search: search.length > 0 ? `?${search}` : "",
+        }}
+        state={location.state}
+      >
+        {reference.label}
+      </Link>
+    );
+  };
 
   return (
     <section className="space-y-8">
@@ -570,6 +595,14 @@ export function ComparisonDetailPage() {
               <ComparisonDeltaStrip
                 metrics={detail.metrics}
                 compatible={detail.comparison.compatible}
+              />
+
+              <InsightPanel
+                badgeLabel="Insights"
+                title="Grounded comparison explanation"
+                description="This heuristic insight layer explains the saved comparison in-place and keeps every pattern attached to the same transition evidence route."
+                report={detail.insightReport}
+                renderEvidenceLink={renderInsightEvidenceLink}
               />
             </div>
           </section>

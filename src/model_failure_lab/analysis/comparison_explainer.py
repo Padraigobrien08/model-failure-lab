@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -20,6 +21,10 @@ from .prompt_builder import (
     build_query_context_payload,
 )
 from .summarizer import DEFAULT_INSIGHT_SAMPLE_LIMIT, summarize_delta_query, summarize_query_results
+
+IDENTIFIER_PATTERN = re.compile(
+    r"\b(?:run_[A-Za-z0-9._:-]+|compare_[A-Za-z0-9._:-]+|case[-_][A-Za-z0-9._:-]+)\b"
+)
 
 
 def build_query_insight_report(
@@ -130,6 +135,8 @@ def _enrich_report_with_llm(
 ) -> InsightReport:
     if analysis_adapter_id is None or analysis_model is None:
         raise ValueError("LLM analysis requires an explicit analysis model")
+    if not base_report.patterns and not base_report.anomalies and not base_report.evidence_links:
+        return base_report
 
     prompt = build_insight_enrichment_prompt(
         base_report=base_report,
@@ -149,9 +156,24 @@ def _enrich_report_with_llm(
     summary = parsed.get("summary")
     if not isinstance(summary, str) or not summary.strip():
         raise RuntimeError("LLM analysis output did not include a non-empty summary")
+    _validate_grounded_text(
+        summary,
+        allowed_identifiers=_allowed_evidence_identifiers(base_report),
+        field="summary",
+    )
 
-    pattern_updates = _parse_updates(parsed.get("patterns"))
-    anomaly_updates = _parse_updates(parsed.get("anomalies"))
+    pattern_updates = _parse_updates(
+        parsed.get("patterns"),
+        allowed_groups={(item.kind, item.group_key) for item in base_report.patterns},
+        allowed_identifiers=_allowed_evidence_identifiers_for_patterns(base_report.patterns),
+        field="patterns",
+    )
+    anomaly_updates = _parse_updates(
+        parsed.get("anomalies"),
+        allowed_groups={(item.kind, item.group_key) for item in base_report.anomalies},
+        allowed_identifiers=_allowed_evidence_identifiers_for_patterns(base_report.anomalies),
+        field="anomalies",
+    )
     return replace(
         base_report,
         analysis_mode="llm",
@@ -172,26 +194,95 @@ def _parse_llm_payload(text: str) -> dict[str, Any]:
     return parsed
 
 
-def _parse_updates(payload: object) -> dict[tuple[str, str | None], str]:
+def _parse_updates(
+    payload: object,
+    *,
+    allowed_groups: set[tuple[str, str | None]],
+    allowed_identifiers: set[str],
+    field: str,
+) -> dict[tuple[str, str | None], str]:
     if payload is None:
         return {}
     if not isinstance(payload, list):
-        raise RuntimeError("LLM analysis output updates must be lists")
+        raise RuntimeError(f"LLM analysis output {field} must be a list")
     updates: dict[tuple[str, str | None], str] = {}
-    for item in payload:
+    for index, item in enumerate(payload):
         if not isinstance(item, dict):
-            continue
+            raise RuntimeError(f"LLM analysis output {field}[{index}] must be an object")
         kind = item.get("kind")
         group_key = item.get("group_key")
         summary = item.get("summary")
         if not isinstance(kind, str):
-            continue
+            raise RuntimeError(f"LLM analysis output {field}[{index}].kind must be a string")
         if group_key is not None and not isinstance(group_key, str):
-            continue
+            raise RuntimeError(
+                f"LLM analysis output {field}[{index}].group_key must be a string or null"
+            )
         if not isinstance(summary, str) or not summary.strip():
-            continue
-        updates[(kind, group_key)] = summary.strip()
+            raise RuntimeError(f"LLM analysis output {field}[{index}].summary must be a string")
+        group = (kind, group_key)
+        if group not in allowed_groups:
+            raise RuntimeError(
+                f"LLM analysis output referenced unsupported insight group {kind}:{group_key}"
+            )
+        if group in updates:
+            raise RuntimeError(
+                f"LLM analysis output referenced duplicate insight group {kind}:{group_key}"
+            )
+        _validate_grounded_text(
+            summary,
+            allowed_identifiers=allowed_identifiers,
+            field=f"{field}[{index}].summary",
+        )
+        updates[group] = summary.strip()
     return updates
+
+
+def _allowed_evidence_identifiers(report: InsightReport) -> set[str]:
+    return _collect_evidence_identifiers(
+        [
+            *report.evidence_links,
+            *(ref for item in report.patterns for ref in item.evidence_refs),
+            *(ref for item in report.anomalies for ref in item.evidence_refs),
+        ]
+    )
+
+
+def _allowed_evidence_identifiers_for_patterns(items: Sequence[InsightPattern]) -> set[str]:
+    return _collect_evidence_identifiers(
+        [ref for item in items for ref in item.evidence_refs]
+    )
+
+
+def _collect_evidence_identifiers(
+    refs: Sequence[Any],
+) -> set[str]:
+    identifiers: set[str] = set()
+    for ref in refs:
+        for value in (
+            getattr(ref, "label", None),
+            getattr(ref, "run_id", None),
+            getattr(ref, "report_id", None),
+            getattr(ref, "case_id", None),
+            getattr(ref, "prompt_id", None),
+        ):
+            if isinstance(value, str) and value.strip():
+                identifiers.add(value.strip())
+    return identifiers
+
+
+def _validate_grounded_text(
+    text: str,
+    *,
+    allowed_identifiers: set[str],
+    field: str,
+) -> None:
+    for identifier in IDENTIFIER_PATTERN.findall(text):
+        if identifier not in allowed_identifiers:
+            raise RuntimeError(
+                f"LLM analysis output referenced unsupported evidence identifier in {field}: "
+                f"{identifier}"
+            )
 
 
 def _apply_updates(

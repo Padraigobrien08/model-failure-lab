@@ -21,6 +21,10 @@ from model_failure_lab.index import (  # noqa: E402
     query_case_deltas,
     query_cases,
 )
+from model_failure_lab.analysis import (  # noqa: E402
+    build_query_insight_report,
+    explain_comparison_report,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -40,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
             model=args.model,
             dataset=args.dataset,
             run_id=args.run_id,
+            prompt_id=args.prompt_id,
             report_id=args.report_id,
             baseline_run_id=args.baseline_run_id,
             candidate_run_id=args.candidate_run_id,
@@ -63,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
                 "model": filters.model,
                 "dataset": filters.dataset,
                 "runId": filters.run_id,
+                "promptId": filters.prompt_id,
                 "reportId": filters.report_id,
                 "baselineRunId": filters.baseline_run_id,
                 "candidateRunId": filters.candidate_run_id,
@@ -74,7 +80,25 @@ def main(argv: list[str] | None = None) -> int:
                 "limit": filters.limit,
             },
             "facets": list_query_facets(root=root),
+            "insight_report": (
+                build_query_insight_report(
+                    mode=args.mode,
+                    filters=filters,
+                    aggregate_by=args.aggregate_by,
+                    root=root,
+                ).to_payload()
+                if args.summarize
+                else None
+            ),
             "rows": rows,
+        }
+    elif args.command == "comparison-insight":
+        payload = {
+            "report_id": args.report_id,
+            "insight_report": explain_comparison_report(
+                report_id=args.report_id,
+                root=root,
+            ).to_payload(),
         }
     else:
         raise ValueError(f"Unsupported query bridge command: {args.command}")
@@ -103,6 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--model")
     query_parser.add_argument("--dataset")
     query_parser.add_argument("--run-id")
+    query_parser.add_argument("--prompt-id")
     query_parser.add_argument("--report-id")
     query_parser.add_argument("--baseline-run-id")
     query_parser.add_argument("--candidate-run-id")
@@ -112,10 +137,15 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["failure_type", "model", "dataset", "prompt_id"],
         default="failure_type",
     )
+    query_parser.add_argument("--summarize", action="store_true")
     query_parser.add_argument("--last-n", type=int)
     query_parser.add_argument("--since")
     query_parser.add_argument("--until")
     query_parser.add_argument("--limit", type=int, default=20)
+
+    comparison_insight_parser = subparsers.add_parser("comparison-insight")
+    comparison_insight_parser.add_argument("--root", required=True)
+    comparison_insight_parser.add_argument("--report-id", required=True)
 
     return parser
 

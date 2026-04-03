@@ -286,6 +286,7 @@ function buildComparisonDetail(
         candidateExplanation: "No heuristic failure signal detected.",
       },
     ],
+    insightReport: null,
   };
 }
 

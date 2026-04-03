@@ -22,6 +22,7 @@ from model_failure_lab.schemas import PromptCase
 TEST_ADAPTER_ID = "cli_insight_test_adapter"
 TEST_CLASSIFIER_ID = "cli_insight_test_classifier"
 TEST_ANALYSIS_ADAPTER_ID = "cli_insight_llm"
+TEST_UNGROUNDED_ANALYSIS_ADAPTER_ID = "cli_insight_llm_ungrounded"
 
 
 class CliInsightAdapter:
@@ -101,10 +102,31 @@ class CliInsightLlmAdapter:
         )
 
 
+class CliInsightUngroundedLlmAdapter:
+    def generate(self, request: ModelRequest) -> ModelResult:
+        del request
+        payload = {
+            "summary": "case-999 is now the dominant unexplained issue in this result set.",
+            "patterns": [
+                {
+                    "kind": "failure_type",
+                    "group_key": "made_up_failure",
+                    "summary": "A made-up failure group is now dominant.",
+                }
+            ],
+            "anomalies": [],
+        }
+        return ModelResult(
+            text=json.dumps(payload),
+            metadata=ModelMetadata(model="ungrounded-llm", latency_ms=2.0),
+        )
+
+
 def _ensure_test_registry() -> None:
     for model_id, factory in (
         (TEST_ADAPTER_ID, CliInsightAdapter),
         (TEST_ANALYSIS_ADAPTER_ID, CliInsightLlmAdapter),
+        (TEST_UNGROUNDED_ANALYSIS_ADAPTER_ID, CliInsightUngroundedLlmAdapter),
     ):
         try:
             register_model(model_id, factory)
@@ -264,3 +286,52 @@ def test_compare_command_can_explain_saved_comparison(tmp_path: Path, capsys) ->
     assert "Failure Lab Compare" in output
     assert "Failure Lab Insights" in output
     assert "matched comparison deltas" in output
+
+
+def test_compare_command_can_explain_saved_comparison_in_llm_mode(
+    tmp_path: Path, capsys
+) -> None:
+    baseline_run_id, candidate_run_id = _materialize_workspace(tmp_path)
+
+    exit_code = main(
+        [
+            "compare",
+            baseline_run_id,
+            candidate_run_id,
+            "--root",
+            str(tmp_path),
+            "--explain",
+            "--analysis-mode",
+            "llm",
+            "--analysis-model",
+            f"{TEST_ANALYSIS_ADAPTER_ID}:analysis-model",
+        ]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "Failure Lab Compare" in output
+    assert "Failure Lab Insights" in output
+    assert "Regressions and improvements split the comparison" in output
+
+
+def test_query_command_rejects_ungrounded_llm_output(tmp_path: Path, capsys) -> None:
+    _materialize_workspace(tmp_path)
+    rebuild_query_index(root=tmp_path)
+
+    exit_code = main(
+        [
+            "query",
+            "--root",
+            str(tmp_path),
+            "--summarize",
+            "--analysis-mode",
+            "llm",
+            "--analysis-model",
+            f"{TEST_UNGROUNDED_ANALYSIS_ADAPTER_ID}:analysis-model",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "unsupported evidence identifier" in captured.err or "unsupported insight group" in captured.err

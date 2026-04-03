@@ -124,6 +124,7 @@ type ComparisonDetailPayload = {
     summary: ComparisonTransitionSummaryRowPayload[];
   };
   caseDeltas: ComparisonCaseDeltaPayload[];
+  insightReport: Record<string, unknown> | null;
 };
 
 type FailureLabelPayload = {
@@ -902,6 +903,7 @@ function failureLabArtifactsPlugin(): Plugin {
         reportDetailsPayload.case_deltas,
         `${reportId}.report_details.case_deltas`,
       ),
+      insightReport: null,
     };
   }
 
@@ -1481,6 +1483,7 @@ function failureLabArtifactsPlugin(): Plugin {
       ["model", "--model"],
       ["dataset", "--dataset"],
       ["runId", "--run-id"],
+      ["promptId", "--prompt-id"],
       ["reportId", "--report-id"],
       ["baselineRunId", "--baseline-run-id"],
       ["candidateRunId", "--candidate-run-id"],
@@ -1498,6 +1501,7 @@ function failureLabArtifactsPlugin(): Plugin {
         args.push(argName, value);
       }
     }
+    args.push("--summarize");
 
     try {
       const payload = await invokeQueryBridge("query", args);
@@ -1531,9 +1535,17 @@ function failureLabArtifactsPlugin(): Plugin {
         artifactSource.reportsPath,
         artifactSource.runsPath,
       );
+      const insightPayload = await invokeQueryBridge<{
+        insight_report: Record<string, unknown> | null;
+      }>("comparison-insight", ["--report-id", reportId]);
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify(payload));
+      res.end(
+        JSON.stringify({
+          ...payload,
+          insightReport: insightPayload.insight_report,
+        }),
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "comparison detail failed";
       const statusCode =

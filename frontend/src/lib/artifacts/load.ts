@@ -7,6 +7,10 @@ import {
   RUN_DETAIL_PATH,
   RUNS_INDEX_PATH,
   type ArtifactCollectionSummary,
+  type ArtifactInsightEvidenceRef,
+  type ArtifactInsightPattern,
+  type ArtifactInsightReport,
+  type ArtifactInsightSampling,
   type ArtifactQueryAggregateRow,
   type ArtifactQueryCaseRow,
   type ArtifactQueryDeltaRow,
@@ -114,6 +118,7 @@ function requireQueryFilters(value: unknown, field: string): ArtifactQueryFilter
     model: requireStringOrNull(filters.model, `${field}.model`),
     dataset: requireStringOrNull(filters.dataset, `${field}.dataset`),
     runId: requireStringOrNull(filters.runId, `${field}.runId`),
+    promptId: requireStringOrNull(filters.promptId, `${field}.promptId`),
     reportId: requireStringOrNull(filters.reportId, `${field}.reportId`),
     baselineRunId: requireStringOrNull(filters.baselineRunId, `${field}.baselineRunId`),
     candidateRunId: requireStringOrNull(filters.candidateRunId, `${field}.candidateRunId`),
@@ -134,6 +139,106 @@ function requireQueryFacets(value: unknown, field: string): ArtifactQueryFacets 
     datasets: requireStringArray(facets.datasets, `${field}.datasets`),
     failureTypes: requireStringArray(facets.failureTypes, `${field}.failureTypes`),
     deltaTypes: requireStringArray(facets.deltaTypes, `${field}.deltaTypes`),
+  };
+}
+
+function requireInsightEvidenceRefs(
+  value: unknown,
+  field: string,
+): ArtifactInsightEvidenceRef[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const ref = requireObject(entry, `${field}[${index}]`);
+    const kind = requireString(ref.kind, `${field}[${index}].kind`);
+    if (kind !== "run_case" && kind !== "comparison_case") {
+      throw new Error(`${field}[${index}].kind must be run_case or comparison_case`);
+    }
+    return {
+      kind,
+      label: requireString(ref.label, `${field}[${index}].label`),
+      runId: requireStringOrNull(ref.run_id, `${field}[${index}].run_id`),
+      reportId: requireStringOrNull(ref.report_id, `${field}[${index}].report_id`),
+      caseId: requireStringOrNull(ref.case_id, `${field}[${index}].case_id`),
+      promptId: requireStringOrNull(ref.prompt_id, `${field}[${index}].prompt_id`),
+      section: requireStringOrNull(ref.section, `${field}[${index}].section`),
+      transitionType: requireStringOrNull(
+        ref.transition_type,
+        `${field}[${index}].transition_type`,
+      ),
+    };
+  });
+}
+
+function requireInsightPatterns(value: unknown, field: string): ArtifactInsightPattern[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const pattern = requireObject(entry, `${field}[${index}]`);
+    return {
+      kind: requireString(pattern.kind, `${field}[${index}].kind`),
+      label: requireString(pattern.label, `${field}[${index}].label`),
+      summary: requireString(pattern.summary, `${field}[${index}].summary`),
+      groupKey: requireStringOrNull(pattern.group_key, `${field}[${index}].group_key`),
+      count: requireCount(pattern.count, `${field}[${index}].count`),
+      share: requireNumberOrNull(pattern.share, `${field}[${index}].share`),
+      evidenceRefs: requireInsightEvidenceRefs(
+        pattern.evidence_refs,
+        `${field}[${index}].evidence_refs`,
+      ),
+    };
+  });
+}
+
+function requireInsightSampling(value: unknown, field: string): ArtifactInsightSampling {
+  const sampling = requireObject(value, field);
+  return {
+    totalMatches: requireCount(sampling.total_matches, `${field}.total_matches`),
+    sampledMatches: requireCount(sampling.sampled_matches, `${field}.sampled_matches`),
+    sampleLimit: requireCount(sampling.sample_limit, `${field}.sample_limit`),
+    truncated:
+      typeof sampling.truncated === "boolean"
+        ? sampling.truncated
+        : (() => {
+            throw new Error(`${field}.truncated must be a boolean`);
+          })(),
+    strategy: requireString(sampling.strategy, `${field}.strategy`),
+  };
+}
+
+function requireInsightReport(
+  value: unknown,
+  field: string,
+): ArtifactInsightReport | null {
+  if (value == null) {
+    return null;
+  }
+  const report = requireObject(value, field);
+  const analysisMode = requireString(report.analysis_mode, `${field}.analysis_mode`);
+  const sourceKind = requireString(report.source_kind, `${field}.source_kind`);
+  if (analysisMode !== "heuristic" && analysisMode !== "llm") {
+    throw new Error(`${field}.analysis_mode must be heuristic or llm`);
+  }
+  if (
+    sourceKind !== "cases" &&
+    sourceKind !== "deltas" &&
+    sourceKind !== "aggregates" &&
+    sourceKind !== "comparison"
+  ) {
+    throw new Error(`${field}.source_kind must be cases, deltas, aggregates, or comparison`);
+  }
+  return {
+    analysisMode,
+    sourceKind,
+    title: requireString(report.title, `${field}.title`),
+    summary: requireString(report.summary, `${field}.summary`),
+    generatedBy: requireString(report.generated_by, `${field}.generated_by`),
+    sampling: requireInsightSampling(report.sampling, `${field}.sampling`),
+    patterns: requireInsightPatterns(report.patterns, `${field}.patterns`),
+    anomalies: requireInsightPatterns(report.anomalies, `${field}.anomalies`),
+    evidenceLinks: requireInsightEvidenceRefs(report.evidence_links, `${field}.evidence_links`),
   };
 }
 
@@ -240,6 +345,7 @@ export function validateArtifactQueryResponse(payload: unknown): ArtifactQueryRe
     source: requireSource(data.source, "query.source"),
     filters: requireQueryFilters(data.filters, "query.filters"),
     facets: requireQueryFacets(data.facets, "query.facets"),
+    insightReport: requireInsightReport(data.insight_report, "query.insight_report"),
   };
   if (mode === "cases") {
     return {
@@ -791,6 +897,7 @@ export function validateComparisonDetail(payload: unknown): ComparisonDetail {
       ),
     },
     caseDeltas: requireComparisonCaseDeltas(data.caseDeltas, "caseDeltas"),
+    insightReport: requireInsightReport(data.insightReport, "insightReport"),
   };
 }
 

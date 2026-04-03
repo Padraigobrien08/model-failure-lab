@@ -141,6 +141,47 @@ export type ComparisonCaseDeltaRecord = {
   candidateExplanation: string | null;
 };
 
+export type ArtifactInsightEvidenceRef = {
+  kind: "run_case" | "comparison_case";
+  label: string;
+  runId: string | null;
+  reportId: string | null;
+  caseId: string | null;
+  promptId: string | null;
+  section: string | null;
+  transitionType: string | null;
+};
+
+export type ArtifactInsightPattern = {
+  kind: string;
+  label: string;
+  summary: string;
+  groupKey: string | null;
+  count: number;
+  share: number | null;
+  evidenceRefs: ArtifactInsightEvidenceRef[];
+};
+
+export type ArtifactInsightSampling = {
+  totalMatches: number;
+  sampledMatches: number;
+  sampleLimit: number;
+  truncated: boolean;
+  strategy: string;
+};
+
+export type ArtifactInsightReport = {
+  analysisMode: "heuristic" | "llm";
+  sourceKind: "cases" | "deltas" | "aggregates" | "comparison";
+  title: string;
+  summary: string;
+  generatedBy: string;
+  sampling: ArtifactInsightSampling;
+  patterns: ArtifactInsightPattern[];
+  anomalies: ArtifactInsightPattern[];
+  evidenceLinks: ArtifactInsightEvidenceRef[];
+};
+
 export type ComparisonDetail = {
   source: ArtifactSourceDescriptor;
   comparison: {
@@ -175,6 +216,7 @@ export type ComparisonDetail = {
     summary: ComparisonTransitionSummaryRow[];
   };
   caseDeltas: ComparisonCaseDeltaRecord[];
+  insightReport: ArtifactInsightReport | null;
 };
 
 export type ComparisonDetailState =
@@ -201,6 +243,7 @@ export type ArtifactQueryFilters = {
   model: string | null;
   dataset: string | null;
   runId: string | null;
+  promptId?: string | null;
   reportId: string | null;
   baselineRunId: string | null;
   candidateRunId: string | null;
@@ -268,6 +311,7 @@ type ArtifactQueryBase = {
   source: ArtifactSourceDescriptor;
   filters: ArtifactQueryFilters;
   facets: ArtifactQueryFacets;
+  insightReport: ArtifactInsightReport | null;
 };
 
 export type ArtifactQueryCasesResponse = ArtifactQueryBase & {
