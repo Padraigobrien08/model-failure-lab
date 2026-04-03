@@ -14,7 +14,10 @@ from model_failure_lab.datasets import FailureDataset
 from model_failure_lab.index import (
     QueryFilters,
     aggregate_case_query,
+    aggregate_delta_query,
     artifact_overview_summary,
+    count_case_query,
+    count_delta_query,
     ensure_query_index,
     list_comparison_inventory,
     list_run_inventory,
@@ -237,6 +240,9 @@ def test_query_cases_and_aggregates_respect_filters(tmp_path: Path) -> None:
     ids = _materialize_workspace(tmp_path)
     rebuild_query_index(root=tmp_path)
 
+    assert count_case_query(root=tmp_path) == 4
+    assert count_delta_query(root=tmp_path) == 3
+
     hallucinations = query_cases(QueryFilters(failure_type="hallucination", limit=10), root=tmp_path)
     assert [(row["run_id"], row["case_id"]) for row in hallucinations] == [
         (ids["candidate_run_id"], "case-regression"),
@@ -259,6 +265,13 @@ def test_query_cases_and_aggregates_respect_filters(tmp_path: Path) -> None:
     assert baseline_aggregate == [
         {"group_key": "hallucination", "group_label": "hallucination", "case_count": 1},
         {"group_key": "reasoning", "group_label": "reasoning", "case_count": 1},
+    ]
+
+    delta_aggregate = aggregate_delta_query("delta_kind", QueryFilters(limit=10), root=tmp_path)
+    assert delta_aggregate == [
+        {"group_key": "improvement", "group_label": "improvement", "case_count": 1},
+        {"group_key": "regression", "group_label": "regression", "case_count": 1},
+        {"group_key": "swap", "group_label": "swap", "case_count": 1},
     ]
 
 
