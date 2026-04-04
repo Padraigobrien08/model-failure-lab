@@ -9,8 +9,8 @@ and a React debugger that reads the same saved artifact contract.
 
 ## Current State
 
-- Latest shipped milestone: `v4.7`
-- Active milestone: `v4.8 Recurring Failure Clusters And Pattern Mining`
+- Latest shipped milestone: `v4.8`
+- Active milestone: none
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -35,43 +35,24 @@ and a React debugger that reads the same saved artifact contract.
   - `v4.7` added artifact-derived history, deterministic trend and dataset-health signals,
     history-aware governance context, and lightweight debugger timeline surfacing
 
-## Latest Completed Milestone: v4.7 Model Behavior Tracking And Dataset Health Over Time
-
-**Goal:** Add deterministic temporal tracking so the system can evaluate model behavior, dataset
-health, and recurring regressions across time instead of only per comparison.
-
-**Delivered:**
-- Artifact-derived history and timeline queries over runs, comparisons, and dataset families.
-- Deterministic trend and recurrence signals such as improving/degrading/stable, recent delta
-  direction, and recurring regression counts.
-- Dataset health summaries for versioned evaluation packs, including recent fail-rate movement and
-  volatility.
-- CLI history surfaces and governance context that incorporate historical state, not just the
-  latest comparison.
-- Lightweight debugger timeline and trend indicators on existing analysis and comparison surfaces.
-
-## Current Milestone: v4.8 Recurring Failure Clusters And Pattern Mining
+## Latest Completed Milestone: v4.8 Recurring Failure Clusters And Pattern Mining
 
 **Goal:** Add deterministic recurring-failure clusters so the system can recognize when the same
 underlying issue is coming back across runs, comparisons, and governance decisions.
 
-**Target features:**
-- Stable deterministic cluster ids over recurring failures, transitions, and temporal history.
+**Delivered:**
+- Stable deterministic cluster ids over recurring failures and comparison deltas.
 - Cluster summaries with recurrence count, recent severity, affected datasets/models, and
   representative evidence.
-- CLI surfaces for listing, filtering, and inspecting clusters and cluster history.
-- Lightweight debugger cluster context on existing analysis, comparison, and timeline-oriented
-  routes.
+- CLI surfaces for listing clusters, inspecting detail, and reading cluster history.
+- Lightweight debugger cluster context on `/analysis` and comparison enforcement surfaces.
 - Governance rationale that can reference recurring clusters explicitly and deterministically.
 
-## Next Milestone Goals
+## Next Milestone Direction
 
-- Build on deterministic clustering with proactive recommendations, alerting, or dataset pruning
-  only after cluster identity is proven useful and stable.
-- Keep future behavior-management work artifact-native unless a clear structural limit forces
-  broader infrastructure.
-- Preserve evidence drillthrough and deterministic reasoning as higher-level pattern layers are
-  added.
+The next layer should build on the shipped time-aware and cluster-aware system with higher-level
+behavior management such as proactive recommendations, alerting, or dataset-family pruning only
+once deterministic cluster identity is proven useful.
 
 ## Core Value
 
@@ -101,12 +82,12 @@ and actionable from local artifacts.
 
 ### Active
 
-- The next milestone should turn time-aware history into stable recurring failure clusters rather
-  than adding more point-in-time surfaces.
-- Governance is now history-aware, but still missing the higher-level notion of “this is the same
-  underlying problem recurring.”
-- The debugger should keep cluster context compact and route-local rather than turning into a full
-  observability dashboard.
+- The next milestone should build on recurring cluster identity rather than reopening one-off
+  comparison workflows.
+- Future behavior-management work should stay artifact-native unless a clear structural limit
+  forces broader infrastructure.
+- The debugger should keep higher-level pattern and recommendation context compact and route-local
+  rather than turning into a full observability dashboard.
 
 ### Out of Scope
 
@@ -126,8 +107,10 @@ and actionable from local artifacts.
 - `v4.5` proved those regressions can become future evaluation inputs automatically and traceably.
 - `v4.6` proved governance decisions can now be deterministic, explainable, reviewable, and stable
   over local artifacts.
-- The core missing question after `v4.7` is: “is this actually the same recurring problem, and how
-  often has it come back?”
+- The core system now covers execution, comparison, insight, harvesting, enforcement, governance,
+  history, and recurring cluster identity over local artifacts.
+- The next missing layer is likely proactive or longitudinal action over those recurring patterns,
+  not more point-in-time retrieval.
 
 ## Constraints
 
@@ -157,7 +140,7 @@ and actionable from local artifacts.
 | Make dataset versions immutable and explicitly linked to source signals and comparisons | Evolution needs traceability and reproducibility, not silent mutation | ✓ Validated in `v4.5` |
 | Make governance decisions explicit, deterministic, and reviewable before writing dataset changes | Recommendation quality matters only if users can trust and inspect the policy basis | ✓ Validated in `v4.6` |
 | Add temporal intelligence as a deterministic artifact-derived layer before introducing proactive automation | Governance is still correct locally but blind globally without longitudinal context | ✓ Validated in `v4.7` |
-| Add recurring cluster identity before proactive alerts or pruning | The system needs to know whether the same problem is returning before escalating or consolidating | — Targeted in `v4.8` |
+| Add recurring cluster identity before proactive alerts or pruning | The system needs to know whether the same problem is returning before escalating or consolidating | ✓ Validated in `v4.8` |
 
 ---
-*Last updated: 2026-04-04 for milestone v4.8 initialization*
+*Last updated: 2026-04-04 after v4.8 completion*

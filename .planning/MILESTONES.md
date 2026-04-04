@@ -1,5 +1,19 @@
 # Milestones
 
+## v4.8 Recurring Failure Clusters And Pattern Mining (Shipped: 2026-04-04)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Added deterministic recurring cluster identity over saved run failures and comparison deltas.
+- Added cluster summaries, detailed history, and direct CLI inspection surfaces for recurring
+  patterns.
+- Added lightweight debugger cluster surfacing on `/analysis` and comparison enforcement views.
+- Proved the full `history -> cluster -> governance -> debugger evidence` loop with Python tests,
+  frontend regressions, build, and real-artifact smoke.
+
+---
+
 ## v4.7 Model Behavior Tracking And Dataset Health Over Time (Shipped: 2026-04-04)
 
 **Phases completed:** 4 phases, 4 plans
