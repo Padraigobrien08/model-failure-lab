@@ -12,6 +12,7 @@ import {
 import type {
   ArtifactDatasetEvolutionResponse,
   ArtifactGovernanceRecommendation,
+  ArtifactSignalHistoryContext,
   ArtifactDatasetVersionsResponse,
   ArtifactRegressionPackResponse,
   ComparisonSignal,
@@ -37,6 +38,7 @@ type SignalDatasetAutomationPanelProps = {
   signal: ComparisonSignal;
   driverFilter?: string | null;
   recommendation?: ArtifactGovernanceRecommendation | null;
+  historyContext?: ArtifactSignalHistoryContext | null;
   returnState?: unknown;
   autoLoadVersions?: boolean;
   title?: string;
@@ -98,6 +100,7 @@ export function SignalDatasetAutomationPanel({
   signal,
   driverFilter = null,
   recommendation = null,
+  historyContext = null,
   returnState = null,
   autoLoadVersions = false,
   title = "Regression pack automation",
@@ -153,6 +156,10 @@ export function SignalDatasetAutomationPanel({
       : generationState.status === "ready"
         ? generationState.value
         : null;
+  const activeHistoryContext = historyContext ?? recommendation?.historyContext ?? null;
+  const loadedFamilyHealth =
+    versionsState.status === "ready" ? versionsState.value.history.datasetHealth : null;
+  const familyHealth = loadedFamilyHealth ?? activeHistoryContext?.familyHealth ?? null;
 
   return (
     <Card className="border-border/70 bg-card/70">
@@ -207,6 +214,60 @@ export function SignalDatasetAutomationPanel({
                 )}
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {activeHistoryContext ? (
+          <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="muted">{activeHistoryContext.scopeKind}</Badge>
+              <Badge tone="muted">{activeHistoryContext.scopeValue}</Badge>
+              <Badge tone="muted">
+                {activeHistoryContext.recentRegressionCount}/
+                {activeHistoryContext.recentComparisonCount} recent regressions
+              </Badge>
+              <Badge tone="muted">
+                {activeHistoryContext.comparisonTrend.label} trend
+              </Badge>
+              <Badge tone="muted">
+                {activeHistoryContext.comparisonTrend.volatilityLabel} volatility
+              </Badge>
+              {activeHistoryContext.candidateRunTrend ? (
+                <Badge tone="muted">
+                  candidate {activeHistoryContext.candidateRunTrend.label}
+                </Badge>
+              ) : null}
+            </div>
+            {activeHistoryContext.recurringFailures.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {activeHistoryContext.recurringFailures.map((pattern) => (
+                  <Badge key={pattern.failureType} tone="accent">
+                    {pattern.failureType} x{pattern.occurrences}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No recurring regression driver has crossed the deterministic repeat threshold in
+                this recent history window.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {familyHealth ? (
+          <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="accent">{familyHealth.familyId}</Badge>
+              <Badge tone="muted">{familyHealth.healthLabel}</Badge>
+              <Badge tone="muted">{familyHealth.trend.label} trend</Badge>
+              <Badge tone="muted">{familyHealth.trend.volatilityLabel} volatility</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Recent fail rate {familyHealth.recentFailRate == null ? "n/a" : `${(familyHealth.recentFailRate * 100).toFixed(1)}%`} · Previous{" "}
+              {familyHealth.previousFailRate == null ? "n/a" : `${(familyHealth.previousFailRate * 100).toFixed(1)}%`} · Evaluated in{" "}
+              {familyHealth.evaluationRunCount} runs.
+            </p>
           </div>
         ) : null}
 
@@ -325,6 +386,9 @@ export function SignalDatasetAutomationPanel({
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone="muted">Family history</Badge>
               <Badge tone="muted">{versionsState.value.versions.length} versions</Badge>
+              {versionsState.value.history.datasetHealth ? (
+                <Badge tone="muted">{versionsState.value.history.datasetHealth.healthLabel}</Badge>
+              ) : null}
             </div>
             {versionsState.value.versions.length === 0 ? (
               <p className="text-sm text-muted-foreground">

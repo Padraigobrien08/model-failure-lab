@@ -529,6 +529,7 @@ export function AnalysisPage() {
           {response.rows.map((row) => {
             const primaryDriver = row.topDrivers[0] ?? null;
             const primaryCaseId = primaryDriver?.caseIds[0] ?? null;
+            const historyContext = row.governanceRecommendation?.historyContext ?? null;
             const comparisonSearch = buildComparisonDetailSearchParams(new URLSearchParams(), {
               section: "transitions",
               caseId: primaryCaseId,
@@ -551,6 +552,14 @@ export function AnalysisPage() {
                         }
                       >
                         {row.governanceRecommendation.action}
+                      </Badge>
+                    ) : null}
+                    {historyContext ? (
+                      <Badge tone="muted">{historyContext.comparisonTrend.label} trend</Badge>
+                    ) : null}
+                    {historyContext ? (
+                      <Badge tone="muted">
+                        {historyContext.recentRegressionCount} recent regressions
                       </Badge>
                     ) : null}
                   </div>
@@ -608,6 +617,7 @@ export function AnalysisPage() {
                     }}
                     driverFilter={failureType || null}
                     recommendation={row.governanceRecommendation}
+                    historyContext={historyContext}
                     returnState={returnState}
                     title="Turn this signal into a dataset"
                   />

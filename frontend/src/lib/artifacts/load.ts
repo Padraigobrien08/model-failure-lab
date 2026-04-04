@@ -20,8 +20,15 @@ import {
   type ArtifactGovernanceFamilyMatch,
   type ArtifactGovernancePolicy,
   type ArtifactGovernanceRecommendation,
+  type ArtifactHistoryComparisonRow,
+  type ArtifactHistoryRunRow,
+  type ArtifactHistorySnapshot,
+  type ArtifactMetricTrend,
+  type ArtifactRecurringFailurePattern,
+  type ArtifactSignalHistoryContext,
   type ArtifactDatasetVersionRecord,
   type ArtifactDatasetVersionsResponse,
+  type ArtifactDatasetHealthSummary,
   type ArtifactHarvestResponse,
   type ArtifactQueryAggregateRow,
   type ArtifactQueryCaseRow,
@@ -175,6 +182,14 @@ function requireArtifactGovernancePolicy(
       data.max_duplicate_ratio,
       `${field}.max_duplicate_ratio`,
     ),
+    recurrenceWindow:
+      data.recurrence_window == null
+        ? 5
+        : requireCount(data.recurrence_window, `${field}.recurrence_window`),
+    recurrenceThreshold:
+      data.recurrence_threshold == null
+        ? null
+        : requireCount(data.recurrence_threshold, `${field}.recurrence_threshold`),
     strategy: requireString(data.strategy, `${field}.strategy`),
   };
 }
@@ -311,6 +326,277 @@ function requireArtifactGovernanceRecommendation(
       data.preview_cases,
       `${field}.preview_cases`,
     ),
+    historyContext:
+      data.history_context == null
+        ? null
+        : requireArtifactSignalHistoryContext(data.history_context, `${field}.history_context`),
+  };
+}
+
+function requireArtifactMetricTrend(value: unknown, field: string): ArtifactMetricTrend {
+  const data = requireObject(value, field);
+  return {
+    label: requireString(data.label, `${field}.label`),
+    delta: requireNumberOrNull(data.delta, `${field}.delta`),
+    sampleCount: requireCount(data.sample_count, `${field}.sample_count`),
+    firstValue: requireNumberOrNull(data.first_value, `${field}.first_value`),
+    lastValue: requireNumberOrNull(data.last_value, `${field}.last_value`),
+    volatility: requireNumberOrNull(data.volatility, `${field}.volatility`),
+    volatilityLabel: requireString(data.volatility_label, `${field}.volatility_label`),
+  };
+}
+
+function requireArtifactRecurringFailurePatterns(
+  value: unknown,
+  field: string,
+): ArtifactRecurringFailurePattern[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      failureType: requireString(row.failure_type, `${field}[${index}].failure_type`),
+      occurrences: requireCount(row.occurrences, `${field}[${index}].occurrences`),
+      comparisonIds: requireStringArray(
+        row.comparison_ids,
+        `${field}[${index}].comparison_ids`,
+      ),
+      latestDelta: requireNumberOrNull(row.latest_delta, `${field}[${index}].latest_delta`),
+    };
+  });
+}
+
+function requireArtifactHistoryRunRows(
+  value: unknown,
+  field: string,
+): ArtifactHistoryRunRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      runId: requireString(row.run_id, `${field}[${index}].run_id`),
+      dataset: requireString(row.dataset, `${field}[${index}].dataset`),
+      model: requireString(row.model, `${field}[${index}].model`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      status: requireString(row.status, `${field}[${index}].status`),
+      attemptedCaseCount: requireCount(
+        row.attempted_case_count,
+        `${field}[${index}].attempted_case_count`,
+      ),
+      classifiedCaseCount: requireCount(
+        row.classified_case_count,
+        `${field}[${index}].classified_case_count`,
+      ),
+      executionErrorCount: requireCount(
+        row.execution_error_count,
+        `${field}[${index}].execution_error_count`,
+      ),
+      unclassifiedCount: requireCount(
+        row.unclassified_count,
+        `${field}[${index}].unclassified_count`,
+      ),
+      successfulModelInvocationCount: requireCount(
+        row.successful_model_invocation_count,
+        `${field}[${index}].successful_model_invocation_count`,
+      ),
+      failureCaseCount: requireCount(
+        row.failure_case_count,
+        `${field}[${index}].failure_case_count`,
+      ),
+      failureRate: requireNumberOrNull(row.failure_rate, `${field}[${index}].failure_rate`),
+      classificationCoverage: requireNumberOrNull(
+        row.classification_coverage,
+        `${field}[${index}].classification_coverage`,
+      ),
+      executionSuccessRate: requireNumberOrNull(
+        row.execution_success_rate,
+        `${field}[${index}].execution_success_rate`,
+      ),
+    };
+  });
+}
+
+function requireArtifactHistoryComparisonRows(
+  value: unknown,
+  field: string,
+): ArtifactHistoryComparisonRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      reportId: requireString(row.report_id, `${field}[${index}].report_id`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      dataset: requireStringOrNull(row.dataset, `${field}[${index}].dataset`),
+      baselineRunId: requireString(row.baseline_run_id, `${field}[${index}].baseline_run_id`),
+      candidateRunId: requireString(
+        row.candidate_run_id,
+        `${field}[${index}].candidate_run_id`,
+      ),
+      baselineModel: requireStringOrNull(
+        row.baseline_model,
+        `${field}[${index}].baseline_model`,
+      ),
+      candidateModel: requireStringOrNull(
+        row.candidate_model,
+        `${field}[${index}].candidate_model`,
+      ),
+      status: requireString(row.status, `${field}[${index}].status`),
+      compatible:
+        typeof row.compatible === "boolean"
+          ? row.compatible
+          : (() => {
+              throw new Error(`${field}[${index}].compatible must be a boolean`);
+            })(),
+      signalVerdict: requireString(
+        row.signal_verdict,
+        `${field}[${index}].signal_verdict`,
+      ),
+      regressionScore: requireNumber(
+        row.regression_score,
+        `${field}[${index}].regression_score`,
+      ),
+      improvementScore: requireNumber(
+        row.improvement_score,
+        `${field}[${index}].improvement_score`,
+      ),
+      netScore: requireNumber(row.net_score, `${field}[${index}].net_score`),
+      severity: requireNumber(row.severity, `${field}[${index}].severity`),
+      topDrivers: requireComparisonSignalDrivers(
+        row.top_drivers,
+        `${field}[${index}].top_drivers`,
+      ),
+    };
+  });
+}
+
+function requireArtifactDatasetHealthSummary(
+  value: unknown,
+  field: string,
+): ArtifactDatasetHealthSummary {
+  const data = requireObject(value, field);
+  return {
+    familyId: requireString(data.family_id, `${field}.family_id`),
+    healthLabel: requireString(data.health_label, `${field}.health_label`),
+    trend: requireArtifactMetricTrend(data.trend, `${field}.trend`),
+    versionCount: requireCount(data.version_count, `${field}.version_count`),
+    evaluationRunCount: requireCount(
+      data.evaluation_run_count,
+      `${field}.evaluation_run_count`,
+    ),
+    recentFailRate: requireNumberOrNull(data.recent_fail_rate, `${field}.recent_fail_rate`),
+    previousFailRate: requireNumberOrNull(
+      data.previous_fail_rate,
+      `${field}.previous_fail_rate`,
+    ),
+    latestDatasetId: requireStringOrNull(data.latest_dataset_id, `${field}.latest_dataset_id`),
+    latestVersionTag: requireStringOrNull(
+      data.latest_version_tag,
+      `${field}.latest_version_tag`,
+    ),
+    latestCreatedAt: requireStringOrNull(
+      data.latest_created_at,
+      `${field}.latest_created_at`,
+    ),
+    sourceDatasetId: requireStringOrNull(
+      data.source_dataset_id,
+      `${field}.source_dataset_id`,
+    ),
+    primaryFailureType: requireStringOrNull(
+      data.primary_failure_type,
+      `${field}.primary_failure_type`,
+    ),
+  };
+}
+
+function requireArtifactHistorySnapshot(
+  value: unknown,
+  field: string,
+): ArtifactHistorySnapshot {
+  const data = requireObject(value, field);
+  return {
+    scopeKind: requireString(data.scope_kind, `${field}.scope_kind`),
+    scopeValue: requireString(data.scope_value, `${field}.scope_value`),
+    runHistory: requireArtifactHistoryRunRows(data.run_history, `${field}.run_history`),
+    comparisonHistory: requireArtifactHistoryComparisonRows(
+      data.comparison_history,
+      `${field}.comparison_history`,
+    ),
+    runTrend:
+      data.run_trend == null
+        ? null
+        : requireArtifactMetricTrend(data.run_trend, `${field}.run_trend`),
+    comparisonTrend:
+      data.comparison_trend == null
+        ? null
+        : requireArtifactMetricTrend(
+            data.comparison_trend,
+            `${field}.comparison_trend`,
+          ),
+    recurringFailures: requireArtifactRecurringFailurePatterns(
+      data.recurring_failures,
+      `${field}.recurring_failures`,
+    ),
+    datasetVersions: requireArtifactDatasetVersionRecords(
+      data.dataset_versions,
+      `${field}.dataset_versions`,
+    ),
+    datasetHealth:
+      data.dataset_health == null
+        ? null
+        : requireArtifactDatasetHealthSummary(
+            data.dataset_health,
+            `${field}.dataset_health`,
+          ),
+  };
+}
+
+function requireArtifactSignalHistoryContext(
+  value: unknown,
+  field: string,
+): ArtifactSignalHistoryContext {
+  const data = requireObject(value, field);
+  return {
+    scopeKind: requireString(data.scope_kind, `${field}.scope_kind`),
+    scopeValue: requireString(data.scope_value, `${field}.scope_value`),
+    recentComparisonCount: requireCount(
+      data.recent_comparison_count,
+      `${field}.recent_comparison_count`,
+    ),
+    recentRegressionCount: requireCount(
+      data.recent_regression_count,
+      `${field}.recent_regression_count`,
+    ),
+    comparisonTrend: requireArtifactMetricTrend(
+      data.comparison_trend,
+      `${field}.comparison_trend`,
+    ),
+    candidateRunTrend:
+      data.candidate_run_trend == null
+        ? null
+        : requireArtifactMetricTrend(
+            data.candidate_run_trend,
+            `${field}.candidate_run_trend`,
+          ),
+    recurringFailures: requireArtifactRecurringFailurePatterns(
+      data.recurring_failures,
+      `${field}.recurring_failures`,
+    ),
+    recentComparisons: requireArtifactHistoryComparisonRows(
+      data.recent_comparisons,
+      `${field}.recent_comparisons`,
+    ),
+    familyHealth:
+      data.family_health == null
+        ? null
+        : requireArtifactDatasetHealthSummary(
+            data.family_health,
+            `${field}.family_health`,
+          ),
   };
 }
 
@@ -350,13 +636,29 @@ function requireArtifactDatasetVersionRecords(
 
 function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatasetVersionsResponse {
   const data = requireObject(payload, "dataset_versions");
+  const familyId = requireString(data.family_id, "dataset_versions.family_id");
+  const versions = requireArtifactDatasetVersionRecords(
+    data.versions,
+    "dataset_versions.versions",
+  );
   return {
     source: requireSource(data.source, "dataset_versions.source"),
-    familyId: requireString(data.family_id, "dataset_versions.family_id"),
-    versions: requireArtifactDatasetVersionRecords(
-      data.versions,
-      "dataset_versions.versions",
-    ),
+    familyId,
+    versions,
+    history:
+      data.history == null
+        ? {
+            scopeKind: "family",
+            scopeValue: familyId,
+            runHistory: [],
+            comparisonHistory: [],
+            runTrend: null,
+            comparisonTrend: null,
+            recurringFailures: [],
+            datasetVersions: versions,
+            datasetHealth: null,
+          }
+        : requireArtifactHistorySnapshot(data.history, "dataset_versions.history"),
   };
 }
 

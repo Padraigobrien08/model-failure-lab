@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from model_failure_lab.datasets import DatasetEvolutionSummary, evolve_dataset_family, list_dataset_versions
+from model_failure_lab.datasets import DatasetEvolutionSummary, evolve_dataset_family
+from model_failure_lab.history import (
+    DatasetHealthSummary,
+    query_history_snapshot,
+)
 from model_failure_lab.datasets.contracts import FailureDataset
 from model_failure_lab.datasets.load import load_dataset
 from model_failure_lab.index import QueryFilters, query_comparison_signals
@@ -29,6 +33,12 @@ class DatasetFamilyHealth:
     source_dataset_id: str | None
     primary_failure_type: str | None
     latest_comparison_id: str | None
+    health_label: str
+    trend_label: str
+    recent_fail_rate: float | None
+    previous_fail_rate: float | None
+    volatility_label: str
+    evaluation_run_count: int
 
     def to_payload(self) -> dict[str, JsonValue]:
         payload: dict[str, JsonValue] = {
@@ -42,6 +52,12 @@ class DatasetFamilyHealth:
             "source_dataset_id": self.source_dataset_id,
             "primary_failure_type": self.primary_failure_type,
             "latest_comparison_id": self.latest_comparison_id,
+            "health_label": self.health_label,
+            "trend_label": self.trend_label,
+            "recent_fail_rate": self.recent_fail_rate,
+            "previous_fail_rate": self.previous_fail_rate,
+            "volatility_label": self.volatility_label,
+            "evaluation_run_count": self.evaluation_run_count,
         }
         if self.latest_created_at is not None:
             payload["latest_created_at"] = self.latest_created_at
@@ -97,31 +113,10 @@ def list_dataset_family_health(
     }
     records: list[DatasetFamilyHealth] = []
     for family_id in sorted(family_ids):
-        versions = list_dataset_versions(family_id, root=artifact_root)
-        if not versions:
+        health = get_dataset_family_health(family_id, root=artifact_root)
+        if health is None:
             continue
-        latest = versions[-1]
-        latest_dataset = load_dataset(latest.path)
-        source = _mapping_or_empty(latest_dataset.source)
-        signal = _mapping_or_empty(source.get("signal"))
-        records.append(
-            DatasetFamilyHealth(
-                family_id=family_id,
-                version_count=len(versions),
-                latest_dataset_id=latest.dataset_id,
-                latest_version_tag=latest.version_tag,
-                latest_case_count=latest.case_count,
-                latest_created_at=latest.created_at,
-                latest_signal_verdict=_string_or_none(signal.get("verdict")),
-                latest_severity=_float_or_none(signal.get("severity")),
-                source_dataset_id=_source_dataset_id(latest_dataset),
-                primary_failure_type=_primary_regression_failure_type(signal),
-                latest_comparison_id=_string_or_none(
-                    _mapping_or_empty(latest_dataset.metadata.get("versioning")).get("source_comparison_id")
-                    or source.get("comparison_report_id")
-                ),
-            )
-        )
+        records.append(health)
     return tuple(
         sorted(
             records,
@@ -207,6 +202,25 @@ def apply_dataset_actions(
     return tuple(results)
 
 
+def get_dataset_family_health(
+    family_id: str,
+    *,
+    root: str | Path | None = None,
+) -> DatasetFamilyHealth | None:
+    artifact_root = project_root(root).resolve()
+    snapshot = query_history_snapshot(
+        family_id=family_id,
+        root=artifact_root,
+        limit=25,
+    )
+    health_summary = snapshot.dataset_health
+    versions = snapshot.dataset_versions
+    if health_summary is None or not versions:
+        return None
+    latest = versions[-1]
+    return _build_dataset_family_health_record(health_summary, latest)
+
+
 def _apply_recommendation(
     recommendation: GovernanceRecommendation,
     *,
@@ -262,6 +276,31 @@ def _primary_regression_failure_type(signal: dict[str, JsonValue]) -> str | None
         if direction == "regression" and isinstance(failure_type, str) and failure_type.strip():
             return failure_type
     return None
+
+
+def _build_dataset_family_health_record(
+    health_summary: DatasetHealthSummary,
+    latest,
+) -> DatasetFamilyHealth:
+    return DatasetFamilyHealth(
+        family_id=health_summary.family_id,
+        version_count=health_summary.version_count,
+        latest_dataset_id=latest.dataset_id,
+        latest_version_tag=latest.version_tag,
+        latest_case_count=latest.case_count,
+        latest_created_at=latest.created_at,
+        latest_signal_verdict=latest.signal_verdict,
+        latest_severity=latest.severity,
+        source_dataset_id=health_summary.source_dataset_id,
+        primary_failure_type=health_summary.primary_failure_type,
+        latest_comparison_id=latest.source_comparison_id,
+        health_label=health_summary.health_label,
+        trend_label=health_summary.trend.label,
+        recent_fail_rate=health_summary.recent_fail_rate,
+        previous_fail_rate=health_summary.previous_fail_rate,
+        volatility_label=health_summary.trend.volatility_label,
+        evaluation_run_count=health_summary.evaluation_run_count,
+    )
 
 
 def _mapping_or_empty(value: object) -> dict[str, JsonValue]:

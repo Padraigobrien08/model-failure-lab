@@ -33,6 +33,7 @@ from model_failure_lab.datasets import (  # noqa: E402
     list_dataset_versions,
 )
 from model_failure_lab.governance import recommend_dataset_action  # noqa: E402
+from model_failure_lab.history import query_history_snapshot  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -198,10 +199,28 @@ def main(argv: list[str] | None = None) -> int:
         }
     elif args.command == "dataset-versions":
         versions = list_dataset_versions(args.dataset_family, root=root)
+        history = query_history_snapshot(
+            family_id=args.dataset_family,
+            root=root,
+            limit=args.limit,
+        )
         payload = {
             "source": build_source_descriptor(root),
             "family_id": args.dataset_family,
             "versions": [version.to_payload() for version in versions],
+            "history": history.to_payload(),
+        }
+    elif args.command == "history":
+        history = query_history_snapshot(
+            dataset=args.dataset,
+            model=args.model,
+            family_id=args.family_id,
+            root=root,
+            limit=args.limit,
+        )
+        payload = {
+            "source": build_source_descriptor(root),
+            **history.to_payload(),
         }
     else:
         raise ValueError(f"Unsupported query bridge command: {args.command}")
@@ -301,6 +320,15 @@ def build_parser() -> argparse.ArgumentParser:
     dataset_versions_parser = subparsers.add_parser("dataset-versions")
     dataset_versions_parser.add_argument("--root", required=True)
     dataset_versions_parser.add_argument("--dataset-family", required=True)
+    dataset_versions_parser.add_argument("--limit", type=int, default=10)
+
+    history_parser = subparsers.add_parser("history")
+    history_parser.add_argument("--root", required=True)
+    history_scope = history_parser.add_mutually_exclusive_group(required=True)
+    history_scope.add_argument("--dataset")
+    history_scope.add_argument("--model")
+    history_scope.add_argument("--family-id")
+    history_parser.add_argument("--limit", type=int, default=10)
 
     return parser
 

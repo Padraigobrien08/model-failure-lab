@@ -39,6 +39,7 @@ from model_failure_lab.governance import (
     recommend_dataset_action,
     review_dataset_actions,
 )
+from model_failure_lab.history import HistorySnapshot, query_history_snapshot
 from model_failure_lab.index import (
     QueryFilters,
     aggregate_case_query,
@@ -68,6 +69,7 @@ DEFAULT_CLASSIFIER_ID = "heuristic_v1"
 DEFAULT_RUN_SEED = 13
 DEFAULT_SIGNAL_ALERT_THRESHOLD = 0.05
 DEFAULT_GOVERNANCE_REVIEW_LIMIT = 10
+DEFAULT_HISTORY_LIMIT = 10
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -401,6 +403,26 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--json", action="store_true", dest="as_json")
     query_parser.set_defaults(handler=_handle_query)
 
+    history_parser = subparsers.add_parser(
+        "history",
+        help="Inspect deterministic run, comparison, or dataset-family history over local artifacts.",
+    )
+    history_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    history_scope = history_parser.add_mutually_exclusive_group(required=True)
+    history_scope.add_argument("--dataset")
+    history_scope.add_argument("--model")
+    history_scope.add_argument("--family", dest="family_id")
+    history_parser.add_argument("--limit", type=int, default=DEFAULT_HISTORY_LIMIT)
+    history_parser.add_argument("--json", action="store_true", dest="as_json")
+    history_parser.set_defaults(handler=_handle_history)
+
     regressions_parser = subparsers.add_parser(
         "regressions",
         help="List recent saved comparison signals ordered by severity.",
@@ -604,6 +626,20 @@ def _add_governance_policy_arguments(parser: argparse.ArgumentParser) -> None:
         dest="max_duplicate_ratio",
         help="Maximum duplicate ratio allowed before governance ignores a family update.",
     )
+    parser.add_argument(
+        "--recurrence-window",
+        type=int,
+        default=5,
+        dest="recurrence_window",
+        help="Recent history window used for deterministic recurring-regression context.",
+    )
+    parser.add_argument(
+        "--recurrence-threshold",
+        type=int,
+        default=2,
+        dest="recurrence_threshold",
+        help="Minimum recent regressions needed before history can override a low-severity ignore.",
+    )
 
 
 def _build_signal_filters(args: argparse.Namespace) -> QueryFilters:
@@ -629,6 +665,8 @@ def _build_governance_policy(args: argparse.Namespace) -> GovernancePolicy:
         family_id=args.family_id,
         family_case_cap=args.family_case_cap,
         max_duplicate_ratio=args.max_duplicate_ratio,
+        recurrence_window=args.recurrence_window,
+        recurrence_threshold=args.recurrence_threshold,
     )
 
 
@@ -952,6 +990,21 @@ def _handle_regressions(args: argparse.Namespace) -> int:
         )
         return 0
     print(_render_signal_rows(rows, direction=args.direction))
+    return 0
+
+
+def _handle_history(args: argparse.Namespace) -> int:
+    snapshot = query_history_snapshot(
+        dataset=args.dataset,
+        model=args.model,
+        family_id=args.family_id,
+        limit=args.limit,
+        root=_normalized_root(args.root),
+    )
+    if args.as_json:
+        print(_render_json_payload(snapshot.to_payload()))
+        return 0
+    print(_render_history_snapshot(snapshot))
     return 0
 
 
@@ -1424,20 +1477,24 @@ def _render_dataset_family_health(rows: tuple[DatasetFamilyHealth, ...]) -> str:
                 [
                     (
                         "family_id",
+                        "health",
+                        "trend",
                         "versions",
                         "latest",
                         "cases",
-                        "dataset",
+                        "fail_rate",
                         "driver",
                         "severity",
                     ),
                     *[
                         (
                             row.family_id,
+                            row.health_label,
+                            row.trend_label,
                             str(row.version_count),
                             row.latest_version_tag,
                             str(row.latest_case_count),
-                            row.source_dataset_id or "n/a",
+                            _format_rate(row.recent_fail_rate),
                             row.primary_failure_type or "n/a",
                             _format_rate(row.latest_severity),
                         )
@@ -1501,10 +1558,42 @@ def _render_governance_recommendation(recommendation: GovernanceRecommendation) 
             f"top_n={recommendation.policy.top_n} "
             f"failure_type={recommendation.policy.failure_type or 'all'} "
             f"family_cap={recommendation.policy.family_case_cap or 'none'} "
-            f"max_duplicate_ratio={recommendation.policy.max_duplicate_ratio if recommendation.policy.max_duplicate_ratio is not None else 'none'}"
+            f"max_duplicate_ratio={recommendation.policy.max_duplicate_ratio if recommendation.policy.max_duplicate_ratio is not None else 'none'} "
+            f"recurrence_window={recommendation.policy.recurrence_window} "
+            f"recurrence_threshold={recommendation.policy.recurrence_threshold or 'none'}"
         ),
         f"Rationale: {recommendation.rationale}",
     ]
+    if recommendation.history_context is not None:
+        lines.extend(
+            [
+                (
+                    "Recent history: "
+                    f"{recommendation.history_context.scope_kind}={recommendation.history_context.scope_value} "
+                    f"regressions={recommendation.history_context.recent_regression_count}/"
+                    f"{recommendation.history_context.recent_comparison_count} "
+                    f"trend={recommendation.history_context.comparison_trend.label} "
+                    f"volatility={recommendation.history_context.comparison_trend.volatility_label}"
+                ),
+            ]
+        )
+        if recommendation.history_context.family_health is not None:
+            lines.append(
+                (
+                    "Family trend: "
+                    f"{recommendation.history_context.family_health.health_label} "
+                    f"(fail_rate={_format_rate(recommendation.history_context.family_health.recent_fail_rate)}, "
+                    f"previous={_format_rate(recommendation.history_context.family_health.previous_fail_rate)})"
+                )
+            )
+        if recommendation.history_context.recurring_failures:
+            lines.append(
+                "Recurring drivers: "
+                + ", ".join(
+                    f"{pattern.failure_type} x{pattern.occurrences}"
+                    for pattern in recommendation.history_context.recurring_failures
+                )
+            )
     if recommendation.preview_cases:
         lines.append(
             _render_table(
@@ -1518,6 +1607,104 @@ def _render_governance_recommendation(recommendation: GovernanceRecommendation) 
                             entry.transition_type,
                         )
                         for entry in recommendation.preview_cases
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _render_history_snapshot(snapshot: HistorySnapshot) -> str:
+    lines = [
+        "Failure Lab History",
+        f"Scope: {snapshot.scope_kind}={snapshot.scope_value}",
+    ]
+    if snapshot.run_trend is not None:
+        lines.append(
+            (
+                "Run trend: "
+                f"{snapshot.run_trend.label} "
+                f"(delta={_format_signed_rate(snapshot.run_trend.delta)} "
+                f"volatility={snapshot.run_trend.volatility_label})"
+            )
+        )
+    if snapshot.comparison_trend is not None:
+        lines.append(
+            (
+                "Comparison trend: "
+                f"{snapshot.comparison_trend.label} "
+                f"(net={_format_signed_rate(snapshot.comparison_trend.delta)} "
+                f"volatility={snapshot.comparison_trend.volatility_label})"
+            )
+        )
+    if snapshot.dataset_health is not None:
+        lines.append(
+            (
+                "Dataset health: "
+                f"{snapshot.dataset_health.health_label} "
+                f"(recent={_format_rate(snapshot.dataset_health.recent_fail_rate)} "
+                f"previous={_format_rate(snapshot.dataset_health.previous_fail_rate)} "
+                f"runs={snapshot.dataset_health.evaluation_run_count})"
+            )
+        )
+    if snapshot.recurring_failures:
+        lines.append(
+            "Recurring drivers: "
+            + ", ".join(
+                f"{pattern.failure_type} x{pattern.occurrences}"
+                for pattern in snapshot.recurring_failures
+            )
+        )
+    if snapshot.run_history:
+        lines.append(
+            _render_table(
+                [
+                    ("run_id", "created_at", "model", "failure_rate", "errors"),
+                    *[
+                        (
+                            row.run_id,
+                            row.created_at,
+                            row.model,
+                            _format_rate(row.failure_rate),
+                            str(row.execution_error_count),
+                        )
+                        for row in snapshot.run_history
+                    ],
+                ]
+            )
+        )
+    if snapshot.comparison_history:
+        lines.append(
+            _render_table(
+                [
+                    ("report_id", "created_at", "verdict", "severity", "net"),
+                    *[
+                        (
+                            row.report_id,
+                            row.created_at,
+                            row.signal_verdict,
+                            _format_rate(row.severity),
+                            _format_signed_rate(row.net_score),
+                        )
+                        for row in snapshot.comparison_history
+                    ],
+                ]
+            )
+        )
+    if snapshot.dataset_versions:
+        lines.append(
+            _render_table(
+                [
+                    ("dataset_id", "version", "runs", "fail_rate", "comparison"),
+                    *[
+                        (
+                            row.dataset_id,
+                            row.version_tag,
+                            str(row.run_count),
+                            _format_rate(row.average_failure_rate),
+                            row.source_comparison_id or "n/a",
+                        )
+                        for row in snapshot.dataset_versions
                     ],
                 ]
             )

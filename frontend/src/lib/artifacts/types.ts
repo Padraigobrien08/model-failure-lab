@@ -291,6 +291,8 @@ export type ArtifactGovernancePolicy = {
   familyId: string | null;
   familyCaseCap: number | null;
   maxDuplicateRatio: number | null;
+  recurrenceWindow: number;
+  recurrenceThreshold: number | null;
   strategy: string;
 };
 
@@ -346,6 +348,98 @@ export type ArtifactGovernanceRecommendation = {
   selectedCaseCount: number;
   evidenceCaseIds: string[];
   previewCases: ArtifactRegressionPreviewCase[];
+  historyContext: ArtifactSignalHistoryContext | null;
+};
+
+export type ArtifactMetricTrend = {
+  label: string;
+  delta: number | null;
+  sampleCount: number;
+  firstValue: number | null;
+  lastValue: number | null;
+  volatility: number | null;
+  volatilityLabel: string;
+};
+
+export type ArtifactRecurringFailurePattern = {
+  failureType: string;
+  occurrences: number;
+  comparisonIds: string[];
+  latestDelta: number | null;
+};
+
+export type ArtifactHistoryRunRow = {
+  runId: string;
+  dataset: string;
+  model: string;
+  createdAt: string;
+  status: string;
+  attemptedCaseCount: number;
+  classifiedCaseCount: number;
+  executionErrorCount: number;
+  unclassifiedCount: number;
+  successfulModelInvocationCount: number;
+  failureCaseCount: number;
+  failureRate: number | null;
+  classificationCoverage: number | null;
+  executionSuccessRate: number | null;
+};
+
+export type ArtifactHistoryComparisonRow = {
+  reportId: string;
+  createdAt: string;
+  dataset: string | null;
+  baselineRunId: string;
+  candidateRunId: string;
+  baselineModel: string | null;
+  candidateModel: string | null;
+  status: string;
+  compatible: boolean;
+  signalVerdict: string;
+  regressionScore: number;
+  improvementScore: number;
+  netScore: number;
+  severity: number;
+  topDrivers: ComparisonSignalDriver[];
+};
+
+export type ArtifactDatasetHealthSummary = {
+  familyId: string;
+  healthLabel: string;
+  trend: ArtifactMetricTrend;
+  versionCount: number;
+  evaluationRunCount: number;
+  recentFailRate: number | null;
+  previousFailRate: number | null;
+  latestDatasetId: string | null;
+  latestVersionTag: string | null;
+  latestCreatedAt: string | null;
+  sourceDatasetId: string | null;
+  primaryFailureType: string | null;
+};
+
+export type ArtifactHistorySnapshot = {
+  scopeKind: string;
+  scopeValue: string;
+  runHistory: ArtifactHistoryRunRow[];
+  comparisonHistory: ArtifactHistoryComparisonRow[];
+  runTrend: ArtifactMetricTrend | null;
+  comparisonTrend: ArtifactMetricTrend | null;
+  recurringFailures: ArtifactRecurringFailurePattern[];
+  datasetVersions: ArtifactDatasetVersionRecord[];
+  datasetHealth: ArtifactDatasetHealthSummary | null;
+};
+
+export type ArtifactSignalHistoryContext = {
+  scopeKind: string;
+  scopeValue: string;
+  recentComparisonCount: number;
+  recentRegressionCount: number;
+  comparisonTrend: ArtifactMetricTrend;
+  candidateRunTrend: ArtifactMetricTrend | null;
+  recurringFailures: ArtifactRecurringFailurePattern[];
+  recentComparisons: ArtifactHistoryComparisonRow[];
+  familyHealth: ArtifactDatasetHealthSummary | null;
 };
 
 export type ArtifactDatasetVersionRecord = {
@@ -366,6 +460,7 @@ export type ArtifactDatasetVersionsResponse = {
   source: ArtifactSourceDescriptor;
   familyId: string;
   versions: ArtifactDatasetVersionRecord[];
+  history: ArtifactHistorySnapshot;
 };
 
 export type ArtifactDatasetEvolutionResponse = {

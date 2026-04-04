@@ -9,6 +9,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import time
 
+from model_failure_lab.datasets.load import load_dataset
 from model_failure_lab.reporting.signals import build_comparison_signal, build_incompatible_signal
 from model_failure_lab.reporting.load import load_saved_run_artifacts
 from model_failure_lab.storage.layout import (
@@ -16,12 +17,13 @@ from model_failure_lab.storage.layout import (
     REPORT_FILENAME,
     RESULTS_FILENAME,
     RUN_FILENAME,
+    datasets_root,
     project_root,
     reports_root,
     runs_root,
 )
 
-QUERY_INDEX_SCHEMA_VERSION = "query_index_v2"
+QUERY_INDEX_SCHEMA_VERSION = "query_index_v3"
 QUERY_INDEX_DIRNAME = ".failure_lab"
 QUERY_INDEX_FILENAME = "query_index.sqlite3"
 
@@ -63,6 +65,7 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
 
     run_rows: list[dict[str, object]] = []
     case_rows: list[dict[str, object]] = []
+    dataset_version_rows: list[dict[str, object]] = []
     run_lookup: dict[str, dict[str, object]] = {}
 
     for run_dir in _artifact_directories(runs_root(root=artifact_root, create=False)):
@@ -72,6 +75,7 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
             raise ValueError(f"run artifact is incomplete: {run_dir.name}")
 
         saved_run = load_saved_run_artifacts(run_dir.name, root=artifact_root)
+        run_metrics = _build_run_metrics(saved_run)
         run_row = {
             "run_id": saved_run.run.run_id,
             "dataset": saved_run.run.dataset,
@@ -81,6 +85,7 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
             "adapter_id": saved_run.adapter_id,
             "classifier_id": saved_run.classifier_id,
             "run_seed": saved_run.run.metadata.get("run_seed"),
+            **run_metrics,
         }
         run_lookup[saved_run.run.run_id] = run_row
         run_rows.append(run_row)
@@ -106,8 +111,36 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                     "explanation": classification.explanation if classification is not None else None,
                     "confidence": classification.confidence if classification is not None else None,
                     "error_stage": error.stage if error is not None else None,
-                }
+                    }
             )
+
+    for dataset_path in sorted(datasets_root(root=artifact_root, create=False).glob("*.json")):
+        dataset = load_dataset(dataset_path)
+        family_id = _dataset_family_id(dataset)
+        if family_id is None:
+            continue
+        versioning = _mapping_or_empty(dataset.metadata.get("versioning"))
+        source = _mapping_or_empty(dataset.source)
+        signal = _mapping_or_empty(source.get("signal"))
+        dataset_version_rows.append(
+            {
+                "family_id": family_id,
+                "dataset_id": dataset.dataset_id,
+                "version_number": _int_or_default(versioning.get("version_number"), 1),
+                "version_tag": _string_or_default(versioning.get("version_tag"), "v1"),
+                "created_at": dataset.created_at,
+                "case_count": len(dataset.cases),
+                "path": str(dataset_path.resolve()),
+                "parent_dataset_id": _optional_string(versioning.get("parent_dataset_id")),
+                "source_comparison_id": _optional_string(
+                    versioning.get("source_comparison_id") or source.get("comparison_report_id")
+                ),
+                "source_dataset_id": _source_dataset_id(dataset),
+                "signal_verdict": _optional_string(signal.get("verdict")),
+                "severity": _number_or_none(signal.get("severity")),
+                "primary_failure_type": _primary_failure_type(signal),
+            }
+        )
 
     comparison_rows: list[dict[str, object]] = []
     delta_rows: list[dict[str, object]] = []
@@ -240,9 +273,15 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
             connection.executemany(
                 """
                 INSERT INTO runs(
-                    run_id, dataset, model, created_at, status, adapter_id, classifier_id, run_seed
+                    run_id, dataset, model, created_at, status, adapter_id, classifier_id, run_seed,
+                    attempted_case_count, classified_case_count, execution_error_count,
+                    unclassified_count, successful_model_invocation_count, failure_case_count,
+                    failure_rate, classification_coverage, execution_success_rate
                 ) VALUES(
-                    :run_id, :dataset, :model, :created_at, :status, :adapter_id, :classifier_id, :run_seed
+                    :run_id, :dataset, :model, :created_at, :status, :adapter_id, :classifier_id, :run_seed,
+                    :attempted_case_count, :classified_case_count, :execution_error_count,
+                    :unclassified_count, :successful_model_invocation_count, :failure_case_count,
+                    :failure_rate, :classification_coverage, :execution_success_rate
                 )
                 """,
                 run_rows,
@@ -272,6 +311,20 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                 )
                 """,
                 comparison_rows,
+            )
+            connection.executemany(
+                """
+                INSERT INTO dataset_versions(
+                    family_id, dataset_id, version_number, version_tag, created_at, case_count,
+                    path, parent_dataset_id, source_comparison_id, source_dataset_id,
+                    signal_verdict, severity, primary_failure_type
+                ) VALUES(
+                    :family_id, :dataset_id, :version_number, :version_tag, :created_at, :case_count,
+                    :path, :parent_dataset_id, :source_comparison_id, :source_dataset_id,
+                    :signal_verdict, :severity, :primary_failure_type
+                )
+                """,
+                dataset_version_rows,
             )
             connection.executemany(
                 """
@@ -367,6 +420,13 @@ def _latest_artifact_mtime(root: Path) -> float | None:
                 continue
             current = path.stat().st_mtime
             latest = current if latest is None else max(latest, current)
+    dataset_root = datasets_root(root=root, create=False)
+    if dataset_root.exists():
+        for path in dataset_root.rglob("*.json"):
+            if not path.is_file():
+                continue
+            current = path.stat().st_mtime
+            latest = current if latest is None else max(latest, current)
     return latest
 
 
@@ -391,7 +451,16 @@ def _create_schema(connection: sqlite3.Connection) -> None:
             status TEXT NOT NULL,
             adapter_id TEXT,
             classifier_id TEXT,
-            run_seed INTEGER
+            run_seed INTEGER,
+            attempted_case_count INTEGER NOT NULL,
+            classified_case_count INTEGER NOT NULL,
+            execution_error_count INTEGER NOT NULL,
+            unclassified_count INTEGER NOT NULL,
+            successful_model_invocation_count INTEGER NOT NULL,
+            failure_case_count INTEGER NOT NULL,
+            failure_rate REAL,
+            classification_coverage REAL,
+            execution_success_rate REAL
         );
 
         CREATE TABLE cases (
@@ -409,6 +478,22 @@ def _create_schema(connection: sqlite3.Connection) -> None:
             confidence REAL,
             error_stage TEXT,
             PRIMARY KEY (run_id, case_id)
+        );
+
+        CREATE TABLE dataset_versions (
+            dataset_id TEXT PRIMARY KEY,
+            family_id TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            version_tag TEXT NOT NULL,
+            created_at TEXT,
+            case_count INTEGER NOT NULL,
+            path TEXT NOT NULL,
+            parent_dataset_id TEXT,
+            source_comparison_id TEXT,
+            source_dataset_id TEXT,
+            signal_verdict TEXT,
+            severity REAL,
+            primary_failure_type TEXT
         );
 
         CREATE TABLE comparisons (
@@ -465,6 +550,7 @@ def _create_schema(connection: sqlite3.Connection) -> None:
         CREATE INDEX idx_cases_failure_type ON cases(failure_type);
         CREATE INDEX idx_cases_created_at ON cases(created_at DESC);
         CREATE INDEX idx_cases_model_dataset ON cases(model, dataset);
+        CREATE INDEX idx_dataset_versions_family_id ON dataset_versions(family_id, version_number ASC);
         CREATE INDEX idx_comparisons_created_at ON comparisons(created_at DESC);
         CREATE INDEX idx_comparisons_signal_verdict ON comparisons(signal_verdict);
         CREATE INDEX idx_comparisons_severity ON comparisons(severity DESC);
@@ -523,6 +609,12 @@ def _require_number(value: object, label: str) -> float:
     return float(value)
 
 
+def _number_or_none(value: object) -> float | None:
+    if value is None:
+        return None
+    return _require_number(value, "optional number")
+
+
 def _read_report_status(report_payload: dict[str, object]) -> str:
     status = report_payload.get("status")
     if isinstance(status, dict):
@@ -530,6 +622,104 @@ def _read_report_status(report_payload: dict[str, object]) -> str:
         if isinstance(overall, str) and overall.strip():
             return overall
     return "comparison_ready"
+
+
+def _build_run_metrics(saved_run) -> dict[str, object]:
+    attempted_case_count = len(saved_run.case_results)
+    successful_model_invocation_count = sum(
+        1 for case in saved_run.case_results if case.output is not None
+    )
+    classified_case_count = sum(
+        1 for case in saved_run.case_results if case.classification is not None
+    )
+    execution_error_count = sum(1 for case in saved_run.case_results if case.error is not None)
+    unclassified_count = attempted_case_count - execution_error_count - classified_case_count
+    failure_case_count = sum(
+        1
+        for case in saved_run.case_results
+        if case.classification is not None and case.classification.failure_type != "no_failure"
+    )
+    return {
+        "attempted_case_count": attempted_case_count,
+        "classified_case_count": classified_case_count,
+        "execution_error_count": execution_error_count,
+        "unclassified_count": max(unclassified_count, 0),
+        "successful_model_invocation_count": successful_model_invocation_count,
+        "failure_case_count": failure_case_count,
+        "failure_rate": (
+            failure_case_count / classified_case_count if classified_case_count else None
+        ),
+        "classification_coverage": (
+            classified_case_count / attempted_case_count if attempted_case_count else None
+        ),
+        "execution_success_rate": (
+            successful_model_invocation_count / attempted_case_count
+            if attempted_case_count
+            else None
+        ),
+    }
+
+
+def _dataset_family_id(dataset) -> str | None:
+    versioning = _mapping_or_empty(dataset.metadata.get("versioning"))
+    family_id = _optional_string(versioning.get("family_id"))
+    if family_id is not None:
+        return family_id
+    source = _mapping_or_empty(dataset.source)
+    return _optional_string(source.get("family_id"))
+
+
+def _source_dataset_id(dataset) -> str | None:
+    values = {
+        source_dataset_id
+        for case in dataset.cases
+        for source_dataset_id in [_case_source_dataset_id(case.metadata)]
+        if source_dataset_id is not None
+    }
+    if len(values) == 1:
+        return next(iter(values))
+    return None
+
+
+def _case_source_dataset_id(metadata: dict[str, object]) -> str | None:
+    harvest = metadata.get("harvest")
+    if not isinstance(harvest, dict):
+        return None
+    return _optional_string(harvest.get("source_dataset_id"))
+
+
+def _primary_failure_type(signal: dict[str, object]) -> str | None:
+    raw_drivers = signal.get("top_drivers")
+    if not isinstance(raw_drivers, list):
+        return None
+    for entry in raw_drivers:
+        if not isinstance(entry, dict):
+            continue
+        if _optional_string(entry.get("direction")) != "regression":
+            continue
+        failure_type = _optional_string(entry.get("failure_type"))
+        if failure_type is not None:
+            return failure_type
+    first = raw_drivers[0] if raw_drivers else None
+    if isinstance(first, dict):
+        return _optional_string(first.get("failure_type"))
+    return None
+
+
+def _mapping_or_empty(value: object) -> dict[str, object]:
+    return value if isinstance(value, dict) else {}
+
+
+def _string_or_default(value: object, default: str) -> str:
+    if isinstance(value, str) and value.strip():
+        return value
+    return default
+
+
+def _int_or_default(value: object, default: int) -> int:
+    if type(value) is int:
+        return value
+    return default
 
 
 def _read_comparison_signal(

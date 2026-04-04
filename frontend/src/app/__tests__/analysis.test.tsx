@@ -379,6 +379,8 @@ function mockSignalAnalysisQuery() {
                   family_id: null,
                   family_case_cap: 200,
                   max_duplicate_ratio: 0.6,
+                  recurrence_window: 5,
+                  recurrence_threshold: 2,
                   strategy: "exact_suggested_family_then_health_guards",
                 },
                 signal: {
@@ -428,6 +430,90 @@ function mockSignalAnalysisQuery() {
                     transition_type: "no_failure_to_failure",
                   },
                 ],
+                history_context: {
+                  scope_kind: "dataset",
+                  scope_value: "query-fixture-v1",
+                  recent_comparison_count: 3,
+                  recent_regression_count: 2,
+                  comparison_trend: {
+                    label: "degrading",
+                    delta: 0.12,
+                    sample_count: 3,
+                    first_value: -0.04,
+                    last_value: 0.08,
+                    volatility: 0.06,
+                    volatility_label: "medium",
+                  },
+                  candidate_run_trend: {
+                    label: "degrading",
+                    delta: 0.2,
+                    sample_count: 2,
+                    first_value: 0.3,
+                    last_value: 0.5,
+                    volatility: 0.2,
+                    volatility_label: "high",
+                  },
+                  recurring_failures: [
+                    {
+                      failure_type: "hallucination",
+                      occurrences: 2,
+                      comparison_ids: [
+                        "compare_alpha_to_beta",
+                        "compare_beta_to_gamma",
+                      ],
+                      latest_delta: 0.18,
+                    },
+                  ],
+                  recent_comparisons: [
+                    {
+                      report_id: "compare_alpha_to_beta",
+                      created_at: "2026-04-01T10:10:00Z",
+                      dataset: "query-fixture-v1",
+                      baseline_run_id: "run_alpha",
+                      candidate_run_id: "run_beta",
+                      baseline_model: "baseline-model",
+                      candidate_model: "candidate-model",
+                      status: "regressed",
+                      compatible: true,
+                      signal_verdict: "regression",
+                      regression_score: 0.27,
+                      improvement_score: 0.08,
+                      net_score: 0.19,
+                      severity: 0.27,
+                      top_drivers: [
+                        {
+                          driver_rank: 0,
+                          failure_type: "hallucination",
+                          delta: 0.18,
+                          direction: "regression",
+                          case_ids: ["case-regression"],
+                        },
+                      ],
+                    },
+                  ],
+                  family_health: {
+                    family_id: "regression-query-fixture-v1-hallucination",
+                    health_label: "degrading",
+                    trend: {
+                      label: "degrading",
+                      delta: 0.1,
+                      sample_count: 2,
+                      first_value: 0.25,
+                      last_value: 0.35,
+                      volatility: 0.1,
+                      volatility_label: "high",
+                    },
+                    version_count: 2,
+                    evaluation_run_count: 4,
+                    recent_fail_rate: 0.35,
+                    previous_fail_rate: 0.25,
+                    latest_dataset_id: "regression-query-fixture-v1-hallucination-v2",
+                    latest_version_tag: "v2",
+                    latest_created_at: "2026-04-01T11:00:00Z",
+                    source_dataset_id: "query-fixture-v1",
+                    primary_failure_type: "hallucination",
+                  },
+                },
               },
             },
           ],
@@ -496,6 +582,38 @@ function mockSignalAnalysisQuery() {
           source: DEFAULT_SOURCE,
           family_id: "regression-query-fixture-v1-hallucination",
           versions: [],
+          history: {
+            scope_kind: "family",
+            scope_value: "regression-query-fixture-v1-hallucination",
+            run_history: [],
+            comparison_history: [],
+            run_trend: null,
+            comparison_trend: null,
+            recurring_failures: [],
+            dataset_versions: [],
+            dataset_health: {
+              family_id: "regression-query-fixture-v1-hallucination",
+              health_label: "degrading",
+              trend: {
+                label: "degrading",
+                delta: 0.1,
+                sample_count: 2,
+                first_value: 0.25,
+                last_value: 0.35,
+                volatility: 0.1,
+                volatility_label: "high",
+              },
+              version_count: 2,
+              evaluation_run_count: 4,
+              recent_fail_rate: 0.35,
+              previous_fail_rate: 0.25,
+              latest_dataset_id: "regression-query-fixture-v1-hallucination-v2",
+              latest_version_tag: "v2",
+              latest_created_at: "2026-04-01T11:00:00Z",
+              source_dataset_id: "query-fixture-v1",
+              primary_failure_type: "hallucination",
+            },
+          },
         }),
       } as Response;
     }
@@ -644,6 +762,9 @@ describe("analysis route", () => {
     expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
     expect(screen.getByText("27.0% severity")).toBeInTheDocument();
     expect(screen.getAllByText("create").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("degrading trend").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2 recent regressions").length).toBeGreaterThan(0);
+    expect(screen.getByText("hallucination x2")).toBeInTheDocument();
     expect(screen.getByText("hallucination +18.0%")).toBeInTheDocument();
     expect(
       screen.getAllByText(

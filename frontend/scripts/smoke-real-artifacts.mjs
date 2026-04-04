@@ -714,6 +714,22 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
       server,
       `${ARTIFACT_QUERY_PATH}?mode=signals&signalDirection=all&limit=10`,
     );
+    const savedSignalRow = analysisSignals.json.rows.find(
+      (row) => row && typeof row.report_id === "string" && row.report_id === comparisonReportId,
+    );
+    const matchedFamilyId =
+      comparisonDetail.governanceRecommendation?.matched_family_id ??
+      savedSignalRow?.governance_recommendation?.matched_family_id ??
+      null;
+    const datasetVersions =
+      typeof matchedFamilyId === "string" && matchedFamilyId.length > 0
+        ? await fetchJsonFromMiddleware(
+            server,
+            `/__failure_lab__/artifacts/dataset-versions.json?familyId=${encodeURIComponent(
+              matchedFamilyId,
+            )}&limit=10`,
+          )
+        : null;
 
     const runIds = await listDirectoryIds(path.join(normalizedArtifactRoot, "runs"));
     const reportIds = await listDirectoryIds(path.join(normalizedArtifactRoot, "reports"));
@@ -804,6 +820,42 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         "Analysis signal query did not expose a governance recommendation for the saved comparison",
       );
     }
+    if (
+      !comparisonDetail.governanceRecommendation.history_context ||
+      typeof comparisonDetail.governanceRecommendation.history_context.scope_kind !== "string" ||
+      typeof comparisonDetail.governanceRecommendation.history_context.scope_value !== "string"
+    ) {
+      throw new Error(
+        "Comparison detail did not expose the persisted governance history context",
+      );
+    }
+    if (
+      !savedSignalRow ||
+      !savedSignalRow.governance_recommendation ||
+      !savedSignalRow.governance_recommendation.history_context ||
+      typeof savedSignalRow.governance_recommendation.history_context.scope_kind !== "string" ||
+      typeof savedSignalRow.governance_recommendation.history_context.scope_value !== "string"
+    ) {
+      throw new Error(
+        "Analysis signal query did not expose the governance history context for the saved comparison",
+      );
+    }
+    if (matchedFamilyId !== null) {
+      if (!datasetVersions) {
+        throw new Error("Dataset versions payload was not fetched for the matched family");
+      }
+      if (datasetVersions.family_id !== matchedFamilyId) {
+        throw new Error("Dataset versions payload did not match the selected family");
+      }
+      if (
+        !datasetVersions.history ||
+        !datasetVersions.history.dataset_health ||
+        !datasetVersions.history.dataset_health.trend ||
+        typeof datasetVersions.history.dataset_health.trend.label !== "string"
+      ) {
+        throw new Error("Dataset versions payload did not expose family health history");
+      }
+    }
     for (const [label, durationMs] of [
       ["cases", analysisCases.durationMs],
       ["deltas", analysisDeltas.durationMs],
@@ -841,6 +893,8 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         "- analysis query (aggregates)",
         "- analysis query (signals)",
         "- governance recommendation payloads",
+        "- governance history context payloads",
+        ...(matchedFamilyId === null ? [] : ["- dataset family health history"]),
       ].join("\n") + "\n",
     );
   } finally {

@@ -644,6 +644,7 @@ export function ComparisonDetailPage() {
                 dataset={detail.comparison.dataset}
                 signal={detail.signal}
                 recommendation={detail.governanceRecommendation}
+                historyContext={detail.governanceRecommendation?.historyContext ?? null}
                 returnState={detailReturnState}
                 autoLoadVersions
                 title="Regression enforcement surface"

@@ -11,6 +11,7 @@ from .workflow import (
     DatasetFamilyHealth,
     GovernanceApplyResult,
     apply_dataset_actions,
+    get_dataset_family_health,
     list_dataset_family_health,
     review_dataset_actions,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "GovernancePolicy",
     "GovernanceRecommendation",
     "apply_dataset_actions",
+    "get_dataset_family_health",
     "list_dataset_family_health",
     "recommend_dataset_action",
     "review_dataset_actions",

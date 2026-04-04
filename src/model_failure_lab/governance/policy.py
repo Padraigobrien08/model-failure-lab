@@ -11,6 +11,7 @@ from model_failure_lab.datasets.evolution import (
     list_dataset_versions,
     preview_regression_pack,
 )
+from model_failure_lab.history import SignalHistoryContext, build_signal_history_context
 from model_failure_lab.datasets.load import load_dataset
 from model_failure_lab.schemas import JsonValue
 from model_failure_lab.storage.layout import project_root
@@ -18,6 +19,8 @@ from model_failure_lab.storage.layout import project_root
 DEFAULT_MINIMUM_SEVERITY = 0.05
 DEFAULT_FAMILY_CASE_CAP = 200
 DEFAULT_MAX_DUPLICATE_RATIO = 0.6
+DEFAULT_RECURRENCE_WINDOW = 5
+DEFAULT_RECURRENCE_THRESHOLD = 2
 
 
 @dataclass(slots=True, frozen=True)
@@ -28,6 +31,8 @@ class GovernancePolicy:
     family_id: str | None = None
     family_case_cap: int | None = DEFAULT_FAMILY_CASE_CAP
     max_duplicate_ratio: float | None = DEFAULT_MAX_DUPLICATE_RATIO
+    recurrence_window: int = DEFAULT_RECURRENCE_WINDOW
+    recurrence_threshold: int | None = DEFAULT_RECURRENCE_THRESHOLD
     strategy: str = "exact_suggested_family_then_health_guards"
 
     def __post_init__(self) -> None:
@@ -39,6 +44,10 @@ class GovernancePolicy:
             raise ValueError("family_case_cap must be >= 1 when provided")
         if self.max_duplicate_ratio is not None and not 0.0 <= self.max_duplicate_ratio <= 1.0:
             raise ValueError("max_duplicate_ratio must be between 0 and 1 when provided")
+        if self.recurrence_window < 1:
+            raise ValueError("recurrence_window must be >= 1")
+        if self.recurrence_threshold is not None and self.recurrence_threshold < 1:
+            raise ValueError("recurrence_threshold must be >= 1 when provided")
 
     def to_payload(self) -> dict[str, JsonValue]:
         return {
@@ -52,6 +61,8 @@ class GovernancePolicy:
                 if self.max_duplicate_ratio is not None
                 else None
             ),
+            "recurrence_window": self.recurrence_window,
+            "recurrence_threshold": self.recurrence_threshold,
             "strategy": self.strategy,
         }
 
@@ -105,9 +116,10 @@ class GovernanceRecommendation:
     selected_case_count: int
     evidence_case_ids: tuple[str, ...]
     preview_cases: tuple[RegressionPackPreviewCase, ...]
+    history_context: SignalHistoryContext | None = None
 
     def to_payload(self) -> dict[str, JsonValue]:
-        return {
+        payload: dict[str, JsonValue] = {
             "comparison_id": self.comparison_id,
             "action": self.action,
             "policy_rule": self.policy_rule,
@@ -119,6 +131,9 @@ class GovernanceRecommendation:
             "evidence_case_ids": list(self.evidence_case_ids),
             "preview_cases": [entry.to_payload() for entry in self.preview_cases],
         }
+        if self.history_context is not None:
+            payload["history_context"] = self.history_context.to_payload()
+        return payload
 
 
 def recommend_dataset_action(
@@ -143,8 +158,20 @@ def recommend_dataset_action(
         root=artifact_root,
         policy=active_policy,
     )
+    history_context = build_signal_history_context(
+        comparison_id,
+        family_id=family_match.family_id,
+        limit=active_policy.recurrence_window,
+        root=artifact_root,
+    )
     signal_verdict = _signal_string(preview.signal, "verdict") or "unknown"
     severity = _signal_float(preview.signal, "severity")
+    history_override = (
+        signal_verdict == "regression"
+        and severity < active_policy.minimum_severity
+        and active_policy.recurrence_threshold is not None
+        and history_context.recent_regression_count >= active_policy.recurrence_threshold
+    )
 
     if signal_verdict == "incompatible":
         action = "ignore"
@@ -155,12 +182,6 @@ def recommend_dataset_action(
         policy_rule = "non_regression_signal"
         rationale = (
             f"Signal verdict is `{signal_verdict}`, so the comparison does not qualify for regression-pack governance."
-        )
-    elif severity < active_policy.minimum_severity:
-        action = "ignore"
-        policy_rule = "below_minimum_severity"
-        rationale = (
-            f"Signal severity {severity:.3f} is below the configured minimum of {active_policy.minimum_severity:.3f}."
         )
     elif preview.selected_case_count == 0:
         action = "ignore"
@@ -190,6 +211,24 @@ def recommend_dataset_action(
         rationale = (
             f"Matched family `{family_match.family_id}` would add too little new signal: duplicate ratio {family_match.duplicate_ratio:.3f} exceeds the configured maximum of {active_policy.max_duplicate_ratio:.3f}."
         )
+    elif severity < active_policy.minimum_severity and not history_override:
+        action = "ignore"
+        policy_rule = "below_minimum_severity"
+        rationale = (
+            f"Signal severity {severity:.3f} is below the configured minimum of {active_policy.minimum_severity:.3f}."
+        )
+    elif history_override and family_match.exists:
+        action = "evolve"
+        policy_rule = "recurring_regression_override"
+        rationale = (
+            f"Signal severity {severity:.3f} is below the configured minimum, but `{history_context.scope_value}` has {history_context.recent_regression_count} regressions in the recent history window, so governance recommends evolving `{family_match.family_id}`."
+        )
+    elif history_override:
+        action = "create"
+        policy_rule = "recurring_regression_override"
+        rationale = (
+            f"Signal severity {severity:.3f} is below the configured minimum, but `{history_context.scope_value}` has {history_context.recent_regression_count} regressions in the recent history window, so governance recommends creating `{family_match.family_id}`."
+        )
     elif family_match.exists:
         action = "evolve"
         policy_rule = "existing_family_match"
@@ -217,6 +256,7 @@ def recommend_dataset_action(
         selected_case_count=preview.selected_case_count,
         evidence_case_ids=evidence_case_ids,
         preview_cases=preview.preview_cases,
+        history_context=history_context,
     )
 
 

@@ -69,6 +69,8 @@ function buildGovernanceRecommendation(
       familyId: null,
       familyCaseCap: 200,
       maxDuplicateRatio: 0.6,
+      recurrenceWindow: 5,
+      recurrenceThreshold: 2,
       strategy: "exact_suggested_family_then_health_guards",
     },
     signal: buildSignal("improvement", 0.25, [
@@ -101,6 +103,7 @@ function buildGovernanceRecommendation(
     selectedCaseCount: 0,
     evidenceCaseIds: [],
     previewCases: [],
+    historyContext: null,
     ...overrides,
   };
 }
@@ -629,6 +632,8 @@ function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unk
               family_id: detail.governanceRecommendation.policy.familyId,
               family_case_cap: detail.governanceRecommendation.policy.familyCaseCap,
               max_duplicate_ratio: detail.governanceRecommendation.policy.maxDuplicateRatio,
+              recurrence_window: detail.governanceRecommendation.policy.recurrenceWindow,
+              recurrence_threshold: detail.governanceRecommendation.policy.recurrenceThreshold,
               strategy: detail.governanceRecommendation.policy.strategy,
             },
             signal: {
@@ -678,6 +683,125 @@ function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unk
               driver_rank: entry.driverRank,
               transition_type: entry.transitionType,
             })),
+            history_context:
+              detail.governanceRecommendation.historyContext === null
+                ? null
+                : {
+                    scope_kind: detail.governanceRecommendation.historyContext.scopeKind,
+                    scope_value: detail.governanceRecommendation.historyContext.scopeValue,
+                    recent_comparison_count:
+                      detail.governanceRecommendation.historyContext.recentComparisonCount,
+                    recent_regression_count:
+                      detail.governanceRecommendation.historyContext.recentRegressionCount,
+                    comparison_trend: {
+                      label: detail.governanceRecommendation.historyContext.comparisonTrend.label,
+                      delta: detail.governanceRecommendation.historyContext.comparisonTrend.delta,
+                      sample_count:
+                        detail.governanceRecommendation.historyContext.comparisonTrend.sampleCount,
+                      first_value:
+                        detail.governanceRecommendation.historyContext.comparisonTrend.firstValue,
+                      last_value:
+                        detail.governanceRecommendation.historyContext.comparisonTrend.lastValue,
+                      volatility:
+                        detail.governanceRecommendation.historyContext.comparisonTrend.volatility,
+                      volatility_label:
+                        detail.governanceRecommendation.historyContext.comparisonTrend.volatilityLabel,
+                    },
+                    candidate_run_trend:
+                      detail.governanceRecommendation.historyContext.candidateRunTrend === null
+                        ? null
+                        : {
+                            label: detail.governanceRecommendation.historyContext.candidateRunTrend.label,
+                            delta: detail.governanceRecommendation.historyContext.candidateRunTrend.delta,
+                            sample_count:
+                              detail.governanceRecommendation.historyContext.candidateRunTrend.sampleCount,
+                            first_value:
+                              detail.governanceRecommendation.historyContext.candidateRunTrend.firstValue,
+                            last_value:
+                              detail.governanceRecommendation.historyContext.candidateRunTrend.lastValue,
+                            volatility:
+                              detail.governanceRecommendation.historyContext.candidateRunTrend.volatility,
+                            volatility_label:
+                              detail.governanceRecommendation.historyContext.candidateRunTrend.volatilityLabel,
+                          },
+                    recurring_failures:
+                      detail.governanceRecommendation.historyContext.recurringFailures.map(
+                        (pattern) => ({
+                          failure_type: pattern.failureType,
+                          occurrences: pattern.occurrences,
+                          comparison_ids: pattern.comparisonIds,
+                          latest_delta: pattern.latestDelta,
+                        }),
+                      ),
+                    recent_comparisons:
+                      detail.governanceRecommendation.historyContext.recentComparisons.map(
+                        (row) => ({
+                          report_id: row.reportId,
+                          created_at: row.createdAt,
+                          dataset: row.dataset,
+                          baseline_run_id: row.baselineRunId,
+                          candidate_run_id: row.candidateRunId,
+                          baseline_model: row.baselineModel,
+                          candidate_model: row.candidateModel,
+                          status: row.status,
+                          compatible: row.compatible,
+                          signal_verdict: row.signalVerdict,
+                          regression_score: row.regressionScore,
+                          improvement_score: row.improvementScore,
+                          net_score: row.netScore,
+                          severity: row.severity,
+                          top_drivers: row.topDrivers.map((driver) => ({
+                            driver_rank: driver.driverRank,
+                            failure_type: driver.failureType,
+                            delta: driver.delta,
+                            direction: driver.direction,
+                            case_ids: driver.caseIds,
+                          })),
+                        }),
+                      ),
+                    family_health:
+                      detail.governanceRecommendation.historyContext.familyHealth === null
+                        ? null
+                        : {
+                            family_id: detail.governanceRecommendation.historyContext.familyHealth.familyId,
+                            health_label:
+                              detail.governanceRecommendation.historyContext.familyHealth.healthLabel,
+                            trend: {
+                              label:
+                                detail.governanceRecommendation.historyContext.familyHealth.trend.label,
+                              delta:
+                                detail.governanceRecommendation.historyContext.familyHealth.trend.delta,
+                              sample_count:
+                                detail.governanceRecommendation.historyContext.familyHealth.trend.sampleCount,
+                              first_value:
+                                detail.governanceRecommendation.historyContext.familyHealth.trend.firstValue,
+                              last_value:
+                                detail.governanceRecommendation.historyContext.familyHealth.trend.lastValue,
+                              volatility:
+                                detail.governanceRecommendation.historyContext.familyHealth.trend.volatility,
+                              volatility_label:
+                                detail.governanceRecommendation.historyContext.familyHealth.trend.volatilityLabel,
+                            },
+                            version_count:
+                              detail.governanceRecommendation.historyContext.familyHealth.versionCount,
+                            evaluation_run_count:
+                              detail.governanceRecommendation.historyContext.familyHealth.evaluationRunCount,
+                            recent_fail_rate:
+                              detail.governanceRecommendation.historyContext.familyHealth.recentFailRate,
+                            previous_fail_rate:
+                              detail.governanceRecommendation.historyContext.familyHealth.previousFailRate,
+                            latest_dataset_id:
+                              detail.governanceRecommendation.historyContext.familyHealth.latestDatasetId,
+                            latest_version_tag:
+                              detail.governanceRecommendation.historyContext.familyHealth.latestVersionTag,
+                            latest_created_at:
+                              detail.governanceRecommendation.historyContext.familyHealth.latestCreatedAt,
+                            source_dataset_id:
+                              detail.governanceRecommendation.historyContext.familyHealth.sourceDatasetId,
+                            primary_failure_type:
+                              detail.governanceRecommendation.historyContext.familyHealth.primaryFailureType,
+                          },
+                  },
           },
   };
 }
@@ -814,6 +938,38 @@ function mockComparisonDetailWithVersionHistory(detail: ComparisonDetail) {
             source: DEFAULT_SOURCE,
             family_id: "regression-reasoning-failures-v1-reasoning",
             versions,
+            history: {
+              scope_kind: "family",
+              scope_value: "regression-reasoning-failures-v1-reasoning",
+              run_history: [],
+              comparison_history: [],
+              run_trend: null,
+              comparison_trend: null,
+              recurring_failures: [],
+              dataset_versions: versions,
+              dataset_health: {
+                family_id: "regression-reasoning-failures-v1-reasoning",
+                health_label: "stable",
+                trend: {
+                  label: "stable",
+                  delta: 0,
+                  sample_count: 2,
+                  first_value: 0.25,
+                  last_value: 0.25,
+                  volatility: 0,
+                  volatility_label: "low",
+                },
+                version_count: versions.length,
+                evaluation_run_count: 2,
+                recent_fail_rate: 0.25,
+                previous_fail_rate: 0.25,
+                latest_dataset_id: versions[versions.length - 1]?.dataset_id ?? null,
+                latest_version_tag: versions[versions.length - 1]?.version_tag ?? null,
+                latest_created_at: versions[versions.length - 1]?.created_at ?? null,
+                source_dataset_id: "reasoning-failures-v1",
+                primary_failure_type: "reasoning",
+              },
+            },
           }),
         } as Response;
       }
@@ -1314,6 +1470,8 @@ describe("comparison detail route", () => {
     expect(
       await screen.findByText("regression-reasoning-failures-v1-reasoning-v1"),
     ).toBeInTheDocument();
+    expect(screen.getByText("stable trend")).toBeInTheDocument();
+    expect(screen.getByText(/Evaluated in\s+2 runs\./)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Evolve family" }));
 
