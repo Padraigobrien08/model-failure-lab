@@ -45,7 +45,7 @@ policy-driven recommendations and review/apply workflows.
     and growth rules are local and inspectable.
 
 ### Phase 94: Family Matching And Review/Apply CLI
-- Status: ready
+- Status: complete
 - Requirements: `REC-01`, `REC-02`, `REC-03`, `FAM-01`, `FAM-02`
 - Goal: add family matching plus recent-signal review and apply flows in the CLI.
 - Success criteria:
@@ -55,7 +55,7 @@ policy-driven recommendations and review/apply workflows.
     policy rules.
 
 ### Phase 95: Debugger Recommendation Surfacing
-- Status: pending
+- Status: ready
 - Requirements: `UI-01`, `UI-02`
 - Goal: surface recommendation status, rationale, and matched-family context directly on debugger
   signal views.
@@ -77,9 +77,9 @@ policy-driven recommendations and review/apply workflows.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 94
-$gsd-plan-phase 94
+$gsd-discuss-phase 95
+$gsd-plan-phase 95
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after Phase 93 completion*
+*Roadmap updated: 2026-04-04 after Phase 94 completion*

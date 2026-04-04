@@ -7,11 +7,23 @@ from .policy import (
     GovernanceRecommendation,
     recommend_dataset_action,
 )
+from .workflow import (
+    DatasetFamilyHealth,
+    GovernanceApplyResult,
+    apply_dataset_actions,
+    list_dataset_family_health,
+    review_dataset_actions,
+)
 
 __all__ = [
     "DEFAULT_GOVERNANCE_POLICY",
+    "DatasetFamilyHealth",
     "GovernanceFamilyMatch",
+    "GovernanceApplyResult",
     "GovernancePolicy",
     "GovernanceRecommendation",
+    "apply_dataset_actions",
+    "list_dataset_family_health",
     "recommend_dataset_action",
+    "review_dataset_actions",
 ]

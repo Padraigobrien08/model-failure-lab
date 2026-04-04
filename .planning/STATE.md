@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Regression Governance And Recommendation Layer
-current_phase: 94
-current_phase_name: Family Matching And Review/Apply CLI
+current_phase: 95
+current_phase_name: Debugger Recommendation Surfacing
 current_plan: null
 status: ready_to_discuss
-stopped_at: Phase 93 complete
-last_updated: "2026-04-04T18:20:00Z"
+stopped_at: Phase 94 complete
+last_updated: "2026-04-04T18:45:00Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 25
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
+  percent: 50
 ---
 
 # State: v4.6 Regression Governance And Recommendation Layer
@@ -30,25 +30,25 @@ review/apply workflows.
 
 ## Current Focus
 
-- next_action: discuss Phase `94`
-- status: Phase `93` complete; next phase ready to discuss
+- next_action: discuss Phase `95`
+- status: Phase `94` complete; next phase ready to discuss
 
 ## Current Position
 
 Milestone: `v4.6`
-Phase: `94` — ready to discuss
+Phase: `95` — ready to discuss
 
 ## Workflow State
 
-**Current Phase:** `94`
-**Current Phase Name:** `Family Matching And Review/Apply CLI`
+**Current Phase:** `95`
+**Current Phase Name:** `Debugger Recommendation Surfacing`
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
 **Status:** Ready to discuss
-**Progress:** [██░░░░░░░░] 25%
+**Progress:** [█████░░░░░] 50%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Completed Phase `93` governance policy contract and recommendation rules
+**Last Activity Description:** Completed Phase `94` governance review/apply CLI and family-health inspection
 
 ## Recent Decisions
 
@@ -71,19 +71,21 @@ Phase: `94` — ready to discuss
   evolving packs high-signal over time.
 - Phase `93` now provides the deterministic backend contract for governance recommendations,
   including policy, matched-family context, and no-write evidence preview.
+- Phase `94` now provides CLI review/apply flows and dataset-family health, so the remaining gap is
+  debugger visibility over those decisions.
 
 ## Session
 
 **Last Date:** 2026-04-04T17:00:00Z
-**Stopped At:** Phase 93 complete
+**Stopped At:** Phase 94 complete
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-discuss-phase 94
-$gsd-plan-phase 94
+$gsd-discuss-phase 95
+$gsd-plan-phase 95
 ```
 
 ---
-*State updated: 2026-04-04 after Phase 93 completion*
+*State updated: 2026-04-04 after Phase 94 completion*

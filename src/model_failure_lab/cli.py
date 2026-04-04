@@ -29,6 +29,16 @@ from model_failure_lab.harvest import (
     promote_harvest_dataset,
     review_harvest_dataset,
 )
+from model_failure_lab.governance import (
+    DatasetFamilyHealth,
+    GovernanceApplyResult,
+    GovernancePolicy,
+    GovernanceRecommendation,
+    apply_dataset_actions,
+    list_dataset_family_health,
+    recommend_dataset_action,
+    review_dataset_actions,
+)
 from model_failure_lab.index import (
     QueryFilters,
     aggregate_case_query,
@@ -57,6 +67,7 @@ COMPATIBILITY_COMMAND = "model-failure-lab"
 DEFAULT_CLASSIFIER_ID = "heuristic_v1"
 DEFAULT_RUN_SEED = 13
 DEFAULT_SIGNAL_ALERT_THRESHOLD = 0.05
+DEFAULT_GOVERNANCE_REVIEW_LIMIT = 10
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -301,6 +312,21 @@ def build_parser() -> argparse.ArgumentParser:
     dataset_versions_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_versions_parser.set_defaults(handler=_handle_dataset_versions)
 
+    dataset_families_parser = dataset_subparsers.add_parser(
+        "families",
+        help="Inspect deterministic health summaries for evolved dataset families.",
+    )
+    dataset_families_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_families_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_families_parser.set_defaults(handler=_handle_dataset_families)
+
     dataset_evolve_parser = dataset_subparsers.add_parser(
         "evolve",
         help="Create the next immutable dataset version from one saved comparison signal.",
@@ -430,6 +456,67 @@ def build_parser() -> argparse.ArgumentParser:
     regressions_generate_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_generate_parser.set_defaults(handler=_handle_regressions_generate)
 
+    regressions_recommend_parser = regressions_subparsers.add_parser(
+        "recommend",
+        help="Evaluate one saved comparison against the deterministic governance policy.",
+    )
+    regressions_recommend_parser.add_argument("--comparison", required=True, dest="comparison_id")
+    regressions_recommend_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_governance_policy_arguments(regressions_recommend_parser)
+    regressions_recommend_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_recommend_parser.set_defaults(handler=_handle_regressions_recommend)
+
+    regressions_review_parser = regressions_subparsers.add_parser(
+        "review",
+        help="Review recent governance recommendations over saved comparison signals.",
+    )
+    regressions_review_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_signal_filter_arguments(regressions_review_parser)
+    _add_governance_policy_arguments(regressions_review_parser)
+    regressions_review_parser.add_argument(
+        "--include-ignored",
+        action="store_true",
+        help="Include `ignore` recommendations in the review output.",
+    )
+    regressions_review_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_review_parser.set_defaults(handler=_handle_regressions_review)
+
+    regressions_apply_parser = regressions_subparsers.add_parser(
+        "apply",
+        help="Apply deterministic governance recommendations to saved comparison signals.",
+    )
+    regressions_apply_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_signal_filter_arguments(regressions_apply_parser)
+    _add_governance_policy_arguments(regressions_apply_parser)
+    regressions_apply_parser.add_argument(
+        "--include-ignored",
+        action="store_true",
+        help="Include skipped `ignore` decisions in the apply output.",
+    )
+    regressions_apply_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_apply_parser.set_defaults(handler=_handle_regressions_apply)
+
     harvest_parser = subparsers.add_parser(
         "harvest",
         help="Harvest saved artifact cases into a draft dataset pack.",
@@ -473,6 +560,76 @@ def build_parser() -> argparse.ArgumentParser:
     harvest_parser.set_defaults(handler=_handle_harvest)
 
     return parser
+
+
+def _add_signal_filter_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--failure-type", dest="failure_type")
+    parser.add_argument("--model")
+    parser.add_argument("--dataset")
+    parser.add_argument("--report-id")
+    parser.add_argument("--baseline-run")
+    parser.add_argument("--candidate-run")
+    parser.add_argument("--last-n", type=int)
+    parser.add_argument("--since")
+    parser.add_argument("--until")
+    parser.add_argument("--limit", type=int, default=DEFAULT_GOVERNANCE_REVIEW_LIMIT)
+
+
+def _add_governance_policy_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--min-severity",
+        type=float,
+        default=DEFAULT_SIGNAL_ALERT_THRESHOLD,
+        dest="minimum_severity",
+        help="Minimum severity needed before a regression qualifies for governance.",
+    )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=10,
+        help="Maximum number of regression cases to preview or apply per comparison.",
+    )
+    parser.add_argument("--family-id", dest="family_id")
+    parser.add_argument(
+        "--family-case-cap",
+        type=int,
+        default=200,
+        dest="family_case_cap",
+        help="Maximum projected case count allowed for one dataset family.",
+    )
+    parser.add_argument(
+        "--max-duplicate-ratio",
+        type=float,
+        default=0.6,
+        dest="max_duplicate_ratio",
+        help="Maximum duplicate ratio allowed before governance ignores a family update.",
+    )
+
+
+def _build_signal_filters(args: argparse.Namespace) -> QueryFilters:
+    return QueryFilters(
+        failure_type=args.failure_type,
+        model=args.model,
+        dataset=args.dataset,
+        report_id=args.report_id,
+        baseline_run_id=args.baseline_run,
+        candidate_run_id=args.candidate_run,
+        last_n=args.last_n,
+        since=args.since,
+        until=args.until,
+        limit=args.limit,
+    )
+
+
+def _build_governance_policy(args: argparse.Namespace) -> GovernancePolicy:
+    return GovernancePolicy(
+        minimum_severity=args.minimum_severity,
+        top_n=args.top_n,
+        failure_type=args.failure_type,
+        family_id=args.family_id,
+        family_case_cap=args.family_case_cap,
+        max_duplicate_ratio=args.max_duplicate_ratio,
+    )
 
 
 def _handle_run(args: argparse.Namespace) -> int:
@@ -777,18 +934,7 @@ def _handle_query(args: argparse.Namespace) -> int:
 
 def _handle_regressions(args: argparse.Namespace) -> int:
     root = _normalized_root(args.root)
-    filters = QueryFilters(
-        failure_type=args.failure_type,
-        model=args.model,
-        dataset=args.dataset,
-        report_id=args.report_id,
-        baseline_run_id=args.baseline_run,
-        candidate_run_id=args.candidate_run,
-        last_n=args.last_n,
-        since=args.since,
-        until=args.until,
-        limit=args.limit,
-    )
+    filters = _build_signal_filters(args)
     verdict = None if args.direction == "all" else args.direction
     rows = query_comparison_signals(filters, verdict=verdict, root=root)
     if args.as_json:
@@ -806,6 +952,67 @@ def _handle_regressions(args: argparse.Namespace) -> int:
         )
         return 0
     print(_render_signal_rows(rows, direction=args.direction))
+    return 0
+
+
+def _handle_regressions_recommend(args: argparse.Namespace) -> int:
+    recommendation = recommend_dataset_action(
+        args.comparison_id,
+        root=_normalized_root(args.root),
+        policy=_build_governance_policy(args),
+    )
+    if args.as_json:
+        print(_render_json_payload(recommendation.to_payload()))
+        return 0
+    print(_render_governance_recommendation(recommendation))
+    return 0
+
+
+def _handle_regressions_review(args: argparse.Namespace) -> int:
+    recommendations = review_dataset_actions(
+        filters=_build_signal_filters(args),
+        root=_normalized_root(args.root),
+        policy=_build_governance_policy(args),
+        include_ignored=args.include_ignored,
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "governance_review",
+                    "filters": _query_filters_payload(_build_signal_filters(args)),
+                    "include_ignored": args.include_ignored,
+                    "policy": _build_governance_policy(args).to_payload(),
+                    "rows": [recommendation.to_payload() for recommendation in recommendations],
+                }
+            )
+        )
+        return 0
+    print(_render_governance_review(recommendations, include_ignored=args.include_ignored))
+    return 0
+
+
+def _handle_regressions_apply(args: argparse.Namespace) -> int:
+    results = apply_dataset_actions(
+        filters=_build_signal_filters(args),
+        root=_normalized_root(args.root),
+        policy=_build_governance_policy(args),
+        include_ignored=args.include_ignored,
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "governance_apply",
+                    "filters": _query_filters_payload(_build_signal_filters(args)),
+                    "include_ignored": args.include_ignored,
+                    "policy": _build_governance_policy(args).to_payload(),
+                    "rows": [result.to_payload() for result in results],
+                }
+            )
+        )
+        return 0
+    print(_render_governance_apply(results, include_ignored=args.include_ignored))
     return 0
 
 
@@ -850,6 +1057,22 @@ def _handle_harvest(args: argparse.Namespace) -> int:
         comparison_id=args.comparison_id,
     )
     print(_render_harvest_summary(summary))
+    return 0
+
+
+def _handle_dataset_families(args: argparse.Namespace) -> int:
+    rows = list_dataset_family_health(root=_normalized_root(args.root))
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "dataset_family_health",
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_dataset_family_health(rows))
     return 0
 
 
@@ -1191,6 +1414,41 @@ def _render_dataset_versions(
     )
 
 
+def _render_dataset_family_health(rows: tuple[DatasetFamilyHealth, ...]) -> str:
+    if not rows:
+        return "Failure Lab Dataset Families\nNo governed dataset families exist under the active root."
+    return "\n".join(
+        [
+            "Failure Lab Dataset Families",
+            _render_table(
+                [
+                    (
+                        "family_id",
+                        "versions",
+                        "latest",
+                        "cases",
+                        "dataset",
+                        "driver",
+                        "severity",
+                    ),
+                    *[
+                        (
+                            row.family_id,
+                            str(row.version_count),
+                            row.latest_version_tag,
+                            str(row.latest_case_count),
+                            row.source_dataset_id or "n/a",
+                            row.primary_failure_type or "n/a",
+                            _format_rate(row.latest_severity),
+                        )
+                        for row in rows
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
 def _render_dataset_evolution(summary: DatasetEvolutionSummary) -> str:
     lines = [
         "Failure Lab Dataset Evolution",
@@ -1226,6 +1484,121 @@ def _render_dataset_evolution(summary: DatasetEvolutionSummary) -> str:
             )
         )
     return "\n".join(lines)
+
+
+def _render_governance_recommendation(recommendation: GovernanceRecommendation) -> str:
+    lines = [
+        "Failure Lab Governance Recommendation",
+        f"Comparison: {recommendation.comparison_id}",
+        f"Action: {recommendation.action}",
+        f"Rule: {recommendation.policy_rule}",
+        f"Severity: {_format_rate(recommendation.signal.get('severity'))}",
+        f"Matched family: {recommendation.matched_family.family_id}",
+        f"Family health: versions={recommendation.matched_family.version_count} projected_cases={recommendation.matched_family.projected_case_count} duplicates={recommendation.matched_family.duplicate_case_count}",
+        (
+            "Policy: "
+            f"min_severity={recommendation.policy.minimum_severity:.3f} "
+            f"top_n={recommendation.policy.top_n} "
+            f"failure_type={recommendation.policy.failure_type or 'all'} "
+            f"family_cap={recommendation.policy.family_case_cap or 'none'} "
+            f"max_duplicate_ratio={recommendation.policy.max_duplicate_ratio if recommendation.policy.max_duplicate_ratio is not None else 'none'}"
+        ),
+        f"Rationale: {recommendation.rationale}",
+    ]
+    if recommendation.preview_cases:
+        lines.append(
+            _render_table(
+                [
+                    ("source_case", "prompt_id", "driver", "transition"),
+                    *[
+                        (
+                            entry.source_case_id,
+                            entry.prompt_id,
+                            entry.driver_failure_type or "n/a",
+                            entry.transition_type,
+                        )
+                        for entry in recommendation.preview_cases
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _render_governance_review(
+    recommendations: tuple[GovernanceRecommendation, ...],
+    *,
+    include_ignored: bool,
+) -> str:
+    if not recommendations:
+        label = " including ignored decisions" if include_ignored else ""
+        return f"Failure Lab Governance Review\nNo governance recommendations matched the current filters{label}."
+    return "\n".join(
+        [
+            "Failure Lab Governance Review",
+            _render_table(
+                [
+                    (
+                        "comparison",
+                        "action",
+                        "family",
+                        "rule",
+                        "severity",
+                        "cases",
+                    ),
+                    *[
+                        (
+                            recommendation.comparison_id,
+                            recommendation.action,
+                            recommendation.matched_family.family_id,
+                            recommendation.policy_rule,
+                            _format_rate(recommendation.signal.get("severity")),
+                            str(recommendation.selected_case_count),
+                        )
+                        for recommendation in recommendations
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
+def _render_governance_apply(
+    results: tuple[GovernanceApplyResult, ...],
+    *,
+    include_ignored: bool,
+) -> str:
+    if not results:
+        label = " including ignored decisions" if include_ignored else ""
+        return f"Failure Lab Governance Apply\nNo governance actions were produced for the current filters{label}."
+    return "\n".join(
+        [
+            "Failure Lab Governance Apply",
+            _render_table(
+                [
+                    (
+                        "comparison",
+                        "status",
+                        "action",
+                        "family",
+                        "dataset",
+                        "rule",
+                    ),
+                    *[
+                        (
+                            result.comparison_id,
+                            result.status,
+                            result.action,
+                            result.family_id,
+                            result.dataset_id or "n/a",
+                            result.policy_rule,
+                        )
+                        for result in results
+                    ],
+                ]
+            ),
+        ]
+    )
 
 
 def _render_case_rows(rows: list[dict[str, object]]) -> str:

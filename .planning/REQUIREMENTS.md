@@ -17,18 +17,18 @@ interpretable, reusable, and actionable from local artifacts.
 
 ### Review And Apply
 
-- [ ] **REC-01**: User can review recommended actions across recent saved comparisons without
+- [x] **REC-01**: User can review recommended actions across recent saved comparisons without
   opening each comparison manually.
-- [ ] **REC-02**: User can dry-run governance application and inspect proposed dataset actions
+- [x] **REC-02**: User can dry-run governance application and inspect proposed dataset actions
   before any files are written.
-- [ ] **REC-03**: User can apply governance decisions reproducibly to generate or evolve datasets
+- [x] **REC-03**: User can apply governance decisions reproducibly to generate or evolve datasets
   from recent signals.
 
 ### Family Matching And Health
 
-- [ ] **FAM-01**: User can inspect dataset-family health and see why a family was chosen, skipped,
+- [x] **FAM-01**: User can inspect dataset-family health and see why a family was chosen, skipped,
   or capped for a signal.
-- [ ] **FAM-02**: Family matching remains deterministic across dataset identity, failure type,
+- [x] **FAM-02**: Family matching remains deterministic across dataset identity, failure type,
   lineage, and overlap heuristics.
 
 ### Debugger Support
@@ -70,11 +70,11 @@ interpretable, reusable, and actionable from local artifacts.
 | GOV-01 | Phase 93 | Complete |
 | GOV-02 | Phase 93 | Complete |
 | GOV-03 | Phase 93 | Complete |
-| REC-01 | Phase 94 | Pending |
-| REC-02 | Phase 94 | Pending |
-| REC-03 | Phase 94 | Pending |
-| FAM-01 | Phase 94 | Pending |
-| FAM-02 | Phase 94 | Pending |
+| REC-01 | Phase 94 | Complete |
+| REC-02 | Phase 94 | Complete |
+| REC-03 | Phase 94 | Complete |
+| FAM-01 | Phase 94 | Complete |
+| FAM-02 | Phase 94 | Complete |
 | UI-01 | Phase 95 | Pending |
 | UI-02 | Phase 95 | Pending |
 | FLOW-01 | Phase 96 | Pending |

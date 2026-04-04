@@ -3,7 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from model_failure_lab.datasets import evolve_dataset_family, preview_regression_pack
-from model_failure_lab.governance import GovernancePolicy, recommend_dataset_action
+from model_failure_lab.governance import (
+    GovernancePolicy,
+    apply_dataset_actions,
+    list_dataset_family_health,
+    recommend_dataset_action,
+    review_dataset_actions,
+)
 from model_failure_lab.index import QueryFilters, query_comparison_signals
 from model_failure_lab.testing import materialize_insight_fixture
 
@@ -170,3 +176,43 @@ def test_recommend_dataset_action_is_deterministic(tmp_path: Path) -> None:
     second = recommend_dataset_action(comparison_id, root=workspace.root, policy=policy)
 
     assert first.to_payload() == second.to_payload()
+
+
+def test_list_dataset_family_health_reports_latest_family_state(tmp_path: Path) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_comparison(workspace.root)
+    family_id = "fixture-health-family"
+
+    evolve_dataset_family(
+        family_id,
+        comparison_id=comparison_id,
+        root=workspace.root,
+        top_n=1,
+    )
+
+    rows = list_dataset_family_health(root=workspace.root)
+    health = next(row for row in rows if row.family_id == family_id)
+
+    assert health.version_count == 1
+    assert health.latest_dataset_id.endswith("-v1")
+    assert health.latest_case_count > 0
+    assert health.source_dataset_id == workspace.dataset_id
+
+
+def test_review_and_apply_dataset_actions_use_deterministic_signal_order(tmp_path: Path) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    policy = GovernancePolicy(minimum_severity=0.0, top_n=2)
+
+    review = review_dataset_actions(root=workspace.root, policy=policy)
+    apply = apply_dataset_actions(root=workspace.root, policy=policy)
+    second_apply = apply_dataset_actions(root=workspace.root, policy=policy)
+
+    assert review
+    assert any(entry.action in {"create", "evolve"} for entry in review)
+    assert apply
+    assert any(result.status in {"created", "evolved"} for result in apply)
+    assert all(
+        result.status == "skipped" or result.dataset_id is not None
+        for result in apply
+    )
+    assert all(result.status == "skipped" for result in second_apply)
