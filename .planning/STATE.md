@@ -1,135 +1,90 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: Packaged Engine And Ollama Adapter Reach
-current_phase: null
-current_phase_name: null
+milestone: v4.4
+milestone_name: Regression Detection And Signal Layer
+current_phase: 85
+current_phase_name: Comparison Signal Contract And Artifact Persistence
 current_plan: null
-status: milestone_complete
-stopped_at: Archived v3.0 milestone
-last_updated: "2026-04-03T09:30:00Z"
-last_activity: 2026-04-03
+status: ready_to_discuss
+stopped_at: Milestone defined
+last_updated: "2026-04-04T13:40:54Z"
+last_activity: 2026-04-04
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# State: v3.0 Packaged Engine And Ollama Adapter Reach
+# State: v4.4 Regression Detection And Signal Layer
 
 ## Project Reference
 
-See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PROJECT.md) (updated 2026-04-03)
+See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PROJECT.md) (updated 2026-04-04)
 
-**Core value:** Make structured LLM failure analysis simple, reproducible, and easy to inspect from local artifacts.
-**Current focus:** Milestone archived; ready to define the next milestone
+**Core value:** Make behavior changes explicit, deterministic, and actionable from local
+artifacts.
+**Current focus:** Define and ship the persisted comparison signal contract before opening new UI
+surfaces.
 
 ## Current Focus
 
-- next_action: start the next milestone
-- status: `v3.0` is archived locally and no active phase is in progress
+- next_action: discuss Phase `85`
+- status: milestone initialized; requirements and roadmap are ready
 
 ## Current Position
 
-Milestone: `v3.0` — archived
-Phase: none active
+Milestone: `v4.4`
+Phase: `85` — ready to discuss
 
 ## Workflow State
 
-**Current Phase:** none
-**Current Phase Name:** none
-**Total Phases:** 3
+**Current Phase:** `85`
+**Current Phase Name:** `Comparison Signal Contract And Artifact Persistence`
+**Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
-**Status:** Milestone complete
-**Progress:** [██████████] 100%
-**Last Activity:** 2026-04-03
-**Last Activity Description:** v3.0 milestone archived locally and tagged
+**Status:** Ready to discuss
+**Progress:** [░░░░░░░░░░] 0%
+**Last Activity:** 2026-04-04
+**Last Activity Description:** Started milestone v4.4 and defined requirements and roadmap
 
 ## Recent Decisions
 
-- Default `failure-lab` artifact placement now follows the invocation current working directory unless `--root` is supplied explicitly.
-- Phase 69 is now complete: configured external roots, installed-package artifacts, and Ollama-backed artifacts are all proven through the existing debugger workflow.
-- The next milestone should start from fresh requirements rather than carrying forward the archived `v3.0` requirements file.
+- Use `v4.4` as the next version because this milestone extends the shipped `v4.3` artifact and
+  harvesting stack with a new signal layer rather than resetting product scope.
+- Keep signal computation deterministic and quantitative first; LLM interpretation remains an
+  optional extension through the existing insight layer.
+- Persist signals directly inside comparison artifacts so they remain artifact-native, reproducible,
+  and queryable.
+- Reuse the current CLI, query, and debugger surfaces instead of introducing a separate alerting
+  service or provider-specific UI branch.
 
 ## Accumulated Context
 
-- The engine backbone is now real:
-  canonical schemas, local artifact storage, adapters, classifiers, runner, reporting,
-  comparison, and the `failure-lab` CLI.
-
-- The repo now ships bundled reasoning, hallucination, and RAG datasets by canonical ID.
-- Bundled dataset discovery is visible at:
-  `failure-lab datasets list`
-
-- `v2.0` shipped the real artifact-backed React debugger for saved runs and comparisons.
-- `v2.1` completed the debugger operability pass:
-  1. run and comparison detail routes keep durable deep-linkable investigation state
-  2. comparison cases drill directly into baseline and candidate run evidence
-  3. route provenance is singular and active-case selection is visibly recoverable
-  4. the investigation loop is explicitly proven through route regressions, build, smoke, and `66-VERIFICATION.md`
-- Local JSON artifacts under `datasets/`, `runs/`, and `reports/` remain the canonical product
-  contract.
-
-- `67-01` removed source-layout assumptions from artifact placement:
-  the installed CLI now writes into the current working directory by default and keeps `--root` as
-  the explicit override.
-
-- `67-01` also made bundled demo/dataset asset failures package-aware and rewrote the README around
-  `python3 -m pip install .` plus the installed `failure-lab demo -> run -> report -> compare`
-  flow.
-
-- `67-02` added the missing install proof:
-  a temp-environment smoke now installs the package, runs the installed `failure-lab` console
-  script end-to-end, and verifies `datasets/`, `runs/`, and `reports/` from a scratch working
-  directory.
-
-- `67-02` also locked the source-level quickstart regression and README wording to that same
-  package-install artifact loop, including the expected incompatible comparison artifact at the end
-  of the quickstart.
-
-- `68-01` added the built-in `ollama` adapter:
-  non-streaming HTTP execution, normalized usage mapping, and saved-artifact compatibility coverage
-  for run, report, and comparison paths.
-
-- `68-02` exposed explicit Ollama CLI configuration:
-  `ollama:<model>`, `--ollama-host`, `--system-prompt`, and JSON `--model-option`, plus a
-  localhost stub proving the full `run -> report -> compare` loop.
-
-- `69-01` made the debugger honest about configured external artifact roots:
-  detail payloads now preserve configured source metadata and route-level regressions protect that
-  contract across shell, run detail, and comparison detail.
-
-- `69-02` closed the compatibility loop:
-  installed-package smoke now verifies debugger inspection, the frontend smoke can inspect existing
-  artifact roots or generate Ollama-stub artifacts, and the README documents the
-  `FAILURE_LAB_ARTIFACT_ROOT` handoff.
-
-- `v3.0` is now archived:
-  roadmap and requirements snapshots are stored under `.planning/milestones/`, the repo is tagged
-  locally, and the live planning files are reset for the next milestone.
-
-- `v3.0` now targets that next gap directly:
-  1. package `failure-lab` for a normal install path without editable-checkout assumptions
-  2. add Ollama as the next real adapter family through the current adapter and artifact seams
-  3. prove packaged and Ollama-produced artifacts still flow through the current debugger without a new UI branch
-- The debugger architecture is intentionally stable during this milestone; widening distribution and
-  adapter reach is the priority.
+- The product already supports execution, reporting, comparison, cross-run query, grounded
+  insight, failure harvesting, dataset curation, and replayable evaluation loops.
+- `v4.3` closed the reuse loop:
+  users can now turn saved failures into curated datasets and rerun them through the standard
+  engine.
+- The next user bottleneck is not “can I inspect or reuse failures?” It is “can the system tell me
+  what materially changed between runs and how severe it is without manual digging?”
+- `v4.4` addresses that directly through deterministic comparison scoring, persisted signal blocks,
+  CLI surfacing, and debugger severity views.
 
 ## Session
 
-**Last Date:** 2026-04-03T09:30:00Z
-**Stopped At:** Archived v3.0 milestone
+**Last Date:** 2026-04-04T13:40:54Z
+**Stopped At:** Milestone defined
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-new-milestone
-$gsd-progress
+$gsd-discuss-phase 85
+$gsd-plan-phase 85
 ```
 
 ---
-*State updated: 2026-04-03 after archiving v3.0*
+*State updated: 2026-04-04 for milestone v4.4 initialization*

@@ -1,5 +1,42 @@
 # Milestones
 
+## v4.3 Failure Harvesting And Dataset Pack Generation (Shipped: 2026-04-04)
+
+**Phases completed:** 4 phases, 8 plans
+
+**Key accomplishments:**
+- Added query-compatible harvesting from saved runs, analysis results, and comparison delta slices.
+- Added deterministic draft review, deduplication, curated promotion, and local harvested dataset
+  discovery.
+- Added lightweight debugger export from `/analysis` and comparison detail into draft dataset
+  packs.
+- Proved the full `artifact -> harvest -> curated dataset -> rerun -> compare -> insight` loop.
+
+---
+
+## v4.2 Insight Layer And Grounded Failure Interpretation (Shipped: 2026-04-03)
+
+**Phases completed:** 4 phases, 8 plans
+
+**Key accomplishments:**
+- Added grounded heuristic insight reports over case, delta, aggregate, and comparison result sets.
+- Added `failure-lab query --summarize` and `failure-lab compare --explain` with heuristic default
+  and explicit LLM opt-in.
+- Added shared debugger insight panels with clickable evidence drillthrough.
+
+---
+
+## v4.1 Artifact Query And Cross-Run Analysis Layer (Shipped: 2026-04-03)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Added a derived local query index over runs, cases, comparisons, and case deltas.
+- Added `failure-lab index rebuild` and `failure-lab query`.
+- Added a query-backed `/analysis` debugger route with URL-backed filters and evidence drillthrough.
+
+---
+
 ## v3.0 Packaged Engine And Ollama Adapter Reach (Shipped: 2026-04-03)
 
 **Phases completed:** 3 phases, 6 plans, 12 tasks  

@@ -2,6 +2,12 @@
 
 ## Archived Milestones
 
+- [x] `v4.3` Failure Harvesting And Dataset Pack Generation - shipped 2026-04-04; harvest draft
+  dataset packs, deterministic review/promotion, debugger export, and replay-loop proof.
+- [x] `v4.2` Insight Layer And Grounded Failure Interpretation - shipped 2026-04-03; heuristic and
+  opt-in LLM insight reports, debugger insight panels, and grounded evidence drillthrough.
+- [x] `v4.1` Artifact Query And Cross-Run Analysis Layer - shipped 2026-04-03; derived local
+  query index, structured query CLI, and query-backed analysis view.
 - [x] [v3.0 Packaged Engine And Ollama Adapter Reach](/Users/padraigobrien/model-failure-lab/.planning/milestones/v3.0-ROADMAP.md) - shipped 2026-04-03; installable CLI path, built-in Ollama adapter, and debugger compatibility proof across packaged and Ollama artifacts.
 - [x] [v2.1 Cross-Artifact Drillthrough And Debugger Operability](/Users/padraigobrien/model-failure-lab/.planning/milestones/v2.1-ROADMAP.md) - shipped 2026-04-02; deep-linkable detail state, exact comparison-to-run drillthrough, singular route provenance, strong active-case cues, and explicit workflow proof.
 - [x] [v2.0 React Debugger On Real Artifacts](/Users/padraigobrien/model-failure-lab/.planning/milestones/v2.0-ROADMAP.md) - shipped 2026-03-31; artifact-backed runs/comparisons debugger, denser guided inspection, and audit-clean UI milestone closure.
@@ -15,16 +21,65 @@
 - [x] [v1.1 Live Benchmark Validation And Research Packaging](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.1-ROADMAP.md) - shipped 2026-03-20; real-run validation and reproducibility packaging.
 - [x] [v1.0 MVP](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.0-ROADMAP.md) - shipped 2026-03-20; benchmark pipeline, baselines, evaluation, and reporting contract.
 
-## No Active Milestone
+## Active Milestone: v4.4 Regression Detection And Signal Layer
 
-`v3.0` is archived. Start the next milestone to create fresh requirements and a new active roadmap.
+**Goal:** Add a deterministic, artifact-native signal layer that scores comparisons, surfaces
+meaningful regressions and improvements, and directs users to the most important behavior changes
+without manual inspection.
+
+### Phase 85: Comparison Signal Contract And Artifact Persistence
+- Status: pending
+- Requirements: `SIG-01`, `SIG-02`
+- Goal: compute deterministic verdicts, scores, and top drivers at comparison time and persist
+  them in comparison artifacts.
+- Success criteria:
+  - Every comparison produces a persisted signal block with verdict, regression score,
+    improvement score, and top drivers.
+  - Scores are derived deterministically from saved comparison data and do not depend on LLM
+    behavior.
+  - Top drivers identify the highest-impact failure-type deltas behind the verdict.
+
+### Phase 86: CLI Signal Surfaces And Regression Listings
+- Status: pending
+- Requirements: `CLI-01`, `CLI-02`, `CLI-03`, `IDX-01`
+- Goal: expose raw scores, deterministic summaries, thresholded alerts, and recent-regression
+  listings over the persisted signal contract.
+- Success criteria:
+  - `failure-lab compare --score` emits the raw signal block.
+  - `failure-lab compare --summary` emits a deterministic human-readable signal summary with
+    evidence-linked drivers.
+  - `failure-lab compare --alert` only emits when configured thresholds are exceeded.
+  - Users can list recent regressions and improvements ordered by severity without manually opening
+    each comparison.
+
+### Phase 87: Debugger Severity Surfacing And Evidence Handoff
+- Status: pending
+- Requirements: `UI-01`, `UI-02`
+- Goal: highlight signal severity, direction, and top drivers in comparison and analysis views
+  before users open dense detail sections.
+- Success criteria:
+  - Comparison routes show regression/improvement badges, score displays, and top drivers.
+  - The debugger links directly from signal surfaces into affected cases and existing detail views.
+  - `/analysis` exposes a recent-regressions view with severity sorting and filtering by dataset or
+    failure type.
+
+### Phase 88: Signal Stability And Workflow Verification
+- Status: pending
+- Requirements: `VERF-01`
+- Goal: prove that the signal layer is stable, reproducible, and useful across CLI and debugger
+  workflows.
+- Success criteria:
+  - Signal outputs are stable across repeated rebuilds or reruns over the same artifacts.
+  - Verification proves persisted comparison signals, CLI surfacing, and debugger severity
+    rendering together.
+  - Users can answer “what changed?” without opening dense detail views first.
 
 ## Next Action
 
 ```bash
-$gsd-new-milestone
-$gsd-progress
+$gsd-discuss-phase 85
+$gsd-plan-phase 85
 ```
 
 ---
-*Roadmap updated: 2026-04-03 after archiving v3.0*
+*Roadmap updated: 2026-04-04 for milestone v4.4 initialization*
