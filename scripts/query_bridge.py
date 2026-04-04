@@ -20,6 +20,7 @@ from model_failure_lab.index import (  # noqa: E402
     list_run_inventory,
     query_case_deltas,
     query_cases,
+    query_comparison_signals,
 )
 from model_failure_lab.analysis import (  # noqa: E402
     build_query_insight_report,
@@ -57,6 +58,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         if args.mode == "aggregates":
             rows = aggregate_case_query(args.aggregate_by, filters, root=root)
+        elif args.mode == "signals":
+            rows = query_comparison_signals(
+                filters,
+                verdict=args.signal_direction,
+                root=root,
+            )
         elif args.mode == "deltas":
             rows = query_case_deltas(filters, root=root)
         else:
@@ -88,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
                     aggregate_by=args.aggregate_by,
                     root=root,
                 ).to_payload()
-                if args.summarize
+                if args.summarize and args.mode != "signals"
                 else None
             ),
             "rows": rows,
@@ -161,7 +168,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     query_parser = subparsers.add_parser("query")
     query_parser.add_argument("--root", required=True)
-    query_parser.add_argument("--mode", choices=["cases", "deltas", "aggregates"], required=True)
+    query_parser.add_argument(
+        "--mode",
+        choices=["cases", "deltas", "aggregates", "signals"],
+        required=True,
+    )
     query_parser.add_argument("--failure-type")
     query_parser.add_argument("--model")
     query_parser.add_argument("--dataset")
@@ -175,6 +186,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--aggregate-by",
         choices=["failure_type", "model", "dataset", "prompt_id"],
         default="failure_type",
+    )
+    query_parser.add_argument(
+        "--signal-direction",
+        choices=["regression", "improvement", "neutral", "incompatible", "all"],
+        default="regression",
     )
     query_parser.add_argument("--summarize", action="store_true")
     query_parser.add_argument("--last-n", type=int)

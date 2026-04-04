@@ -3,8 +3,10 @@ import type { ComparisonDetail } from "@/lib/artifacts/types";
 import { cn } from "@/lib/utils";
 
 type ComparisonDeltaStripProps = {
+  signal: ComparisonDetail["signal"];
   metrics: ComparisonDetail["metrics"];
   compatible: boolean;
+  onOpenDriverCase?: (caseId: string) => void;
 };
 
 function formatPercent(value: number | null): string {
@@ -122,8 +124,10 @@ function MetricCard({
 }
 
 export function ComparisonDeltaStrip({
+  signal,
   metrics,
   compatible,
+  onOpenDriverCase,
 }: ComparisonDeltaStripProps) {
   const narrative = formatDeltaNarrative(metrics, compatible);
 
@@ -152,6 +156,43 @@ export function ComparisonDeltaStrip({
               {narrative.headline}
             </p>
             <p className="text-sm leading-6 text-muted-foreground">{narrative.copy}</p>
+            <div className="rounded-[18px] border border-border/60 bg-background/60 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Signal verdict
+                </p>
+                <span className="text-sm font-semibold text-foreground">{signal.verdict}</span>
+                <span className="text-xs text-muted-foreground">
+                  severity {formatPercent(signal.severity)}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Regression {formatPercent(signal.regressionScore)} · Improvement{" "}
+                {formatPercent(signal.improvementScore)}
+              </p>
+              {signal.topDrivers.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {signal.topDrivers.map((driver) => {
+                    const primaryCaseId = driver.caseIds[0] ?? null;
+                    return (
+                      <button
+                        key={`${driver.driverRank}-${driver.failureType}`}
+                        type="button"
+                        className="rounded-full border border-border/60 bg-card/80 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-card"
+                        disabled={primaryCaseId === null || onOpenDriverCase === undefined}
+                        onClick={() => {
+                          if (primaryCaseId && onOpenDriverCase) {
+                            onOpenDriverCase(primaryCaseId);
+                          }
+                        }}
+                      >
+                        {driver.failureType} {formatSignedPercent(driver.delta)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-[18px] border border-border/60 bg-background/60 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">

@@ -16,6 +16,7 @@ import {
   type ArtifactQueryAggregateRow,
   type ArtifactQueryCaseRow,
   type ArtifactQueryDeltaRow,
+  type ArtifactQuerySignalRow,
   type ArtifactQueryFacets,
   type ArtifactQueryFilters,
   type ArtifactQueryResponse,
@@ -27,6 +28,8 @@ import {
   type ComparisonInventory,
   type ComparisonInventoryItem,
   type ComparisonMetricsSnapshot,
+  type ComparisonSignal,
+  type ComparisonSignalDriver,
   type ComparisonTransitionSummaryRow,
   type ArtifactSourceDescriptor,
   type FailureLabelRecord,
@@ -263,6 +266,55 @@ function requireInsightReport(
   };
 }
 
+function requireComparisonSignalDrivers(
+  value: unknown,
+  field: string,
+): ComparisonSignalDriver[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      driverRank:
+        row.driver_rank == null
+          ? index
+          : requireCount(row.driver_rank, `${field}[${index}].driver_rank`),
+      failureType: requireString(row.failure_type, `${field}[${index}].failure_type`),
+      delta: requireNumber(row.delta, `${field}[${index}].delta`),
+      direction: requireString(row.direction, `${field}[${index}].direction`),
+      caseIds: requireStringArray(row.case_ids, `${field}[${index}].case_ids`),
+    };
+  });
+}
+
+function requireComparisonSignal(
+  value: unknown,
+  field: string,
+): ComparisonSignal {
+  if (value == null) {
+    return {
+      verdict: "neutral",
+      reason: null,
+      regressionScore: 0,
+      improvementScore: 0,
+      netScore: 0,
+      severity: 0,
+      topDrivers: [],
+    };
+  }
+  const signal = requireObject(value, field);
+  return {
+    verdict: requireString(signal.verdict, `${field}.verdict`),
+    reason: requireStringOrNull(signal.reason, `${field}.reason`),
+    regressionScore: requireNumber(signal.regression_score, `${field}.regression_score`),
+    improvementScore: requireNumber(signal.improvement_score, `${field}.improvement_score`),
+    netScore: requireNumber(signal.net_score, `${field}.net_score`),
+    severity: requireNumber(signal.severity, `${field}.severity`),
+    topDrivers: requireComparisonSignalDrivers(signal.top_drivers, `${field}.top_drivers`),
+  };
+}
+
 function requireArtifactQueryCaseRows(value: unknown, field: string): ArtifactQueryCaseRow[] {
   if (!Array.isArray(value)) {
     throw new Error(`${field} must be an array`);
@@ -359,6 +411,58 @@ function requireArtifactQueryAggregateRows(
   });
 }
 
+function requireArtifactQuerySignalRows(value: unknown, field: string): ArtifactQuerySignalRow[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      reportId: requireString(row.report_id, `${field}[${index}].report_id`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      dataset: requireStringOrNull(row.dataset, `${field}[${index}].dataset`),
+      baselineRunId: requireString(
+        row.baseline_run_id,
+        `${field}[${index}].baseline_run_id`,
+      ),
+      candidateRunId: requireString(
+        row.candidate_run_id,
+        `${field}[${index}].candidate_run_id`,
+      ),
+      baselineModel: requireStringOrNull(
+        row.baseline_model,
+        `${field}[${index}].baseline_model`,
+      ),
+      candidateModel: requireStringOrNull(
+        row.candidate_model,
+        `${field}[${index}].candidate_model`,
+      ),
+      status: requireString(row.status, `${field}[${index}].status`),
+      compatible:
+        typeof row.compatible === "boolean"
+          ? row.compatible
+          : (() => {
+              throw new Error(`${field}[${index}].compatible must be a boolean`);
+            })(),
+      signalVerdict: requireString(
+        row.signal_verdict,
+        `${field}[${index}].signal_verdict`,
+      ),
+      regressionScore: requireNumber(
+        row.regression_score,
+        `${field}[${index}].regression_score`,
+      ),
+      improvementScore: requireNumber(
+        row.improvement_score,
+        `${field}[${index}].improvement_score`,
+      ),
+      netScore: requireNumber(row.net_score, `${field}[${index}].net_score`),
+      severity: requireNumber(row.severity, `${field}[${index}].severity`),
+      topDrivers: requireComparisonSignalDrivers(row.top_drivers, `${field}[${index}].top_drivers`),
+    };
+  });
+}
+
 export function validateArtifactQueryResponse(payload: unknown): ArtifactQueryResponse {
   const data = requireObject(payload, "query");
   const mode = requireString(data.mode, "query.mode");
@@ -389,7 +493,14 @@ export function validateArtifactQueryResponse(payload: unknown): ArtifactQueryRe
       rows: requireArtifactQueryAggregateRows(data.rows, "query.rows"),
     };
   }
-  throw new Error("query.mode must be cases, deltas, or aggregates");
+  if (mode === "signals") {
+    return {
+      ...base,
+      mode,
+      rows: requireArtifactQuerySignalRows(data.rows, "query.rows"),
+    };
+  }
+  throw new Error("query.mode must be cases, deltas, aggregates, or signals");
 }
 
 export async function loadArtifactQuery(
@@ -543,6 +654,30 @@ function requireComparisonInventoryItems(
           : (() => {
               throw new Error(`${field}[${index}].compatible must be a boolean`);
             })(),
+      signalVerdict:
+        row.signal_verdict == null
+          ? "neutral"
+          : requireString(row.signal_verdict, `${field}[${index}].signal_verdict`),
+      regressionScore:
+        row.regression_score == null
+          ? 0
+          : requireNumber(row.regression_score, `${field}[${index}].regression_score`),
+      improvementScore:
+        row.improvement_score == null
+          ? 0
+          : requireNumber(row.improvement_score, `${field}[${index}].improvement_score`),
+      netScore:
+        row.net_score == null
+          ? 0
+          : requireNumber(row.net_score, `${field}[${index}].net_score`),
+      severity:
+        row.severity == null
+          ? 0
+          : requireNumber(row.severity, `${field}[${index}].severity`),
+      topDrivers: requireComparisonSignalDrivers(
+        row.top_drivers,
+        `${field}[${index}].top_drivers`,
+      ),
     };
   });
 }
@@ -931,6 +1066,7 @@ export function validateComparisonDetail(payload: unknown): ComparisonDetail {
         "comparison.metricsComputedOn",
       ),
     },
+    signal: requireComparisonSignal(data.signal, "signal"),
     metrics: {
       baseline: requireComparisonMetricsSnapshot(metrics.baseline, "metrics.baseline"),
       candidate: requireComparisonMetricsSnapshot(metrics.candidate, "metrics.candidate"),

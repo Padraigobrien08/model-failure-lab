@@ -610,14 +610,31 @@ export function ComparisonDetailPage() {
             <div className="space-y-8">
               <ComparisonDetailHeader
                 comparison={detail.comparison}
+                signal={detail.signal}
                 inventoryHref={returnHref}
                 baselineRunState={detailReturnState}
                 candidateRunState={detailReturnState}
               />
 
               <ComparisonDeltaStrip
+                signal={detail.signal}
                 metrics={detail.metrics}
                 compatible={detail.comparison.compatible}
+                onOpenDriverCase={(caseId) => {
+                  const caseRow =
+                    detail.caseDeltas.find((candidate) => candidate.caseId === caseId) ?? null;
+                  setSearchParams(
+                    buildComparisonDetailSearchParams(searchParams, {
+                      section: "transitions",
+                      caseId,
+                      transition: caseRow?.transitionType ?? null,
+                    }),
+                    {
+                      replace: true,
+                      state: location.state,
+                    },
+                  );
+                }}
               />
 
               <InsightPanel

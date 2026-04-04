@@ -23,6 +23,34 @@ const CONFIGURED_SOURCE = {
   reportsPath: "/tmp/external-artifacts/reports",
 };
 
+function buildSignalInventoryFields(
+  verdict: string,
+  severity: number,
+  driver?: { failureType: string; delta: number; caseIds: string[] },
+) {
+  const topDrivers =
+    driver === undefined
+      ? []
+      : [
+          {
+            driverRank: 0,
+            failureType: driver.failureType,
+            delta: driver.delta,
+            direction: driver.delta >= 0 ? "regression" : "improvement",
+            caseIds: driver.caseIds,
+          },
+        ];
+
+  return {
+    signalVerdict: verdict,
+    regressionScore: verdict === "regression" ? severity : 0,
+    improvementScore: verdict === "improvement" ? severity : 0,
+    netScore: verdict === "improvement" ? -severity : severity,
+    severity,
+    topDrivers,
+  };
+}
+
 function buildReadyState(
   overrides?: Partial<ArtifactShellState & { status: "ready" }>,
 ): ArtifactShellState {
@@ -96,6 +124,11 @@ function buildReadyComparisonInventoryState(): ComparisonInventoryState {
           createdAt: "2026-03-30T11:40:00Z",
           status: "improved",
           compatible: true,
+          ...buildSignalInventoryFields("improvement", 0.18, {
+            failureType: "hallucination",
+            delta: -0.18,
+            caseIds: ["case-002"],
+          }),
         },
       ],
     },

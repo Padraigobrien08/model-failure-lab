@@ -44,6 +44,38 @@ type ComparisonInventoryRow = {
   created_at: string;
   status: string;
   compatible: boolean;
+  signal_verdict: string;
+  regression_score: number;
+  improvement_score: number;
+  net_score: number;
+  severity: number;
+  top_drivers: ComparisonSignalDriverRow[];
+};
+
+type ComparisonSignalDriverRow = {
+  driver_rank: number;
+  failure_type: string;
+  delta: number;
+  direction: string;
+  case_ids: string[];
+};
+
+type ComparisonSignalDriverPayload = {
+  driverRank: number;
+  failureType: string;
+  delta: number;
+  direction: string;
+  caseIds: string[];
+};
+
+type ComparisonSignalPayload = {
+  verdict: string;
+  reason: string | null;
+  regressionScore: number;
+  improvementScore: number;
+  netScore: number;
+  severity: number;
+  topDrivers: ComparisonSignalDriverPayload[];
 };
 
 type ComparisonMetricsPayload = {
@@ -72,6 +104,7 @@ type ComparisonTransitionSummaryRowPayload = {
 
 type ComparisonCaseDeltaPayload = {
   caseId: string;
+  promptId: string;
   prompt: string;
   tags: string[];
   transitionType: string;
@@ -107,6 +140,7 @@ type ComparisonDetailPayload = {
     comparisonMode: string | null;
     metricsComputedOn: string | null;
   };
+  signal: ComparisonSignalPayload;
   metrics: {
     baseline: ComparisonMetricsPayload;
     candidate: ComparisonMetricsPayload;
@@ -363,6 +397,10 @@ function failureLabArtifactsPlugin(): Plugin {
     });
   }
 
+  function roundSignal(value: number): number {
+    return Math.round(value * 1_000_000) / 1_000_000;
+  }
+
   async function readJsonRecord(
     filePath: string,
     label: string,
@@ -549,6 +587,11 @@ function failureLabArtifactsPlugin(): Plugin {
           "comparison",
           `${entry.name}.comparison`,
         );
+        const signal = requireComparisonSignalPayload(
+          reportPayload,
+          null,
+          `${entry.name}.signal`,
+        );
         rows.push({
           report_id: requireStringField(
             reportPayload,
@@ -581,6 +624,18 @@ function failureLabArtifactsPlugin(): Plugin {
               : (() => {
                   throw new Error(`${entry.name}.comparison.compatible must be a boolean`);
                 })(),
+          signal_verdict: signal.verdict,
+          regression_score: signal.regressionScore,
+          improvement_score: signal.improvementScore,
+          net_score: signal.netScore,
+          severity: signal.severity,
+          top_drivers: signal.topDrivers.map((driver) => ({
+            driver_rank: driver.driverRank,
+            failure_type: driver.failureType,
+            delta: driver.delta,
+            direction: driver.direction,
+            case_ids: driver.caseIds,
+          })),
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "unknown error";
@@ -698,6 +753,7 @@ function failureLabArtifactsPlugin(): Plugin {
       const row = requireObjectField({ value: entry }, "value", `${label}[${index}]`);
       return {
         caseId: requireStringField(row, "case_id", `${label}[${index}].case_id`),
+        promptId: requireStringField(row, "prompt_id", `${label}[${index}].prompt_id`),
         prompt: requireStringField(row, "prompt", `${label}[${index}].prompt`),
         tags: requireStringArrayField(row, "tags", `${label}[${index}].tags`),
         transitionType: requireStringField(
@@ -754,6 +810,167 @@ function failureLabArtifactsPlugin(): Plugin {
     });
   }
 
+  function deriveComparisonSignalPayload(
+    reportPayload: Record<string, unknown>,
+    reportDetailsPayload: Record<string, unknown>,
+    label: string,
+  ): ComparisonSignalPayload {
+    const comparison = requireObjectField(reportPayload, "comparison", `${label}.comparison`);
+    const compatible =
+      typeof comparison.compatible === "boolean"
+        ? comparison.compatible
+        : (() => {
+            throw new Error(`${label}.comparison.compatible must be a boolean`);
+          })();
+    if (!compatible) {
+      return {
+        verdict: "incompatible",
+        reason:
+          typeof comparison.reason === "string" && comparison.reason.trim().length > 0
+            ? comparison.reason
+            : "incompatible",
+        regressionScore: 0,
+        improvementScore: 0,
+        netScore: 0,
+        severity: 0,
+        topDrivers: [],
+      };
+    }
+
+    const failureRates = requireObjectField(reportPayload, "failure_rates", `${label}.failure_rates`);
+    const caseDeltas = Array.isArray(reportDetailsPayload.case_deltas)
+      ? reportDetailsPayload.case_deltas.filter(
+          (entry): entry is Record<string, unknown> =>
+            entry !== null && typeof entry === "object" && !Array.isArray(entry),
+        )
+      : [];
+
+    let regressionScore = 0;
+    let improvementScore = 0;
+    const rawDrivers: Array<{ failureType: string; delta: number }> = [];
+    for (const [failureType, rawDelta] of Object.entries(failureRates)) {
+      if (typeof rawDelta !== "number" || Number.isNaN(rawDelta) || rawDelta === 0) {
+        continue;
+      }
+      if (rawDelta > 0) {
+        regressionScore += rawDelta;
+      } else {
+        improvementScore += Math.abs(rawDelta);
+      }
+      rawDrivers.push({ failureType, delta: rawDelta });
+    }
+
+    const regression = roundSignal(regressionScore);
+    const improvement = roundSignal(improvementScore);
+    return {
+      verdict:
+        regression > improvement
+          ? "regression"
+          : improvement > regression
+            ? "improvement"
+            : "neutral",
+      reason: null,
+      regressionScore: regression,
+      improvementScore: improvement,
+      netScore: roundSignal(improvement - regression),
+      severity: Math.max(regression, improvement),
+      topDrivers: rawDrivers
+        .sort((left, right) => {
+          const magnitude = Math.abs(right.delta) - Math.abs(left.delta);
+          if (magnitude !== 0) {
+            return magnitude;
+          }
+          if ((left.delta > 0) !== (right.delta > 0)) {
+            return left.delta > 0 ? -1 : 1;
+          }
+          return left.failureType.localeCompare(right.failureType);
+        })
+        .slice(0, 4)
+        .map((driver, index) => ({
+          driverRank: index,
+          failureType: driver.failureType,
+          delta: roundSignal(driver.delta),
+          direction: driver.delta > 0 ? "regression" : "improvement",
+          caseIds: Array.from(
+            new Set(
+              caseDeltas
+                .filter((row) => {
+                  const baselineFailureType = row.baseline_failure_type;
+                  const candidateFailureType = row.candidate_failure_type;
+                  return driver.delta > 0
+                    ? candidateFailureType === driver.failureType &&
+                        baselineFailureType !== driver.failureType
+                    : baselineFailureType === driver.failureType &&
+                        candidateFailureType !== driver.failureType;
+                })
+                .map((row) => String(row.case_id)),
+            ),
+          ).sort(),
+        })),
+    };
+  }
+
+  function requireComparisonSignalPayload(
+    reportPayload: Record<string, unknown>,
+    reportDetailsPayload: Record<string, unknown>,
+    label: string,
+  ): ComparisonSignalPayload {
+    const comparison = requireObjectField(reportPayload, "comparison", `${label}.comparison`);
+    const rawSignal =
+      comparison.signal !== undefined ? comparison.signal : reportDetailsPayload.signal;
+    if (rawSignal == null) {
+      return deriveComparisonSignalPayload(reportPayload, reportDetailsPayload, label);
+    }
+
+    const signal = requireObjectField({ value: rawSignal }, "value", `${label}.signal`);
+    const rawTopDrivers = Array.isArray(signal.top_drivers) ? signal.top_drivers : [];
+    return {
+      verdict: requireStringField(signal, "verdict", `${label}.signal.verdict`),
+      reason: optionalStringField(signal, "reason", `${label}.signal.reason`),
+      regressionScore: requireNumberField(
+        signal,
+        "regression_score",
+        `${label}.signal.regression_score`,
+      ),
+      improvementScore: requireNumberField(
+        signal,
+        "improvement_score",
+        `${label}.signal.improvement_score`,
+      ),
+      netScore: requireNumberField(signal, "net_score", `${label}.signal.net_score`),
+      severity: requireNumberField(signal, "severity", `${label}.signal.severity`),
+      topDrivers: rawTopDrivers.map((entry, index) => {
+        const driver = requireObjectField({ value: entry }, "value", `${label}.signal.top_drivers[${index}]`);
+        return {
+          driverRank:
+            driver.driver_rank == null
+              ? index
+              : requireNumberField(
+                  driver,
+                  "driver_rank",
+                  `${label}.signal.top_drivers[${index}].driver_rank`,
+                ),
+          failureType: requireStringField(
+            driver,
+            "failure_type",
+            `${label}.signal.top_drivers[${index}].failure_type`,
+          ),
+          delta: requireNumberField(driver, "delta", `${label}.signal.top_drivers[${index}].delta`),
+          direction: requireStringField(
+            driver,
+            "direction",
+            `${label}.signal.top_drivers[${index}].direction`,
+          ),
+          caseIds: requireStringArrayField(
+            driver,
+            "case_ids",
+            `${label}.signal.top_drivers[${index}].case_ids`,
+          ),
+        };
+      }),
+    };
+  }
+
   async function collectComparisonDetail(
     reportId: string,
     reportsPath: string,
@@ -787,6 +1004,11 @@ function failureLabArtifactsPlugin(): Plugin {
       reportDetailsPayload,
       "compatibility",
       `${reportId}.report_details.compatibility`,
+    );
+    const signal = requireComparisonSignalPayload(
+      reportPayload,
+      reportDetailsPayload,
+      reportId,
     );
 
     return {
@@ -837,6 +1059,7 @@ function failureLabArtifactsPlugin(): Plugin {
           `${reportId}.comparison.metrics_computed_on`,
         ),
       },
+      signal,
       metrics: {
         baseline: requireMetricSnapshotPayload(metrics.baseline, `${reportId}.metrics.baseline`),
         candidate: requireMetricSnapshotPayload(
@@ -1506,6 +1729,7 @@ function failureLabArtifactsPlugin(): Plugin {
       ["candidateRunId", "--candidate-run-id"],
       ["delta", "--delta"],
       ["aggregateBy", "--aggregate-by"],
+      ["signalDirection", "--signal-direction"],
       ["lastN", "--last-n"],
       ["since", "--since"],
       ["until", "--until"],
@@ -1518,7 +1742,9 @@ function failureLabArtifactsPlugin(): Plugin {
         args.push(argName, value);
       }
     }
-    args.push("--summarize");
+    if (mode !== "signals") {
+      args.push("--summarize");
+    }
 
     try {
       const payload = await invokeQueryBridge("query", args);

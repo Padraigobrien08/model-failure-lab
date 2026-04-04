@@ -71,6 +71,20 @@ function buildReadyComparisonInventoryState(): ComparisonInventoryState {
           createdAt: "2026-04-01T10:10:00Z",
           status: "regressed",
           compatible: true,
+          signalVerdict: "regression",
+          regressionScore: 0.27,
+          improvementScore: 0.08,
+          netScore: 0.19,
+          severity: 0.27,
+          topDrivers: [
+            {
+              driverRank: 0,
+              failureType: "hallucination",
+              delta: 0.18,
+              direction: "regression",
+              caseIds: ["case-regression"],
+            },
+          ],
         },
       ],
     },
@@ -295,6 +309,80 @@ function mockAnalysisQueryAndRunDetail() {
   return fetchMock;
 }
 
+function mockSignalAnalysisQuery() {
+  const fetchMock = vi.fn(async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.includes("/__failure_lab__/artifacts/query.json")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          source: DEFAULT_SOURCE,
+          mode: "signals",
+          filters: {
+            failureType: "hallucination",
+            model: null,
+            dataset: null,
+            runId: null,
+            reportId: null,
+            baselineRunId: null,
+            candidateRunId: null,
+            delta: null,
+            aggregateBy: null,
+            lastN: 10,
+            since: null,
+            until: null,
+            limit: 20,
+          },
+          facets: {
+            models: ["baseline-model", "candidate-model"],
+            datasets: ["query-fixture-v1"],
+            failureTypes: ["hallucination", "instruction_following", "reasoning"],
+            deltaTypes: ["regression", "improvement", "swap"],
+          },
+          insight_report: null,
+          rows: [
+            {
+              report_id: "compare_alpha_to_beta",
+              created_at: "2026-04-01T10:10:00Z",
+              dataset: "query-fixture-v1",
+              baseline_run_id: "run_alpha",
+              candidate_run_id: "run_beta",
+              baseline_model: "baseline-model",
+              candidate_model: "candidate-model",
+              status: "regressed",
+              compatible: true,
+              signal_verdict: "regression",
+              regression_score: 0.27,
+              improvement_score: 0.08,
+              net_score: 0.19,
+              severity: 0.27,
+              top_drivers: [
+                {
+                  driver_rank: 0,
+                  failure_type: "hallucination",
+                  delta: 0.18,
+                  direction: "regression",
+                  case_ids: ["case-regression"],
+                },
+              ],
+            },
+          ],
+        }),
+      } as Response;
+    }
+
+    return {
+      ok: false,
+      status: 404,
+      json: async () => ({ message: `Unexpected request: ${url}` }),
+    } as Response;
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 describe("analysis route", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -406,5 +494,41 @@ describe("analysis route", () => {
         outputStem: "analysis-cases-hallucination",
       });
     });
+  });
+
+  it("renders comparison signal rows without enabling draft export", async () => {
+    const fetchMock = mockSignalAnalysisQuery();
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/analysis?mode=signals&signalDirection=regression&failureType=hallucination&lastN=10"]}
+        initialArtifactState={buildReadyArtifactState()}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Cross-run artifact analysis." }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Grounded cross-run readout")).not.toBeInTheDocument();
+    expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
+    expect(screen.getByText("27.0% severity")).toBeInTheDocument();
+    expect(screen.getByText("hallucination +18.0%")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Inspect strongest driver" }),
+    ).toHaveAttribute(
+      "href",
+      "/comparisons/compare_alpha_to_beta?section=transitions&case=case-regression",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Export draft dataset" }),
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/__failure_lab__/artifacts/query.json?mode=signals&signalDirection=regression&failureType=hallucination&lastN=10&limit=20&summarize=1",
+      ),
+    );
   });
 });

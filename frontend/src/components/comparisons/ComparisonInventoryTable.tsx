@@ -52,6 +52,20 @@ function datasetLabel(dataset: string | null): string {
   return dataset ?? "Multiple datasets";
 }
 
+function signalTone(verdict: string): "accent" | "default" | "muted" {
+  if (verdict === "improvement") {
+    return "accent";
+  }
+  if (verdict === "regression") {
+    return "default";
+  }
+  return "muted";
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
 export function ComparisonInventoryTable({
   rows,
   onOpenComparison,
@@ -81,7 +95,7 @@ export function ComparisonInventoryTable({
                 Saved at
               </th>
               <th className="px-4 py-3 font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Status
+                Signal
               </th>
               <th className="px-4 py-3 font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Open
@@ -125,8 +139,19 @@ export function ComparisonInventoryTable({
                   <time dateTime={row.createdAt}>{formatTimestamp(row.createdAt)}</time>
                 </td>
                 <td className="block px-0 py-2 md:table-cell md:px-4 md:py-3">
-                  <MobileLabel>Status</MobileLabel>
-                  <Badge tone={statusTone(row.compatible, row.status)}>{row.status}</Badge>
+                  <MobileLabel>Signal</MobileLabel>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={signalTone(row.signalVerdict)}>{row.signalVerdict}</Badge>
+                    <Badge tone="muted">{formatPercent(row.severity)} severity</Badge>
+                    <Badge tone={statusTone(row.compatible, row.status)}>{row.status}</Badge>
+                  </div>
+                  {row.topDrivers[0] ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Driver: {row.topDrivers[0].failureType}{" "}
+                      {row.topDrivers[0].delta > 0 ? "+" : ""}
+                      {(row.topDrivers[0].delta * 100).toFixed(1)}%
+                    </p>
+                  ) : null}
                 </td>
                 <td className="block px-0 pt-3 md:table-cell md:px-4 md:py-3">
                   <MobileLabel>Open</MobileLabel>

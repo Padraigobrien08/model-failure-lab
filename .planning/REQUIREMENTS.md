@@ -24,9 +24,9 @@ comparison artifacts.
 
 ### Debugger Signal Layer
 
-- [ ] **UI-01**: Comparison debugger views show verdict, severity score, top contributing failure
+- [x] **UI-01**: Comparison debugger views show verdict, severity score, top contributing failure
   types, and direct links to affected evidence.
-- [ ] **UI-02**: `/analysis` supports a recent-regressions view with severity sorting and filtering
+- [x] **UI-02**: `/analysis` supports a recent-regressions view with severity sorting and filtering
   by failure type or dataset.
 
 ### Stability And Verification
@@ -63,8 +63,8 @@ comparison artifacts.
 | CLI-02 | Phase 86 | Complete |
 | CLI-03 | Phase 86 | Complete |
 | IDX-01 | Phase 86 | Complete |
-| UI-01 | Phase 87 | Pending |
-| UI-02 | Phase 87 | Pending |
+| UI-01 | Phase 87 | Complete |
+| UI-02 | Phase 87 | Complete |
 | VERF-01 | Phase 88 | Pending |
 
 **Coverage:**

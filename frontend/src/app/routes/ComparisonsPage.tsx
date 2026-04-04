@@ -22,6 +22,10 @@ function compareComparisonsNewestFirst(
   left: ComparisonInventoryItem,
   right: ComparisonInventoryItem,
 ): number {
+  if (left.severity !== right.severity) {
+    return right.severity - left.severity;
+  }
+
   const leftTime = Date.parse(left.createdAt);
   const rightTime = Date.parse(right.createdAt);
 
@@ -128,7 +132,8 @@ export function ComparisonsPage() {
         </h1>
         <p className="max-w-3xl text-base leading-7 text-muted-foreground">
           The comparisons route reads saved baseline-to-candidate reports from the engine contract
-          and renders them as a dense newest-first inventory you can scan and open.
+          and prioritizes the highest-signal behavior changes first, so you can open the sharpest
+          regressions or improvements without manual sorting.
         </p>
       </div>
 

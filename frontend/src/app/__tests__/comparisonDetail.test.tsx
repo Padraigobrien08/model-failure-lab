@@ -24,6 +24,35 @@ const CONFIGURED_SOURCE = {
   reportsPath: "/tmp/external-artifacts/reports",
 };
 
+function buildSignal(
+  verdict: string,
+  severity: number,
+  drivers: Array<{ failureType: string; delta: number; caseIds: string[] }>,
+) {
+  return {
+    verdict,
+    reason: null,
+    regressionScore:
+      verdict === "regression" ? severity : drivers.reduce((total, driver) => total + Math.max(driver.delta, 0), 0),
+    improvementScore:
+      verdict === "improvement" ? severity : drivers.reduce((total, driver) => total + Math.abs(Math.min(driver.delta, 0)), 0),
+    netScore:
+      verdict === "improvement"
+        ? -severity
+        : verdict === "regression"
+          ? severity
+          : 0,
+    severity,
+    topDrivers: drivers.map((driver, index) => ({
+      driverRank: index,
+      failureType: driver.failureType,
+      delta: driver.delta,
+      direction: driver.delta >= 0 ? "regression" : "improvement",
+      caseIds: driver.caseIds,
+    })),
+  };
+}
+
 function buildReadyArtifactState(
   comparisonIds: string[],
   source = DEFAULT_SOURCE,
@@ -92,6 +121,27 @@ function buildReadyComparisonInventoryState(
           createdAt: "2026-03-30T12:00:00Z",
           status: "improved",
           compatible: true,
+          signalVerdict: "improvement",
+          regressionScore: 0.125,
+          improvementScore: 0.25,
+          netScore: -0.125,
+          severity: 0.25,
+          topDrivers: [
+            {
+              driverRank: 0,
+              failureType: "hallucination",
+              delta: -0.25,
+              direction: "improvement",
+              caseIds: ["case-002"],
+            },
+            {
+              driverRank: 1,
+              failureType: "reasoning",
+              delta: 0.125,
+              direction: "regression",
+              caseIds: ["case-004"],
+            },
+          ],
         },
         {
           reportId: "compare_dataset_mismatch",
@@ -101,6 +151,12 @@ function buildReadyComparisonInventoryState(
           createdAt: "2026-03-30T12:30:00Z",
           status: "incompatible_dataset",
           compatible: false,
+          signalVerdict: "incompatible",
+          regressionScore: 0,
+          improvementScore: 0,
+          netScore: 0,
+          severity: 0,
+          topDrivers: [],
         },
       ],
     },
@@ -125,6 +181,18 @@ function buildCompatibleDetail(source = DEFAULT_SOURCE): ComparisonDetail {
       comparisonMode: "baseline_to_candidate",
       metricsComputedOn: "shared_cases_only",
     },
+    signal: buildSignal("improvement", 0.25, [
+      {
+        failureType: "hallucination",
+        delta: -0.25,
+        caseIds: ["case-002"],
+      },
+      {
+        failureType: "reasoning",
+        delta: 0.125,
+        caseIds: ["case-004"],
+      },
+    ]),
     metrics: {
       baseline: {
         attemptedCaseCount: 8,
@@ -321,6 +389,15 @@ function buildIncompatibleDetail(): ComparisonDetail {
       comparisonMode: "baseline_to_candidate",
       metricsComputedOn: null,
     },
+    signal: {
+      verdict: "incompatible",
+      reason: "dataset_mismatch",
+      regressionScore: 0,
+      improvementScore: 0,
+      netScore: 0,
+      severity: 0,
+      topDrivers: [],
+    },
     metrics: {
       baseline: {
         attemptedCaseCount: 10,
@@ -373,6 +450,21 @@ function buildIncompatibleDetail(): ComparisonDetail {
 function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unknown> {
   return {
     ...detail,
+    signal: {
+      verdict: detail.signal.verdict,
+      reason: detail.signal.reason,
+      regression_score: detail.signal.regressionScore,
+      improvement_score: detail.signal.improvementScore,
+      net_score: detail.signal.netScore,
+      severity: detail.signal.severity,
+      top_drivers: detail.signal.topDrivers.map((driver) => ({
+        driver_rank: driver.driverRank,
+        failure_type: driver.failureType,
+        delta: driver.delta,
+        direction: driver.direction,
+        case_ids: driver.caseIds,
+      })),
+    },
     insightReport:
       detail.insightReport === null
         ? null
@@ -702,6 +794,8 @@ describe("comparison detail route", () => {
     expect(within(comparisonHeader as HTMLElement).getByText("Candidate")).toBeInTheDocument();
     expect(within(comparisonHeader as HTMLElement).getByText("Status")).toBeInTheDocument();
     expect(within(comparisonHeader as HTMLElement).getByText("Saved at")).toBeInTheDocument();
+    expect(screen.getAllByText("improvement").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("25.0% severity").length).toBeGreaterThan(0);
     expect(screen.getAllByText("compare_alpha_to_beta").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("navigation", { name: "Detail section jumps" }),
@@ -753,6 +847,17 @@ describe("comparison detail route", () => {
     expect(
       await screen.findByText("Unsupported factual framing detected."),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "reasoning +12.5%" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "reasoning +12.5%" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Inspect transition case case-004" }),
+      ).toHaveAttribute("data-active-case", "true");
+    });
 
     fireEvent.click(
       screen.getByRole("link", { name: "compare_alpha_to_beta:case-004" }),

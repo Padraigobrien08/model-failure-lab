@@ -6,6 +6,7 @@ import { formatLabel } from "@/lib/formatters";
 
 type ComparisonDetailHeaderProps = {
   comparison: ComparisonDetail["comparison"];
+  signal: ComparisonDetail["signal"];
   inventoryHref: string;
   baselineRunState?: unknown;
   candidateRunState?: unknown;
@@ -44,6 +45,16 @@ function statusTone(
   return "muted";
 }
 
+function signalTone(verdict: string): "accent" | "default" | "muted" {
+  if (verdict === "improvement") {
+    return "accent";
+  }
+  if (verdict === "regression") {
+    return "default";
+  }
+  return "muted";
+}
+
 function datasetBadgeText(comparison: ComparisonDetail["comparison"]): string {
   if (comparison.dataset) {
     return comparison.dataset;
@@ -56,6 +67,7 @@ function datasetBadgeText(comparison: ComparisonDetail["comparison"]): string {
 
 export function ComparisonDetailHeader({
   comparison,
+  signal,
   inventoryHref,
   baselineRunState: _baselineRunState,
   candidateRunState: _candidateRunState,
@@ -80,6 +92,8 @@ export function ComparisonDetailHeader({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Comparison detail</Badge>
+          <Badge tone={signalTone(signal.verdict)}>{formatLabel(signal.verdict)}</Badge>
+          <Badge tone="muted">{(signal.severity * 100).toFixed(1)}% severity</Badge>
         </div>
 
         <div className="space-y-3">

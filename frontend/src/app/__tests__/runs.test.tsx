@@ -71,6 +71,34 @@ function buildReadyComparisonInventoryState(
   };
 }
 
+function buildSignalInventoryFields(
+  verdict: string,
+  severity: number,
+  driver?: { failureType: string; delta: number; caseIds: string[] },
+) {
+  const topDrivers =
+    driver === undefined
+      ? []
+      : [
+          {
+            driverRank: 0,
+            failureType: driver.failureType,
+            delta: driver.delta,
+            direction: driver.delta >= 0 ? "regression" : "improvement",
+            caseIds: driver.caseIds,
+          },
+        ];
+
+  return {
+    signalVerdict: verdict,
+    regressionScore: verdict === "regression" ? severity : 0,
+    improvementScore: verdict === "improvement" ? severity : 0,
+    netScore: verdict === "improvement" ? -severity : severity,
+    severity,
+    topDrivers,
+  };
+}
+
 const SAMPLE_RUNS: RunInventoryItem[] = [
   {
     runId: "run_alpha",
@@ -217,6 +245,23 @@ function buildComparisonDetail(
       comparisonMode: "baseline_to_candidate",
       metricsComputedOn: "shared_cases_only",
     },
+    signal: {
+      verdict: "improvement",
+      reason: null,
+      regressionScore: 0.05,
+      improvementScore: 0.25,
+      netScore: -0.2,
+      severity: 0.25,
+      topDrivers: [
+        {
+          driverRank: 0,
+          failureType: "hallucination",
+          delta: -0.25,
+          direction: "improvement",
+          caseIds: ["case-002"],
+        },
+      ],
+    },
     metrics: {
       baseline: {
         attemptedCaseCount: 4,
@@ -290,6 +335,27 @@ function buildComparisonDetail(
   };
 }
 
+function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unknown> {
+  return {
+    ...detail,
+    signal: {
+      verdict: detail.signal.verdict,
+      reason: detail.signal.reason,
+      regression_score: detail.signal.regressionScore,
+      improvement_score: detail.signal.improvementScore,
+      net_score: detail.signal.netScore,
+      severity: detail.signal.severity,
+      top_drivers: detail.signal.topDrivers.map((driver) => ({
+        driver_rank: driver.driverRank,
+        failure_type: driver.failureType,
+        delta: driver.delta,
+        direction: driver.direction,
+        case_ids: driver.caseIds,
+      })),
+    },
+  };
+}
+
 function mockRunDetail(runs: RunInventoryItem[]) {
   vi.stubGlobal(
     "fetch",
@@ -342,7 +408,7 @@ function mockRunAndComparisonDetails(
         return {
           ok: true,
           status: 200,
-          json: async () => matchedComparison,
+          json: async () => serializeComparisonDetail(matchedComparison),
         } as Response;
       }
 
@@ -508,6 +574,11 @@ describe("runs route", () => {
             createdAt: "2026-03-30T12:30:00Z",
             status: "improved",
             compatible: true,
+            ...buildSignalInventoryFields("improvement", 0.25, {
+              failureType: "hallucination",
+              delta: -0.25,
+              caseIds: ["case-002"],
+            }),
           },
         ])}
       />,

@@ -45,10 +45,14 @@ function readSearchValue(searchParams: URLSearchParams, key: string): string {
 
 function readMode(searchParams: URLSearchParams): ArtifactQueryMode {
   const mode = searchParams.get("mode");
-  if (mode === "deltas" || mode === "aggregates") {
+  if (mode === "deltas" || mode === "aggregates" || mode === "signals") {
     return mode;
   }
   return "cases";
+}
+
+function readSignalDirection(searchParams: URLSearchParams): string {
+  return searchParams.get("signalDirection") ?? "regression";
 }
 
 function buildAnalysisSearchParams(
@@ -208,9 +212,10 @@ export function AnalysisPage() {
   const dataset = readSearchValue(searchParams, "dataset");
   const delta = readSearchValue(searchParams, "delta");
   const aggregateBy = readSearchValue(searchParams, "aggregateBy");
+  const signalDirection = readSignalDirection(searchParams);
   const since = readSearchValue(searchParams, "since");
   const lastN = readSearchValue(searchParams, "lastN");
-  const canExportDraft = response.mode !== "aggregates" && resultCount > 0;
+  const canExportDraft = response.mode !== "aggregates" && response.mode !== "signals" && resultCount > 0;
 
   const renderEvidenceLink = (reference: ArtifactInsightEvidenceRef) => {
     if (reference.kind === "run_case" && reference.runId && reference.caseId) {
@@ -281,7 +286,7 @@ export function AnalysisPage() {
             <FilterSelect
               label="Mode"
               value={mode}
-              options={["cases", "deltas", "aggregates"]}
+              options={["cases", "deltas", "aggregates", "signals"]}
               placeholder="Cases"
               onChange={(value) => {
                 const nextMode = value || "cases";
@@ -289,15 +294,18 @@ export function AnalysisPage() {
                 if (nextMode === "aggregates" && aggregateBy.length === 0) {
                   patch.aggregateBy = "failure_type";
                 }
+                if (nextMode === "signals") {
+                  patch.signalDirection = "regression";
+                }
                 setSearchParams(buildAnalysisSearchParams(searchParams, patch), {
                   replace: true,
                 });
               }}
             />
 
-            {mode === "cases" ? (
+            {mode === "cases" || mode === "signals" ? (
               <FilterSelect
-                label="Failure type"
+                label={mode === "signals" ? "Driver type" : "Failure type"}
                 value={failureType}
                 options={response.facets.failureTypes}
                 onChange={(value) =>
@@ -318,6 +326,23 @@ export function AnalysisPage() {
                   setSearchParams(buildAnalysisSearchParams(searchParams, { delta: value }), {
                     replace: true,
                   })
+                }
+              />
+            ) : null}
+
+            {mode === "signals" ? (
+              <FilterSelect
+                label="Direction"
+                value={signalDirection}
+                options={["regression", "improvement", "neutral", "incompatible", "all"]}
+                placeholder="regression"
+                onChange={(value) =>
+                  setSearchParams(
+                    buildAnalysisSearchParams(searchParams, {
+                      signalDirection: value || "regression",
+                    }),
+                    { replace: true },
+                  )
                 }
               />
             ) : null}
@@ -479,13 +504,15 @@ export function AnalysisPage() {
         </Card>
       ) : null}
 
-      <InsightPanel
-        badgeLabel="Insights"
-        title="Grounded cross-run readout"
-        description="The heuristic insight layer summarizes the current filtered result set and keeps every pattern anchored to drillable saved evidence."
-        report={response.insightReport}
-        renderEvidenceLink={renderEvidenceLink}
-      />
+      {response.mode !== "signals" ? (
+        <InsightPanel
+          badgeLabel="Insights"
+          title="Grounded cross-run readout"
+          description="The heuristic insight layer summarizes the current filtered result set and keeps every pattern anchored to drillable saved evidence."
+          report={response.insightReport}
+          renderEvidenceLink={renderEvidenceLink}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -496,7 +523,66 @@ export function AnalysisPage() {
         </CardHeader>
       </Card>
 
-      {response.mode === "cases" ? (
+      {response.mode === "signals" ? (
+        <div className="grid gap-4">
+          {response.rows.map((row) => {
+            const primaryDriver = row.topDrivers[0] ?? null;
+            const primaryCaseId = primaryDriver?.caseIds[0] ?? null;
+            const comparisonSearch = buildComparisonDetailSearchParams(new URLSearchParams(), {
+              section: "transitions",
+              caseId: primaryCaseId,
+            }).toString();
+            return (
+              <Card key={row.reportId}>
+                <CardHeader>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={row.signalVerdict === "improvement" ? "accent" : row.signalVerdict === "regression" ? "default" : "muted"}>
+                      {row.signalVerdict}
+                    </Badge>
+                    <Badge tone="muted">{(row.severity * 100).toFixed(1)}% severity</Badge>
+                    {row.dataset ? <Badge tone="muted">{row.dataset}</Badge> : null}
+                  </div>
+                  <CardTitle className="text-xl">{row.reportId}</CardTitle>
+                  <CardDescription>
+                    {row.baselineRunId} → {row.candidateRunId} • {row.createdAt}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Regression {`${(row.regressionScore * 100).toFixed(1)}%`} · Improvement{" "}
+                    {`${(row.improvementScore * 100).toFixed(1)}%`}
+                  </p>
+                  {row.topDrivers.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {row.topDrivers.map((driver) => (
+                        <span
+                          key={`${row.reportId}-${driver.driverRank}`}
+                          className="inline-flex rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground"
+                        >
+                          {driver.failureType} {driver.delta > 0 ? "+" : ""}
+                          {(driver.delta * 100).toFixed(1)}%
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      className="inline-flex rounded-full border border-border/70 bg-background/70 px-4 py-2 text-sm font-semibold text-foreground no-underline transition-colors hover:bg-background"
+                      state={returnState}
+                      to={{
+                        pathname: `/comparisons/${encodeURIComponent(row.reportId)}`,
+                        search: comparisonSearch.length > 0 ? `?${comparisonSearch}` : "",
+                      }}
+                    >
+                      {primaryCaseId ? "Inspect strongest driver" : "Open comparison"}
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : response.mode === "cases" ? (
         <div className="grid gap-4">
           {response.rows.map((row) => {
             const runSearch = buildRunDetailSearchParams(new URLSearchParams(), {

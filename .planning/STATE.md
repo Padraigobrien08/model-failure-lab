@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Regression Detection And Signal Layer
-current_phase: 87
-current_phase_name: Debugger Severity Surfacing And Evidence Handoff
+current_phase: 88
+current_phase_name: Signal Stability And Workflow Verification
 current_plan: null
 status: ready_to_plan
-stopped_at: Phase 86 complete
-last_updated: "2026-04-04T14:04:56Z"
+stopped_at: Phase 87 complete
+last_updated: "2026-04-04T14:30:15Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
+  percent: 75
 ---
 
 # State: v4.4 Regression Detection And Signal Layer
@@ -25,30 +25,30 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 
 **Core value:** Make behavior changes explicit, deterministic, and actionable from local
 artifacts.
-**Current focus:** Surface persisted signal severity inside the debugger before users need to open
-dense comparison detail sections.
+**Current focus:** Prove the signal layer is stable and workflow-complete across persisted
+artifacts, CLI surfaces, and debugger severity views.
 
 ## Current Focus
 
-- next_action: plan Phase `87`
-- status: Phase 86 complete; debugger severity surfacing is next
+- next_action: plan Phase `88`
+- status: Phase 87 complete; final workflow verification is next
 
 ## Current Position
 
 Milestone: `v4.4`
-Phase: `87` — ready to plan
+Phase: `88` — ready to plan
 
 ## Workflow State
 
-**Current Phase:** `87`
-**Current Phase Name:** `Debugger Severity Surfacing And Evidence Handoff`
+**Current Phase:** `88`
+**Current Phase Name:** `Signal Stability And Workflow Verification`
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
 **Status:** Ready to plan
-**Progress:** [█████░░░░░] 50%
+**Progress:** [████████░░] 75%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Completed Phase 86 CLI signal surfacing and severity-ranked listing surfaces
+**Last Activity Description:** Completed Phase 87 debugger severity surfacing and evidence handoff
 
 ## Recent Decisions
 
@@ -64,6 +64,10 @@ Phase: `87` — ready to plan
   derives signals from older comparison artifacts when the signal block is absent.
 - Keep the CLI alert surface directional-only so neutral comparisons remain queryable without
   producing noisy automated alerts.
+- Keep debugger signal views quantitative first:
+  verdict, severity, top drivers, then drillthrough into existing evidence routes.
+- Treat `/analysis?mode=signals` as a ranking view rather than an insight or harvesting surface,
+  so it does not show heuristic summaries or draft-export actions.
 
 ## Accumulated Context
 
@@ -80,15 +84,15 @@ Phase: `87` — ready to plan
 ## Session
 
 **Last Date:** 2026-04-04T14:04:56Z
-**Stopped At:** Phase 86 complete
+**Stopped At:** Phase 87 complete
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-plan-phase 87
-$gsd-execute-phase 87
+$gsd-plan-phase 88
+$gsd-execute-phase 88
 ```
 
 ---
-*State updated: 2026-04-04 after Phase 86 completion*
+*State updated: 2026-04-04 after Phase 87 completion*

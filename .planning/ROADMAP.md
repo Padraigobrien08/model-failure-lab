@@ -53,7 +53,7 @@ without manual inspection.
     each comparison.
 
 ### Phase 87: Debugger Severity Surfacing And Evidence Handoff
-- Status: pending
+- Status: complete
 - Requirements: `UI-01`, `UI-02`
 - Goal: highlight signal severity, direction, and top drivers in comparison and analysis views
   before users open dense detail sections.
@@ -77,9 +77,9 @@ without manual inspection.
 ## Next Action
 
 ```bash
-$gsd-plan-phase 87
-$gsd-execute-phase 87
+$gsd-plan-phase 88
+$gsd-execute-phase 88
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after Phase 86 completion*
+*Roadmap updated: 2026-04-04 after Phase 87 completion*

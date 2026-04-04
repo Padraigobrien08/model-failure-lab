@@ -86,6 +86,34 @@ function buildReadyComparisonInventoryState(
   };
 }
 
+function buildSignalInventoryFields(
+  verdict: string,
+  severity: number,
+  driver?: { failureType: string; delta: number; caseIds: string[] },
+) {
+  const topDrivers =
+    driver === undefined
+      ? []
+      : [
+          {
+            driverRank: 0,
+            failureType: driver.failureType,
+            delta: driver.delta,
+            direction: driver.delta >= 0 ? "regression" : "improvement",
+            caseIds: driver.caseIds,
+          },
+        ];
+
+  return {
+    signalVerdict: verdict,
+    regressionScore: verdict === "regression" ? severity : 0,
+    improvementScore: verdict === "improvement" ? severity : 0,
+    netScore: verdict === "improvement" ? -severity : severity,
+    severity,
+    topDrivers,
+  };
+}
+
 function buildComparisonDetail(reportId: string): ComparisonDetail {
   return {
     source: {
@@ -107,6 +135,23 @@ function buildComparisonDetail(reportId: string): ComparisonDetail {
       reason: null,
       comparisonMode: "baseline_to_candidate",
       metricsComputedOn: "shared_cases_only",
+    },
+    signal: {
+      verdict: "improvement",
+      reason: null,
+      regressionScore: 0.08,
+      improvementScore: 0.22,
+      netScore: -0.14,
+      severity: 0.22,
+      topDrivers: [
+        {
+          driverRank: 0,
+          failureType: "hallucination",
+          delta: -0.22,
+          direction: "improvement",
+          caseIds: ["case-002"],
+        },
+      ],
     },
     metrics: {
       baseline: {
@@ -181,6 +226,27 @@ function buildComparisonDetail(reportId: string): ComparisonDetail {
   };
 }
 
+function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unknown> {
+  return {
+    ...detail,
+    signal: {
+      verdict: detail.signal.verdict,
+      reason: detail.signal.reason,
+      regression_score: detail.signal.regressionScore,
+      improvement_score: detail.signal.improvementScore,
+      net_score: detail.signal.netScore,
+      severity: detail.signal.severity,
+      top_drivers: detail.signal.topDrivers.map((driver) => ({
+        driver_rank: driver.driverRank,
+        failure_type: driver.failureType,
+        delta: driver.delta,
+        direction: driver.direction,
+        case_ids: driver.caseIds,
+      })),
+    },
+  };
+}
+
 function mockComparisonDetail(detail: ComparisonDetail) {
   vi.stubGlobal(
     "fetch",
@@ -190,7 +256,7 @@ function mockComparisonDetail(detail: ComparisonDetail) {
         return {
           ok: true,
           status: 200,
-          json: async () => detail,
+          json: async () => serializeComparisonDetail(detail),
         } as Response;
       }
 
@@ -293,7 +359,7 @@ function mockComparisonAndRunDetails(detail: ComparisonDetail) {
         return {
           ok: true,
           status: 200,
-          json: async () => detail,
+          json: async () => serializeComparisonDetail(detail),
         } as Response;
       }
 
@@ -357,6 +423,11 @@ describe("comparisons route", () => {
             createdAt: "2026-03-30T12:00:00Z",
             status: "improved",
             compatible: true,
+            ...buildSignalInventoryFields("improvement", 0.22, {
+              failureType: "hallucination",
+              delta: -0.22,
+              caseIds: ["case-002"],
+            }),
           },
           {
             reportId: "compare_beta_to_gamma",
@@ -366,6 +437,7 @@ describe("comparisons route", () => {
             createdAt: "2026-03-30T12:30:00Z",
             status: "incompatible_dataset",
             compatible: false,
+            ...buildSignalInventoryFields("incompatible", 0.05),
           },
         ])}
       />,
@@ -378,9 +450,11 @@ describe("comparisons route", () => {
     expect(screen.getByRole("table", { name: "Comparisons inventory" })).toBeInTheDocument();
     const rows = screen.getAllByRole("link", { name: /Open comparison /i });
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveAttribute("aria-label", "Open comparison compare_beta_to_gamma");
-    expect(rows[1]).toHaveAttribute("aria-label", "Open comparison compare_alpha_to_beta");
+    expect(rows[0]).toHaveAttribute("aria-label", "Open comparison compare_alpha_to_beta");
+    expect(rows[1]).toHaveAttribute("aria-label", "Open comparison compare_beta_to_gamma");
     expect(screen.getByText("Multiple datasets")).toBeInTheDocument();
+    expect(screen.getByText("22.0% severity")).toBeInTheDocument();
+    expect(screen.getByText("Driver: hallucination -22.0%")).toBeInTheDocument();
   });
 
   it("shows a route-level empty state when no comparison reports exist yet", () => {
@@ -419,6 +493,11 @@ describe("comparisons route", () => {
             createdAt: "2026-03-30T12:00:00Z",
             status: "improved",
             compatible: true,
+            ...buildSignalInventoryFields("improvement", 0.22, {
+              failureType: "hallucination",
+              delta: -0.22,
+              caseIds: ["case-002"],
+            }),
           },
         ])}
       />,
@@ -461,6 +540,11 @@ describe("comparisons route", () => {
             createdAt: "2026-03-30T12:00:00Z",
             status: "improved",
             compatible: true,
+            ...buildSignalInventoryFields("improvement", 0.22, {
+              failureType: "hallucination",
+              delta: -0.22,
+              caseIds: ["case-002"],
+            }),
           },
         ])}
       />,

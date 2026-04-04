@@ -77,6 +77,12 @@ export type ComparisonInventoryItem = {
   createdAt: string;
   status: string;
   compatible: boolean;
+  signalVerdict: string;
+  regressionScore: number;
+  improvementScore: number;
+  netScore: number;
+  severity: number;
+  topDrivers: ComparisonSignalDriver[];
 };
 
 export type ComparisonInventory = {
@@ -123,6 +129,24 @@ export type ComparisonTransitionSummaryRow = {
   label: string;
   count: number;
   caseIds: string[];
+};
+
+export type ComparisonSignalDriver = {
+  driverRank: number;
+  failureType: string;
+  delta: number;
+  direction: string;
+  caseIds: string[];
+};
+
+export type ComparisonSignal = {
+  verdict: string;
+  reason: string | null;
+  regressionScore: number;
+  improvementScore: number;
+  netScore: number;
+  severity: number;
+  topDrivers: ComparisonSignalDriver[];
 };
 
 export type ComparisonCaseDeltaRecord = {
@@ -199,6 +223,7 @@ export type ComparisonDetail = {
     comparisonMode: string | null;
     metricsComputedOn: string | null;
   };
+  signal: ComparisonSignal;
   metrics: {
     baseline: ComparisonMetricsSnapshot;
     candidate: ComparisonMetricsSnapshot;
@@ -237,7 +262,7 @@ export type ComparisonDetailState =
       message: string;
     };
 
-export type ArtifactQueryMode = "cases" | "deltas" | "aggregates";
+export type ArtifactQueryMode = "cases" | "deltas" | "aggregates" | "signals";
 
 export type ArtifactHarvestResponse = {
   source: ArtifactSourceDescriptor;
@@ -317,6 +342,24 @@ export type ArtifactQueryAggregateRow = {
   caseCount: number;
 };
 
+export type ArtifactQuerySignalRow = {
+  reportId: string;
+  createdAt: string;
+  dataset: string | null;
+  baselineRunId: string;
+  candidateRunId: string;
+  baselineModel: string | null;
+  candidateModel: string | null;
+  status: string;
+  compatible: boolean;
+  signalVerdict: string;
+  regressionScore: number;
+  improvementScore: number;
+  netScore: number;
+  severity: number;
+  topDrivers: ComparisonSignalDriver[];
+};
+
 type ArtifactQueryBase = {
   source: ArtifactSourceDescriptor;
   filters: ArtifactQueryFilters;
@@ -339,10 +382,16 @@ export type ArtifactQueryAggregatesResponse = ArtifactQueryBase & {
   rows: ArtifactQueryAggregateRow[];
 };
 
+export type ArtifactQuerySignalsResponse = ArtifactQueryBase & {
+  mode: "signals";
+  rows: ArtifactQuerySignalRow[];
+};
+
 export type ArtifactQueryResponse =
   | ArtifactQueryCasesResponse
   | ArtifactQueryDeltasResponse
-  | ArtifactQueryAggregatesResponse;
+  | ArtifactQueryAggregatesResponse
+  | ArtifactQuerySignalsResponse;
 
 export type ArtifactQueryState =
   | {
