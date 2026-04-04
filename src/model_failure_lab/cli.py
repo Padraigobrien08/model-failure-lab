@@ -11,13 +11,18 @@ from typing import TYPE_CHECKING, Sequence
 from model_failure_lab.datasets import (
     available_bundled_dataset_ids,
     available_bundled_datasets,
+    available_local_datasets,
     has_bundled_dataset,
     load_bundled_dataset,
     load_dataset,
     load_demo_dataset,
 )
 from model_failure_lab.analysis import build_query_insight_report, explain_comparison_report
-from model_failure_lab.harvest import harvest_artifact_cases
+from model_failure_lab.harvest import (
+    harvest_artifact_cases,
+    promote_harvest_dataset,
+    review_harvest_dataset,
+)
 from model_failure_lab.index import (
     QueryFilters,
     aggregate_case_query,
@@ -206,7 +211,50 @@ def build_parser() -> argparse.ArgumentParser:
         "list",
         help="List bundled datasets available by canonical ID.",
     )
+    datasets_list_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
     datasets_list_parser.set_defaults(handler=_handle_datasets_list)
+
+    dataset_parser = subparsers.add_parser(
+        "dataset",
+        help="Review or promote harvested dataset packs.",
+    )
+    dataset_subparsers = dataset_parser.add_subparsers(dest="dataset_command")
+
+    dataset_review_parser = dataset_subparsers.add_parser(
+        "review",
+        help="Inspect deterministic duplicate groups inside one harvested draft dataset pack.",
+    )
+    dataset_review_parser.add_argument("draft_path", type=Path)
+    dataset_review_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_review_parser.set_defaults(handler=_handle_dataset_review)
+
+    dataset_promote_parser = dataset_subparsers.add_parser(
+        "promote",
+        help="Promote one harvested draft dataset pack into a curated dataset file.",
+    )
+    dataset_promote_parser.add_argument("draft_path", type=Path)
+    dataset_promote_parser.add_argument("--dataset-id", required=True)
+    dataset_promote_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_promote_parser.add_argument(
+        "--out",
+        type=Path,
+        help="Optional output path for the curated dataset JSON file.",
+    )
+    dataset_promote_parser.set_defaults(handler=_handle_dataset_promote)
 
     index_parser = subparsers.add_parser(
         "index",
@@ -418,8 +466,45 @@ def _handle_demo(args: argparse.Namespace) -> int:
 
 
 def _handle_datasets_list(args: argparse.Namespace) -> int:
-    del args
-    print(_render_bundled_dataset_list())
+    print(_render_dataset_catalog(root=_normalized_root(args.root)))
+    return 0
+
+
+def _handle_dataset_review(args: argparse.Namespace) -> int:
+    review = review_harvest_dataset(args.draft_path)
+    if args.as_json:
+        payload = {
+            "dataset_id": review.dataset.dataset_id,
+            "lifecycle": review.dataset.lifecycle,
+            "total_cases": review.total_cases,
+            "unique_case_count": review.unique_case_count,
+            "duplicate_case_count": review.duplicate_case_count,
+            "duplicate_groups": [
+                {
+                    "canonical_case_id": group.canonical_case_id,
+                    "kept_case_id": group.kept_case_id,
+                    "case_ids": list(group.case_ids),
+                    "source_case_ids": list(group.source_case_ids),
+                    "size": group.size,
+                    "match_kind": group.match_kind,
+                }
+                for group in review.duplicate_groups
+            ],
+        }
+        print(_render_json_payload(payload))
+        return 0
+    print(_render_dataset_review(review))
+    return 0
+
+
+def _handle_dataset_promote(args: argparse.Namespace) -> int:
+    summary = promote_harvest_dataset(
+        args.draft_path,
+        dataset_id=args.dataset_id,
+        root=_normalized_root(args.root),
+        output_path=args.out,
+    )
+    print(_render_dataset_promotion(summary))
     return 0
 
 
@@ -676,49 +761,63 @@ def _write_dataset_snapshot(dataset: FailureDataset, *, root: Path | None) -> Pa
     return dataset_path
 
 
-def _render_bundled_dataset_list() -> str:
+def _render_dataset_catalog(*, root: Path | None) -> str:
     summaries = available_bundled_datasets()
-    if not summaries:
-        return "Failure Lab Datasets\nNo bundled datasets registered."
+    local_summaries = available_local_datasets(root=root)
+    lines = ["Failure Lab Datasets"]
 
-    rows = [
-        (
-            "id",
-            "name",
-            "target",
-            "scope",
-            "core",
-            "full",
-            "description",
-        )
-    ]
-    for summary in summaries:
-        rows.append(
+    if summaries:
+        rows = [
             (
-                summary.dataset_id,
-                _truncate(summary.name, 24),
-                summary.target_failure_type,
-                summary.default_scope,
-                str(summary.core_case_count),
-                str(summary.full_case_count),
-                _truncate(summary.description, 68),
+                "id",
+                "name",
+                "target",
+                "scope",
+                "core",
+                "full",
+                "description",
             )
+        ]
+        for summary in summaries:
+            rows.append(
+                (
+                    summary.dataset_id,
+                    _truncate(summary.name, 24),
+                    summary.target_failure_type,
+                    summary.default_scope,
+                    str(summary.core_case_count),
+                    str(summary.full_case_count),
+                    _truncate(summary.description, 68),
+                )
+            )
+        lines.append(_render_table(rows))
+    else:
+        lines.append("No bundled datasets registered.")
+
+    if local_summaries:
+        lines.extend(
+            [
+                "",
+                "Local dataset packs",
+                _render_table(
+                    [
+                        ("id", "name", "lifecycle", "cases", "description"),
+                        *[
+                            (
+                                summary.dataset_id,
+                                _truncate(summary.name, 24),
+                                summary.lifecycle,
+                                str(summary.case_count),
+                                _truncate(summary.description, 68),
+                            )
+                            for summary in local_summaries
+                        ],
+                    ]
+                ),
+            ]
         )
 
-    widths = [max(len(row[index]) for row in rows) for index in range(len(rows[0]))]
-    rendered_rows = []
-    for index, row in enumerate(rows):
-        rendered_row = "  ".join(
-            value.ljust(widths[column_index])
-            for column_index, value in enumerate(row)
-        ).rstrip()
-        rendered_rows.append(rendered_row)
-        if index == 0:
-            rendered_rows.append(
-                "  ".join("-" * widths[column_index] for column_index in range(len(widths)))
-            )
-
-    return "\n".join(["Failure Lab Datasets", *rendered_rows])
+    return "\n".join(lines)
 
 
 def _render_index_rebuild_summary(summary) -> str:
@@ -742,6 +841,46 @@ def _render_harvest_summary(summary) -> str:
             f"Lifecycle: {summary.dataset.lifecycle or 'draft'}",
             f"Mode: {summary.mode}",
             f"Cases: {summary.selected_case_count}",
+            f"Output: {summary.output_path}",
+        ]
+    )
+
+
+def _render_dataset_review(review) -> str:
+    lines = [
+        "Failure Lab Dataset Review",
+        f"Dataset: {review.dataset.dataset_id}",
+        f"Lifecycle: {review.dataset.lifecycle or 'draft'}",
+        f"Draft path: {review.draft_path}",
+        f"Cases: total={review.total_cases} unique={review.unique_case_count} duplicates={review.duplicate_case_count}",
+    ]
+    if review.duplicate_groups:
+        lines.append(
+            _render_table(
+                [
+                    ("canonical_case", "kept_case", "group_size", "match_kind"),
+                    *[
+                        (
+                            group.canonical_case_id,
+                            group.kept_case_id,
+                            str(group.size),
+                            group.match_kind,
+                        )
+                        for group in review.duplicate_groups
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _render_dataset_promotion(summary) -> str:
+    return "\n".join(
+        [
+            "Failure Lab Dataset Promotion",
+            f"Dataset: {summary.dataset.dataset_id}",
+            f"Lifecycle: {summary.dataset.lifecycle or 'curated'}",
+            f"Cases: total={summary.total_cases} unique={summary.unique_case_count} duplicates={summary.duplicate_case_count}",
             f"Output: {summary.output_path}",
         ]
     )

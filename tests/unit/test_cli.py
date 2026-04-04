@@ -105,6 +105,7 @@ def test_python_module_entrypoint_prints_new_help_surface_without_args() -> None
     assert "report" in result.stdout
     assert "compare" in result.stdout
     assert "demo" in result.stdout
+    assert "dataset" in result.stdout
     assert "datasets" in result.stdout
     assert "index" in result.stdout
     assert "query" in result.stdout
@@ -182,6 +183,36 @@ def test_harvest_help_describes_query_compatible_export_surface() -> None:
     assert "--comparison" in result.stdout
     assert "--delta" in result.stdout
     assert "--dataset-id" in result.stdout
+    assert "--out" in result.stdout
+
+
+def test_dataset_review_help_describes_duplicate_inspection_surface() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "dataset", "review", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--json" in result.stdout
+
+
+def test_dataset_promote_help_describes_curated_dataset_output_surface() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "dataset", "promote", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--dataset-id" in result.stdout
+    assert "--root" in result.stdout
     assert "--out" in result.stdout
 
 

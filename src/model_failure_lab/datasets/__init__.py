@@ -12,6 +12,7 @@ from .bundled import (
     load_bundled_dataset,
 )
 from .contracts import FailureDataset
+from .local import LocalDatasetSummary, available_local_datasets
 from .load import load_dataset, parse_dataset_payload
 
 _DEMO_DATASET_FILENAME = "demo_dataset.json"
@@ -46,9 +47,11 @@ def load_demo_dataset() -> FailureDataset:
 __all__ = [
     "BundledDatasetSummary",
     "FailureDataset",
+    "LocalDatasetSummary",
     "UnknownBundledDatasetError",
     "available_bundled_datasets",
     "available_bundled_dataset_ids",
+    "available_local_datasets",
     "demo_dataset_path",
     "describe_bundled_dataset",
     "has_bundled_dataset",
