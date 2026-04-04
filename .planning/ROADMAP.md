@@ -2,6 +2,9 @@
 
 ## Archived Milestones
 
+- [x] `v4.7` Model Behavior Tracking And Dataset Health Over Time - shipped 2026-04-04;
+  artifact-derived history timelines, deterministic trend and dataset-health signals,
+  history-aware governance context, and time-aware debugger surfacing with workflow proof.
 - [x] `v4.6` Regression Governance And Recommendation Layer - shipped 2026-04-04; deterministic
   create/evolve/ignore recommendations, governance review/apply CLI, debugger recommendation
   surfacing, and end-to-end governance workflow proof.
@@ -30,54 +33,16 @@
 - [x] [v1.1 Live Benchmark Validation And Research Packaging](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.1-ROADMAP.md) - shipped 2026-03-20; real-run validation and reproducibility packaging.
 - [x] [v1.0 MVP](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.0-ROADMAP.md) - shipped 2026-03-20; benchmark pipeline, baselines, evaluation, and reporting contract.
 
-## Active Milestone: v4.7 Model Behavior Tracking And Dataset Health Over Time
+## Active Milestone
 
-**Goal:** Add deterministic temporal tracking so the system can understand model behavior, dataset
-health, and recurring regressions across time, not just one comparison at a time.
-
-### Phase 97: History Index And Timeline Contract
-- Status: ready
-- Requirements: `HIST-01`, `HIST-02`
-- Goal: add the artifact-derived history contract for ordered run, comparison, and dataset-family
-  timelines.
-- Success criteria:
-  - Users can retrieve ordered history by dataset, model, or family from local artifacts.
-  - Timeline records remain reproducible and derive only from saved artifact state.
-
-### Phase 98: Deterministic Trend And Recurrence Signals
-- Status: pending
-- Requirements: `TREND-01`, `TREND-02`, `HEALTH-01`
-- Goal: compute deterministic trend, volatility, recurrence, and dataset-health signals over
-  recent history.
-- Success criteria:
-  - Trend labels like `improving`, `degrading`, and `stable` are computed from recent history.
-  - Recurring regressions and volatility indicators are exposed deterministically.
-  - Dataset health summarizes whether a versioned pack is helping, stale, or unstable over time.
-
-### Phase 99: CLI History Surfaces And Governance Context
-- Status: pending
-- Requirements: `CLI-01`, `GOV-01`
-- Goal: expose history and trend context in the CLI and thread that context into governance
-  decisions.
-- Success criteria:
-  - Users can inspect history via CLI by dataset, model, or family.
-  - Governance can incorporate historical context while preserving deterministic policy output.
-
-### Phase 100: Debugger Timeline Views And Workflow Verification
-- Status: pending
-- Requirements: `UI-01`, `FLOW-01`
-- Goal: surface lightweight timeline views in the debugger and prove the full time-aware workflow.
-- Success criteria:
-  - Existing debugger routes show trend and timeline context without a dashboard rewrite.
-  - Verification proves the full `history -> trend -> governance context` loop over local
-    artifacts.
+No active milestone. `v4.7` is archived and the planning root is ready for the next milestone
+definition.
 
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 97
-$gsd-plan-phase 97
+$gsd-new-milestone
 ```
 
 ---
-*Roadmap updated: 2026-04-04 for milestone v4.7 initialization*
+*Roadmap updated: 2026-04-04 after v4.7 archive*

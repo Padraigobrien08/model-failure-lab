@@ -1,5 +1,21 @@
 # Milestones
 
+## v4.7 Model Behavior Tracking And Dataset Health Over Time (Shipped: 2026-04-04)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Added a deterministic history layer over saved runs, comparisons, and dataset families using the
+  derived local artifact index.
+- Added deterministic trend, volatility, recurrence, and dataset-health summaries over that
+  history.
+- Added `failure-lab history`, history-aware governance recommendations, and bridge payloads for
+  time-aware debugger views.
+- Proved the full `history -> trend -> governance context` loop with Python tests, frontend route
+  regressions, production build, and real-artifact smoke.
+
+---
+
 ## v4.6 Regression Governance And Recommendation Layer (Shipped: 2026-04-04)
 
 **Phases completed:** 4 phases, 8 plans
