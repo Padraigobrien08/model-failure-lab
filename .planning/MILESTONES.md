@@ -1,5 +1,20 @@
 # Milestones
 
+## v4.5 Dataset Evolution And Regression Pack Automation (Shipped: 2026-04-04)
+
+**Phases completed:** 4 phases, 8 plans
+
+**Key accomplishments:**
+- Added deterministic regression-pack generation directly from persisted comparison signals.
+- Added immutable dataset-family evolution, lineage inspection, and stable duplicate collapse in the
+  CLI.
+- Added debugger enforcement surfaces for pack generation, family evolution, and version-history
+  provenance drillback.
+- Proved the full `compare -> signal -> generate/evolve -> run -> compare` enforcement loop with
+  Python tests, frontend regressions, build, and real-artifact smoke.
+
+---
+
 ## v4.4 Regression Detection And Signal Layer (Shipped: 2026-04-04)
 
 **Phases completed:** 4 phases, 4 plans
