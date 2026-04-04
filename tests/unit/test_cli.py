@@ -108,6 +108,7 @@ def test_python_module_entrypoint_prints_new_help_surface_without_args() -> None
     assert "datasets" in result.stdout
     assert "index" in result.stdout
     assert "query" in result.stdout
+    assert "harvest" in result.stdout
     assert "run-baseline" not in result.stdout
 
 
@@ -164,6 +165,24 @@ def test_compare_help_describes_explain_surface() -> None:
     assert "--explain" in result.stdout
     assert "--analysis-mode" in result.stdout
     assert "--analysis-model" in result.stdout
+
+
+def test_harvest_help_describes_query_compatible_export_surface() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "harvest", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--failure-type" in result.stdout
+    assert "--comparison" in result.stdout
+    assert "--delta" in result.stdout
+    assert "--dataset-id" in result.stdout
+    assert "--out" in result.stdout
 
 
 def test_index_rebuild_help_is_exposed() -> None:

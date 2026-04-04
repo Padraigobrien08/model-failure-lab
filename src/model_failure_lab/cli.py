@@ -17,6 +17,7 @@ from model_failure_lab.datasets import (
     load_demo_dataset,
 )
 from model_failure_lab.analysis import build_query_insight_report, explain_comparison_report
+from model_failure_lab.harvest import harvest_artifact_cases
 from model_failure_lab.index import (
     QueryFilters,
     aggregate_case_query,
@@ -257,6 +258,48 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--json", action="store_true", dest="as_json")
     query_parser.set_defaults(handler=_handle_query)
 
+    harvest_parser = subparsers.add_parser(
+        "harvest",
+        help="Harvest saved artifact cases into a draft dataset pack.",
+    )
+    harvest_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    harvest_parser.add_argument("--failure-type", dest="failure_type")
+    harvest_parser.add_argument("--model")
+    harvest_parser.add_argument("--dataset")
+    harvest_parser.add_argument("--run", dest="run_id")
+    harvest_parser.add_argument("--prompt-id")
+    harvest_parser.add_argument("--report-id")
+    harvest_parser.add_argument(
+        "--comparison",
+        dest="comparison_id",
+        help="Saved comparison report ID to harvest delta cases from.",
+    )
+    harvest_parser.add_argument("--baseline-run")
+    harvest_parser.add_argument("--candidate-run")
+    harvest_parser.add_argument("--delta")
+    harvest_parser.add_argument("--last-n", type=int)
+    harvest_parser.add_argument("--since")
+    harvest_parser.add_argument("--until")
+    harvest_parser.add_argument("--limit", type=int, default=200)
+    harvest_parser.add_argument(
+        "--dataset-id",
+        help="Optional draft dataset ID. Defaults to the output filename stem.",
+    )
+    harvest_parser.add_argument(
+        "--out",
+        required=True,
+        type=Path,
+        help="Write the harvested draft dataset pack to this JSON path.",
+    )
+    harvest_parser.set_defaults(handler=_handle_harvest)
+
     return parser
 
 
@@ -454,6 +497,34 @@ def _handle_query(args: argparse.Namespace) -> int:
         print(_render_delta_rows(rows))
     else:
         print(_render_case_rows(rows))
+    return 0
+
+
+def _handle_harvest(args: argparse.Namespace) -> int:
+    root = _normalized_root(args.root)
+    filters = QueryFilters(
+        failure_type=args.failure_type,
+        model=args.model,
+        dataset=args.dataset,
+        run_id=args.run_id,
+        prompt_id=args.prompt_id,
+        report_id=args.report_id,
+        baseline_run_id=args.baseline_run,
+        candidate_run_id=args.candidate_run,
+        delta=args.delta,
+        last_n=args.last_n,
+        since=args.since,
+        until=args.until,
+        limit=args.limit,
+    )
+    summary = harvest_artifact_cases(
+        filters=filters,
+        output_path=args.out,
+        root=root,
+        dataset_id=args.dataset_id,
+        comparison_id=args.comparison_id,
+    )
+    print(_render_harvest_summary(summary))
     return 0
 
 
@@ -659,6 +730,19 @@ def _render_index_rebuild_summary(summary) -> str:
             f"Cases: {summary.case_count}",
             f"Comparisons: {summary.comparison_count}",
             f"Case deltas: {summary.case_delta_count}",
+        ]
+    )
+
+
+def _render_harvest_summary(summary) -> str:
+    return "\n".join(
+        [
+            "Failure Lab Harvest",
+            f"Dataset: {summary.dataset.dataset_id}",
+            f"Lifecycle: {summary.dataset.lifecycle or 'draft'}",
+            f"Mode: {summary.mode}",
+            f"Cases: {summary.selected_case_count}",
+            f"Output: {summary.output_path}",
         ]
     )
 

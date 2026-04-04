@@ -66,6 +66,9 @@ class FailureDataset:
     name: str | None = None
     description: str | None = None
     version: str | None = None
+    created_at: str | None = None
+    lifecycle: str | None = None
+    source: dict[str, JsonValue] = field(default_factory=dict)
     cases: tuple[PromptCase, ...] = ()
     metadata: dict[str, JsonValue] = field(default_factory=dict)
 
@@ -80,6 +83,12 @@ class FailureDataset:
             payload["description"] = self.description
         if self.version is not None:
             payload["version"] = self.version
+        if self.created_at is not None:
+            payload["created_at"] = self.created_at
+        if self.lifecycle is not None:
+            payload["lifecycle"] = self.lifecycle
+        if self.source:
+            payload["source"] = dict(self.source)
         if self.metadata:
             payload["metadata"] = dict(self.metadata)
         return payload
@@ -92,6 +101,9 @@ class FailureDataset:
             name=_optional_string(data, "name"),
             description=_optional_string(data, "description"),
             version=_optional_string(data, "version"),
+            created_at=_optional_string(data, "created_at"),
+            lifecycle=_optional_string(data, "lifecycle"),
+            source=_optional_json_mapping(data, "source"),
             cases=_require_cases(data, "cases"),
             metadata=_optional_json_mapping(data, "metadata"),
         )
