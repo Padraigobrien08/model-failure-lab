@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Regression Detection And Signal Layer
-current_phase: 88
-current_phase_name: Signal Stability And Workflow Verification
+current_phase: null
+current_phase_name: null
 current_plan: null
-status: ready_to_complete
-stopped_at: Phase 88 complete
+status: milestone_completed
+stopped_at: Milestone archived
 last_updated: "2026-04-04T14:34:26Z"
 last_activity: 2026-04-04
 progress:
@@ -25,29 +25,29 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 
 **Core value:** Make behavior changes explicit, deterministic, and actionable from local
 artifacts.
-**Current focus:** Milestone closeout for the fully verified signal layer.
+**Current focus:** Await the next milestone definition.
 
 ## Current Focus
 
-- next_action: complete milestone `v4.4`
-- status: Phase 88 complete; milestone is ready to archive
+- next_action: define the next milestone
+- status: `v4.4` archived locally
 
 ## Current Position
 
 Milestone: `v4.4`
-Phase: `88` — ready to complete
+Phase: none
 
 ## Workflow State
 
-**Current Phase:** `88`
-**Current Phase Name:** `Signal Stability And Workflow Verification`
+**Current Phase:** none
+**Current Phase Name:** none
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
-**Status:** Ready to complete
+**Status:** Milestone completed
 **Progress:** [██████████] 100%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Completed Phase 88 signal stability and workflow verification
+**Last Activity Description:** Archived milestone `v4.4`
 
 ## Recent Decisions
 
@@ -85,14 +85,14 @@ Phase: `88` — ready to complete
 ## Session
 
 **Last Date:** 2026-04-04T14:04:56Z
-**Stopped At:** Phase 88 complete
+**Stopped At:** Milestone archived
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-complete-milestone
+$gsd-new-milestone
 ```
 
 ---
-*State updated: 2026-04-04 after Phase 88 completion*
+*State updated: 2026-04-04 after v4.4 archive*

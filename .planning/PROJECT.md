@@ -9,8 +9,8 @@ artifact contract.
 
 ## Current State
 
-- Latest shipped milestone: `v4.3`
-- Active milestone: `v4.4 Regression Detection And Signal Layer`
+- Latest shipped milestone: `v4.4`
+- Active milestone: none
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -27,35 +27,26 @@ artifact contract.
   - `v4.2` added grounded heuristic and opt-in LLM insight reports in the CLI and debugger
   - `v4.3` added failure harvesting, deterministic dataset promotion, debugger export, and a
     proven replay loop
+  - `v4.4` added deterministic regression/improvement signals with CLI and debugger severity views
 
-## Latest Completed Milestone: v4.3 Failure Harvesting And Dataset Pack Generation
+## Latest Completed Milestone: v4.4 Regression Detection And Signal Layer
 
-**Goal:** Turn observed failures into reusable evaluation assets by harvesting real artifact cases
-into curated dataset packs that rerun through the standard engine workflow.
+**Goal:** Make behavior changes explicit, deterministic, and actionable from local comparison
+artifacts.
 
 **Delivered:**
-- Query-compatible harvesting from saved runs, cross-run analysis results, and comparison delta
-  slices.
-- Deterministic draft review, deduplication, curated promotion, and local dataset catalog
-  discovery.
-- Lightweight debugger export from `/analysis` and comparison detail into draft dataset packs.
-- Automated proof of the full `artifact -> harvest -> curated dataset -> rerun -> compare ->
-  insight` loop.
-
-## Current Milestone: v4.4 Regression Detection And Signal Layer
-
-**Goal:** Add a deterministic signal layer that detects, scores, persists, and surfaces meaningful
-regressions and improvements across runs.
-
-**Target features:**
 - Persisted comparison signal blocks with deterministic verdict, regression score, improvement
   score, and top failure-type drivers.
 - CLI signal surfaces for raw scoring, deterministic summaries, alert-style output, and recent
   regression listing.
 - Comparison and analysis debugger views that show severity, change direction, top drivers, and
   direct evidence handoff before users open dense detail views.
-- One shared signal contract that stays quantitative first and can optionally feed the existing
-  insight layer for richer interpretation.
+- Stability proof across repeated compare operations, index rebuilds, debugger routes, and
+  real-artifact smoke.
+
+## Current Milestone
+
+No active milestone is defined yet.
 
 ## Next Milestone Goals
 
@@ -84,12 +75,12 @@ and actionable from local artifacts.
   panels — `v4.2`
 - ✓ Failure harvesting, deterministic dataset promotion, debugger export, and replay-loop proof —
   `v4.3`
+- ✓ Deterministic signal scoring, CLI change surfacing, debugger severity views, and workflow
+  stability proof — `v4.4`
 
 ### Active
 
-- Every comparison should produce deterministic persisted regression and improvement signals.
-- Users should be able to identify meaningful changes without manually opening every comparison.
-- Debugger views should highlight severity and top drivers before deep inspection.
+No active milestone requirements yet.
 
 ### Out of Scope
 
@@ -103,22 +94,19 @@ and actionable from local artifacts.
 
 - The product now covers execution, reporting, comparison, query, grounded interpretation, failure
   harvesting, dataset curation, and replayable evaluation loops.
-- The next product pressure is no longer “can we inspect or reuse failures?” It is “can we tell
-  users what changed and how severe it is without manual comparison-by-comparison inspection?”
-- The right next layer is deterministic and quantitative first:
-  explicit verdicts, persisted scores, top drivers, and evidence-linked summaries over comparison
-  artifacts.
+- The product now supports execution, reporting, comparison, query, grounded interpretation,
+  harvesting, dataset promotion, and deterministic change signals over the same artifact contract.
+- The next product pressure is how to act on those signals automatically over time rather than
+  detecting them manually.
 
 ## Constraints
 
-- **Storage:** Filesystem artifacts remain canonical. Signals must persist inside comparison
-  artifacts, not in a separate service.
-- **Determinism:** Signal scoring must be reproducible and independent of LLM behavior.
-- **Grounding:** Signal summaries must stay tied to concrete failure types and case-level evidence.
-- **Compatibility:** The query, insight, harvest, and debugger layers must keep working over the
-  same artifact contract.
-- **Complexity:** No background jobs or external infrastructure; compute signals at comparison
-  time and query them locally.
+- **Storage:** Filesystem artifacts remain canonical.
+- **Determinism:** Core behavior should remain reproducible and inspectable from local artifacts.
+- **Grounding:** Higher-level interpretation must stay tied to concrete evidence and drillthrough.
+- **Compatibility:** New layers should keep working over the shared artifact contract.
+- **Complexity:** Avoid background services or hosted infrastructure unless a milestone explicitly
+  justifies them.
 
 ## Key Decisions
 
@@ -128,8 +116,8 @@ and actionable from local artifacts.
 | Make grounded interpretation opt-in richer, but deterministic by default | Heuristic, testable behavior should remain the base contract | ✓ Validated in `v4.2` |
 | Turn harvested failures into first-class datasets rather than one-off exports | Reuse matters only if failures re-enter the evaluation loop cleanly | ✓ Validated in `v4.3` |
 | Keep debugger export lightweight and route-local | Review and promotion belong in explicit lifecycle steps, not a browser editor | ✓ Validated in `v4.3` |
-| Compute change signals deterministically from comparison artifacts before any LLM enrichment | Users need stable quantitative answers to “what changed?” first | — Targeted in `v4.4` |
-| Persist signal blocks directly in comparison artifacts and expose them through CLI and debugger | Signals should be artifact-native and queryable without new infrastructure | — Targeted in `v4.4` |
+| Compute change signals deterministically from comparison artifacts before any LLM enrichment | Users need stable quantitative answers to “what changed?” first | ✓ Validated in `v4.4` |
+| Persist signal blocks directly in comparison artifacts and expose them through CLI and debugger | Signals should be artifact-native and queryable without new infrastructure | ✓ Validated in `v4.4` |
 
 ---
-*Last updated: 2026-04-04 for milestone v4.4 initialization*
+*Last updated: 2026-04-04 after v4.4 completion*

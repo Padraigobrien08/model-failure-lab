@@ -1,5 +1,19 @@
 # Milestones
 
+## v4.4 Regression Detection And Signal Layer (Shipped: 2026-04-04)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Added deterministic comparison signal blocks with verdict, severity, and top-driver metadata.
+- Added raw score, summary, alert, and severity-ranked listing surfaces in the CLI.
+- Added debugger severity surfacing in comparison inventory/detail routes and `/analysis` signal
+  mode.
+- Proved signal stability across repeated compare operations, index rebuilds, route regressions,
+  production build, and real-artifact smoke.
+
+---
+
 ## v4.3 Failure Harvesting And Dataset Pack Generation (Shipped: 2026-04-04)
 
 **Phases completed:** 4 phases, 8 plans
