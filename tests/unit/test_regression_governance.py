@@ -31,6 +31,16 @@ def _pick_regression_comparison(root: Path, *, minimum_cases: int = 1) -> str:
     raise AssertionError("expected at least one regression comparison in the fixture")
 
 
+def _pick_improvement_comparison(root: Path) -> str:
+    rows = query_comparison_signals(
+        QueryFilters(limit=20),
+        verdict="improvement",
+        root=root,
+    )
+    assert rows
+    return str(rows[0]["report_id"])
+
+
 def test_preview_regression_pack_does_not_write_dataset_files(tmp_path: Path) -> None:
     workspace = materialize_insight_fixture(tmp_path / "fixture")
     comparison_id = _pick_regression_comparison(workspace.root)
@@ -126,6 +136,23 @@ def test_recommend_dataset_action_ignores_non_regression_and_below_threshold_sig
     assert first.policy_rule in {"non_regression_signal", "incompatible_signal"}
     assert second.action == "ignore"
     assert second.policy_rule == "below_minimum_severity"
+
+
+def test_recommend_dataset_action_includes_recurring_cluster_context_when_available(
+    tmp_path: Path,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+
+    recommendation = recommend_dataset_action(
+        _pick_improvement_comparison(workspace.root),
+        root=workspace.root,
+    )
+
+    assert recommendation.action == "ignore"
+    assert recommendation.cluster_context
+    assert recommendation.history_context is not None
+    assert recommendation.history_context.recurring_clusters == recommendation.cluster_context
+    assert "Primary recurring cluster" in recommendation.rationale
 
 
 def test_recommend_dataset_action_respects_family_cap_and_duplicate_growth_guards(

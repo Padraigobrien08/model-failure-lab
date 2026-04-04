@@ -92,6 +92,8 @@ def test_query_history_snapshot_returns_ordered_dataset_history(tmp_path: Path) 
     assert snapshot.run_trend.label != "insufficient_history"
     assert snapshot.comparison_trend is not None
     assert snapshot.comparison_trend.label != "insufficient_history"
+    assert snapshot.recurring_clusters
+    assert snapshot.recurring_clusters[0].scope_count >= 2
 
 
 def test_history_aware_governance_can_override_low_severity_ignore(tmp_path: Path) -> None:

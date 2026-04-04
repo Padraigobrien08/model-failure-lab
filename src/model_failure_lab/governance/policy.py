@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from model_failure_lab.clusters import FailureClusterSummary
 from model_failure_lab.datasets.evolution import (
     RegressionPackPreviewCase,
     list_dataset_versions,
@@ -117,6 +118,7 @@ class GovernanceRecommendation:
     evidence_case_ids: tuple[str, ...]
     preview_cases: tuple[RegressionPackPreviewCase, ...]
     history_context: SignalHistoryContext | None = None
+    cluster_context: tuple[FailureClusterSummary, ...] = ()
 
     def to_payload(self) -> dict[str, JsonValue]:
         payload: dict[str, JsonValue] = {
@@ -130,6 +132,7 @@ class GovernanceRecommendation:
             "selected_case_count": self.selected_case_count,
             "evidence_case_ids": list(self.evidence_case_ids),
             "preview_cases": [entry.to_payload() for entry in self.preview_cases],
+            "cluster_context": [summary.to_payload() for summary in self.cluster_context],
         }
         if self.history_context is not None:
             payload["history_context"] = self.history_context.to_payload()
@@ -172,6 +175,7 @@ def recommend_dataset_action(
         and active_policy.recurrence_threshold is not None
         and history_context.recent_regression_count >= active_policy.recurrence_threshold
     )
+    cluster_context = history_context.recurring_clusters
 
     if signal_verdict == "incompatible":
         action = "ignore"
@@ -249,7 +253,7 @@ def recommend_dataset_action(
         comparison_id=comparison_id,
         action=action,
         policy_rule=policy_rule,
-        rationale=rationale,
+        rationale=_append_cluster_rationale(rationale, cluster_context),
         policy=active_policy,
         signal=dict(preview.signal),
         matched_family=family_match,
@@ -257,6 +261,7 @@ def recommend_dataset_action(
         evidence_case_ids=evidence_case_ids,
         preview_cases=preview.preview_cases,
         history_context=history_context,
+        cluster_context=cluster_context,
     )
 
 
@@ -336,3 +341,16 @@ def _signal_float(payload: dict[str, JsonValue], key: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return 0.0
     return float(value)
+
+
+def _append_cluster_rationale(
+    rationale: str,
+    cluster_context: tuple[FailureClusterSummary, ...],
+) -> str:
+    if not cluster_context:
+        return rationale
+    primary = cluster_context[0]
+    return (
+        f"{rationale} Primary recurring cluster `{primary.cluster_id}` "
+        f"({primary.label}) spans {primary.scope_count} saved artifacts."
+    )

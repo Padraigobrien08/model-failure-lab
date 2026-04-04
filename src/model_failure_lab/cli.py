@@ -24,6 +24,12 @@ from model_failure_lab.datasets import (
     load_demo_dataset,
 )
 from model_failure_lab.analysis import build_query_insight_report, explain_comparison_report
+from model_failure_lab.clusters import (
+    FailureClusterDetail,
+    FailureClusterSummary,
+    get_failure_cluster_detail,
+    list_failure_clusters,
+)
 from model_failure_lab.harvest import (
     harvest_artifact_cases,
     promote_harvest_dataset,
@@ -422,6 +428,85 @@ def build_parser() -> argparse.ArgumentParser:
     history_parser.add_argument("--limit", type=int, default=DEFAULT_HISTORY_LIMIT)
     history_parser.add_argument("--json", action="store_true", dest="as_json")
     history_parser.set_defaults(handler=_handle_history)
+
+    clusters_parser = subparsers.add_parser(
+        "clusters",
+        help="List deterministic recurring failure clusters over saved local artifacts.",
+    )
+    clusters_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    clusters_parser.add_argument(
+        "--kind",
+        choices=["run_case", "comparison_delta", "all"],
+        default="all",
+    )
+    clusters_parser.add_argument("--failure-type", dest="failure_type")
+    clusters_parser.add_argument("--model")
+    clusters_parser.add_argument("--dataset")
+    clusters_parser.add_argument("--run-id")
+    clusters_parser.add_argument("--report-id")
+    clusters_parser.add_argument("--baseline-run")
+    clusters_parser.add_argument("--candidate-run")
+    clusters_parser.add_argument("--prompt-id")
+    clusters_parser.add_argument("--delta")
+    clusters_parser.add_argument("--last-n", type=int)
+    clusters_parser.add_argument("--since")
+    clusters_parser.add_argument("--until")
+    clusters_parser.add_argument("--limit", type=int, default=10)
+    clusters_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="include_non_recurring",
+        help="Include one-off clusters instead of filtering to recurring clusters only.",
+    )
+    clusters_parser.add_argument("--json", action="store_true", dest="as_json")
+    clusters_parser.set_defaults(handler=_handle_clusters)
+
+    cluster_parser = subparsers.add_parser(
+        "cluster",
+        help="Inspect one deterministic recurring cluster in detail.",
+    )
+    cluster_subparsers = cluster_parser.add_subparsers(dest="cluster_command")
+
+    cluster_show_parser = cluster_subparsers.add_parser(
+        "show",
+        help="Show one cluster summary plus representative saved evidence.",
+    )
+    cluster_show_parser.add_argument("cluster_id")
+    cluster_show_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    cluster_show_parser.add_argument("--limit", type=int, default=10)
+    cluster_show_parser.add_argument("--json", action="store_true", dest="as_json")
+    cluster_show_parser.set_defaults(handler=_handle_cluster_show)
+
+    cluster_history_parser = cluster_subparsers.add_parser(
+        "history",
+        help="Show the saved occurrence history for one cluster.",
+    )
+    cluster_history_parser.add_argument("cluster_id")
+    cluster_history_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    cluster_history_parser.add_argument("--limit", type=int, default=20)
+    cluster_history_parser.add_argument("--json", action="store_true", dest="as_json")
+    cluster_history_parser.set_defaults(handler=_handle_cluster_history)
 
     regressions_parser = subparsers.add_parser(
         "regressions",
@@ -1005,6 +1090,74 @@ def _handle_history(args: argparse.Namespace) -> int:
         print(_render_json_payload(snapshot.to_payload()))
         return 0
     print(_render_history_snapshot(snapshot))
+    return 0
+
+
+def _handle_clusters(args: argparse.Namespace) -> int:
+    filters = QueryFilters(
+        failure_type=args.failure_type,
+        model=args.model,
+        dataset=args.dataset,
+        run_id=args.run_id,
+        prompt_id=args.prompt_id,
+        report_id=args.report_id,
+        baseline_run_id=args.baseline_run,
+        candidate_run_id=args.candidate_run,
+        delta=args.delta,
+        last_n=args.last_n,
+        since=args.since,
+        until=args.until,
+        limit=args.limit,
+    )
+    cluster_kind = None if args.kind == "all" else args.kind
+    rows = list_failure_clusters(
+        filters,
+        cluster_kind=cluster_kind,
+        recurring_only=not args.include_non_recurring,
+        root=_normalized_root(args.root),
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "failure_clusters",
+                    "filters": {
+                        **_query_filters_payload(filters),
+                        "kind": args.kind,
+                        "include_non_recurring": args.include_non_recurring,
+                    },
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_cluster_rows(rows, kind=args.kind))
+    return 0
+
+
+def _handle_cluster_show(args: argparse.Namespace) -> int:
+    detail = get_failure_cluster_detail(
+        args.cluster_id,
+        root=_normalized_root(args.root),
+        limit=args.limit,
+    )
+    if args.as_json:
+        print(_render_json_payload(detail.to_payload()))
+        return 0
+    print(_render_cluster_detail(detail, limit=args.limit))
+    return 0
+
+
+def _handle_cluster_history(args: argparse.Namespace) -> int:
+    detail = get_failure_cluster_detail(
+        args.cluster_id,
+        root=_normalized_root(args.root),
+        limit=args.limit,
+    )
+    if args.as_json:
+        print(_render_json_payload(detail.to_payload()))
+        return 0
+    print(_render_cluster_history(detail))
     return 0
 
 
@@ -1594,6 +1747,14 @@ def _render_governance_recommendation(recommendation: GovernanceRecommendation) 
                     for pattern in recommendation.history_context.recurring_failures
                 )
             )
+        if recommendation.cluster_context:
+            lines.append(
+                "Recurring clusters: "
+                + ", ".join(
+                    f"{summary.cluster_id} ({summary.scope_count})"
+                    for summary in recommendation.cluster_context
+                )
+            )
     if recommendation.preview_cases:
         lines.append(
             _render_table(
@@ -1653,6 +1814,14 @@ def _render_history_snapshot(snapshot: HistorySnapshot) -> str:
             + ", ".join(
                 f"{pattern.failure_type} x{pattern.occurrences}"
                 for pattern in snapshot.recurring_failures
+            )
+        )
+    if snapshot.recurring_clusters:
+        lines.append(
+            "Recurring clusters: "
+            + ", ".join(
+                f"{summary.cluster_id} ({summary.scope_count})"
+                for summary in snapshot.recurring_clusters
             )
         )
     if snapshot.run_history:
@@ -1804,6 +1973,108 @@ def _render_case_rows(rows: list[dict[str, object]]) -> str:
             )
         )
     return "\n".join(["Failure Lab Query", _render_table(table_rows)])
+
+
+def _render_cluster_rows(
+    rows: tuple[FailureClusterSummary, ...],
+    *,
+    kind: str,
+) -> str:
+    if not rows:
+        return "Failure Lab Clusters\nNo recurring failure clusters matched the current filters."
+    title = "Failure Lab Clusters" if kind == "all" else f"Failure Lab Clusters ({kind})"
+    table_rows = [
+        ("cluster_id", "kind", "scope_count", "occurrences", "severity", "label"),
+        *[
+            (
+                row.cluster_id,
+                row.cluster_kind,
+                str(row.scope_count),
+                str(row.occurrence_count),
+                _format_rate(row.recent_severity),
+                _truncate(row.label, 42),
+            )
+            for row in rows
+        ],
+    ]
+    return "\n".join([title, _render_table(table_rows)])
+ 
+
+def _render_cluster_detail(detail: FailureClusterDetail, *, limit: int) -> str:
+    summary = detail.summary
+    lines = [
+        "Failure Lab Cluster",
+        f"Cluster: {summary.cluster_id}",
+        f"Kind: {summary.cluster_kind}",
+        f"Label: {summary.label}",
+        f"Summary: {summary.summary}",
+        (
+            "Counts: "
+            f"scopes={summary.scope_count} "
+            f"occurrences={summary.occurrence_count} "
+            f"first={summary.first_seen_at} "
+            f"last={summary.last_seen_at}"
+        ),
+    ]
+    if summary.datasets:
+        lines.append(f"Datasets: {', '.join(summary.datasets)}")
+    if summary.models:
+        lines.append(f"Models: {', '.join(summary.models)}")
+    if summary.failure_types:
+        lines.append(f"Failure types: {', '.join(summary.failure_types)}")
+    if summary.transition_types:
+        lines.append(f"Transitions: {', '.join(summary.transition_types)}")
+    if summary.representative_evidence:
+        lines.append(
+            "Representative evidence: "
+            + ", ".join(reference.label for reference in summary.representative_evidence)
+        )
+    if detail.occurrences:
+        lines.append(
+            _render_table(
+                [
+                    ("created_at", "artifact", "case", "severity", "prompt"),
+                    *[
+                        (
+                            row.created_at,
+                            row.report_id or row.run_id or "n/a",
+                            row.case_id,
+                            _format_rate(row.severity),
+                            _truncate(row.prompt, 42),
+                        )
+                        for row in detail.occurrences[: max(limit, 1)]
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _render_cluster_history(detail: FailureClusterDetail) -> str:
+    if not detail.occurrences:
+        return f"Failure Lab Cluster History\nNo saved occurrences for {detail.summary.cluster_id}."
+    return "\n".join(
+        [
+            "Failure Lab Cluster History",
+            f"Cluster: {detail.summary.cluster_id} ({detail.summary.label})",
+            _render_table(
+                [
+                    ("created_at", "artifact", "dataset", "case", "severity", "prompt_id"),
+                    *[
+                        (
+                            row.created_at,
+                            row.report_id or row.run_id or "n/a",
+                            row.dataset_scope or row.dataset or "n/a",
+                            row.case_id,
+                            _format_rate(row.severity),
+                            row.prompt_id,
+                        )
+                        for row in detail.occurrences
+                    ],
+                ]
+            ),
+        ]
+    )
 
 
 def _render_delta_rows(rows: list[dict[str, object]]) -> str:

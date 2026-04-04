@@ -157,6 +157,10 @@ export function SignalDatasetAutomationPanel({
         ? generationState.value
         : null;
   const activeHistoryContext = historyContext ?? recommendation?.historyContext ?? null;
+  const activeClusterContext =
+    recommendation?.clusterContext ??
+    activeHistoryContext?.recurringClusters ??
+    [];
   const loadedFamilyHealth =
     versionsState.status === "ready" ? versionsState.value.history.datasetHealth : null;
   const familyHealth = loadedFamilyHealth ?? activeHistoryContext?.familyHealth ?? null;
@@ -252,6 +256,45 @@ export function SignalDatasetAutomationPanel({
                 this recent history window.
               </p>
             )}
+          </div>
+        ) : null}
+
+        {activeClusterContext.length > 0 ? (
+          <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="accent">Recurring clusters</Badge>
+              <Badge tone="muted">{activeClusterContext.length} linked</Badge>
+            </div>
+            <div className="space-y-3">
+              {activeClusterContext.map((cluster) => (
+                <div
+                  key={cluster.clusterId}
+                  className="rounded-[16px] border border-border/60 bg-card/70 p-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="muted">{cluster.clusterKind}</Badge>
+                    <Badge tone="muted">{cluster.scopeCount} artifacts</Badge>
+                    <Badge tone="muted">{cluster.occurrenceCount} occurrences</Badge>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-foreground">
+                    {cluster.label}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{cluster.summary}</p>
+                  {cluster.representativeEvidence.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {cluster.representativeEvidence.map((reference) =>
+                        renderPreviewLink(
+                          reference.reportId ?? comparisonId,
+                          reference.caseId,
+                          reference.label,
+                          returnState,
+                        ),
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
 

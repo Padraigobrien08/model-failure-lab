@@ -266,7 +266,12 @@ export type ComparisonDetailState =
       message: string;
     };
 
-export type ArtifactQueryMode = "cases" | "deltas" | "aggregates" | "signals";
+export type ArtifactQueryMode =
+  | "cases"
+  | "deltas"
+  | "aggregates"
+  | "signals"
+  | "clusters";
 
 export type ArtifactHarvestResponse = {
   source: ArtifactSourceDescriptor;
@@ -349,6 +354,7 @@ export type ArtifactGovernanceRecommendation = {
   evidenceCaseIds: string[];
   previewCases: ArtifactRegressionPreviewCase[];
   historyContext: ArtifactSignalHistoryContext | null;
+  clusterContext?: ArtifactFailureClusterSummary[];
 };
 
 export type ArtifactMetricTrend = {
@@ -426,6 +432,7 @@ export type ArtifactHistorySnapshot = {
   runTrend: ArtifactMetricTrend | null;
   comparisonTrend: ArtifactMetricTrend | null;
   recurringFailures: ArtifactRecurringFailurePattern[];
+  recurringClusters: ArtifactFailureClusterSummary[];
   datasetVersions: ArtifactDatasetVersionRecord[];
   datasetHealth: ArtifactDatasetHealthSummary | null;
 };
@@ -438,8 +445,73 @@ export type ArtifactSignalHistoryContext = {
   comparisonTrend: ArtifactMetricTrend;
   candidateRunTrend: ArtifactMetricTrend | null;
   recurringFailures: ArtifactRecurringFailurePattern[];
+  recurringClusters: ArtifactFailureClusterSummary[];
   recentComparisons: ArtifactHistoryComparisonRow[];
   familyHealth: ArtifactDatasetHealthSummary | null;
+};
+
+export type ArtifactFailureClusterEvidenceRef = {
+  kind: "run_case" | "comparison_case";
+  label: string;
+  runId: string | null;
+  reportId: string | null;
+  caseId: string | null;
+  promptId: string | null;
+  section: string | null;
+  transitionType: string | null;
+};
+
+export type ArtifactFailureClusterSummary = {
+  clusterId: string;
+  clusterKind: "run_case" | "comparison_delta";
+  label: string;
+  summary: string;
+  occurrenceCount: number;
+  scopeCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  datasets: string[];
+  models: string[];
+  failureTypes: string[];
+  transitionTypes: string[];
+  recentSeverity: number | null;
+  representativeEvidence: ArtifactFailureClusterEvidenceRef[];
+};
+
+export type ArtifactFailureClusterOccurrence = {
+  clusterId: string;
+  clusterKind: "run_case" | "comparison_delta";
+  createdAt: string;
+  datasetScope: string | null;
+  dataset: string | null;
+  runId: string | null;
+  model: string | null;
+  reportId: string | null;
+  caseId: string;
+  promptId: string;
+  prompt: string;
+  tags: string[];
+  failureType: string | null;
+  expectationVerdict: string | null;
+  errorStage: string | null;
+  deltaKind: string | null;
+  transitionType: string | null;
+  baselineRunId: string | null;
+  candidateRunId: string | null;
+  baselineModel: string | null;
+  candidateModel: string | null;
+  baselineFailureType: string | null;
+  candidateFailureType: string | null;
+  baselineExpectationVerdict: string | null;
+  candidateExpectationVerdict: string | null;
+  signalVerdict: string | null;
+  severity: number | null;
+  evidenceRef: ArtifactFailureClusterEvidenceRef;
+};
+
+export type ArtifactFailureClusterDetail = {
+  summary: ArtifactFailureClusterSummary;
+  occurrences: ArtifactFailureClusterOccurrence[];
 };
 
 export type ArtifactDatasetVersionRecord = {
@@ -493,6 +565,8 @@ export type ArtifactQueryFilters = {
   candidateRunId: string | null;
   delta: string | null;
   aggregateBy: string | null;
+  clusterKind?: string | null;
+  includeNonRecurring?: boolean;
   lastN: number | null;
   since: string | null;
   until: string | null;
@@ -570,6 +644,8 @@ export type ArtifactQuerySignalRow = {
   governanceRecommendation: ArtifactGovernanceRecommendation | null;
 };
 
+export type ArtifactQueryClusterRow = ArtifactFailureClusterSummary;
+
 type ArtifactQueryBase = {
   source: ArtifactSourceDescriptor;
   filters: ArtifactQueryFilters;
@@ -597,11 +673,17 @@ export type ArtifactQuerySignalsResponse = ArtifactQueryBase & {
   rows: ArtifactQuerySignalRow[];
 };
 
+export type ArtifactQueryClustersResponse = ArtifactQueryBase & {
+  mode: "clusters";
+  rows: ArtifactQueryClusterRow[];
+};
+
 export type ArtifactQueryResponse =
   | ArtifactQueryCasesResponse
   | ArtifactQueryDeltasResponse
   | ArtifactQueryAggregatesResponse
-  | ArtifactQuerySignalsResponse;
+  | ArtifactQuerySignalsResponse
+  | ArtifactQueryClustersResponse;
 
 export type ArtifactQueryState =
   | {

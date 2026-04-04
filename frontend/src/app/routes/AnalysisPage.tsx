@@ -46,7 +46,12 @@ function readSearchValue(searchParams: URLSearchParams, key: string): string {
 
 function readMode(searchParams: URLSearchParams): ArtifactQueryMode {
   const mode = searchParams.get("mode");
-  if (mode === "deltas" || mode === "aggregates" || mode === "signals") {
+  if (
+    mode === "deltas" ||
+    mode === "aggregates" ||
+    mode === "signals" ||
+    mode === "clusters"
+  ) {
     return mode;
   }
   return "cases";
@@ -216,7 +221,11 @@ export function AnalysisPage() {
   const signalDirection = readSignalDirection(searchParams);
   const since = readSearchValue(searchParams, "since");
   const lastN = readSearchValue(searchParams, "lastN");
-  const canExportDraft = response.mode !== "aggregates" && response.mode !== "signals" && resultCount > 0;
+  const canExportDraft =
+    response.mode !== "aggregates" &&
+    response.mode !== "signals" &&
+    response.mode !== "clusters" &&
+    resultCount > 0;
 
   const renderEvidenceLink = (reference: ArtifactInsightEvidenceRef) => {
     if (reference.kind === "run_case" && reference.runId && reference.caseId) {
@@ -287,7 +296,7 @@ export function AnalysisPage() {
             <FilterSelect
               label="Mode"
               value={mode}
-              options={["cases", "deltas", "aggregates", "signals"]}
+              options={["cases", "deltas", "aggregates", "signals", "clusters"]}
               placeholder="Cases"
               onChange={(value) => {
                 const nextMode = value || "cases";
@@ -304,7 +313,7 @@ export function AnalysisPage() {
               }}
             />
 
-            {mode === "cases" || mode === "signals" ? (
+            {mode === "cases" || mode === "signals" || mode === "clusters" ? (
               <FilterSelect
                 label={mode === "signals" ? "Driver type" : "Failure type"}
                 value={failureType}
@@ -530,6 +539,7 @@ export function AnalysisPage() {
             const primaryDriver = row.topDrivers[0] ?? null;
             const primaryCaseId = primaryDriver?.caseIds[0] ?? null;
             const historyContext = row.governanceRecommendation?.historyContext ?? null;
+            const clusterContext = row.governanceRecommendation?.clusterContext ?? [];
             const comparisonSearch = buildComparisonDetailSearchParams(new URLSearchParams(), {
               section: "transitions",
               caseId: primaryCaseId,
@@ -560,6 +570,11 @@ export function AnalysisPage() {
                     {historyContext ? (
                       <Badge tone="muted">
                         {historyContext.recentRegressionCount} recent regressions
+                      </Badge>
+                    ) : null}
+                    {clusterContext.length > 0 ? (
+                      <Badge tone="muted">
+                        {clusterContext.length} recurring clusters
                       </Badge>
                     ) : null}
                   </div>
@@ -671,6 +686,49 @@ export function AnalysisPage() {
               </Card>
             );
           })}
+        </div>
+      ) : response.mode === "clusters" ? (
+        <div className="grid gap-4">
+          {response.rows.map((row) => (
+            <Card key={row.clusterId}>
+              <CardHeader>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="accent">{row.clusterKind}</Badge>
+                  <Badge tone="muted">{row.scopeCount} artifacts</Badge>
+                  <Badge tone="muted">{row.occurrenceCount} occurrences</Badge>
+                  {row.recentSeverity != null ? (
+                    <Badge tone="muted">
+                      {(row.recentSeverity * 100).toFixed(1)}% severity
+                    </Badge>
+                  ) : null}
+                </div>
+                <CardTitle className="text-xl">{row.label}</CardTitle>
+                <CardDescription>{row.clusterId}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">{row.summary}</p>
+                <div className="flex flex-wrap gap-2">
+                  {row.failureTypes.map((failureType) => (
+                    <Badge key={`${row.clusterId}-${failureType}`} tone="muted">
+                      {failureType}
+                    </Badge>
+                  ))}
+                  {row.datasets.map((clusterDataset) => (
+                    <Badge key={`${row.clusterId}-${clusterDataset}`} tone="muted">
+                      {clusterDataset}
+                    </Badge>
+                  ))}
+                </div>
+                {row.representativeEvidence.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {row.representativeEvidence
+                      .map((reference) => renderEvidenceLink(reference))
+                      .filter((reference) => reference !== null)}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : null}
 

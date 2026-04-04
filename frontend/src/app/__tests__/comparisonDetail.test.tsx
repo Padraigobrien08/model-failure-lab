@@ -108,6 +108,42 @@ function buildGovernanceRecommendation(
   };
 }
 
+function buildClusterContext(
+  overrides: Partial<
+    NonNullable<NonNullable<ComparisonDetail["governanceRecommendation"]>["clusterContext"]>[number]
+  > = {},
+) {
+  return {
+    clusterId: "cd_reasoning_failure_to_no_failure",
+    clusterKind: "comparison_delta" as const,
+    label: "reasoning · failure to no failure",
+    summary:
+      "Reasoning failure to no failure recurred 2 times across 2 saved comparisons in reasoning-failures-v1.",
+    occurrenceCount: 2,
+    scopeCount: 2,
+    firstSeenAt: "2026-03-29T12:00:00Z",
+    lastSeenAt: "2026-03-30T12:00:00Z",
+    datasets: ["reasoning-failures-v1"],
+    models: ["run_alpha→run_beta"],
+    failureTypes: ["reasoning"],
+    transitionTypes: ["failure_to_no_failure"],
+    recentSeverity: 0.25,
+    representativeEvidence: [
+      {
+        kind: "comparison_case" as const,
+        label: "compare_alpha_to_beta:case-002",
+        runId: null,
+        reportId: "compare_alpha_to_beta",
+        caseId: "case-002",
+        promptId: "case-002",
+        section: "transitions",
+        transitionType: "failure_to_no_failure",
+      },
+    ],
+    ...overrides,
+  };
+}
+
 function buildReadyArtifactState(
   comparisonIds: string[],
   source = DEFAULT_SOURCE,
@@ -733,6 +769,36 @@ function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unk
                           latest_delta: pattern.latestDelta,
                         }),
                       ),
+                    recurring_clusters:
+                      detail.governanceRecommendation.historyContext.recurringClusters.map(
+                        (cluster) => ({
+                          cluster_id: cluster.clusterId,
+                          cluster_kind: cluster.clusterKind,
+                          label: cluster.label,
+                          summary: cluster.summary,
+                          occurrence_count: cluster.occurrenceCount,
+                          scope_count: cluster.scopeCount,
+                          first_seen_at: cluster.firstSeenAt,
+                          last_seen_at: cluster.lastSeenAt,
+                          datasets: cluster.datasets,
+                          models: cluster.models,
+                          failure_types: cluster.failureTypes,
+                          transition_types: cluster.transitionTypes,
+                          recent_severity: cluster.recentSeverity,
+                          representative_evidence: cluster.representativeEvidence.map(
+                            (reference) => ({
+                              kind: reference.kind,
+                              label: reference.label,
+                              run_id: reference.runId,
+                              report_id: reference.reportId,
+                              case_id: reference.caseId,
+                              prompt_id: reference.promptId,
+                              section: reference.section,
+                              transition_type: reference.transitionType,
+                            }),
+                          ),
+                        }),
+                      ),
                     recent_comparisons:
                       detail.governanceRecommendation.historyContext.recentComparisons.map(
                         (row) => ({
@@ -802,6 +868,32 @@ function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unk
                               detail.governanceRecommendation.historyContext.familyHealth.primaryFailureType,
                           },
                   },
+            cluster_context:
+              detail.governanceRecommendation.clusterContext?.map((cluster) => ({
+                cluster_id: cluster.clusterId,
+                cluster_kind: cluster.clusterKind,
+                label: cluster.label,
+                summary: cluster.summary,
+                occurrence_count: cluster.occurrenceCount,
+                scope_count: cluster.scopeCount,
+                first_seen_at: cluster.firstSeenAt,
+                last_seen_at: cluster.lastSeenAt,
+                datasets: cluster.datasets,
+                models: cluster.models,
+                failure_types: cluster.failureTypes,
+                transition_types: cluster.transitionTypes,
+                recent_severity: cluster.recentSeverity,
+                representative_evidence: cluster.representativeEvidence.map((reference) => ({
+                  kind: reference.kind,
+                  label: reference.label,
+                  run_id: reference.runId,
+                  report_id: reference.reportId,
+                  case_id: reference.caseId,
+                  prompt_id: reference.promptId,
+                  section: reference.section,
+                  transition_type: reference.transitionType,
+                })),
+              })) ?? [],
           },
   };
 }
@@ -1500,6 +1592,39 @@ describe("comparison detail route", () => {
         failureType: null,
       });
     });
+  });
+
+  it("surfaces recurring cluster context on the comparison automation panel", async () => {
+    const detail = buildCompatibleDetail();
+    detail.governanceRecommendation = buildGovernanceRecommendation({
+      clusterContext: [buildClusterContext()],
+    });
+    mockComparisonDetail(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByText("Regression enforcement surface"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Recurring clusters")).toBeInTheDocument();
+    expect(screen.getByText("reasoning · failure to no failure")).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("link", { name: "compare_alpha_to_beta:case-002" })
+        .some(
+          (link) =>
+            link.getAttribute("href") ===
+            "/comparisons/compare_alpha_to_beta?section=transitions&case=case-002",
+        ),
+    ).toBe(true);
   });
 
   it("keeps incompatible comparisons openable with explicit coverage semantics", async () => {

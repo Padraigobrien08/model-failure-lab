@@ -1738,6 +1738,7 @@ function failureLabArtifactsPlugin(): Plugin {
       ["delta", "--delta"],
       ["aggregateBy", "--aggregate-by"],
       ["signalDirection", "--signal-direction"],
+      ["clusterKind", "--cluster-kind"],
       ["lastN", "--last-n"],
       ["since", "--since"],
       ["until", "--until"],
@@ -1750,7 +1751,10 @@ function failureLabArtifactsPlugin(): Plugin {
         args.push(argName, value);
       }
     }
-    if (mode !== "signals") {
+    if (requestUrl.searchParams.get("includeNonRecurring") === "1") {
+      args.push("--include-non-recurring");
+    }
+    if (mode !== "signals" && mode !== "clusters") {
       args.push("--summarize");
     }
 

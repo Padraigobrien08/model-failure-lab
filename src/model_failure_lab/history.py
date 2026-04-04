@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from model_failure_lab.clusters import FailureClusterSummary, list_clusters_for_comparison, list_failure_clusters
+from model_failure_lab.index.query import QueryFilters
 from model_failure_lab.index.builder import ensure_query_index, query_index_path
 from model_failure_lab.schemas import JsonValue
 
@@ -219,6 +221,7 @@ class SignalHistoryContext:
     comparison_trend: MetricTrend
     candidate_run_trend: MetricTrend | None
     recurring_failures: tuple[RecurringFailurePattern, ...]
+    recurring_clusters: tuple[FailureClusterSummary, ...]
     recent_comparisons: tuple[ComparisonHistoryRecord, ...]
     family_health: DatasetHealthSummary | None
 
@@ -231,6 +234,9 @@ class SignalHistoryContext:
             "comparison_trend": self.comparison_trend.to_payload(),
             "recurring_failures": [
                 pattern.to_payload() for pattern in self.recurring_failures
+            ],
+            "recurring_clusters": [
+                summary.to_payload() for summary in self.recurring_clusters
             ],
             "recent_comparisons": [
                 row.to_payload() for row in self.recent_comparisons
@@ -251,6 +257,7 @@ class HistorySnapshot:
     run_trend: MetricTrend | None
     comparison_trend: MetricTrend | None
     recurring_failures: tuple[RecurringFailurePattern, ...]
+    recurring_clusters: tuple[FailureClusterSummary, ...]
     dataset_versions: tuple[DatasetVersionHistoryRecord, ...]
     dataset_health: DatasetHealthSummary | None
 
@@ -266,6 +273,9 @@ class HistorySnapshot:
             ),
             "recurring_failures": [
                 pattern.to_payload() for pattern in self.recurring_failures
+            ],
+            "recurring_clusters": [
+                summary.to_payload() for summary in self.recurring_clusters
             ],
             "dataset_versions": [row.to_payload() for row in self.dataset_versions],
             "dataset_health": self.dataset_health.to_payload() if self.dataset_health else None,
@@ -298,6 +308,7 @@ def query_history_snapshot(
                 run_trend=summarize_run_trend(run_history),
                 comparison_trend=None,
                 recurring_failures=(),
+                recurring_clusters=(),
                 dataset_versions=versions,
                 dataset_health=dataset_health,
             )
@@ -322,6 +333,15 @@ def query_history_snapshot(
             run_trend=summarize_run_trend(run_history),
             comparison_trend=summarize_comparison_trend(comparison_history),
             recurring_failures=summarize_recurring_failures(comparison_history),
+            recurring_clusters=list_failure_clusters(
+                QueryFilters(
+                    dataset=dataset,
+                    model=model,
+                    limit=3,
+                ),
+                recurring_only=True,
+                root=root,
+            ),
             dataset_versions=(),
             dataset_health=None,
         )
@@ -378,6 +398,12 @@ def build_signal_history_context(
                 else None
             ),
             recurring_failures=summarize_recurring_failures(recent_comparisons),
+            recurring_clusters=list_clusters_for_comparison(
+                comparison_id,
+                root=root,
+                limit=3,
+                recurring_only=True,
+            ),
             recent_comparisons=recent_comparisons,
             family_health=family_health,
         )

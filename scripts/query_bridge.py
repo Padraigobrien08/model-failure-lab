@@ -12,11 +12,14 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from model_failure_lab.index import (  # noqa: E402
+    get_failure_cluster_detail,
     QueryFilters,
     aggregate_case_query,
     artifact_overview_summary,
+    list_failure_clusters,
     list_comparison_inventory,
     list_query_facets,
+    list_clusters_for_comparison,
     list_run_inventory,
     query_case_deltas,
     query_cases,
@@ -65,6 +68,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         if args.mode == "aggregates":
             rows = aggregate_case_query(args.aggregate_by, filters, root=root)
+        elif args.mode == "clusters":
+            rows = [row.to_payload() for row in list_failure_clusters(
+                filters,
+                cluster_kind=None if args.cluster_kind == "all" else args.cluster_kind,
+                recurring_only=not args.include_non_recurring,
+                root=root,
+            )]
         elif args.mode == "signals":
             rows = query_comparison_signals(
                 filters,
@@ -99,6 +109,10 @@ def main(argv: list[str] | None = None) -> int:
                 "candidateRunId": filters.candidate_run_id,
                 "delta": filters.delta,
                 "aggregateBy": args.aggregate_by if args.mode == "aggregates" else None,
+                "clusterKind": args.cluster_kind if args.mode == "clusters" else None,
+                "includeNonRecurring": (
+                    args.include_non_recurring if args.mode == "clusters" else False
+                ),
                 "lastN": filters.last_n,
                 "since": filters.since,
                 "until": filters.until,
@@ -112,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
                     aggregate_by=args.aggregate_by,
                     root=root,
                 ).to_payload()
-                if args.summarize and args.mode != "signals"
+                if args.summarize and args.mode not in {"signals", "clusters"}
                 else None
             ),
             "rows": rows,
@@ -222,6 +236,28 @@ def main(argv: list[str] | None = None) -> int:
             "source": build_source_descriptor(root),
             **history.to_payload(),
         }
+    elif args.command == "cluster-detail":
+        detail = get_failure_cluster_detail(
+            args.cluster_id,
+            root=root,
+            limit=args.limit,
+        )
+        payload = {
+            "source": build_source_descriptor(root),
+            **detail.to_payload(),
+        }
+    elif args.command == "comparison-clusters":
+        rows = list_clusters_for_comparison(
+            args.report_id,
+            root=root,
+            limit=args.limit,
+            recurring_only=not args.include_non_recurring,
+        )
+        payload = {
+            "source": build_source_descriptor(root),
+            "report_id": args.report_id,
+            "rows": [row.to_payload() for row in rows],
+        }
     else:
         raise ValueError(f"Unsupported query bridge command: {args.command}")
 
@@ -246,7 +282,7 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--root", required=True)
     query_parser.add_argument(
         "--mode",
-        choices=["cases", "deltas", "aggregates", "signals"],
+        choices=["cases", "deltas", "aggregates", "signals", "clusters"],
         required=True,
     )
     query_parser.add_argument("--failure-type")
@@ -268,6 +304,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["regression", "improvement", "neutral", "incompatible", "all"],
         default="regression",
     )
+    query_parser.add_argument(
+        "--cluster-kind",
+        choices=["run_case", "comparison_delta", "all"],
+        default="all",
+    )
+    query_parser.add_argument("--include-non-recurring", action="store_true")
     query_parser.add_argument("--summarize", action="store_true")
     query_parser.add_argument("--last-n", type=int)
     query_parser.add_argument("--since")
@@ -329,6 +371,17 @@ def build_parser() -> argparse.ArgumentParser:
     history_scope.add_argument("--model")
     history_scope.add_argument("--family-id")
     history_parser.add_argument("--limit", type=int, default=10)
+
+    cluster_detail_parser = subparsers.add_parser("cluster-detail")
+    cluster_detail_parser.add_argument("--root", required=True)
+    cluster_detail_parser.add_argument("--cluster-id", required=True)
+    cluster_detail_parser.add_argument("--limit", type=int, default=20)
+
+    comparison_clusters_parser = subparsers.add_parser("comparison-clusters")
+    comparison_clusters_parser.add_argument("--root", required=True)
+    comparison_clusters_parser.add_argument("--report-id", required=True)
+    comparison_clusters_parser.add_argument("--limit", type=int, default=5)
+    comparison_clusters_parser.add_argument("--include-non-recurring", action="store_true")
 
     return parser
 

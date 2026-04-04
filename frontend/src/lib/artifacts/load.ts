@@ -20,6 +20,9 @@ import {
   type ArtifactGovernanceFamilyMatch,
   type ArtifactGovernancePolicy,
   type ArtifactGovernanceRecommendation,
+  type ArtifactFailureClusterEvidenceRef,
+  type ArtifactFailureClusterOccurrence,
+  type ArtifactFailureClusterSummary,
   type ArtifactHistoryComparisonRow,
   type ArtifactHistoryRunRow,
   type ArtifactHistorySnapshot,
@@ -32,6 +35,7 @@ import {
   type ArtifactHarvestResponse,
   type ArtifactQueryAggregateRow,
   type ArtifactQueryCaseRow,
+  type ArtifactQueryClusterRow,
   type ArtifactQueryDeltaRow,
   type ArtifactQuerySignalRow,
   type ArtifactQueryFacets,
@@ -330,6 +334,10 @@ function requireArtifactGovernanceRecommendation(
       data.history_context == null
         ? null
         : requireArtifactSignalHistoryContext(data.history_context, `${field}.history_context`),
+    clusterContext: requireArtifactFailureClusterSummaries(
+      data.cluster_context ?? [],
+      `${field}.cluster_context`,
+    ),
   };
 }
 
@@ -363,6 +371,82 @@ function requireArtifactRecurringFailurePatterns(
         `${field}[${index}].comparison_ids`,
       ),
       latestDelta: requireNumberOrNull(row.latest_delta, `${field}[${index}].latest_delta`),
+    };
+  });
+}
+
+function requireArtifactFailureClusterEvidenceRefs(
+  value: unknown,
+  field: string,
+): ArtifactFailureClusterEvidenceRef[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    const kind = requireString(row.kind, `${field}[${index}].kind`);
+    if (kind !== "run_case" && kind !== "comparison_case") {
+      throw new Error(`${field}[${index}].kind must be run_case or comparison_case`);
+    }
+    return {
+      kind,
+      label: requireString(row.label, `${field}[${index}].label`),
+      runId: requireStringOrNull(row.run_id, `${field}[${index}].run_id`),
+      reportId: requireStringOrNull(row.report_id, `${field}[${index}].report_id`),
+      caseId: requireStringOrNull(row.case_id, `${field}[${index}].case_id`),
+      promptId: requireStringOrNull(row.prompt_id, `${field}[${index}].prompt_id`),
+      section: requireStringOrNull(row.section, `${field}[${index}].section`),
+      transitionType: requireStringOrNull(
+        row.transition_type,
+        `${field}[${index}].transition_type`,
+      ),
+    };
+  });
+}
+
+function requireArtifactFailureClusterSummaries(
+  value: unknown,
+  field: string,
+): ArtifactFailureClusterSummary[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    const clusterKind = requireString(
+      row.cluster_kind,
+      `${field}[${index}].cluster_kind`,
+    );
+    if (clusterKind !== "run_case" && clusterKind !== "comparison_delta") {
+      throw new Error(`${field}[${index}].cluster_kind must be run_case or comparison_delta`);
+    }
+    return {
+      clusterId: requireString(row.cluster_id, `${field}[${index}].cluster_id`),
+      clusterKind,
+      label: requireString(row.label, `${field}[${index}].label`),
+      summary: requireString(row.summary, `${field}[${index}].summary`),
+      occurrenceCount: requireCount(row.occurrence_count, `${field}[${index}].occurrence_count`),
+      scopeCount: requireCount(row.scope_count, `${field}[${index}].scope_count`),
+      firstSeenAt: requireString(row.first_seen_at, `${field}[${index}].first_seen_at`),
+      lastSeenAt: requireString(row.last_seen_at, `${field}[${index}].last_seen_at`),
+      datasets: requireStringArray(row.datasets, `${field}[${index}].datasets`),
+      models: requireStringArray(row.models, `${field}[${index}].models`),
+      failureTypes: requireStringArray(
+        row.failure_types,
+        `${field}[${index}].failure_types`,
+      ),
+      transitionTypes: requireStringArray(
+        row.transition_types,
+        `${field}[${index}].transition_types`,
+      ),
+      recentSeverity: requireNumberOrNull(
+        row.recent_severity,
+        `${field}[${index}].recent_severity`,
+      ),
+      representativeEvidence: requireArtifactFailureClusterEvidenceRefs(
+        row.representative_evidence,
+        `${field}[${index}].representative_evidence`,
+      ),
     };
   });
 }
@@ -541,6 +625,10 @@ function requireArtifactHistorySnapshot(
       data.recurring_failures,
       `${field}.recurring_failures`,
     ),
+    recurringClusters: requireArtifactFailureClusterSummaries(
+      data.recurring_clusters ?? [],
+      `${field}.recurring_clusters`,
+    ),
     datasetVersions: requireArtifactDatasetVersionRecords(
       data.dataset_versions,
       `${field}.dataset_versions`,
@@ -585,6 +673,10 @@ function requireArtifactSignalHistoryContext(
     recurringFailures: requireArtifactRecurringFailurePatterns(
       data.recurring_failures,
       `${field}.recurring_failures`,
+    ),
+    recurringClusters: requireArtifactFailureClusterSummaries(
+      data.recurring_clusters ?? [],
+      `${field}.recurring_clusters`,
     ),
     recentComparisons: requireArtifactHistoryComparisonRows(
       data.recent_comparisons,
@@ -655,6 +747,7 @@ function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatas
             runTrend: null,
             comparisonTrend: null,
             recurringFailures: [],
+            recurringClusters: [],
             datasetVersions: versions,
             datasetHealth: null,
           }
@@ -714,6 +807,9 @@ function requireQueryFilters(value: unknown, field: string): ArtifactQueryFilter
     candidateRunId: requireStringOrNull(filters.candidateRunId, `${field}.candidateRunId`),
     delta: requireStringOrNull(filters.delta, `${field}.delta`),
     aggregateBy: requireStringOrNull(filters.aggregateBy, `${field}.aggregateBy`),
+    clusterKind: requireStringOrNull(filters.clusterKind, `${field}.clusterKind`),
+    includeNonRecurring:
+      typeof filters.includeNonRecurring === "boolean" ? filters.includeNonRecurring : false,
     lastN:
       filters.lastN == null ? null : requireCount(filters.lastN, `${field}.lastN`),
     since: requireStringOrNull(filters.since, `${field}.since`),
@@ -1036,6 +1132,13 @@ function requireArtifactQuerySignalRows(value: unknown, field: string): Artifact
   });
 }
 
+function requireArtifactQueryClusterRows(
+  value: unknown,
+  field: string,
+): ArtifactQueryClusterRow[] {
+  return requireArtifactFailureClusterSummaries(value, field);
+}
+
 export function validateArtifactQueryResponse(payload: unknown): ArtifactQueryResponse {
   const data = requireObject(payload, "query");
   const mode = requireString(data.mode, "query.mode");
@@ -1073,7 +1176,14 @@ export function validateArtifactQueryResponse(payload: unknown): ArtifactQueryRe
       rows: requireArtifactQuerySignalRows(data.rows, "query.rows"),
     };
   }
-  throw new Error("query.mode must be cases, deltas, aggregates, or signals");
+  if (mode === "clusters") {
+    return {
+      ...base,
+      mode,
+      rows: requireArtifactQueryClusterRows(data.rows, "query.rows"),
+    };
+  }
+  throw new Error("query.mode must be cases, deltas, aggregates, signals, or clusters");
 }
 
 export async function loadArtifactQuery(

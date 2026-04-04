@@ -714,6 +714,10 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
       server,
       `${ARTIFACT_QUERY_PATH}?mode=signals&signalDirection=all&limit=10`,
     );
+    const analysisClusters = await fetchTimedJsonFromMiddleware(
+      server,
+      `${ARTIFACT_QUERY_PATH}?mode=clusters&limit=10`,
+    );
     const savedSignalRow = analysisSignals.json.rows.find(
       (row) => row && typeof row.report_id === "string" && row.report_id === comparisonReportId,
     );
@@ -794,6 +798,9 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
     if (analysisSignals.json.source.path !== normalizedArtifactRoot) {
       throw new Error("Analysis signal query source path did not use the configured artifact root");
     }
+    if (analysisClusters.json.source.path !== normalizedArtifactRoot) {
+      throw new Error("Analysis cluster query source path did not use the configured artifact root");
+    }
     if (!Array.isArray(analysisCases.json.rows)) {
       throw new Error("Analysis case query did not return rows");
     }
@@ -805,6 +812,20 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
     }
     if (!Array.isArray(analysisSignals.json.rows)) {
       throw new Error("Analysis signal query did not return rows");
+    }
+    if (!Array.isArray(analysisClusters.json.rows)) {
+      throw new Error("Analysis cluster query did not return rows");
+    }
+    if (
+      !analysisClusters.json.rows.some(
+        (row) =>
+          row &&
+          typeof row.cluster_id === "string" &&
+          typeof row.cluster_kind === "string" &&
+          Array.isArray(row.representative_evidence),
+      )
+    ) {
+      throw new Error("Analysis cluster query did not expose recurring cluster summaries");
     }
     if (
       !analysisSignals.json.rows.some(
@@ -861,6 +882,7 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
       ["deltas", analysisDeltas.durationMs],
       ["aggregates", analysisAggregates.durationMs],
       ["signals", analysisSignals.durationMs],
+      ["clusters", analysisClusters.durationMs],
     ]) {
       if (durationMs > QUERY_LATENCY_BUDGET_MS) {
         throw new Error(
@@ -882,6 +904,7 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         `Query latency (deltas): ${analysisDeltas.durationMs.toFixed(1)}ms`,
         `Query latency (aggregates): ${analysisAggregates.durationMs.toFixed(1)}ms`,
         `Query latency (signals): ${analysisSignals.durationMs.toFixed(1)}ms`,
+        `Query latency (clusters): ${analysisClusters.durationMs.toFixed(1)}ms`,
         "Verified endpoints:",
         "- overview",
         "- runs inventory",
@@ -892,6 +915,7 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         "- analysis query (deltas)",
         "- analysis query (aggregates)",
         "- analysis query (signals)",
+        "- analysis query (clusters)",
         "- governance recommendation payloads",
         "- governance history context payloads",
         ...(matchedFamilyId === null ? [] : ["- dataset family health history"]),

@@ -174,6 +174,37 @@ function buildRunDetail(runId: string): RunDetail {
   };
 }
 
+function buildClusterSummaryPayload() {
+  return {
+    cluster_id: "cd_cluster_reasoning_recurrence",
+    cluster_kind: "comparison_delta",
+    label: "reasoning · no_failure to failure",
+    summary:
+      "Reasoning no_failure to failure recurred 2 times across 2 saved comparisons in query-fixture-v1.",
+    occurrence_count: 2,
+    scope_count: 2,
+    first_seen_at: "2026-04-01T09:50:00Z",
+    last_seen_at: "2026-04-01T10:10:00Z",
+    datasets: ["query-fixture-v1"],
+    models: ["baseline-model→candidate-model"],
+    failure_types: ["reasoning"],
+    transition_types: ["no_failure_to_failure"],
+    recent_severity: 0.27,
+    representative_evidence: [
+      {
+        kind: "comparison_case",
+        label: "compare_alpha_to_beta:case-regression",
+        run_id: null,
+        report_id: "compare_alpha_to_beta",
+        case_id: "case-regression",
+        prompt_id: "case-regression",
+        section: "transitions",
+        transition_type: "no_failure_to_failure",
+      },
+    ],
+  };
+}
+
 function mockAnalysisQueryAndRunDetail() {
   const fetchMock = vi.fn(async (input: string | URL | Request) => {
     const url = String(input);
@@ -430,6 +461,7 @@ function mockSignalAnalysisQuery() {
                     transition_type: "no_failure_to_failure",
                   },
                 ],
+                cluster_context: [buildClusterSummaryPayload()],
                 history_context: {
                   scope_kind: "dataset",
                   scope_value: "query-fixture-v1",
@@ -629,6 +661,56 @@ function mockSignalAnalysisQuery() {
   return fetchMock;
 }
 
+function mockClusterAnalysisQuery() {
+  const fetchMock = vi.fn(async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.includes("/__failure_lab__/artifacts/query.json")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          source: DEFAULT_SOURCE,
+          mode: "clusters",
+          filters: {
+            failureType: "reasoning",
+            model: null,
+            dataset: null,
+            runId: null,
+            reportId: null,
+            baselineRunId: null,
+            candidateRunId: null,
+            delta: null,
+            aggregateBy: null,
+            clusterKind: null,
+            includeNonRecurring: false,
+            lastN: 10,
+            since: null,
+            until: null,
+            limit: 20,
+          },
+          facets: {
+            models: ["baseline-model", "candidate-model"],
+            datasets: ["query-fixture-v1"],
+            failureTypes: ["hallucination", "instruction_following", "reasoning"],
+            deltaTypes: ["regression", "improvement", "swap"],
+          },
+          insight_report: null,
+          rows: [buildClusterSummaryPayload()],
+        }),
+      } as Response;
+    }
+
+    return {
+      ok: false,
+      status: 404,
+      json: async () => ({ message: `Unexpected request: ${url}` }),
+    } as Response;
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 describe("analysis route", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -764,6 +846,7 @@ describe("analysis route", () => {
     expect(screen.getAllByText("create").length).toBeGreaterThan(0);
     expect(screen.getAllByText("degrading trend").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2 recent regressions").length).toBeGreaterThan(0);
+    expect(screen.getByText("1 recurring clusters")).toBeInTheDocument();
     expect(screen.getByText("hallucination x2")).toBeInTheDocument();
     expect(screen.getByText("hallucination +18.0%")).toBeInTheDocument();
     expect(
@@ -839,5 +922,43 @@ describe("analysis route", () => {
         failureType: "hallucination",
       });
     });
+  });
+
+  it("renders recurring cluster rows with direct evidence drillthrough", async () => {
+    const fetchMock = mockClusterAnalysisQuery();
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/analysis?mode=clusters&failureType=reasoning&lastN=10"]}
+        initialArtifactState={buildReadyArtifactState()}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Cross-run artifact analysis." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("reasoning · no_failure to failure")).toBeInTheDocument();
+    expect(screen.getByText("2 artifacts")).toBeInTheDocument();
+    expect(screen.getByText("2 occurrences")).toBeInTheDocument();
+    expect(screen.getByText("27.0% severity")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "compare_alpha_to_beta:case-regression" }),
+    ).toHaveAttribute(
+      "href",
+      expect.stringContaining(
+        "/comparisons/compare_alpha_to_beta?section=transitions&case=case-regression",
+      ),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Export draft dataset" }),
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/__failure_lab__/artifacts/query.json?mode=clusters&failureType=reasoning&lastN=10&limit=20&summarize=1",
+      ),
+    );
   });
 });

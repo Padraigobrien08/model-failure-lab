@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,9 +25,10 @@ from model_failure_lab.storage.layout import (
     runs_root,
 )
 
-QUERY_INDEX_SCHEMA_VERSION = "query_index_v3"
+QUERY_INDEX_SCHEMA_VERSION = "query_index_v4"
 QUERY_INDEX_DIRNAME = ".failure_lab"
 QUERY_INDEX_FILENAME = "query_index.sqlite3"
+_PROMPT_NORMALIZE_PATTERN = re.compile(r"[^a-z0-9]+")
 
 DELTA_KIND_BY_TRANSITION = {
     "failure_to_no_failure": "improvement",
@@ -63,9 +66,40 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
     index_dir = query_index_dir(root=artifact_root, create=True)
     final_path = query_index_path(root=artifact_root)
 
+    dataset_scope_by_id: dict[str, str] = {}
+    dataset_version_rows: list[dict[str, object]] = []
+    for dataset_path in sorted(datasets_root(root=artifact_root, create=False).glob("*.json")):
+        dataset = load_dataset(dataset_path)
+        family_id = _dataset_family_id(dataset)
+        source_dataset_id = _source_dataset_id(dataset)
+        dataset_scope_by_id[dataset.dataset_id] = source_dataset_id or dataset.dataset_id
+        if family_id is None:
+            continue
+        versioning = _mapping_or_empty(dataset.metadata.get("versioning"))
+        source = _mapping_or_empty(dataset.source)
+        signal = _mapping_or_empty(source.get("signal"))
+        dataset_version_rows.append(
+            {
+                "family_id": family_id,
+                "dataset_id": dataset.dataset_id,
+                "version_number": _int_or_default(versioning.get("version_number"), 1),
+                "version_tag": _string_or_default(versioning.get("version_tag"), "v1"),
+                "created_at": dataset.created_at,
+                "case_count": len(dataset.cases),
+                "path": str(dataset_path.resolve()),
+                "parent_dataset_id": _optional_string(versioning.get("parent_dataset_id")),
+                "source_comparison_id": _optional_string(
+                    versioning.get("source_comparison_id") or source.get("comparison_report_id")
+                ),
+                "source_dataset_id": source_dataset_id,
+                "signal_verdict": _optional_string(signal.get("verdict")),
+                "severity": _number_or_none(signal.get("severity")),
+                "primary_failure_type": _primary_failure_type(signal),
+            }
+        )
+
     run_rows: list[dict[str, object]] = []
     case_rows: list[dict[str, object]] = []
-    dataset_version_rows: list[dict[str, object]] = []
     run_lookup: dict[str, dict[str, object]] = {}
 
     for run_dir in _artifact_directories(runs_root(root=artifact_root, create=False)):
@@ -114,34 +148,6 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                     }
             )
 
-    for dataset_path in sorted(datasets_root(root=artifact_root, create=False).glob("*.json")):
-        dataset = load_dataset(dataset_path)
-        family_id = _dataset_family_id(dataset)
-        if family_id is None:
-            continue
-        versioning = _mapping_or_empty(dataset.metadata.get("versioning"))
-        source = _mapping_or_empty(dataset.source)
-        signal = _mapping_or_empty(source.get("signal"))
-        dataset_version_rows.append(
-            {
-                "family_id": family_id,
-                "dataset_id": dataset.dataset_id,
-                "version_number": _int_or_default(versioning.get("version_number"), 1),
-                "version_tag": _string_or_default(versioning.get("version_tag"), "v1"),
-                "created_at": dataset.created_at,
-                "case_count": len(dataset.cases),
-                "path": str(dataset_path.resolve()),
-                "parent_dataset_id": _optional_string(versioning.get("parent_dataset_id")),
-                "source_comparison_id": _optional_string(
-                    versioning.get("source_comparison_id") or source.get("comparison_report_id")
-                ),
-                "source_dataset_id": _source_dataset_id(dataset),
-                "signal_verdict": _optional_string(signal.get("verdict")),
-                "severity": _number_or_none(signal.get("severity")),
-                "primary_failure_type": _primary_failure_type(signal),
-            }
-        )
-
     comparison_rows: list[dict[str, object]] = []
     delta_rows: list[dict[str, object]] = []
     signal_driver_rows: list[dict[str, object]] = []
@@ -170,6 +176,11 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
         )
         baseline_row = run_lookup.get(baseline_run_id)
         candidate_row = run_lookup.get(candidate_run_id)
+        comparison_dataset = (
+            _optional_string(comparison.get("dataset_id"))
+            or _string_or_none(candidate_row["dataset"] if candidate_row else None)
+            or _string_or_none(baseline_row["dataset"] if baseline_row else None)
+        )
         signal = _read_comparison_signal(report_payload, details_payload, report_id=report_id)
         comparison_rows.append(
             {
@@ -177,7 +188,7 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                 "created_at": _require_string(
                     report_payload.get("created_at"), f"{report_id}.created_at"
                 ),
-                "dataset": _optional_string(comparison.get("dataset_id")),
+                "dataset": comparison_dataset,
                 "baseline_run_id": baseline_run_id,
                 "candidate_run_id": candidate_run_id,
                 "baseline_model": baseline_row["model"] if baseline_row else None,
@@ -221,7 +232,7 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                     "created_at": _require_string(
                         report_payload.get("created_at"), f"{report_id}.created_at"
                     ),
-                    "dataset": _optional_string(comparison.get("dataset_id")),
+                    "dataset": comparison_dataset,
                     "case_id": _require_string(
                         payload.get("case_id"), f"{report_id}.case_delta.case_id"
                     ),
@@ -254,6 +265,13 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                     "candidate_explanation": _optional_string(payload.get("candidate_explanation")),
                 }
             )
+
+    cluster_rows = _build_cluster_occurrence_rows(
+        case_rows=case_rows,
+        delta_rows=delta_rows,
+        comparison_rows=comparison_rows,
+        dataset_scope_by_id=dataset_scope_by_id,
+    )
 
     with NamedTemporaryFile(dir=index_dir, suffix=".sqlite3", delete=False) as handle:
         temp_path = Path(handle.name)
@@ -353,6 +371,27 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                 )
                 """,
                 signal_driver_rows,
+            )
+            connection.executemany(
+                """
+                INSERT INTO cluster_occurrences(
+                    occurrence_id, cluster_id, cluster_kind, created_at, dataset_scope, dataset,
+                    run_id, model, report_id, case_id, prompt_id, prompt, tags_json,
+                    failure_type, expectation_verdict, error_stage, delta_kind, transition_type,
+                    baseline_run_id, candidate_run_id, baseline_model, candidate_model,
+                    baseline_failure_type, candidate_failure_type, baseline_expectation_verdict,
+                    candidate_expectation_verdict, signal_verdict, severity
+                ) VALUES(
+                    :occurrence_id, :cluster_id, :cluster_kind, :created_at, :dataset_scope,
+                    :dataset, :run_id, :model, :report_id, :case_id, :prompt_id, :prompt,
+                    :tags_json, :failure_type, :expectation_verdict, :error_stage, :delta_kind,
+                    :transition_type, :baseline_run_id, :candidate_run_id, :baseline_model,
+                    :candidate_model, :baseline_failure_type, :candidate_failure_type,
+                    :baseline_expectation_verdict, :candidate_expectation_verdict,
+                    :signal_verdict, :severity
+                )
+                """,
+                cluster_rows,
             )
             connection.commit()
         temp_path.replace(final_path)
@@ -547,6 +586,37 @@ def _create_schema(connection: sqlite3.Connection) -> None:
             PRIMARY KEY (report_id, driver_rank)
         );
 
+        CREATE TABLE cluster_occurrences (
+            occurrence_id TEXT PRIMARY KEY,
+            cluster_id TEXT NOT NULL,
+            cluster_kind TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            dataset_scope TEXT,
+            dataset TEXT,
+            run_id TEXT,
+            model TEXT,
+            report_id TEXT,
+            case_id TEXT NOT NULL,
+            prompt_id TEXT NOT NULL,
+            prompt TEXT NOT NULL,
+            tags_json TEXT NOT NULL,
+            failure_type TEXT,
+            expectation_verdict TEXT,
+            error_stage TEXT,
+            delta_kind TEXT,
+            transition_type TEXT,
+            baseline_run_id TEXT,
+            candidate_run_id TEXT,
+            baseline_model TEXT,
+            candidate_model TEXT,
+            baseline_failure_type TEXT,
+            candidate_failure_type TEXT,
+            baseline_expectation_verdict TEXT,
+            candidate_expectation_verdict TEXT,
+            signal_verdict TEXT,
+            severity REAL
+        );
+
         CREATE INDEX idx_cases_failure_type ON cases(failure_type);
         CREATE INDEX idx_cases_created_at ON cases(created_at DESC);
         CREATE INDEX idx_cases_model_dataset ON cases(model, dataset);
@@ -557,6 +627,13 @@ def _create_schema(connection: sqlite3.Connection) -> None:
         CREATE INDEX idx_case_deltas_delta_kind ON case_deltas(delta_kind);
         CREATE INDEX idx_case_deltas_transition_type ON case_deltas(transition_type);
         CREATE INDEX idx_signal_drivers_failure_type ON signal_drivers(failure_type);
+        CREATE INDEX idx_cluster_occurrences_cluster_id ON cluster_occurrences(cluster_id);
+        CREATE INDEX idx_cluster_occurrences_cluster_kind ON cluster_occurrences(cluster_kind);
+        CREATE INDEX idx_cluster_occurrences_created_at ON cluster_occurrences(created_at DESC);
+        CREATE INDEX idx_cluster_occurrences_dataset_scope ON cluster_occurrences(dataset_scope);
+        CREATE INDEX idx_cluster_occurrences_failure_type ON cluster_occurrences(failure_type);
+        CREATE INDEX idx_cluster_occurrences_report_id ON cluster_occurrences(report_id);
+        CREATE INDEX idx_cluster_occurrences_run_id ON cluster_occurrences(run_id);
         """
     )
 
@@ -716,6 +793,14 @@ def _string_or_default(value: object, default: str) -> str:
     return default
 
 
+def _string_or_none(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
 def _int_or_default(value: object, default: int) -> int:
     if type(value) is int:
         return value
@@ -837,3 +922,193 @@ def _signal_driver_rows(
             }
         )
     return rows
+
+
+def _build_cluster_occurrence_rows(
+    *,
+    case_rows: list[dict[str, object]],
+    delta_rows: list[dict[str, object]],
+    comparison_rows: list[dict[str, object]],
+    dataset_scope_by_id: dict[str, str],
+) -> list[dict[str, object]]:
+    comparison_lookup = {
+        str(row["report_id"]): row
+        for row in comparison_rows
+    }
+    rows: list[dict[str, object]] = []
+    for case_row in case_rows:
+        failure_type = _string_or_none(case_row.get("failure_type"))
+        error_stage = _string_or_none(case_row.get("error_stage"))
+        if failure_type in {None, "no_failure"} and error_stage is None:
+            continue
+        dataset = _string_or_none(case_row.get("dataset"))
+        dataset_scope = (
+            dataset_scope_by_id.get(dataset) if dataset is not None else None
+        ) or dataset
+        tags_json = _string_or_default(case_row.get("tags_json"), "[]")
+        cluster_id = _stable_cluster_id(
+            "run_case",
+            dataset_scope,
+            _string_or_default(case_row.get("prompt"), ""),
+            tags_json,
+            failure_type or f"error:{error_stage}",
+            _string_or_none(case_row.get("expectation_verdict")) or "observed",
+        )
+        rows.append(
+            {
+                "occurrence_id": _stable_cluster_occurrence_id(
+                    "run_case",
+                    _string_or_default(case_row.get("run_id"), ""),
+                    _string_or_default(case_row.get("case_id"), ""),
+                    None,
+                ),
+                "cluster_id": cluster_id,
+                "cluster_kind": "run_case",
+                "created_at": _string_or_default(case_row.get("created_at"), ""),
+                "dataset_scope": dataset_scope,
+                "dataset": dataset,
+                "run_id": _string_or_none(case_row.get("run_id")),
+                "model": _string_or_none(case_row.get("model")),
+                "report_id": None,
+                "case_id": _string_or_default(case_row.get("case_id"), ""),
+                "prompt_id": _string_or_default(case_row.get("prompt_id"), ""),
+                "prompt": _string_or_default(case_row.get("prompt"), ""),
+                "tags_json": tags_json,
+                "failure_type": failure_type,
+                "expectation_verdict": _string_or_none(case_row.get("expectation_verdict")),
+                "error_stage": error_stage,
+                "delta_kind": None,
+                "transition_type": None,
+                "baseline_run_id": None,
+                "candidate_run_id": None,
+                "baseline_model": None,
+                "candidate_model": None,
+                "baseline_failure_type": None,
+                "candidate_failure_type": None,
+                "baseline_expectation_verdict": None,
+                "candidate_expectation_verdict": None,
+                "signal_verdict": None,
+                "severity": None,
+            }
+        )
+
+    for delta_row in delta_rows:
+        dataset = _string_or_none(delta_row.get("dataset"))
+        dataset_scope = (
+            dataset_scope_by_id.get(dataset) if dataset is not None else None
+        ) or dataset
+        tags_json = _string_or_default(delta_row.get("tags_json"), "[]")
+        report_id = _string_or_default(delta_row.get("report_id"), "")
+        comparison_signal = comparison_lookup.get(report_id, {})
+        cluster_id = _stable_cluster_id(
+            "comparison_delta",
+            dataset_scope,
+            _string_or_default(delta_row.get("prompt"), ""),
+            tags_json,
+            _string_or_none(delta_row.get("transition_type")) or "delta",
+            _string_or_none(delta_row.get("baseline_failure_type")) or "none",
+            _string_or_none(delta_row.get("candidate_failure_type")) or "none",
+            _string_or_none(delta_row.get("baseline_expectation_verdict")) or "none",
+            _string_or_none(delta_row.get("candidate_expectation_verdict")) or "none",
+        )
+        rows.append(
+            {
+                "occurrence_id": _stable_cluster_occurrence_id(
+                    "comparison_delta",
+                    report_id,
+                    _string_or_default(delta_row.get("case_id"), ""),
+                    _string_or_none(delta_row.get("transition_type")),
+                ),
+                "cluster_id": cluster_id,
+                "cluster_kind": "comparison_delta",
+                "created_at": _string_or_default(delta_row.get("created_at"), ""),
+                "dataset_scope": dataset_scope,
+                "dataset": dataset,
+                "run_id": None,
+                "model": None,
+                "report_id": report_id,
+                "case_id": _string_or_default(delta_row.get("case_id"), ""),
+                "prompt_id": _string_or_default(delta_row.get("prompt_id"), ""),
+                "prompt": _string_or_default(delta_row.get("prompt"), ""),
+                "tags_json": tags_json,
+                "failure_type": None,
+                "expectation_verdict": None,
+                "error_stage": None,
+                "delta_kind": _string_or_none(delta_row.get("delta_kind")),
+                "transition_type": _string_or_none(delta_row.get("transition_type")),
+                "baseline_run_id": _string_or_none(delta_row.get("baseline_run_id")),
+                "candidate_run_id": _string_or_none(delta_row.get("candidate_run_id")),
+                "baseline_model": _string_or_none(delta_row.get("baseline_model")),
+                "candidate_model": _string_or_none(delta_row.get("candidate_model")),
+                "baseline_failure_type": _string_or_none(delta_row.get("baseline_failure_type")),
+                "candidate_failure_type": _string_or_none(delta_row.get("candidate_failure_type")),
+                "baseline_expectation_verdict": _string_or_none(
+                    delta_row.get("baseline_expectation_verdict")
+                ),
+                "candidate_expectation_verdict": _string_or_none(
+                    delta_row.get("candidate_expectation_verdict")
+                ),
+                "signal_verdict": _string_or_none(comparison_signal.get("signal_verdict")),
+                "severity": _number_or_none(comparison_signal.get("severity")),
+            }
+        )
+
+    return rows
+
+
+def _stable_cluster_occurrence_id(
+    cluster_kind: str,
+    artifact_id: str,
+    case_id: str,
+    transition_type: str | None,
+) -> str:
+    seed = "|".join(
+        [cluster_kind, artifact_id, case_id, transition_type or "-"]
+    )
+    return hashlib.sha1(seed.encode("utf-8")).hexdigest()[:20]
+
+
+def _stable_cluster_id(
+    cluster_kind: str,
+    dataset_scope: str | None,
+    prompt: str,
+    tags_json: str,
+    *parts: str,
+) -> str:
+    normalized_tags = _normalized_tags_signature(tags_json)
+    prompt_signature = _normalized_prompt_signature(prompt)
+    seed = "|".join(
+        [
+            cluster_kind,
+            dataset_scope or "unscoped",
+            prompt_signature,
+            normalized_tags,
+            *parts,
+        ]
+    )
+    digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:16]
+    prefix = "rc" if cluster_kind == "run_case" else "cd"
+    return f"{prefix}_{digest}"
+
+
+def _normalized_tags_signature(tags_json: str) -> str:
+    try:
+        tags = json.loads(tags_json)
+    except json.JSONDecodeError:
+        return "-"
+    if not isinstance(tags, list):
+        return "-"
+    normalized = sorted(
+        tag.strip().lower()
+        for tag in tags
+        if isinstance(tag, str) and tag.strip()
+    )
+    return "|".join(normalized) or "-"
+
+
+def _normalized_prompt_signature(prompt: str) -> str:
+    normalized = _PROMPT_NORMALIZE_PATTERN.sub(" ", prompt.lower()).strip()
+    normalized = " ".join(segment for segment in normalized.split(" ") if segment)
+    if not normalized:
+        return "empty"
+    return hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:16]
