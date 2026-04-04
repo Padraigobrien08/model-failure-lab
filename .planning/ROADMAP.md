@@ -33,16 +33,56 @@
 - [x] [v1.1 Live Benchmark Validation And Research Packaging](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.1-ROADMAP.md) - shipped 2026-03-20; real-run validation and reproducibility packaging.
 - [x] [v1.0 MVP](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.0-ROADMAP.md) - shipped 2026-03-20; benchmark pipeline, baselines, evaluation, and reporting contract.
 
-## Active Milestone
+## Active Milestone: v4.8 Recurring Failure Clusters And Pattern Mining
 
-No active milestone. `v4.7` is archived and the planning root is ready for the next milestone
-definition.
+**Goal:** Add deterministic recurring-failure clusters so the system can tell when the same
+underlying problem is coming back across runs, comparisons, and governance decisions.
+
+### Phase 101: Cluster Contract And Stable Identity
+- Status: ready
+- Requirements: `CLUSTER-01`, `CLUSTER-02`
+- Goal: define stable deterministic cluster identity over saved failures, deltas, and recurring
+  temporal context.
+- Success criteria:
+  - The same recurring behavior maps to the same stable cluster id across compatible artifact
+    history.
+  - Cluster identity remains fully local, reproducible, and artifact-derived.
+
+### Phase 102: Cluster Summaries And CLI Surfaces
+- Status: pending
+- Requirements: `SUMMARY-01`, `SUMMARY-02`, `CLI-01`, `CLI-02`
+- Goal: expose cluster summaries, representative evidence, and detailed cluster history in the
+  CLI.
+- Success criteria:
+  - Users can list and filter clusters without opening individual comparisons manually.
+  - Users can inspect one cluster’s recurrence, severity, affected models/datasets, and evidence
+    cases.
+
+### Phase 103: Debugger Cluster Surfacing And Evidence Drillthrough
+- Status: pending
+- Requirements: `UI-01`, `UI-02`
+- Goal: surface cluster context on existing debugger routes and allow drillthrough into source
+  evidence.
+- Success criteria:
+  - Analysis and comparison surfaces show recurring cluster context without becoming dashboard-like.
+  - Users can move from a surfaced cluster directly into representative evidence and source routes.
+
+### Phase 104: Governance Cluster Context And Workflow Verification
+- Status: pending
+- Requirements: `GOV-01`, `FLOW-01`
+- Goal: thread recurring cluster context into governance rationale and verify the full local
+  workflow.
+- Success criteria:
+  - Governance recommendations can explain that a change belongs to a recurring cluster, not just a
+    one-off regression.
+  - Verification proves the full `history -> cluster -> governance -> debugger evidence` loop.
 
 ## Next Action
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 101
+$gsd-plan-phase 101
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after v4.7 archive*
+*Roadmap updated: 2026-04-04 for milestone v4.8 initialization*

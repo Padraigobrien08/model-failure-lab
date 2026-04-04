@@ -3,14 +3,14 @@
 ## What This Is
 
 Model Failure Lab is a local, artifact-native system for evaluating, debugging, comparing,
-querying, interpreting, harvesting, replaying, enforcing, and now tracking LLM failures across
-time. It is built around reproducible filesystem artifacts, a CLI-first workflow, and a React
-debugger that reads the same saved artifact contract.
+querying, interpreting, harvesting, replaying, enforcing, tracking, and now clustering recurring
+LLM failure behavior. It is built around reproducible filesystem artifacts, a CLI-first workflow,
+and a React debugger that reads the same saved artifact contract.
 
 ## Current State
 
 - Latest shipped milestone: `v4.7`
-- Active milestone: none
+- Active milestone: `v4.8 Recurring Failure Clusters And Pattern Mining`
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -50,14 +50,28 @@ health, and recurring regressions across time instead of only per comparison.
   latest comparison.
 - Lightweight debugger timeline and trend indicators on existing analysis and comparison surfaces.
 
+## Current Milestone: v4.8 Recurring Failure Clusters And Pattern Mining
+
+**Goal:** Add deterministic recurring-failure clusters so the system can recognize when the same
+underlying issue is coming back across runs, comparisons, and governance decisions.
+
+**Target features:**
+- Stable deterministic cluster ids over recurring failures, transitions, and temporal history.
+- Cluster summaries with recurrence count, recent severity, affected datasets/models, and
+  representative evidence.
+- CLI surfaces for listing, filtering, and inspecting clusters and cluster history.
+- Lightweight debugger cluster context on existing analysis, comparison, and timeline-oriented
+  routes.
+- Governance rationale that can reference recurring clusters explicitly and deterministically.
+
 ## Next Milestone Goals
 
-- Build on temporal tracking with clustering, pattern mining, proactive recommendations, or
-  longer-horizon dataset-health management.
-- Extend governance with history-aware automation only after deterministic timeline signals are
-  proven.
+- Build on deterministic clustering with proactive recommendations, alerting, or dataset pruning
+  only after cluster identity is proven useful and stable.
 - Keep future behavior-management work artifact-native unless a clear structural limit forces
   broader infrastructure.
+- Preserve evidence drillthrough and deterministic reasoning as higher-level pattern layers are
+  added.
 
 ## Core Value
 
@@ -87,12 +101,12 @@ and actionable from local artifacts.
 
 ### Active
 
-- The next milestone should build on the new temporal layer rather than re-solving point-in-time
-  comparison questions.
-- History-aware governance is now in place; the remaining opportunity is higher-level pattern
-  mining, clustering, or proactive recommendations over that temporal evidence.
-- The debugger should keep time-aware surfaces compact and route-local rather than growing into a
-  dashboard product.
+- The next milestone should turn time-aware history into stable recurring failure clusters rather
+  than adding more point-in-time surfaces.
+- Governance is now history-aware, but still missing the higher-level notion of “this is the same
+  underlying problem recurring.”
+- The debugger should keep cluster context compact and route-local rather than turning into a full
+  observability dashboard.
 
 ### Out of Scope
 
@@ -112,8 +126,8 @@ and actionable from local artifacts.
 - `v4.5` proved those regressions can become future evaluation inputs automatically and traceably.
 - `v4.6` proved governance decisions can now be deterministic, explainable, reviewable, and stable
   over local artifacts.
-- The core missing question after `v4.7` is no longer "what changed over time?" but "which
-  recurring behaviors matter enough to escalate, cluster, or prune?"
+- The core missing question after `v4.7` is: “is this actually the same recurring problem, and how
+  often has it come back?”
 
 ## Constraints
 
@@ -126,7 +140,8 @@ and actionable from local artifacts.
   unchanged.
 - **Complexity:** Keep the next milestone local and artifact-native unless a real structural limit
   forces broader infrastructure.
-- **Explainability:** Governance decisions must be deterministic and inspectable, not opaque.
+- **Explainability:** Governance decisions and cluster identities must be deterministic and
+  inspectable, not opaque.
 
 ## Key Decisions
 
@@ -142,6 +157,7 @@ and actionable from local artifacts.
 | Make dataset versions immutable and explicitly linked to source signals and comparisons | Evolution needs traceability and reproducibility, not silent mutation | ✓ Validated in `v4.5` |
 | Make governance decisions explicit, deterministic, and reviewable before writing dataset changes | Recommendation quality matters only if users can trust and inspect the policy basis | ✓ Validated in `v4.6` |
 | Add temporal intelligence as a deterministic artifact-derived layer before introducing proactive automation | Governance is still correct locally but blind globally without longitudinal context | ✓ Validated in `v4.7` |
+| Add recurring cluster identity before proactive alerts or pruning | The system needs to know whether the same problem is returning before escalating or consolidating | — Targeted in `v4.8` |
 
 ---
-*Last updated: 2026-04-04 after v4.7 archive*
+*Last updated: 2026-04-04 for milestone v4.8 initialization*
