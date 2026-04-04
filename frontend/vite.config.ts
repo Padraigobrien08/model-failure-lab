@@ -12,6 +12,7 @@ const COMPARISONS_INDEX_PATH = "/__failure_lab__/artifacts/comparisons.json";
 const COMPARISON_DETAIL_PATH = "/__failure_lab__/artifacts/comparison-detail.json";
 const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
 const ARTIFACT_QUERY_PATH = "/__failure_lab__/artifacts/query.json";
+const ARTIFACT_HARVEST_PATH = "/__failure_lab__/artifacts/harvest.json";
 const ARTIFACT_ROOT_ENV = "FAILURE_LAB_ARTIFACT_ROOT";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
@@ -267,6 +268,22 @@ function failureLabArtifactsPlugin(): Plugin {
     }
 
     return JSON.parse(stdout) as T;
+  }
+
+  async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const rawBody = Buffer.concat(chunks).toString("utf-8").trim();
+    if (rawBody.length === 0) {
+      throw new Error("request body must be a JSON object");
+    }
+    const payload = JSON.parse(rawBody) as unknown;
+    if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new Error("request body must be a JSON object");
+    }
+    return payload as Record<string, unknown>;
   }
 
   function requireStringField(
@@ -1516,6 +1533,69 @@ function failureLabArtifactsPlugin(): Plugin {
     }
   }
 
+  async function handleArtifactHarvest(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    if ((req.method ?? "GET").toUpperCase() !== "POST") {
+      res.statusCode = 405;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message: "harvest endpoint requires POST" }));
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const mode = requireStringField(body, "mode", "harvest.mode");
+      if (mode !== "cases" && mode !== "deltas") {
+        throw new Error("harvest.mode must be cases or deltas");
+      }
+      const filters =
+        body.filters !== null && typeof body.filters === "object" && !Array.isArray(body.filters)
+          ? (body.filters as Record<string, unknown>)
+          : {};
+      const args = ["--mode", mode];
+      const optionMap: Array<[string, string]> = [
+        ["failureType", "--failure-type"],
+        ["model", "--model"],
+        ["dataset", "--dataset"],
+        ["runId", "--run-id"],
+        ["promptId", "--prompt-id"],
+        ["reportId", "--report-id"],
+        ["comparisonId", "--comparison-id"],
+        ["baselineRunId", "--baseline-run-id"],
+        ["candidateRunId", "--candidate-run-id"],
+        ["delta", "--delta"],
+        ["lastN", "--last-n"],
+        ["since", "--since"],
+        ["until", "--until"],
+        ["limit", "--limit"],
+      ];
+      for (const [bodyKey, argName] of optionMap) {
+        const value = filters[bodyKey];
+        if (typeof value === "number") {
+          args.push(argName, String(value));
+        } else if (typeof value === "string" && value.trim().length > 0) {
+          args.push(argName, value);
+        }
+      }
+      const outputStem = body.outputStem;
+      if (typeof outputStem === "string" && outputStem.trim().length > 0) {
+        args.push("--output-stem", outputStem);
+      }
+
+      const payload = await invokeQueryBridge("harvest", args);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "artifact harvest failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
   async function handleComparisonDetail(
     req: IncomingMessage,
     res: ServerResponse,
@@ -1635,6 +1715,11 @@ function failureLabArtifactsPlugin(): Plugin {
 
       if (pathname === ARTIFACT_QUERY_PATH) {
         void handleArtifactQuery(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_HARVEST_PATH) {
+        void handleArtifactHarvest(req, res).catch(next);
         return;
       }
 

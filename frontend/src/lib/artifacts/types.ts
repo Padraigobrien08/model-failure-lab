@@ -4,6 +4,7 @@ export const COMPARISONS_INDEX_PATH = "/__failure_lab__/artifacts/comparisons.js
 export const COMPARISON_DETAIL_PATH = "/__failure_lab__/artifacts/comparison-detail.json";
 export const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
 export const ARTIFACT_QUERY_PATH = "/__failure_lab__/artifacts/query.json";
+export const ARTIFACT_HARVEST_PATH = "/__failure_lab__/artifacts/harvest.json";
 
 export type ArtifactOverviewStatus = "ready" | "empty" | "incompatible";
 
@@ -237,6 +238,15 @@ export type ComparisonDetailState =
     };
 
 export type ArtifactQueryMode = "cases" | "deltas" | "aggregates";
+
+export type ArtifactHarvestResponse = {
+  source: ArtifactSourceDescriptor;
+  datasetId: string;
+  lifecycle: string | null;
+  mode: "cases" | "deltas";
+  outputPath: string;
+  selectedCaseCount: number;
+};
 
 export type ArtifactQueryFilters = {
   failureType: string | null;

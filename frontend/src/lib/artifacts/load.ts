@@ -1,4 +1,5 @@
 import {
+  ARTIFACT_HARVEST_PATH,
   ARTIFACT_QUERY_PATH,
   ARTIFACT_OVERVIEW_PATH,
   COMPARISON_DETAIL_PATH,
@@ -11,6 +12,7 @@ import {
   type ArtifactInsightPattern,
   type ArtifactInsightReport,
   type ArtifactInsightSampling,
+  type ArtifactHarvestResponse,
   type ArtifactQueryAggregateRow,
   type ArtifactQueryCaseRow,
   type ArtifactQueryDeltaRow,
@@ -109,6 +111,25 @@ function requireSource(value: unknown, field: string): ArtifactSourceDescriptor 
 export function buildArtifactQueryPath(searchParams: URLSearchParams): string {
   const query = searchParams.toString();
   return query.length > 0 ? `${ARTIFACT_QUERY_PATH}?${query}` : ARTIFACT_QUERY_PATH;
+}
+
+function requireArtifactHarvestResponse(payload: unknown): ArtifactHarvestResponse {
+  const data = requireObject(payload, "harvest");
+  const mode = requireString(data.mode, "harvest.mode");
+  if (mode !== "cases" && mode !== "deltas") {
+    throw new Error("harvest.mode must be cases or deltas");
+  }
+  return {
+    source: requireSource(data.source, "harvest.source"),
+    datasetId: requireString(data.dataset_id, "harvest.dataset_id"),
+    lifecycle: requireStringOrNull(data.lifecycle, "harvest.lifecycle"),
+    mode,
+    outputPath: requireString(data.output_path, "harvest.output_path"),
+    selectedCaseCount: requireCount(
+      data.selected_case_count,
+      "harvest.selected_case_count",
+    ),
+  };
 }
 
 function requireQueryFilters(value: unknown, field: string): ArtifactQueryFilters {
@@ -381,6 +402,52 @@ export async function loadArtifactQuery(
   }
   const payload = await response.json();
   return validateArtifactQueryResponse(payload);
+}
+
+export async function createArtifactHarvestDraft(
+  request: {
+    mode: "cases" | "deltas";
+    filters: {
+      failureType?: string | null;
+      model?: string | null;
+      dataset?: string | null;
+      runId?: string | null;
+      promptId?: string | null;
+      reportId?: string | null;
+      comparisonId?: string | null;
+      baselineRunId?: string | null;
+      candidateRunId?: string | null;
+      delta?: string | null;
+      lastN?: number | null;
+      since?: string | null;
+      until?: string | null;
+      limit?: number;
+    };
+    outputStem?: string | null;
+  },
+  fetchImpl: typeof fetch = fetch,
+): Promise<ArtifactHarvestResponse> {
+  const response = await fetchImpl(ARTIFACT_HARVEST_PATH, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    let message = `artifact harvest request failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload === "object" && typeof payload.message === "string") {
+        message = payload.message;
+      }
+    } catch {
+      // Keep the status-based fallback message.
+    }
+    throw new Error(message);
+  }
+  const payload = await response.json();
+  return requireArtifactHarvestResponse(payload);
 }
 
 export function validateArtifactOverview(payload: unknown): ArtifactOverview {

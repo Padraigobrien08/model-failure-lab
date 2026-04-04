@@ -25,6 +25,7 @@ from model_failure_lab.analysis import (  # noqa: E402
     build_query_insight_report,
     explain_comparison_report,
 )
+from model_failure_lab.harvest import harvest_artifact_cases  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -100,6 +101,44 @@ def main(argv: list[str] | None = None) -> int:
                 root=root,
             ).to_payload(),
         }
+    elif args.command == "harvest":
+        filters = QueryFilters(
+            failure_type=args.failure_type,
+            model=args.model,
+            dataset=args.dataset,
+            run_id=args.run_id,
+            prompt_id=args.prompt_id,
+            report_id=args.report_id,
+            baseline_run_id=args.baseline_run_id,
+            candidate_run_id=args.candidate_run_id,
+            delta=args.delta,
+            last_n=args.last_n,
+            since=args.since,
+            until=args.until,
+            limit=args.limit,
+        )
+        output_path = _default_harvest_output_path(
+            root=root,
+            output_stem=args.output_stem,
+            mode=args.mode,
+            filters=filters,
+            comparison_id=args.comparison_id,
+        )
+        summary = harvest_artifact_cases(
+            filters=filters,
+            output_path=output_path,
+            root=root,
+            comparison_id=args.comparison_id,
+            mode=args.mode,
+        )
+        payload = {
+            "source": build_source_descriptor(root),
+            "dataset_id": summary.dataset.dataset_id,
+            "lifecycle": summary.dataset.lifecycle,
+            "mode": summary.mode,
+            "output_path": str(summary.output_path),
+            "selected_case_count": summary.selected_case_count,
+        }
     else:
         raise ValueError(f"Unsupported query bridge command: {args.command}")
 
@@ -147,6 +186,25 @@ def build_parser() -> argparse.ArgumentParser:
     comparison_insight_parser.add_argument("--root", required=True)
     comparison_insight_parser.add_argument("--report-id", required=True)
 
+    harvest_parser = subparsers.add_parser("harvest")
+    harvest_parser.add_argument("--root", required=True)
+    harvest_parser.add_argument("--mode", choices=["cases", "deltas"], required=True)
+    harvest_parser.add_argument("--failure-type")
+    harvest_parser.add_argument("--model")
+    harvest_parser.add_argument("--dataset")
+    harvest_parser.add_argument("--run-id")
+    harvest_parser.add_argument("--prompt-id")
+    harvest_parser.add_argument("--report-id")
+    harvest_parser.add_argument("--comparison-id")
+    harvest_parser.add_argument("--baseline-run-id")
+    harvest_parser.add_argument("--candidate-run-id")
+    harvest_parser.add_argument("--delta")
+    harvest_parser.add_argument("--last-n", type=int)
+    harvest_parser.add_argument("--since")
+    harvest_parser.add_argument("--until")
+    harvest_parser.add_argument("--limit", type=int, default=200)
+    harvest_parser.add_argument("--output-stem")
+
     return parser
 
 
@@ -158,6 +216,37 @@ def build_source_descriptor(root: Path) -> dict[str, str]:
         "runsPath": str(root / "runs"),
         "reportsPath": str(root / "reports"),
     }
+
+
+def _default_harvest_output_path(
+    *,
+    root: Path,
+    output_stem: str | None,
+    mode: str,
+    filters: QueryFilters,
+    comparison_id: str | None,
+) -> str:
+    stem = _slugify(
+        output_stem
+        or (
+            f"analysis-{filters.failure_type or filters.dataset or filters.model or 'cases'}"
+            if mode == "cases"
+            else f"comparison-{comparison_id or filters.report_id or 'deltas'}-{filters.delta or 'slice'}"
+        )
+    )
+    harvested_dir = root / "datasets" / "harvested"
+    candidate = harvested_dir / f"{stem}.json"
+    suffix = 2
+    while candidate.exists():
+        candidate = harvested_dir / f"{stem}-{suffix}.json"
+        suffix += 1
+    return os.path.relpath(candidate, root)
+
+
+def _slugify(value: str) -> str:
+    normalized = "".join(character if character.isalnum() else "-" for character in value.lower())
+    collapsed = "-".join(part for part in normalized.split("-") if part)
+    return collapsed or "harvested-draft"
 
 
 if __name__ == "__main__":

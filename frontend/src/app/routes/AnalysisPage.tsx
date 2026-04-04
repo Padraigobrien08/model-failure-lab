@@ -13,9 +13,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { buildComparisonDetailSearchParams, buildRunDetailSearchParams } from "@/lib/artifacts/detailRouteState";
-import { buildArtifactQueryPath, loadArtifactQuery } from "@/lib/artifacts/load";
+import { buildArtifactQueryPath, createArtifactHarvestDraft, loadArtifactQuery } from "@/lib/artifacts/load";
 import { buildArtifactReturnState, createSearchString } from "@/lib/artifacts/navigation";
 import type {
+  ArtifactHarvestResponse,
   ArtifactInsightEvidenceRef,
   ArtifactQueryMode,
   ArtifactQueryState,
@@ -31,6 +32,12 @@ type FilterSelectProps = {
 
 const AGGREGATE_OPTIONS = ["failure_type", "model", "dataset", "prompt_id"];
 const LAST_N_OPTIONS = ["1", "5", "10"];
+
+type ExportState =
+  | { status: "idle"; response: null; message: null }
+  | { status: "loading"; response: null; message: null }
+  | { status: "ready"; response: ArtifactHarvestResponse; message: null }
+  | { status: "error"; response: null; message: string };
 
 function readSearchValue(searchParams: URLSearchParams, key: string): string {
   return searchParams.get(key) ?? "";
@@ -57,6 +64,18 @@ function buildAnalysisSearchParams(
     }
   }
   return next;
+}
+
+function buildAnalysisExportStem(
+  mode: ArtifactQueryMode,
+  values: { failureType: string; delta: string; dataset: string; model: string },
+): string {
+  const descriptor =
+    values.failureType || values.delta || values.dataset || values.model || "selection";
+  return `analysis-${mode}-${descriptor}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function FilterSelect({
@@ -96,6 +115,11 @@ export function AnalysisPage() {
     response: null,
     message: null,
   });
+  const [exportState, setExportState] = useState<ExportState>({
+    status: "idle",
+    response: null,
+    message: null,
+  });
 
   const mode = readMode(searchParams);
   const deferredSearch = useDeferredValue(searchParams.toString());
@@ -131,6 +155,10 @@ export function AnalysisPage() {
         });
       });
   }, [artifactState.status, deferredSearch, mode]);
+
+  useEffect(() => {
+    setExportState({ status: "idle", response: null, message: null });
+  }, [deferredSearch, mode]);
 
   if (artifactState.status !== "ready" || artifactOverview === null) {
     return <ArtifactStatePanel area="Analysis" state={artifactState} />;
@@ -182,6 +210,7 @@ export function AnalysisPage() {
   const aggregateBy = readSearchValue(searchParams, "aggregateBy");
   const since = readSearchValue(searchParams, "since");
   const lastN = readSearchValue(searchParams, "lastN");
+  const canExportDraft = response.mode !== "aggregates" && resultCount > 0;
 
   const renderEvidenceLink = (reference: ArtifactInsightEvidenceRef) => {
     if (reference.kind === "run_case" && reference.runId && reference.caseId) {
@@ -362,15 +391,93 @@ export function AnalysisPage() {
             </label>
           </div>
 
-          <button
-            type="button"
-            className="h-11 rounded-full border border-border/70 bg-background/70 px-5 text-sm font-semibold text-foreground transition-colors hover:bg-background"
-            onClick={() => setSearchParams(new URLSearchParams({ mode: "cases" }), { replace: true })}
-          >
-            Clear filters
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {canExportDraft ? (
+              <button
+                type="button"
+                className="h-11 rounded-full border border-primary/30 bg-primary/12 px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/18 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={exportState.status === "loading"}
+                onClick={() => {
+                  setExportState({ status: "loading", response: null, message: null });
+                  void createArtifactHarvestDraft({
+                    mode: response.mode,
+                    filters: {
+                      failureType,
+                      model,
+                      dataset,
+                      runId: readSearchValue(searchParams, "runId"),
+                      promptId: readSearchValue(searchParams, "promptId"),
+                      reportId: readSearchValue(searchParams, "reportId"),
+                      baselineRunId: readSearchValue(searchParams, "baselineRunId"),
+                      candidateRunId: readSearchValue(searchParams, "candidateRunId"),
+                      delta,
+                      lastN: lastN.length > 0 ? Number(lastN) : null,
+                      since,
+                      until: readSearchValue(searchParams, "until"),
+                      limit: Number(readSearchValue(searchParams, "limit") || "20"),
+                    },
+                    outputStem: buildAnalysisExportStem(response.mode, {
+                      failureType,
+                      delta,
+                      dataset,
+                      model,
+                    }),
+                  })
+                    .then((harvestResponse) => {
+                      setExportState({
+                        status: "ready",
+                        response: harvestResponse,
+                        message: null,
+                      });
+                    })
+                    .catch((error: unknown) => {
+                      setExportState({
+                        status: "error",
+                        response: null,
+                        message:
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to export a draft dataset pack",
+                      });
+                    });
+                }}
+              >
+                {exportState.status === "loading" ? "Exporting draft..." : "Export draft dataset"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="h-11 rounded-full border border-border/70 bg-background/70 px-5 text-sm font-semibold text-foreground transition-colors hover:bg-background"
+              onClick={() =>
+                setSearchParams(new URLSearchParams({ mode: "cases" }), { replace: true })
+              }
+            >
+              Clear filters
+            </button>
+          </div>
         </div>
       </div>
+
+      {exportState.status === "ready" ? (
+        <Card className="border-primary/20 bg-primary/[0.04]">
+          <CardHeader>
+            <CardTitle>Draft dataset exported.</CardTitle>
+            <CardDescription>
+              {exportState.response.datasetId} was written to {exportState.response.outputPath} with{" "}
+              {exportState.response.selectedCaseCount} selected cases.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
+
+      {exportState.status === "error" ? (
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle>Draft export failed.</CardTitle>
+            <CardDescription>{exportState.message}</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
 
       <InsightPanel
         badgeLabel="Insights"

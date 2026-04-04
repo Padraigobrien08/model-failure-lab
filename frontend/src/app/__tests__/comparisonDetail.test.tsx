@@ -618,7 +618,6 @@ function mockComparisonAndRunDetails(
     ["run_beta", buildLinkedRunDetail("run_beta", "reasoning-failures-v1")],
   ]),
 ) {
-
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request) => {
@@ -628,6 +627,22 @@ function mockComparisonAndRunDetails(
           ok: true,
           status: 200,
           json: async () => serializeComparisonDetail(detail),
+        } as Response;
+      }
+
+      if (url.includes("/__failure_lab__/artifacts/harvest.json")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            source: detail.source,
+            dataset_id: "comparison-compare-alpha-to-beta-failure-to-no-failure",
+            lifecycle: "draft",
+            mode: "deltas",
+            output_path:
+              "datasets/harvested/comparison-compare-alpha-to-beta-failure-to-no-failure.json",
+            selected_case_count: 1,
+          }),
         } as Response;
       }
 
@@ -759,6 +774,64 @@ describe("comparison detail route", () => {
     expect(
       screen.getByRole("heading", { name: "Use only the provided evidence bullets." }),
     ).toBeInTheDocument();
+  });
+
+  it("exports the selected transition slice as a draft dataset", async () => {
+    const detail = buildCompatibleDetail();
+    mockComparisonAndRunDetails(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /export failure -> no_failure draft/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(
+        /comparison-compare-alpha-to-beta-failure-to-no-failure written to datasets\/harvested\/comparison-compare-alpha-to-beta-failure-to-no-failure\.json\./i,
+      ),
+    ).toBeInTheDocument();
+
+    const fetchMock = vi.mocked(globalThis.fetch);
+    await waitFor(() => {
+      const harvestCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).includes("/__failure_lab__/artifacts/harvest.json"),
+      ) as [string | URL | Request, RequestInit?] | undefined;
+      expect(harvestCall).toBeTruthy();
+      const init = harvestCall?.[1];
+      expect(init).toBeDefined();
+      if (!init) {
+        throw new Error("Expected harvest request init");
+      }
+      expect(init).toMatchObject({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(JSON.parse(String(init.body))).toEqual({
+        mode: "deltas",
+        filters: {
+          comparisonId: "compare_alpha_to_beta",
+          reportId: "compare_alpha_to_beta",
+          delta: "failure_to_no_failure",
+          limit: 2,
+        },
+        outputStem: "comparison-compare-alpha-to-beta-failure-to-no-failure",
+      });
+    });
   });
 
   it("keeps incompatible comparisons openable with explicit coverage semantics", async () => {

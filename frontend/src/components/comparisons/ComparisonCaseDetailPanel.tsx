@@ -14,10 +14,19 @@ type ComparisonCaseDrillthroughAction = {
   disabledReason?: string | null;
 };
 
+type ComparisonCaseExportAction = {
+  label: string;
+  status: "idle" | "loading" | "ready" | "error";
+  onExport: () => void;
+  message?: string | null;
+  disabled?: boolean;
+};
+
 type ComparisonCaseDetailPanelProps = {
   caseDelta: ComparisonCaseDeltaRecord | null;
   baselineAction?: ComparisonCaseDrillthroughAction | null;
   candidateAction?: ComparisonCaseDrillthroughAction | null;
+  exportAction?: ComparisonCaseExportAction | null;
   artifactContext?: {
     reportId: string;
     baselineRunId: string;
@@ -37,6 +46,7 @@ export function ComparisonCaseDetailPanel({
   caseDelta,
   baselineAction = null,
   candidateAction = null,
+  exportAction = null,
   artifactContext = null,
 }: ComparisonCaseDetailPanelProps) {
   if (!caseDelta) {
@@ -129,6 +139,25 @@ export function ComparisonCaseDetailPanel({
                   ),
                 )}
             </div>
+          </section>
+        ) : null}
+
+        {exportAction ? (
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Export transition slice
+            </p>
+            <button
+              type="button"
+              className="rounded-[18px] border border-primary/30 bg-primary/12 px-4 py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/18 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={exportAction.disabled || exportAction.status === "loading"}
+              onClick={exportAction.onExport}
+            >
+              {exportAction.status === "loading" ? "Exporting draft..." : exportAction.label}
+            </button>
+            {exportAction.message ? (
+              <p className="text-sm leading-6 text-muted-foreground">{exportAction.message}</p>
+            ) : null}
           </section>
         ) : null}
 

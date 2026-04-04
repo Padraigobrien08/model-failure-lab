@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, vi } from "vitest";
 
@@ -269,6 +269,21 @@ function mockAnalysisQueryAndRunDetail() {
       } as Response;
     }
 
+    if (url.includes("/__failure_lab__/artifacts/harvest.json")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          source: DEFAULT_SOURCE,
+          dataset_id: "analysis-cases-hallucination",
+          lifecycle: "draft",
+          mode: "cases",
+          output_path: "datasets/harvested/analysis-cases-hallucination.json",
+          selected_case_count: 1,
+        }),
+      } as Response;
+    }
+
     return {
       ok: false,
       status: 404,
@@ -334,5 +349,62 @@ describe("analysis route", () => {
       "href",
       "/analysis?mode=cases&failureType=hallucination",
     );
+  });
+
+  it("exports the filtered result set as a draft dataset", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockAnalysisQueryAndRunDetail();
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/analysis?mode=cases&failureType=hallucination&lastN=5"]}
+        initialArtifactState={buildReadyArtifactState()}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Export draft dataset" }));
+
+    expect(await screen.findByRole("heading", { name: "Draft dataset exported." })).toBeInTheDocument();
+    expect(
+      screen.getByText(/analysis-cases-hallucination was written to datasets\/harvested\/analysis-cases-hallucination\.json/i),
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      const harvestCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).includes("/__failure_lab__/artifacts/harvest.json"),
+      ) as [string | URL | Request, RequestInit?] | undefined;
+      expect(harvestCall).toBeTruthy();
+      const init = harvestCall?.[1];
+      expect(init).toBeDefined();
+      if (!init) {
+        throw new Error("Expected harvest request init");
+      }
+      expect(init).toMatchObject({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(JSON.parse(String(init.body))).toEqual({
+        mode: "cases",
+        filters: {
+          failureType: "hallucination",
+          model: "",
+          dataset: "",
+          runId: "",
+          promptId: "",
+          reportId: "",
+          baselineRunId: "",
+          candidateRunId: "",
+          delta: "",
+          lastN: 5,
+          since: "",
+          until: "",
+          limit: 20,
+        },
+        outputStem: "analysis-cases-hallucination",
+      });
+    });
   });
 });
