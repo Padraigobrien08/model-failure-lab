@@ -53,6 +53,58 @@ function buildSignal(
   };
 }
 
+function buildGovernanceRecommendation(
+  overrides: Partial<NonNullable<ComparisonDetail["governanceRecommendation"]>> = {},
+) {
+  return {
+    comparisonId: "compare_alpha_to_beta",
+    action: "ignore" as const,
+    policyRule: "non_regression_signal",
+    rationale:
+      "Signal verdict is `improvement`, so the comparison does not qualify for regression-pack governance.",
+    policy: {
+      minimumSeverity: 0.05,
+      topN: 10,
+      failureType: null,
+      familyId: null,
+      familyCaseCap: 200,
+      maxDuplicateRatio: 0.6,
+      strategy: "exact_suggested_family_then_health_guards",
+    },
+    signal: buildSignal("improvement", 0.25, [
+      {
+        failureType: "hallucination",
+        delta: -0.25,
+        caseIds: ["case-002"],
+      },
+      {
+        failureType: "reasoning",
+        delta: 0.125,
+        caseIds: ["case-004"],
+      },
+    ]),
+    matchedFamily: {
+      familyId: "regression-reasoning-failures-v1-reasoning",
+      matchKind: "suggested_new",
+      exists: false,
+      versionCount: 0,
+      latestDatasetId: null,
+      currentCaseCount: 0,
+      proposedAdditionCount: 0,
+      duplicateCaseCount: 0,
+      duplicateRatio: 0,
+      projectedCaseCount: 0,
+      familyCaseCap: 200,
+      capReached: false,
+      duplicateRatioExceeded: false,
+    },
+    selectedCaseCount: 0,
+    evidenceCaseIds: [],
+    previewCases: [],
+    ...overrides,
+  };
+}
+
 function buildReadyArtifactState(
   comparisonIds: string[],
   source = DEFAULT_SOURCE,
@@ -364,6 +416,7 @@ function buildCompatibleDetail(source = DEFAULT_SOURCE): ComparisonDetail {
         },
       ],
     },
+    governanceRecommendation: buildGovernanceRecommendation(),
   };
 }
 
@@ -444,6 +497,39 @@ function buildIncompatibleDetail(): ComparisonDetail {
     },
     caseDeltas: [],
     insightReport: null,
+    governanceRecommendation: {
+      ...buildGovernanceRecommendation({
+        comparisonId: "compare_dataset_mismatch",
+        action: "ignore",
+        policyRule: "incompatible_signal",
+        rationale:
+          "Saved comparison is incompatible, so governance cannot create or evolve a regression family from it.",
+        signal: {
+          verdict: "incompatible",
+          reason: "dataset_mismatch",
+          regressionScore: 0,
+          improvementScore: 0,
+          netScore: 0,
+          severity: 0,
+          topDrivers: [],
+        },
+        matchedFamily: {
+          familyId: "regression-comparison-general",
+          matchKind: "suggested_new",
+          exists: false,
+          versionCount: 0,
+          latestDatasetId: null,
+          currentCaseCount: 0,
+          proposedAdditionCount: 0,
+          duplicateCaseCount: 0,
+          duplicateRatio: 0,
+          projectedCaseCount: 0,
+          familyCaseCap: 200,
+          capReached: false,
+          duplicateRatioExceeded: false,
+        },
+      }),
+    },
   };
 }
 
@@ -526,6 +612,71 @@ function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unk
               prompt_id: reference.promptId,
               section: reference.section,
               transition_type: reference.transitionType,
+            })),
+          },
+    governanceRecommendation:
+      detail.governanceRecommendation === null
+        ? null
+        : {
+            comparison_id: detail.governanceRecommendation.comparisonId,
+            action: detail.governanceRecommendation.action,
+            policy_rule: detail.governanceRecommendation.policyRule,
+            rationale: detail.governanceRecommendation.rationale,
+            policy: {
+              minimum_severity: detail.governanceRecommendation.policy.minimumSeverity,
+              top_n: detail.governanceRecommendation.policy.topN,
+              failure_type: detail.governanceRecommendation.policy.failureType,
+              family_id: detail.governanceRecommendation.policy.familyId,
+              family_case_cap: detail.governanceRecommendation.policy.familyCaseCap,
+              max_duplicate_ratio: detail.governanceRecommendation.policy.maxDuplicateRatio,
+              strategy: detail.governanceRecommendation.policy.strategy,
+            },
+            signal: {
+              verdict: detail.governanceRecommendation.signal.verdict,
+              reason: detail.governanceRecommendation.signal.reason,
+              regression_score: detail.governanceRecommendation.signal.regressionScore,
+              improvement_score: detail.governanceRecommendation.signal.improvementScore,
+              net_score: detail.governanceRecommendation.signal.netScore,
+              severity: detail.governanceRecommendation.signal.severity,
+              top_drivers: detail.governanceRecommendation.signal.topDrivers.map((driver) => ({
+                driver_rank: driver.driverRank,
+                failure_type: driver.failureType,
+                delta: driver.delta,
+                direction: driver.direction,
+                case_ids: driver.caseIds,
+              })),
+            },
+            matched_family: {
+              family_id: detail.governanceRecommendation.matchedFamily.familyId,
+              match_kind: detail.governanceRecommendation.matchedFamily.matchKind,
+              exists: detail.governanceRecommendation.matchedFamily.exists,
+              version_count: detail.governanceRecommendation.matchedFamily.versionCount,
+              latest_dataset_id: detail.governanceRecommendation.matchedFamily.latestDatasetId,
+              current_case_count: detail.governanceRecommendation.matchedFamily.currentCaseCount,
+              proposed_addition_count:
+                detail.governanceRecommendation.matchedFamily.proposedAdditionCount,
+              duplicate_case_count:
+                detail.governanceRecommendation.matchedFamily.duplicateCaseCount,
+              duplicate_ratio: detail.governanceRecommendation.matchedFamily.duplicateRatio,
+              projected_case_count:
+                detail.governanceRecommendation.matchedFamily.projectedCaseCount,
+              family_case_cap: detail.governanceRecommendation.matchedFamily.familyCaseCap,
+              cap_reached: detail.governanceRecommendation.matchedFamily.capReached,
+              duplicate_ratio_exceeded:
+                detail.governanceRecommendation.matchedFamily.duplicateRatioExceeded,
+            },
+            selected_case_count: detail.governanceRecommendation.selectedCaseCount,
+            evidence_case_ids: detail.governanceRecommendation.evidenceCaseIds,
+            preview_cases: detail.governanceRecommendation.previewCases.map((entry) => ({
+              case_id: entry.caseId,
+              prompt_id: entry.promptId,
+              prompt: entry.prompt,
+              source_case_id: entry.sourceCaseId,
+              source_report_id: entry.sourceReportId,
+              source_run_id: entry.sourceRunId,
+              driver_failure_type: entry.driverFailureType,
+              driver_rank: entry.driverRank,
+              transition_type: entry.transitionType,
             })),
           },
   };
@@ -993,6 +1144,7 @@ describe("comparison detail route", () => {
     expect(within(comparisonHeader as HTMLElement).getByText("Status")).toBeInTheDocument();
     expect(within(comparisonHeader as HTMLElement).getByText("Saved at")).toBeInTheDocument();
     expect(screen.getAllByText("improvement").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("ignore").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("25.0% severity").length).toBeGreaterThan(0);
     expect(screen.getAllByText("compare_alpha_to_beta").length).toBeGreaterThan(0);
     expect(
@@ -1008,6 +1160,11 @@ describe("comparison detail route", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Grounded comparison explanation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Signal verdict is `improvement`, so the comparison does not qualify for regression-pack governance.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText(

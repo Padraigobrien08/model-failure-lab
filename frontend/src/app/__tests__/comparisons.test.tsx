@@ -223,6 +223,7 @@ function buildComparisonDetail(reportId: string): ComparisonDetail {
       },
     ],
     insightReport: null,
+    governanceRecommendation: null,
   };
 }
 

@@ -246,6 +246,7 @@ export type ComparisonDetail = {
   };
   caseDeltas: ComparisonCaseDeltaRecord[];
   insightReport: ArtifactInsightReport | null;
+  governanceRecommendation: ArtifactGovernanceRecommendation | null;
 };
 
 export type ComparisonDetailState =
@@ -283,6 +284,32 @@ export type ArtifactDatasetPolicy = {
   deltaKind: string;
 };
 
+export type ArtifactGovernancePolicy = {
+  minimumSeverity: number;
+  topN: number;
+  failureType: string | null;
+  familyId: string | null;
+  familyCaseCap: number | null;
+  maxDuplicateRatio: number | null;
+  strategy: string;
+};
+
+export type ArtifactGovernanceFamilyMatch = {
+  familyId: string;
+  matchKind: string;
+  exists: boolean;
+  versionCount: number;
+  latestDatasetId: string | null;
+  currentCaseCount: number;
+  proposedAdditionCount: number;
+  duplicateCaseCount: number;
+  duplicateRatio: number;
+  projectedCaseCount: number;
+  familyCaseCap: number | null;
+  capReached: boolean;
+  duplicateRatioExceeded: boolean;
+};
+
 export type ArtifactRegressionPreviewCase = {
   caseId: string;
   promptId: string;
@@ -305,6 +332,19 @@ export type ArtifactRegressionPackResponse = {
   selectedCaseCount: number;
   policy: ArtifactDatasetPolicy;
   signal: ComparisonSignal;
+  previewCases: ArtifactRegressionPreviewCase[];
+};
+
+export type ArtifactGovernanceRecommendation = {
+  comparisonId: string;
+  action: "create" | "evolve" | "ignore";
+  policyRule: string;
+  rationale: string;
+  policy: ArtifactGovernancePolicy;
+  signal: ComparisonSignal;
+  matchedFamily: ArtifactGovernanceFamilyMatch;
+  selectedCaseCount: number;
+  evidenceCaseIds: string[];
   previewCases: ArtifactRegressionPreviewCase[];
 };
 
@@ -432,6 +472,7 @@ export type ArtifactQuerySignalRow = {
   netScore: number;
   severity: number;
   topDrivers: ComparisonSignalDriver[];
+  governanceRecommendation: ArtifactGovernanceRecommendation | null;
 };
 
 type ArtifactQueryBase = {

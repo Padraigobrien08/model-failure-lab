@@ -33,9 +33,9 @@ interpretable, reusable, and actionable from local artifacts.
 
 ### Debugger Support
 
-- [ ] **UI-01**: Debugger signal surfaces show recommendation status and policy rationale without
+- [x] **UI-01**: Debugger signal surfaces show recommendation status and policy rationale without
   requiring detailed route drilldown.
-- [ ] **UI-02**: Debugger users can inspect matched-family context and open the relevant family or
+- [x] **UI-02**: Debugger users can inspect matched-family context and open the relevant family or
   source signal evidence from the recommendation surface.
 
 ### Workflow Verification
@@ -75,8 +75,8 @@ interpretable, reusable, and actionable from local artifacts.
 | REC-03 | Phase 94 | Complete |
 | FAM-01 | Phase 94 | Complete |
 | FAM-02 | Phase 94 | Complete |
-| UI-01 | Phase 95 | Pending |
-| UI-02 | Phase 95 | Pending |
+| UI-01 | Phase 95 | Complete |
+| UI-02 | Phase 95 | Complete |
 | FLOW-01 | Phase 96 | Pending |
 
 **Coverage:**

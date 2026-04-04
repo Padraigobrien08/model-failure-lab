@@ -542,6 +542,17 @@ export function AnalysisPage() {
                     </Badge>
                     <Badge tone="muted">{(row.severity * 100).toFixed(1)}% severity</Badge>
                     {row.dataset ? <Badge tone="muted">{row.dataset}</Badge> : null}
+                    {row.governanceRecommendation ? (
+                      <Badge
+                        tone={
+                          row.governanceRecommendation.action === "ignore"
+                            ? "default"
+                            : "accent"
+                        }
+                      >
+                        {row.governanceRecommendation.action}
+                      </Badge>
+                    ) : null}
                   </div>
                   <CardTitle className="text-xl">{row.reportId}</CardTitle>
                   <CardDescription>
@@ -553,6 +564,11 @@ export function AnalysisPage() {
                     Regression {`${(row.regressionScore * 100).toFixed(1)}%`} · Improvement{" "}
                     {`${(row.improvementScore * 100).toFixed(1)}%`}
                   </p>
+                  {row.governanceRecommendation ? (
+                    <p className="text-sm text-muted-foreground">
+                      {row.governanceRecommendation.rationale}
+                    </p>
+                  ) : null}
                   {row.topDrivers.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {row.topDrivers.map((driver) => (
@@ -591,6 +607,7 @@ export function AnalysisPage() {
                       topDrivers: row.topDrivers,
                     }}
                     driverFilter={failureType || null}
+                    recommendation={row.governanceRecommendation}
                     returnState={returnState}
                     title="Turn this signal into a dataset"
                   />

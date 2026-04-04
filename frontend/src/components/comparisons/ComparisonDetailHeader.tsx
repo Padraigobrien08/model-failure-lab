@@ -7,6 +7,7 @@ import { formatLabel } from "@/lib/formatters";
 type ComparisonDetailHeaderProps = {
   comparison: ComparisonDetail["comparison"];
   signal: ComparisonDetail["signal"];
+  governanceRecommendation: ComparisonDetail["governanceRecommendation"];
   inventoryHref: string;
   baselineRunState?: unknown;
   candidateRunState?: unknown;
@@ -68,6 +69,7 @@ function datasetBadgeText(comparison: ComparisonDetail["comparison"]): string {
 export function ComparisonDetailHeader({
   comparison,
   signal,
+  governanceRecommendation,
   inventoryHref,
   baselineRunState: _baselineRunState,
   candidateRunState: _candidateRunState,
@@ -94,6 +96,11 @@ export function ComparisonDetailHeader({
           <Badge tone="accent">Comparison detail</Badge>
           <Badge tone={signalTone(signal.verdict)}>{formatLabel(signal.verdict)}</Badge>
           <Badge tone="muted">{(signal.severity * 100).toFixed(1)}% severity</Badge>
+          {governanceRecommendation ? (
+            <Badge tone={governanceRecommendation.action === "ignore" ? "default" : "accent"}>
+              {formatLabel(governanceRecommendation.action)}
+            </Badge>
+          ) : null}
         </div>
 
         <div className="space-y-3">
@@ -107,6 +114,11 @@ export function ComparisonDetailHeader({
             Frame the comparison first, then move into shared-case scope and grouped transition
             evidence without repeating the full provenance block in the header.
           </p>
+          {governanceRecommendation ? (
+            <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
+              Recommendation: {governanceRecommendation.rationale}
+            </p>
+          ) : null}
         </div>
 
         <div className="rounded-[22px] border border-border/60 bg-card/55 px-4 py-4">

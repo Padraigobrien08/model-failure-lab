@@ -32,6 +32,7 @@ from model_failure_lab.datasets import (  # noqa: E402
     generate_regression_pack,
     list_dataset_versions,
 )
+from model_failure_lab.governance import recommend_dataset_action  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -66,9 +67,19 @@ def main(argv: list[str] | None = None) -> int:
         elif args.mode == "signals":
             rows = query_comparison_signals(
                 filters,
-                verdict=args.signal_direction,
+                verdict=None if args.signal_direction == "all" else args.signal_direction,
                 root=root,
             )
+            rows = [
+                {
+                    **row,
+                    "governance_recommendation": recommend_dataset_action(
+                        str(row["report_id"]),
+                        root=root,
+                    ).to_payload(),
+                }
+                for row in rows
+            ]
         elif args.mode == "deltas":
             rows = query_case_deltas(filters, root=root)
         else:
@@ -110,6 +121,14 @@ def main(argv: list[str] | None = None) -> int:
             "report_id": args.report_id,
             "insight_report": explain_comparison_report(
                 report_id=args.report_id,
+                root=root,
+            ).to_payload(),
+        }
+    elif args.command == "governance-recommend":
+        payload = {
+            "comparison_id": args.comparison_id,
+            "recommendation": recommend_dataset_action(
+                args.comparison_id,
                 root=root,
             ).to_payload(),
         }
@@ -239,6 +258,10 @@ def build_parser() -> argparse.ArgumentParser:
     comparison_insight_parser = subparsers.add_parser("comparison-insight")
     comparison_insight_parser.add_argument("--root", required=True)
     comparison_insight_parser.add_argument("--report-id", required=True)
+
+    governance_recommend_parser = subparsers.add_parser("governance-recommend")
+    governance_recommend_parser.add_argument("--root", required=True)
+    governance_recommend_parser.add_argument("--comparison-id", required=True)
 
     harvest_parser = subparsers.add_parser("harvest")
     harvest_parser.add_argument("--root", required=True)

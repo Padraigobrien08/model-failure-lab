@@ -11,6 +11,7 @@ import {
 } from "@/lib/artifacts/detailRouteState";
 import type {
   ArtifactDatasetEvolutionResponse,
+  ArtifactGovernanceRecommendation,
   ArtifactDatasetVersionsResponse,
   ArtifactRegressionPackResponse,
   ComparisonSignal,
@@ -35,6 +36,7 @@ type SignalDatasetAutomationPanelProps = {
   dataset: string | null;
   signal: ComparisonSignal;
   driverFilter?: string | null;
+  recommendation?: ArtifactGovernanceRecommendation | null;
   returnState?: unknown;
   autoLoadVersions?: boolean;
   title?: string;
@@ -95,11 +97,13 @@ export function SignalDatasetAutomationPanel({
   dataset,
   signal,
   driverFilter = null,
+  recommendation = null,
   returnState = null,
   autoLoadVersions = false,
   title = "Regression pack automation",
 }: SignalDatasetAutomationPanelProps) {
   const suggestedFamilyId = buildSuggestedFamilyId(dataset, signal, driverFilter);
+  const targetFamilyId = recommendation?.matchedFamily.familyId ?? suggestedFamilyId;
   const [generationState, setGenerationState] = useState<AsyncState<ArtifactRegressionPackResponse>>(
     {
       status: "idle",
@@ -122,7 +126,7 @@ export function SignalDatasetAutomationPanel({
 
   const loadVersions = () => {
     setVersionsState({ status: "loading", value: null, message: null });
-    void loadArtifactDatasetVersions(suggestedFamilyId)
+    void loadArtifactDatasetVersions(targetFamilyId)
       .then((response) => {
         setVersionsState({ status: "ready", value: response, message: null });
       })
@@ -141,7 +145,7 @@ export function SignalDatasetAutomationPanel({
       return;
     }
     loadVersions();
-  }, [autoLoadVersions, suggestedFamilyId]);
+  }, [autoLoadVersions, targetFamilyId]);
 
   const activePreview =
     evolutionState.status === "ready"
@@ -156,7 +160,12 @@ export function SignalDatasetAutomationPanel({
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">Dataset evolution</Badge>
           <Badge tone="muted">{signal.verdict}</Badge>
-          <Badge tone="muted">{suggestedFamilyId}</Badge>
+          <Badge tone="muted">{targetFamilyId}</Badge>
+          {recommendation ? (
+            <Badge tone={recommendation.action === "ignore" ? "default" : "accent"}>
+              recommend {recommendation.action}
+            </Badge>
+          ) : null}
         </div>
         <CardTitle>{title}</CardTitle>
         <CardDescription>
@@ -165,6 +174,42 @@ export function SignalDatasetAutomationPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {recommendation ? (
+          <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={recommendation.action === "ignore" ? "default" : "accent"}>
+                {recommendation.action}
+              </Badge>
+              <Badge tone="muted">{recommendation.policyRule}</Badge>
+              <Badge tone="muted">
+                {recommendation.matchedFamily.versionCount} versions
+              </Badge>
+              <Badge tone="muted">
+                {recommendation.matchedFamily.projectedCaseCount} projected cases
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">{recommendation.rationale}</p>
+            <p className="text-xs text-muted-foreground">
+              Family {recommendation.matchedFamily.familyId} · duplicates{" "}
+              {recommendation.matchedFamily.duplicateCaseCount}/{recommendation.selectedCaseCount} ·
+              cap{" "}
+              {recommendation.matchedFamily.familyCaseCap ?? "none"}
+            </p>
+            {recommendation.previewCases.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {recommendation.previewCases.slice(0, 4).map((entry) =>
+                  renderPreviewLink(
+                    entry.sourceReportId,
+                    entry.sourceCaseId,
+                    entry.promptId,
+                    returnState,
+                  ),
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
@@ -174,7 +219,7 @@ export function SignalDatasetAutomationPanel({
               setGenerationState({ status: "loading", value: null, message: null });
               void createArtifactRegressionPack({
                 comparisonId,
-                familyId: suggestedFamilyId,
+                familyId: targetFamilyId,
                 failureType: driverFilter,
               })
                 .then((response) => {
@@ -203,7 +248,7 @@ export function SignalDatasetAutomationPanel({
             onClick={() => {
               setEvolutionState({ status: "loading", value: null, message: null });
               void evolveArtifactDataset({
-                familyId: suggestedFamilyId,
+                familyId: targetFamilyId,
                 comparisonId,
                 failureType: driverFilter,
               })
@@ -283,7 +328,7 @@ export function SignalDatasetAutomationPanel({
             </div>
             {versionsState.value.versions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No immutable versions exist yet for {suggestedFamilyId}.
+                No immutable versions exist yet for {targetFamilyId}.
               </p>
             ) : (
               <div className="space-y-2">

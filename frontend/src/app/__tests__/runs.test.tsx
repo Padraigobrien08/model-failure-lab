@@ -332,6 +332,7 @@ function buildComparisonDetail(
       },
     ],
     insightReport: null,
+    governanceRecommendation: null,
   };
 }
 

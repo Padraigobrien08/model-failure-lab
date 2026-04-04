@@ -366,6 +366,69 @@ function mockSignalAnalysisQuery() {
                   case_ids: ["case-regression"],
                 },
               ],
+              governance_recommendation: {
+                comparison_id: "compare_alpha_to_beta",
+                action: "create",
+                policy_rule: "new_family_required",
+                rationale:
+                  "Qualifying regression has no existing family match, so governance recommends creating `regression-query-fixture-v1-hallucination`.",
+                policy: {
+                  minimum_severity: 0.05,
+                  top_n: 10,
+                  failure_type: null,
+                  family_id: null,
+                  family_case_cap: 200,
+                  max_duplicate_ratio: 0.6,
+                  strategy: "exact_suggested_family_then_health_guards",
+                },
+                signal: {
+                  verdict: "regression",
+                  reason: null,
+                  regression_score: 0.27,
+                  improvement_score: 0.08,
+                  net_score: 0.19,
+                  severity: 0.27,
+                  top_drivers: [
+                    {
+                      driver_rank: 0,
+                      failure_type: "hallucination",
+                      delta: 0.18,
+                      direction: "regression",
+                      case_ids: ["case-regression"],
+                    },
+                  ],
+                },
+                matched_family: {
+                  family_id: "regression-query-fixture-v1-hallucination",
+                  match_kind: "suggested_new",
+                  exists: false,
+                  version_count: 0,
+                  latest_dataset_id: null,
+                  current_case_count: 0,
+                  proposed_addition_count: 1,
+                  duplicate_case_count: 0,
+                  duplicate_ratio: 0,
+                  projected_case_count: 1,
+                  family_case_cap: 200,
+                  cap_reached: false,
+                  duplicate_ratio_exceeded: false,
+                },
+                selected_case_count: 1,
+                evidence_case_ids: ["case-regression"],
+                preview_cases: [
+                  {
+                    case_id: "case-regression-pack-001",
+                    prompt_id: "case-regression",
+                    prompt: "Regression case",
+                    source_case_id: "case-regression",
+                    source_report_id: "compare_alpha_to_beta",
+                    source_run_id: "run_beta",
+                    driver_failure_type: "hallucination",
+                    driver_rank: 0,
+                    transition_type: "no_failure_to_failure",
+                  },
+                ],
+              },
             },
           ],
         }),
@@ -580,7 +643,13 @@ describe("analysis route", () => {
     expect(screen.queryByText("Grounded cross-run readout")).not.toBeInTheDocument();
     expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
     expect(screen.getByText("27.0% severity")).toBeInTheDocument();
+    expect(screen.getAllByText("create").length).toBeGreaterThan(0);
     expect(screen.getByText("hallucination +18.0%")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        "Qualifying regression has no existing family match, so governance recommends creating `regression-query-fixture-v1-hallucination`.",
+      ).length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByRole("link", { name: "Inspect strongest driver" }),
     ).toHaveAttribute(

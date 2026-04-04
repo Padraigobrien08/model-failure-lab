@@ -163,6 +163,7 @@ type ComparisonDetailPayload = {
   };
   caseDeltas: ComparisonCaseDeltaPayload[];
   insightReport: Record<string, unknown> | null;
+  governanceRecommendation: Record<string, unknown> | null;
 };
 
 type FailureLabelPayload = {
@@ -1013,6 +1014,9 @@ function failureLabArtifactsPlugin(): Plugin {
       reportDetailsPayload,
       reportId,
     );
+    const governancePayload = await invokeQueryBridge<{
+      recommendation: Record<string, unknown>;
+    }>("governance-recommend", ["--comparison-id", reportId]);
 
     return {
       source: sourcePayload(artifactSource),
@@ -1147,6 +1151,7 @@ function failureLabArtifactsPlugin(): Plugin {
         `${reportId}.report_details.case_deltas`,
       ),
       insightReport: null,
+      governanceRecommendation: governancePayload.recommendation,
     };
   }
 

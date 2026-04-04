@@ -612,6 +612,7 @@ export function ComparisonDetailPage() {
               <ComparisonDetailHeader
                 comparison={detail.comparison}
                 signal={detail.signal}
+                governanceRecommendation={detail.governanceRecommendation}
                 inventoryHref={returnHref}
                 baselineRunState={detailReturnState}
                 candidateRunState={detailReturnState}
@@ -642,6 +643,7 @@ export function ComparisonDetailPage() {
                 comparisonId={detail.comparison.reportId}
                 dataset={detail.comparison.dataset}
                 signal={detail.signal}
+                recommendation={detail.governanceRecommendation}
                 returnState={detailReturnState}
                 autoLoadVersions
                 title="Regression enforcement surface"

@@ -55,7 +55,7 @@ policy-driven recommendations and review/apply workflows.
     policy rules.
 
 ### Phase 95: Debugger Recommendation Surfacing
-- Status: ready
+- Status: complete
 - Requirements: `UI-01`, `UI-02`
 - Goal: surface recommendation status, rationale, and matched-family context directly on debugger
   signal views.
@@ -65,7 +65,7 @@ policy-driven recommendations and review/apply workflows.
     from the debugger.
 
 ### Phase 96: Governance Stability And Workflow Verification
-- Status: pending
+- Status: ready
 - Requirements: `FLOW-01`
 - Goal: prove the full governance loop from comparison signal to recommendation to applied dataset
   action.
@@ -77,9 +77,9 @@ policy-driven recommendations and review/apply workflows.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 95
-$gsd-plan-phase 95
+$gsd-discuss-phase 96
+$gsd-plan-phase 96
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after Phase 94 completion*
+*Roadmap updated: 2026-04-04 after Phase 95 completion*

@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Regression Governance And Recommendation Layer
-current_phase: 95
-current_phase_name: Debugger Recommendation Surfacing
+current_phase: 96
+current_phase_name: Governance Stability And Workflow Verification
 current_plan: null
 status: ready_to_discuss
-stopped_at: Phase 94 complete
-last_updated: "2026-04-04T18:45:00Z"
+stopped_at: Phase 95 complete
+last_updated: "2026-04-04T17:55:00Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 50
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
+  percent: 75
 ---
 
 # State: v4.6 Regression Governance And Recommendation Layer
@@ -30,25 +30,25 @@ review/apply workflows.
 
 ## Current Focus
 
-- next_action: discuss Phase `95`
-- status: Phase `94` complete; next phase ready to discuss
+- next_action: discuss Phase `96`
+- status: Phase `95` complete; final verification phase ready to discuss
 
 ## Current Position
 
 Milestone: `v4.6`
-Phase: `95` — ready to discuss
+Phase: `96` — ready to discuss
 
 ## Workflow State
 
-**Current Phase:** `95`
-**Current Phase Name:** `Debugger Recommendation Surfacing`
+**Current Phase:** `96`
+**Current Phase Name:** `Governance Stability And Workflow Verification`
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
 **Status:** Ready to discuss
-**Progress:** [█████░░░░░] 50%
+**Progress:** [████████░░] 75%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Completed Phase `94` governance review/apply CLI and family-health inspection
+**Last Activity Description:** Completed Phase `95` debugger recommendation surfacing and frontend verification
 
 ## Recent Decisions
 
@@ -71,21 +71,23 @@ Phase: `95` — ready to discuss
   evolving packs high-signal over time.
 - Phase `93` now provides the deterministic backend contract for governance recommendations,
   including policy, matched-family context, and no-write evidence preview.
-- Phase `94` now provides CLI review/apply flows and dataset-family health, so the remaining gap is
-  debugger visibility over those decisions.
+- Phase `94` now provides CLI review/apply flows and dataset-family health.
+- Phase `95` now surfaces recommendation action, rationale, and matched-family context directly on
+  debugger signal surfaces without introducing a new governance route.
+- The remaining gap is end-to-end governance workflow proof across repeated local artifact runs.
 
 ## Session
 
 **Last Date:** 2026-04-04T17:00:00Z
-**Stopped At:** Phase 94 complete
+**Stopped At:** Phase 95 complete
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-discuss-phase 95
-$gsd-plan-phase 95
+$gsd-discuss-phase 96
+$gsd-plan-phase 96
 ```
 
 ---
-*State updated: 2026-04-04 after Phase 94 completion*
+*State updated: 2026-04-04 after Phase 95 completion*

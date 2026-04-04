@@ -17,6 +17,9 @@ import {
   type ArtifactInsightSampling,
   type ArtifactDatasetEvolutionResponse,
   type ArtifactDatasetPolicy,
+  type ArtifactGovernanceFamilyMatch,
+  type ArtifactGovernancePolicy,
+  type ArtifactGovernanceRecommendation,
   type ArtifactDatasetVersionRecord,
   type ArtifactDatasetVersionsResponse,
   type ArtifactHarvestResponse,
@@ -154,6 +157,80 @@ function requireArtifactDatasetPolicy(value: unknown, field: string): ArtifactDa
   };
 }
 
+function requireArtifactGovernancePolicy(
+  value: unknown,
+  field: string,
+): ArtifactGovernancePolicy {
+  const data = requireObject(value, field);
+  return {
+    minimumSeverity: requireNumber(data.minimum_severity, `${field}.minimum_severity`),
+    topN: requireCount(data.top_n, `${field}.top_n`),
+    failureType: requireStringOrNull(data.failure_type, `${field}.failure_type`),
+    familyId: requireStringOrNull(data.family_id, `${field}.family_id`),
+    familyCaseCap:
+      data.family_case_cap == null
+        ? null
+        : requireCount(data.family_case_cap, `${field}.family_case_cap`),
+    maxDuplicateRatio: requireNumberOrNull(
+      data.max_duplicate_ratio,
+      `${field}.max_duplicate_ratio`,
+    ),
+    strategy: requireString(data.strategy, `${field}.strategy`),
+  };
+}
+
+function requireArtifactGovernanceFamilyMatch(
+  value: unknown,
+  field: string,
+): ArtifactGovernanceFamilyMatch {
+  const data = requireObject(value, field);
+  return {
+    familyId: requireString(data.family_id, `${field}.family_id`),
+    matchKind: requireString(data.match_kind, `${field}.match_kind`),
+    exists:
+      typeof data.exists === "boolean"
+        ? data.exists
+        : (() => {
+            throw new Error(`${field}.exists must be a boolean`);
+          })(),
+    versionCount: requireCount(data.version_count, `${field}.version_count`),
+    latestDatasetId: requireStringOrNull(
+      data.latest_dataset_id,
+      `${field}.latest_dataset_id`,
+    ),
+    currentCaseCount: requireCount(data.current_case_count, `${field}.current_case_count`),
+    proposedAdditionCount: requireCount(
+      data.proposed_addition_count,
+      `${field}.proposed_addition_count`,
+    ),
+    duplicateCaseCount: requireCount(
+      data.duplicate_case_count,
+      `${field}.duplicate_case_count`,
+    ),
+    duplicateRatio: requireNumber(data.duplicate_ratio, `${field}.duplicate_ratio`),
+    projectedCaseCount: requireCount(
+      data.projected_case_count,
+      `${field}.projected_case_count`,
+    ),
+    familyCaseCap:
+      data.family_case_cap == null
+        ? null
+        : requireCount(data.family_case_cap, `${field}.family_case_cap`),
+    capReached:
+      typeof data.cap_reached === "boolean"
+        ? data.cap_reached
+        : (() => {
+            throw new Error(`${field}.cap_reached must be a boolean`);
+          })(),
+    duplicateRatioExceeded:
+      typeof data.duplicate_ratio_exceeded === "boolean"
+        ? data.duplicate_ratio_exceeded
+        : (() => {
+            throw new Error(`${field}.duplicate_ratio_exceeded must be a boolean`);
+          })(),
+  };
+}
+
 function requireArtifactRegressionPreviewCases(
   value: unknown,
   field: string,
@@ -204,6 +281,35 @@ function requireArtifactRegressionPackResponse(payload: unknown): ArtifactRegres
     previewCases: requireArtifactRegressionPreviewCases(
       data.preview_cases,
       "regression_pack.preview_cases",
+    ),
+  };
+}
+
+function requireArtifactGovernanceRecommendation(
+  value: unknown,
+  field: string,
+): ArtifactGovernanceRecommendation {
+  const data = requireObject(value, field);
+  const action = requireString(data.action, `${field}.action`);
+  if (action !== "create" && action !== "evolve" && action !== "ignore") {
+    throw new Error(`${field}.action must be create, evolve, or ignore`);
+  }
+  return {
+    comparisonId: requireString(data.comparison_id, `${field}.comparison_id`),
+    action,
+    policyRule: requireString(data.policy_rule, `${field}.policy_rule`),
+    rationale: requireString(data.rationale, `${field}.rationale`),
+    policy: requireArtifactGovernancePolicy(data.policy, `${field}.policy`),
+    signal: requireComparisonSignal(data.signal, `${field}.signal`),
+    matchedFamily: requireArtifactGovernanceFamilyMatch(
+      data.matched_family,
+      `${field}.matched_family`,
+    ),
+    selectedCaseCount: requireCount(data.selected_case_count, `${field}.selected_case_count`),
+    evidenceCaseIds: requireStringArray(data.evidence_case_ids, `${field}.evidence_case_ids`),
+    previewCases: requireArtifactRegressionPreviewCases(
+      data.preview_cases,
+      `${field}.preview_cases`,
     ),
   };
 }
@@ -617,6 +723,13 @@ function requireArtifactQuerySignalRows(value: unknown, field: string): Artifact
       netScore: requireNumber(row.net_score, `${field}[${index}].net_score`),
       severity: requireNumber(row.severity, `${field}[${index}].severity`),
       topDrivers: requireComparisonSignalDrivers(row.top_drivers, `${field}[${index}].top_drivers`),
+      governanceRecommendation:
+        row.governance_recommendation == null
+          ? null
+          : requireArtifactGovernanceRecommendation(
+              row.governance_recommendation,
+              `${field}[${index}].governance_recommendation`,
+            ),
     };
   });
 }
@@ -1348,6 +1461,13 @@ export function validateComparisonDetail(payload: unknown): ComparisonDetail {
     },
     caseDeltas: requireComparisonCaseDeltas(data.caseDeltas, "caseDeltas"),
     insightReport: requireInsightReport(data.insightReport, "insightReport"),
+    governanceRecommendation:
+      data.governanceRecommendation == null
+        ? null
+        : requireArtifactGovernanceRecommendation(
+            data.governanceRecommendation,
+            "governanceRecommendation",
+          ),
   };
 }
 
