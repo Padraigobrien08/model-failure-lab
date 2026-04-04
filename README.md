@@ -206,6 +206,20 @@ failure-lab query --root artifacts/insight-fixture-workspace --failure-type hall
 failure-lab compare <baseline-run-id> <candidate-run-id> --root artifacts/insight-fixture-workspace --explain
 ```
 
+Closed-loop harvest replay over the same workspace:
+
+```bash
+failure-lab harvest --root artifacts/insight-fixture-workspace --comparison <comparison-report-id> --delta regression --out artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json
+failure-lab dataset review artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json
+failure-lab dataset promote artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json --dataset-id fixture-regression-pack-v1 --root artifacts/insight-fixture-workspace
+failure-lab run --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --model insight_fixture_v1:candidate-model --classifier insight_fixture_classifier_v1
+failure-lab run --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --model insight_fixture_v1:stable-model --classifier insight_fixture_classifier_v1
+failure-lab report --root artifacts/insight-fixture-workspace --run <candidate-rerun-id>
+failure-lab report --root artifacts/insight-fixture-workspace --run <stable-rerun-id>
+failure-lab compare <candidate-rerun-id> <stable-rerun-id> --root artifacts/insight-fixture-workspace --explain
+failure-lab query --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --summarize
+```
+
 ## Development Setup
 
 Editable install:
