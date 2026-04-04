@@ -710,6 +710,114 @@ def test_compare_signal_flags_and_regression_listing_use_persisted_scores(
     assert regressions_payload["rows"][0]["signal_verdict"] == "improvement"
 
 
+def test_compare_signal_outputs_stay_stable_across_repeat_compare_and_index_rebuild(
+    tmp_path,
+    capsys,
+) -> None:
+    adapter_id = "unit-cli-signal-stability-adapter"
+    classifier_id = "unit-cli-signal-stability-classifier"
+    register_model(adapter_id, CompareCliAdapter)
+    register_classifier(classifier_id, CompareCliClassifier())
+
+    baseline_path = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+        model="baseline-model",
+        seed=65,
+        suffix_minutes=0,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+    candidate_path = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+        model="candidate-model",
+        seed=66,
+        suffix_minutes=1,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+
+    first_exit = main(
+        [
+            "compare",
+            str(baseline_path),
+            str(candidate_path),
+            "--root",
+            str(tmp_path),
+            "--score",
+        ]
+    )
+    first_payload = json.loads(capsys.readouterr().out)
+
+    second_exit = main(
+        [
+            "compare",
+            str(baseline_path),
+            str(candidate_path),
+            "--root",
+            str(tmp_path),
+            "--score",
+        ]
+    )
+    second_payload = json.loads(capsys.readouterr().out)
+
+    rebuild_exit = main(["index", "rebuild", "--root", str(tmp_path)])
+    rebuild_output = capsys.readouterr().out
+
+    listing_exit = main(
+        [
+            "regressions",
+            "--root",
+            str(tmp_path),
+            "--direction",
+            "improvement",
+            "--json",
+        ]
+    )
+    listing_payload = json.loads(capsys.readouterr().out)
+
+    assert first_exit == 0
+    assert second_exit == 0
+    assert first_payload["signal"] == second_payload["signal"]
+
+    assert rebuild_exit == 0
+    assert "Failure Lab Index" in rebuild_output
+    assert "Comparisons: 1" in rebuild_output
+
+    assert listing_exit == 0
+    assert listing_payload["query_kind"] == "comparison_signals"
+    assert len(listing_payload["rows"]) == 1
+    assert {
+        (
+            row["signal_verdict"],
+            row["regression_score"],
+            row["improvement_score"],
+            row["severity"],
+        )
+        for row in listing_payload["rows"]
+    } == {
+        (
+            first_payload["signal"]["verdict"],
+            first_payload["signal"]["regression_score"],
+            first_payload["signal"]["improvement_score"],
+            first_payload["signal"]["severity"],
+        )
+    }
+
+
 def test_cli_ollama_stub_loop_runs_report_and_compare(tmp_path, capsys) -> None:
     classifier_id = "unit-cli-ollama-compare-classifier"
     register_classifier(classifier_id, CompareCliClassifier())

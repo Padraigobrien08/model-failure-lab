@@ -64,7 +64,7 @@ without manual inspection.
     failure type.
 
 ### Phase 88: Signal Stability And Workflow Verification
-- Status: pending
+- Status: complete
 - Requirements: `VERF-01`
 - Goal: prove that the signal layer is stable, reproducible, and useful across CLI and debugger
   workflows.
@@ -77,9 +77,8 @@ without manual inspection.
 ## Next Action
 
 ```bash
-$gsd-plan-phase 88
-$gsd-execute-phase 88
+$gsd-complete-milestone
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after Phase 87 completion*
+*Roadmap updated: 2026-04-04 after Phase 88 completion*

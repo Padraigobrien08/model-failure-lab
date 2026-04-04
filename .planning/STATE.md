@@ -5,16 +5,16 @@ milestone_name: Regression Detection And Signal Layer
 current_phase: 88
 current_phase_name: Signal Stability And Workflow Verification
 current_plan: null
-status: ready_to_plan
-stopped_at: Phase 87 complete
-last_updated: "2026-04-04T14:30:15Z"
+status: ready_to_complete
+stopped_at: Phase 88 complete
+last_updated: "2026-04-04T14:34:26Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 75
+  completed_phases: 4
+  total_plans: 4
+  completed_plans: 4
+  percent: 100
 ---
 
 # State: v4.4 Regression Detection And Signal Layer
@@ -25,18 +25,17 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 
 **Core value:** Make behavior changes explicit, deterministic, and actionable from local
 artifacts.
-**Current focus:** Prove the signal layer is stable and workflow-complete across persisted
-artifacts, CLI surfaces, and debugger severity views.
+**Current focus:** Milestone closeout for the fully verified signal layer.
 
 ## Current Focus
 
-- next_action: plan Phase `88`
-- status: Phase 87 complete; final workflow verification is next
+- next_action: complete milestone `v4.4`
+- status: Phase 88 complete; milestone is ready to archive
 
 ## Current Position
 
 Milestone: `v4.4`
-Phase: `88` — ready to plan
+Phase: `88` — ready to complete
 
 ## Workflow State
 
@@ -45,10 +44,10 @@ Phase: `88` — ready to plan
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
-**Status:** Ready to plan
-**Progress:** [████████░░] 75%
+**Status:** Ready to complete
+**Progress:** [██████████] 100%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Completed Phase 87 debugger severity surfacing and evidence handoff
+**Last Activity Description:** Completed Phase 88 signal stability and workflow verification
 
 ## Recent Decisions
 
@@ -68,6 +67,8 @@ Phase: `88` — ready to plan
   verdict, severity, top drivers, then drillthrough into existing evidence routes.
 - Treat `/analysis?mode=signals` as a ranking view rather than an insight or harvesting surface,
   so it does not show heuristic summaries or draft-export actions.
+- Treat repeated comparison generation over the same saved runs as deterministic:
+  persisted signal payloads must remain stable and index rebuilds must not drift the listing layer.
 
 ## Accumulated Context
 
@@ -84,15 +85,14 @@ Phase: `88` — ready to plan
 ## Session
 
 **Last Date:** 2026-04-04T14:04:56Z
-**Stopped At:** Phase 87 complete
+**Stopped At:** Phase 88 complete
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-plan-phase 88
-$gsd-execute-phase 88
+$gsd-complete-milestone
 ```
 
 ---
-*State updated: 2026-04-04 after Phase 87 completion*
+*State updated: 2026-04-04 after Phase 88 completion*

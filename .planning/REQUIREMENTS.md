@@ -31,7 +31,7 @@ comparison artifacts.
 
 ### Stability And Verification
 
-- [ ] **VERF-01**: Signal outputs remain stable and reproducible across repeated runs over the same
+- [x] **VERF-01**: Signal outputs remain stable and reproducible across repeated runs over the same
   artifacts, and verification proves users can identify meaningful changes without opening dense
   detail views first.
 
@@ -65,7 +65,7 @@ comparison artifacts.
 | IDX-01 | Phase 86 | Complete |
 | UI-01 | Phase 87 | Complete |
 | UI-02 | Phase 87 | Complete |
-| VERF-01 | Phase 88 | Pending |
+| VERF-01 | Phase 88 | Complete |
 
 **Coverage:**
 - v4.4 requirements: 9 total

@@ -710,6 +710,10 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
       server,
       `${ARTIFACT_QUERY_PATH}?mode=aggregates&aggregateBy=failure_type&limit=10`,
     );
+    const analysisSignals = await fetchTimedJsonFromMiddleware(
+      server,
+      `${ARTIFACT_QUERY_PATH}?mode=signals&signalDirection=all&limit=10`,
+    );
 
     const runIds = await listDirectoryIds(path.join(normalizedArtifactRoot, "runs"));
     const reportIds = await listDirectoryIds(path.join(normalizedArtifactRoot, "reports"));
@@ -735,6 +739,9 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
       throw new Error(
         "Comparison detail source path did not use the configured artifact root",
       );
+    }
+    if (!comparisonDetail.signal || typeof comparisonDetail.signal.verdict !== "string") {
+      throw new Error("Comparison detail did not expose the persisted signal block");
     }
     if (!runIds.includes(runId) || !runsInventory.runs.some((row) => row.run_id === runId)) {
       throw new Error(`Runs inventory did not include ${runId}`);
@@ -762,6 +769,9 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         "Analysis aggregate query source path did not use the configured artifact root",
       );
     }
+    if (analysisSignals.json.source.path !== normalizedArtifactRoot) {
+      throw new Error("Analysis signal query source path did not use the configured artifact root");
+    }
     if (!Array.isArray(analysisCases.json.rows)) {
       throw new Error("Analysis case query did not return rows");
     }
@@ -771,10 +781,14 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
     if (!Array.isArray(analysisAggregates.json.rows)) {
       throw new Error("Analysis aggregate query did not return rows");
     }
+    if (!Array.isArray(analysisSignals.json.rows)) {
+      throw new Error("Analysis signal query did not return rows");
+    }
     for (const [label, durationMs] of [
       ["cases", analysisCases.durationMs],
       ["deltas", analysisDeltas.durationMs],
       ["aggregates", analysisAggregates.durationMs],
+      ["signals", analysisSignals.durationMs],
     ]) {
       if (durationMs > QUERY_LATENCY_BUDGET_MS) {
         throw new Error(
@@ -795,6 +809,7 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         `Query latency (cases): ${analysisCases.durationMs.toFixed(1)}ms`,
         `Query latency (deltas): ${analysisDeltas.durationMs.toFixed(1)}ms`,
         `Query latency (aggregates): ${analysisAggregates.durationMs.toFixed(1)}ms`,
+        `Query latency (signals): ${analysisSignals.durationMs.toFixed(1)}ms`,
         "Verified endpoints:",
         "- overview",
         "- runs inventory",
@@ -804,6 +819,7 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         "- analysis query (cases)",
         "- analysis query (deltas)",
         "- analysis query (aggregates)",
+        "- analysis query (signals)",
       ].join("\n") + "\n",
     );
   } finally {
