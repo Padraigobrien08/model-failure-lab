@@ -1,23 +1,23 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.5
-milestone_name: Dataset Evolution And Regression Pack Automation
-current_phase: null
-current_phase_name: null
+milestone: v4.6
+milestone_name: Regression Governance And Recommendation Layer
+current_phase: 93
+current_phase_name: Policy Contract And Recommendation Rules
 current_plan: null
-status: milestone_complete
-stopped_at: Milestone archived and ready for next milestone
-last_updated: "2026-04-04T16:45:00Z"
+status: ready_to_discuss
+stopped_at: Milestone v4.6 started
+last_updated: "2026-04-04T17:00:00Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# State: v4.5 Dataset Evolution And Regression Pack Automation
+# State: v4.6 Regression Governance And Recommendation Layer
 
 ## Project Reference
 
@@ -25,59 +25,63 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, and actionable from local artifacts.
-**Current focus:** No active milestone; the repo is ready for the next planning cycle.
+**Current focus:** Turn regression enforcement into deterministic governance recommendations and
+review/apply workflows.
 
 ## Current Focus
 
-- next_action: start the next milestone with `$gsd-new-milestone`
-- status: `v4.5` archived locally after passing verification
+- next_action: discuss Phase `93`
+- status: milestone started; requirements and roadmap are defined
 
 ## Current Position
 
-Latest completed milestone: `v4.5`
-Phase: none active
+Milestone: `v4.6`
+Phase: `93` — ready to discuss
 
 ## Workflow State
 
-**Current Phase:** none
-**Current Phase Name:** none
+**Current Phase:** `93`
+**Current Phase Name:** `Policy Contract And Recommendation Rules`
 **Total Phases:** 4
 **Current Plan:** none
-**Total Plans in Milestone:** 8
-**Status:** Milestone complete
-**Progress:** [██████████] 100%
+**Total Plans in Phase:** 0
+**Status:** Ready to discuss
+**Progress:** [░░░░░░░░░░] 0%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Archived milestone `v4.5` after dataset-evolution and enforcement-loop verification
+**Last Activity Description:** Started milestone `v4.6` and defined regression governance requirements
 
 ## Recent Decisions
 
-- Keep regression-pack generation deterministic and signal-driven rather than introducing an opaque
-  ranking layer.
-- Make dataset families immutable with explicit parent/version lineage and source-comparison
-  provenance.
-- Keep debugger support route-local and lightweight: generate, evolve, inspect history, and drill
-  back into evidence.
-- Treat smoke failures as milestone blockers; the final closeout fixed circular imports uncovered by
-  the real-artifact debugger path.
+- Use `v4.6` because this work extends the shipped `v4.5` enforcement loop rather than resetting
+  product scope.
+- Skip separate milestone research because the governance layer is a direct continuation of the
+  current signal and dataset-evolution architecture.
+- Keep governance recommendations deterministic, local, and inspectable rather than introducing a
+  hosted policy service or opaque ranking model.
+- Treat review/apply as an explicit user-facing workflow with dry-run surfaces before writes.
 
 ## Accumulated Context
 
-- The product now supports execution, reporting, comparison, query, grounded interpretation,
-  harvesting, signal scoring, and versioned regression-pack enforcement over local artifacts.
+- The product already supports execution, reporting, comparison, query, grounded insight, failure
+  harvesting, regression signals, and versioned regression-pack enforcement over local artifacts.
 - `v4.5` closed the enforcement loop:
   saved regressions can become future evaluation datasets automatically and reproducibly.
+- The next user bottleneck is governance:
+  deciding which regressions deserve action, which family should absorb them, and how to keep
+  evolving packs high-signal over time.
 
 ## Session
 
-**Last Date:** 2026-04-04T16:45:00Z
-**Stopped At:** Milestone archived and ready for next milestone
+**Last Date:** 2026-04-04T17:00:00Z
+**Stopped At:** Milestone v4.6 started
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 93
+$gsd-plan-phase 93
 ```
 
 ---
-*State updated: 2026-04-04 after v4.5 completion*
+*State updated: 2026-04-04 for milestone v4.6 initialization*

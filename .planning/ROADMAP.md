@@ -27,15 +27,59 @@
 - [x] [v1.1 Live Benchmark Validation And Research Packaging](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.1-ROADMAP.md) - shipped 2026-03-20; real-run validation and reproducibility packaging.
 - [x] [v1.0 MVP](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.0-ROADMAP.md) - shipped 2026-03-20; benchmark pipeline, baselines, evaluation, and reporting contract.
 
-## Active Milestone
+## Active Milestone: v4.6 Regression Governance And Recommendation Layer
 
-No active milestone. `v4.5` is archived locally and the planning root is ready for the next cycle.
+**Goal:** Turn regression enforcement from manual dataset-evolution decisions into deterministic,
+policy-driven recommendations and review/apply workflows.
+
+### Phase 93: Policy Contract And Recommendation Rules
+- Status: pending
+- Requirements: `GOV-01`, `GOV-02`, `GOV-03`
+- Goal: define the deterministic governance-policy contract and produce stable recommendation output
+  for saved comparison signals.
+- Success criteria:
+  - A saved comparison yields a deterministic `create`, `evolve`, or `ignore` recommendation.
+  - Recommendation output includes explicit rationale, severity basis, matched family, and
+    evidence-linked context.
+  - Governance policy inputs such as severity threshold, top-N, failure-type filter, family cap,
+    and growth rules are local and inspectable.
+
+### Phase 94: Family Matching And Review/Apply CLI
+- Status: pending
+- Requirements: `REC-01`, `REC-02`, `REC-03`, `FAM-01`, `FAM-02`
+- Goal: add family matching plus recent-signal review and apply flows in the CLI.
+- Success criteria:
+  - Users can review recent recommendations without opening every comparison manually.
+  - Dry-run and apply modes stay reproducible and inspectable before writing dataset artifacts.
+  - Family matching and family-health reporting are deterministic across lineage, overlap, and
+    policy rules.
+
+### Phase 95: Debugger Recommendation Surfacing
+- Status: pending
+- Requirements: `UI-01`, `UI-02`
+- Goal: surface recommendation status, rationale, and matched-family context directly on debugger
+  signal views.
+- Success criteria:
+  - Signal surfaces show recommendation status and rationale before dense inspection.
+  - Users can inspect matched-family context and open relevant source or family evidence directly
+    from the debugger.
+
+### Phase 96: Governance Stability And Workflow Verification
+- Status: pending
+- Requirements: `FLOW-01`
+- Goal: prove the full governance loop from comparison signal to recommendation to applied dataset
+  action.
+- Success criteria:
+  - Governance decisions remain deterministic and reproducible across repeated runs.
+  - Applied decisions generate stable dataset actions over local artifacts.
+  - Verification proves the full `compare -> recommend -> review/apply -> dataset action` loop.
 
 ## Next Action
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 93
+$gsd-plan-phase 93
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after v4.5 completion*
+*Roadmap updated: 2026-04-04 for milestone v4.6 initialization*
