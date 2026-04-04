@@ -220,6 +220,25 @@ def test_query_command_can_summarize_in_heuristic_json_mode(tmp_path: Path, caps
     assert payload["insight_report"]["patterns"]
 
 
+def test_compare_alert_stays_silent_for_neutral_signals(tmp_path: Path, capsys) -> None:
+    baseline_run_id, candidate_run_id = _materialize_workspace(tmp_path)
+
+    exit_code = main(
+        [
+            "compare",
+            baseline_run_id,
+            candidate_run_id,
+            "--root",
+            str(tmp_path),
+            "--alert",
+        ]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert output == ""
+
+
 def test_query_command_can_enrich_summaries_in_llm_mode(tmp_path: Path, capsys) -> None:
     _materialize_workspace(tmp_path)
     rebuild_query_index(root=tmp_path)

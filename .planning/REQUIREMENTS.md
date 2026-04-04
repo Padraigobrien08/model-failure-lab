@@ -15,11 +15,11 @@ comparison artifacts.
 
 ### CLI Signal Surfaces
 
-- [ ] **CLI-01**: User can inspect raw comparison signal output with `failure-lab compare A B --score`.
-- [ ] **CLI-02**: User can inspect a deterministic human-readable signal summary with
+- [x] **CLI-01**: User can inspect raw comparison signal output with `failure-lab compare A B --score`.
+- [x] **CLI-02**: User can inspect a deterministic human-readable signal summary with
   `failure-lab compare A B --summary`, including top drivers and case-level evidence references.
-- [ ] **CLI-03**: User can emit thresholded alert-style output with `failure-lab compare A B --alert`.
-- [ ] **IDX-01**: User can list recent regressions or improvements ordered by severity without
+- [x] **CLI-03**: User can emit thresholded alert-style output with `failure-lab compare A B --alert`.
+- [x] **IDX-01**: User can list recent regressions or improvements ordered by severity without
   manually opening each saved comparison.
 
 ### Debugger Signal Layer
@@ -59,10 +59,10 @@ comparison artifacts.
 |-------------|-------|--------|
 | SIG-01 | Phase 85 | Complete |
 | SIG-02 | Phase 85 | Complete |
-| CLI-01 | Phase 86 | Pending |
-| CLI-02 | Phase 86 | Pending |
-| CLI-03 | Phase 86 | Pending |
-| IDX-01 | Phase 86 | Pending |
+| CLI-01 | Phase 86 | Complete |
+| CLI-02 | Phase 86 | Complete |
+| CLI-03 | Phase 86 | Complete |
+| IDX-01 | Phase 86 | Complete |
 | UI-01 | Phase 87 | Pending |
 | UI-02 | Phase 87 | Pending |
 | VERF-01 | Phase 88 | Pending |

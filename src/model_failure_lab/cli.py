@@ -28,6 +28,7 @@ from model_failure_lab.index import (
     aggregate_case_query,
     query_case_deltas,
     query_cases,
+    query_comparison_signals,
     rebuild_query_index,
 )
 from model_failure_lab.runner.artifacts import write_run_artifacts
@@ -49,6 +50,7 @@ CANONICAL_COMMAND = "failure-lab"
 COMPATIBILITY_COMMAND = "model-failure-lab"
 DEFAULT_CLASSIFIER_ID = "heuristic_v1"
 DEFAULT_RUN_SEED = 13
+DEFAULT_SIGNAL_ALERT_THRESHOLD = 0.05
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -184,6 +186,27 @@ def build_parser() -> argparse.ArgumentParser:
             "directory."
         ),
     )
+    compare_parser.add_argument(
+        "--score",
+        action="store_true",
+        help="Emit the raw persisted comparison signal payload as JSON.",
+    )
+    compare_parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Emit a deterministic signal summary with top drivers and evidence-linked case ids.",
+    )
+    compare_parser.add_argument(
+        "--alert",
+        action="store_true",
+        help="Only emit alert-style output when the comparison signal exceeds the alert threshold.",
+    )
+    compare_parser.add_argument(
+        "--alert-threshold",
+        type=float,
+        default=DEFAULT_SIGNAL_ALERT_THRESHOLD,
+        help="Minimum severity score needed before `--alert` emits output (default: 0.05).",
+    )
     _add_analysis_arguments(compare_parser, verb="explain")
     compare_parser.set_defaults(handler=_handle_compare)
 
@@ -306,6 +329,36 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--json", action="store_true", dest="as_json")
     query_parser.set_defaults(handler=_handle_query)
 
+    regressions_parser = subparsers.add_parser(
+        "regressions",
+        help="List recent saved comparison signals ordered by severity.",
+    )
+    regressions_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    regressions_parser.add_argument(
+        "--direction",
+        choices=["regression", "improvement", "neutral", "incompatible", "all"],
+        default="regression",
+    )
+    regressions_parser.add_argument("--failure-type", dest="failure_type")
+    regressions_parser.add_argument("--model")
+    regressions_parser.add_argument("--dataset")
+    regressions_parser.add_argument("--report-id")
+    regressions_parser.add_argument("--baseline-run")
+    regressions_parser.add_argument("--candidate-run")
+    regressions_parser.add_argument("--last-n", type=int)
+    regressions_parser.add_argument("--since")
+    regressions_parser.add_argument("--until")
+    regressions_parser.add_argument("--limit", type=int, default=10)
+    regressions_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_parser.set_defaults(handler=_handle_regressions)
+
     harvest_parser = subparsers.add_parser(
         "harvest",
         help="Harvest saved artifact cases into a draft dataset pack.",
@@ -403,6 +456,11 @@ def _handle_report(args: argparse.Namespace) -> int:
 
 
 def _handle_compare(args: argparse.Namespace) -> int:
+    if args.score and (args.summary or args.alert or args.explain):
+        raise ValueError("`--score` cannot be combined with `--summary`, `--alert`, or `--explain`")
+    if args.alert and (args.summary or args.explain):
+        raise ValueError("`--alert` cannot be combined with `--summary` or `--explain`")
+
     root = _normalized_root(args.root)
     baseline = _load_saved_run_reference(args.baseline, root=root)
     candidate = _load_saved_run_reference(args.candidate, root=root)
@@ -413,8 +471,36 @@ def _handle_compare(args: argparse.Namespace) -> int:
         root=root,
     )
     compare_summary = _render_compare_summary(built.report, built.details, report_path, details_path)
+    if args.score:
+        print(
+            _render_json_payload(
+                {
+                    "report_id": built.report.report_id,
+                    "baseline_run_id": built.report.comparison.get("baseline_run_id"),
+                    "candidate_run_id": built.report.comparison.get("candidate_run_id"),
+                    "status": built.report.status.get("overall"),
+                    "compatible": built.report.comparison.get("compatible"),
+                    "signal": _comparison_signal_payload(built.report, built.details),
+                }
+            )
+        )
+        return 0
+
+    if args.alert:
+        alert_output = _render_signal_alert(
+            built.report,
+            built.details,
+            threshold=args.alert_threshold,
+        )
+        if alert_output is not None:
+            print(alert_output)
+        return 0
+
+    output_sections = [compare_summary]
+    if args.summary:
+        output_sections.append(_render_signal_summary(built.report, built.details))
     if not args.explain:
-        print(compare_summary)
+        print("\n\n".join(output_sections))
         return 0
 
     rebuild_query_index(root=root)
@@ -428,7 +514,8 @@ def _handle_compare(args: argparse.Namespace) -> int:
         analysis_system_prompt=args.analysis_system_prompt,
         analysis_options=analysis_options,
     )
-    print("\n\n".join([compare_summary, _render_insight_report(insight_report)]))
+    output_sections.append(_render_insight_report(insight_report))
+    print("\n\n".join(output_sections))
     return 0
 
 
@@ -582,6 +669,40 @@ def _handle_query(args: argparse.Namespace) -> int:
         print(_render_delta_rows(rows))
     else:
         print(_render_case_rows(rows))
+    return 0
+
+
+def _handle_regressions(args: argparse.Namespace) -> int:
+    root = _normalized_root(args.root)
+    filters = QueryFilters(
+        failure_type=args.failure_type,
+        model=args.model,
+        dataset=args.dataset,
+        report_id=args.report_id,
+        baseline_run_id=args.baseline_run,
+        candidate_run_id=args.candidate_run,
+        last_n=args.last_n,
+        since=args.since,
+        until=args.until,
+        limit=args.limit,
+    )
+    verdict = None if args.direction == "all" else args.direction
+    rows = query_comparison_signals(filters, verdict=verdict, root=root)
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "comparison_signals",
+                    "filters": {
+                        **_query_filters_payload(filters),
+                        "direction": args.direction,
+                    },
+                    "rows": rows,
+                }
+            )
+        )
+        return 0
+    print(_render_signal_rows(rows, direction=args.direction))
     return 0
 
 
@@ -922,6 +1043,41 @@ def _render_delta_rows(rows: list[dict[str, object]]) -> str:
     return "\n".join(["Failure Lab Query", _render_table(table_rows)])
 
 
+def _render_signal_rows(
+    rows: list[dict[str, object]],
+    *,
+    direction: str,
+) -> str:
+    if not rows:
+        return "Failure Lab Signals\nNo saved comparison signals matched the current filters."
+    title = "Failure Lab Regressions" if direction == "regression" else "Failure Lab Signals"
+    table_rows = [
+        (
+            "report_id",
+            "verdict",
+            "severity",
+            "dataset",
+            "baseline_run",
+            "candidate_run",
+            "top_driver",
+        )
+    ]
+    for row in rows:
+        driver = _first_signal_driver(row)
+        table_rows.append(
+            (
+                str(row.get("report_id", "")),
+                str(row.get("signal_verdict", "")),
+                _format_rate(row.get("severity")),
+                str(row.get("dataset", "")),
+                str(row.get("baseline_run_id", "")),
+                str(row.get("candidate_run_id", "")),
+                driver,
+            )
+        )
+    return "\n".join([title, _render_table(table_rows)])
+
+
 def _render_aggregate_rows(rows: list[dict[str, object]]) -> str:
     if not rows:
         return "Failure Lab Query\nNo aggregate rows matched the current filters."
@@ -1218,6 +1374,13 @@ def _render_compare_summary(
             f"baseline_only={comparison.get('baseline_only_case_count', 0)} "
             f"candidate_only={comparison.get('candidate_only_case_count', 0)}"
         ),
+        f"Signal verdict: {_comparison_signal_payload(report, details).get('verdict', 'unknown')}",
+        (
+            "Signal scores: "
+            f"regression={_format_rate(_comparison_signal_payload(report, details).get('regression_score'))} "
+            f"improvement={_format_rate(_comparison_signal_payload(report, details).get('improvement_score'))} "
+            f"severity={_format_rate(_comparison_signal_payload(report, details).get('severity'))}"
+        ),
         f"Failure rate delta: {_format_signed_rate(delta.get('failure_rate'))}",
         f"Coverage delta: {_format_signed_rate(delta.get('classification_coverage'))}",
     ]
@@ -1234,6 +1397,92 @@ def _render_compare_summary(
     if comparison.get("compatible") is False:
         lines.append("Warning: comparison is incompatible, but artifacts were still written.")
     return "\n".join(lines)
+
+
+def _comparison_signal_payload(report, details: dict[str, object]) -> dict[str, object]:
+    comparison = getattr(report, "comparison", {})
+    if isinstance(comparison, dict):
+        signal = comparison.get("signal")
+        if isinstance(signal, dict):
+            return signal
+    signal = details.get("signal")
+    if isinstance(signal, dict):
+        return signal
+    raise ValueError("comparison signal payload is unavailable")
+
+
+def _render_signal_summary(report, details: dict[str, object]) -> str:
+    signal = _comparison_signal_payload(report, details)
+    drivers = signal.get("top_drivers")
+    lines = [
+        "Failure Lab Signal Summary",
+        f"Report ID: {report.report_id}",
+        f"Verdict: {signal.get('verdict', 'unknown')}",
+        (
+            "Scores: "
+            f"regression={_format_rate(signal.get('regression_score'))} "
+            f"improvement={_format_rate(signal.get('improvement_score'))} "
+            f"severity={_format_rate(signal.get('severity'))} "
+            f"net={_format_signed_rate(signal.get('net_score'))}"
+        ),
+    ]
+    if isinstance(signal.get("reason"), str):
+        lines.append(f"Reason: {signal['reason']}")
+    if isinstance(drivers, list) and drivers:
+        lines.append("Top drivers:")
+        for driver in drivers:
+            if not isinstance(driver, dict):
+                continue
+            evidence = driver.get("case_ids")
+            evidence_suffix = ""
+            if isinstance(evidence, list) and evidence:
+                evidence_suffix = " evidence=" + ", ".join(str(case_id) for case_id in evidence[:3])
+            lines.append(
+                f"- {driver.get('failure_type', 'unknown')} "
+                f"{_format_signed_rate(driver.get('delta'))} "
+                f"({driver.get('direction', 'unknown')}){evidence_suffix}"
+            )
+    else:
+        lines.append("Top drivers: none")
+    return "\n".join(lines)
+
+
+def _render_signal_alert(report, details: dict[str, object], *, threshold: float) -> str | None:
+    signal = _comparison_signal_payload(report, details)
+    verdict = signal.get("verdict")
+    severity = signal.get("severity")
+    if verdict not in {"regression", "improvement"} or not isinstance(severity, (int, float)):
+        return None
+    if float(severity) < threshold:
+        return None
+    primary_driver = _first_signal_driver(signal)
+    return "\n".join(
+        [
+            "Failure Lab Alert",
+            f"Report ID: {report.report_id}",
+            f"Verdict: {verdict}",
+            f"Severity: {_format_rate(severity)} (threshold {_format_rate(threshold)})",
+            f"Primary driver: {primary_driver}",
+        ]
+    )
+
+
+def _first_signal_driver(payload: dict[str, object]) -> str:
+    drivers = payload.get("top_drivers")
+    if not isinstance(drivers, list) or not drivers:
+        return "n/a"
+    first = drivers[0]
+    if not isinstance(first, dict):
+        return "n/a"
+    evidence = first.get("case_ids")
+    evidence_suffix = ""
+    if isinstance(evidence, list) and evidence:
+        evidence_suffix = f" [{', '.join(str(case_id) for case_id in evidence[:2])}]"
+    return (
+        f"{first.get('failure_type', 'unknown')} "
+        f"{_format_signed_rate(first.get('delta'))}"
+        f"{evidence_suffix}"
+    )
 
 
 def _render_failure_type_summary(

@@ -40,7 +40,7 @@ without manual inspection.
   - Top drivers identify the highest-impact failure-type deltas behind the verdict.
 
 ### Phase 86: CLI Signal Surfaces And Regression Listings
-- Status: pending
+- Status: complete
 - Requirements: `CLI-01`, `CLI-02`, `CLI-03`, `IDX-01`
 - Goal: expose raw scores, deterministic summaries, thresholded alerts, and recent-regression
   listings over the persisted signal contract.
@@ -77,9 +77,9 @@ without manual inspection.
 ## Next Action
 
 ```bash
-$gsd-plan-phase 86
-$gsd-execute-phase 86
+$gsd-plan-phase 87
+$gsd-execute-phase 87
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after Phase 85 completion*
+*Roadmap updated: 2026-04-04 after Phase 86 completion*
