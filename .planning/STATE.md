@@ -6,8 +6,9 @@ current_phase: null
 current_phase_name: null
 current_plan: null
 status: ready_for_new_milestone
-stopped_at: v4.6 archived
-last_updated: "2026-04-04T19:03:00Z"
+stopped_at: Milestone v4.6 summary generated
+resume_file: .planning/reports/MILESTONE_SUMMARY-v4.6.md
+last_updated: "2026-04-04T19:15:00Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 0
@@ -47,7 +48,7 @@ Phase: none
 **Status:** Ready for new milestone
 **Progress:** [░░░░░░░░░░] 0%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Archived milestone `v4.6` after governance-loop verification
+**Last Activity Description:** Generated onboarding summary for archived milestone `v4.6`
 
 ## Recent Decisions
 
@@ -79,8 +80,8 @@ Phase: none
 ## Session
 
 **Last Date:** 2026-04-04T19:03:00Z
-**Stopped At:** v4.6 archived
-**Resume File:** None
+**Stopped At:** Milestone v4.6 summary generated
+**Resume File:** [.planning/reports/MILESTONE_SUMMARY-v4.6.md](/Users/padraigobrien/model-failure-lab/.planning/reports/MILESTONE_SUMMARY-v4.6.md)
 
 ## Next Suggested Commands
 
