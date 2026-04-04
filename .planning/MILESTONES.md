@@ -1,5 +1,21 @@
 # Milestones
 
+## v4.6 Regression Governance And Recommendation Layer (Shipped: 2026-04-04)
+
+**Phases completed:** 4 phases, 8 plans
+
+**Key accomplishments:**
+- Added deterministic governance recommendations that classify saved comparison signals as
+  `create`, `evolve`, or `ignore`.
+- Added governance review/apply CLI workflows plus dataset-family health inspection over recent
+  comparisons.
+- Surfaced recommendation status, rationale, and matched-family context directly on debugger
+  signal surfaces and comparison detail.
+- Proved the full `compare -> recommend -> review/apply -> dataset action` loop with Python tests,
+  frontend regressions, production build, and real-artifact smoke.
+
+---
+
 ## v4.5 Dataset Evolution And Regression Pack Automation (Shipped: 2026-04-04)
 
 **Phases completed:** 4 phases, 8 plans

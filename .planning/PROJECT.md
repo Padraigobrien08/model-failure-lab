@@ -9,8 +9,8 @@ saved artifact contract.
 
 ## Current State
 
-- Latest shipped milestone: `v4.5`
-- Active milestone: `v4.6 Regression Governance And Recommendation Layer`
+- Latest shipped milestone: `v4.6`
+- Active milestone: none
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -30,39 +30,36 @@ saved artifact contract.
   - `v4.4` added deterministic regression/improvement signals with CLI and debugger severity views
   - `v4.5` turned those signals into versioned regression packs, immutable family evolution, and
     enforced replay loops
+  - `v4.6` added deterministic governance recommendations, review/apply workflows, debugger
+    recommendation surfacing, and proven governance-loop stability
 
-## Latest Completed Milestone: v4.5 Dataset Evolution And Regression Pack Automation
-
-**Goal:** Turn detected regressions into versioned evaluation datasets that evolve deterministically
-from real comparison signals.
-
-**Delivered:**
-- Deterministic draft regression-pack generation directly from saved comparison signals.
-- Immutable dataset-family evolution with stable duplicate collapse, lineage metadata, and CLI
-  history inspection.
-- Debugger enforcement surfaces on comparison detail and `/analysis` signal views for generate,
-  evolve, and version-history inspection.
-- End-to-end enforcement proof across Python workflow tests, frontend regressions, production
-  build, and real-artifact smoke.
-
-## Current Milestone: v4.6 Regression Governance And Recommendation Layer
+## Latest Completed Milestone: v4.6 Regression Governance And Recommendation Layer
 
 **Goal:** Turn regression enforcement from manual dataset-evolution decisions into deterministic,
 policy-driven recommendations and review/apply workflows.
 
-**Target features:**
-- Deterministic recommendation output for `create`, `evolve`, or `ignore` over saved comparison
-  signals.
-- Local policy controls for severity thresholds, top-N limits, failure-type filters, family caps,
-  and duplicate-growth behavior.
-- Review/apply CLI surfaces for recent signals plus dataset-family health inspection.
-- Debugger recommendation status and rationale on signal surfaces without opening dense detail views.
+**Delivered:**
+- Deterministic governance recommendations over saved comparison signals, including explicit
+  severity, matched-family, policy-rule, and evidence-linked rationale.
+- Review/apply CLI workflows and dataset-family health inspection across recent signals.
+- Debugger recommendation status, rationale, and matched-family context on `/analysis` signal
+  views and comparison detail surfaces.
+- End-to-end governance proof across fresh compare artifacts, repeat apply stability, frontend
+  regressions, production build, and real-artifact smoke.
+
+## Current Milestone
+
+No active milestone is defined. The roadmap is ready for the next milestone to be scoped from the
+post-`v4.6` platform state.
 
 ## Next Milestone Goals
 
-- Use governance decisions to drive more proactive alerting and enforcement workflows.
-- Add pack-policy tuning, recommendation explainability, and long-term family health controls.
-- Strengthen dataset governance around growth, pruning, and recurring signal clusters.
+- Build on deterministic governance with more proactive alerting, policy automation, or family
+  lifecycle controls.
+- Extend the enforcement loop without giving up local artifact truth, deterministic policy, or
+  debugger grounding.
+- Keep the next milestone artifact-native unless a clear structural limit forces broader
+  infrastructure.
 
 ## Core Value
 
@@ -92,14 +89,7 @@ and actionable from local artifacts.
 
 ### Active
 
-- Regression signals should yield deterministic recommendations to create a new family, evolve an
-  existing family, or ignore low-value changes.
-- Policy decisions should be explainable through severity, family matching, growth rules, and
-  evidence-linked rationale.
-- Users should be able to review and apply governance decisions across recent comparisons without
-  manually opening each one.
-- Debugger signal views should surface recommendation status and matched-family context before dense
-  inspection.
+- No active milestone. Define the next requirement set with `$gsd-new-milestone`.
 
 ### Out of Scope
 
@@ -117,9 +107,10 @@ and actionable from local artifacts.
 - `v4.4` proved the system can identify what changed and how severe it is without manual
   comparison-by-comparison inspection.
 - `v4.5` proved those regressions can become future evaluation inputs automatically and traceably.
-- The next product pressure is governance:
-  which regressions deserve enforcement, which family should absorb them, and how to keep packs
-  high-signal over time.
+- `v4.6` proved governance decisions can now be deterministic, explainable, reviewable, and stable
+  over local artifacts.
+- The next product pressure is what to do beyond deterministic governance:
+  alerting, policy automation, or longer-term family lifecycle management.
 
 ## Constraints
 
@@ -146,7 +137,7 @@ and actionable from local artifacts.
 | Persist signal blocks directly in comparison artifacts and expose them through CLI and debugger | Signals should be artifact-native and queryable without new infrastructure | ✓ Validated in `v4.4` |
 | Turn high-signal regressions into generated dataset packs instead of alert-only outputs | Enforcement only matters if regressions become future evaluation inputs | ✓ Validated in `v4.5` |
 | Make dataset versions immutable and explicitly linked to source signals and comparisons | Evolution needs traceability and reproducibility, not silent mutation | ✓ Validated in `v4.5` |
-| Make governance decisions explicit, deterministic, and reviewable before writing dataset changes | Recommendation quality matters only if users can trust and inspect the policy basis | — Targeted in `v4.6` |
+| Make governance decisions explicit, deterministic, and reviewable before writing dataset changes | Recommendation quality matters only if users can trust and inspect the policy basis | ✓ Validated in `v4.6` |
 
 ---
-*Last updated: 2026-04-04 for milestone v4.6 initialization*
+*Last updated: 2026-04-04 after archiving milestone v4.6*

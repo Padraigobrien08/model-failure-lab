@@ -1,23 +1,23 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.6
-milestone_name: Regression Governance And Recommendation Layer
-current_phase: 96
-current_phase_name: Governance Stability And Workflow Verification
+milestone: null
+milestone_name: null
+current_phase: null
+current_phase_name: null
 current_plan: null
-status: ready_to_complete
-stopped_at: Phase 95 complete
-last_updated: "2026-04-04T18:59:00Z"
+status: ready_for_new_milestone
+stopped_at: v4.6 archived
+last_updated: "2026-04-04T19:03:00Z"
 last_activity: 2026-04-04
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# State: v4.6 Regression Governance And Recommendation Layer
+# State: Awaiting Next Milestone
 
 ## Project Reference
 
@@ -25,30 +25,29 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, and actionable from local artifacts.
-**Current focus:** Turn regression enforcement into deterministic governance recommendations and
-review/apply workflows.
+**Current focus:** Define the next milestone from the shipped `v4.6` platform state.
 
 ## Current Focus
 
-- next_action: complete milestone `v4.6`
-- status: Phase `96` complete; milestone ready to archive
+- next_action: define the next milestone
+- status: no active milestone; `v4.6` archived
 
 ## Current Position
 
-Milestone: `v4.6`
-Phase: `96` — complete
+Milestone: none
+Phase: none
 
 ## Workflow State
 
-**Current Phase:** `96`
-**Current Phase Name:** `Governance Stability And Workflow Verification`
-**Total Phases:** 4
+**Current Phase:** none
+**Current Phase Name:** none
+**Total Phases:** 0
 **Current Plan:** none
-**Total Plans in Phase:** 2
-**Status:** Ready to complete
-**Progress:** [██████████] 100%
+**Total Plans in Phase:** 0
+**Status:** Ready for new milestone
+**Progress:** [░░░░░░░░░░] 0%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Completed Phase `96` governance workflow proof across CLI, smoke, and frontend verification
+**Last Activity Description:** Archived milestone `v4.6` after governance-loop verification
 
 ## Recent Decisions
 
@@ -71,23 +70,23 @@ Phase: `96` — complete
   evolving packs high-signal over time.
 - Phase `93` now provides the deterministic backend contract for governance recommendations,
   including policy, matched-family context, and no-write evidence preview.
-- Phase `94` now provides CLI review/apply flows and dataset-family health.
-- Phase `95` now surfaces recommendation action, rationale, and matched-family context directly on
-  debugger signal surfaces without introducing a new governance route.
-- Phase `96` now proves the end-to-end governance loop across repeated local artifact runs, so the
-  milestone is ready to archive.
+- `v4.6` is shipped and archived.
+- The platform now covers execution, reporting, comparison, query, grounded interpretation,
+  harvesting, signal scoring, dataset evolution, and governance recommendations over local
+  artifacts.
+- The next milestone can now build from a clean post-governance baseline.
 
 ## Session
 
-**Last Date:** 2026-04-04T17:00:00Z
-**Stopped At:** Phase 96 complete
+**Last Date:** 2026-04-04T19:03:00Z
+**Stopped At:** v4.6 archived
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-complete-milestone
+$gsd-new-milestone
 ```
 
 ---
-*State updated: 2026-04-04 after Phase 96 completion*
+*State updated: 2026-04-04 after archiving v4.6*
