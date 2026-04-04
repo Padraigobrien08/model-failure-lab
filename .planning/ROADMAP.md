@@ -33,7 +33,7 @@
 policy-driven recommendations and review/apply workflows.
 
 ### Phase 93: Policy Contract And Recommendation Rules
-- Status: pending
+- Status: complete
 - Requirements: `GOV-01`, `GOV-02`, `GOV-03`
 - Goal: define the deterministic governance-policy contract and produce stable recommendation output
   for saved comparison signals.
@@ -45,7 +45,7 @@ policy-driven recommendations and review/apply workflows.
     and growth rules are local and inspectable.
 
 ### Phase 94: Family Matching And Review/Apply CLI
-- Status: pending
+- Status: ready
 - Requirements: `REC-01`, `REC-02`, `REC-03`, `FAM-01`, `FAM-02`
 - Goal: add family matching plus recent-signal review and apply flows in the CLI.
 - Success criteria:
@@ -77,9 +77,9 @@ policy-driven recommendations and review/apply workflows.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 93
-$gsd-plan-phase 93
+$gsd-discuss-phase 94
+$gsd-plan-phase 94
 ```
 
 ---
-*Roadmap updated: 2026-04-04 for milestone v4.6 initialization*
+*Roadmap updated: 2026-04-04 after Phase 93 completion*

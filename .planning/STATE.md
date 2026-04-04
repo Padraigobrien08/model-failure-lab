@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.6
 milestone_name: Regression Governance And Recommendation Layer
-current_phase: 93
-current_phase_name: Policy Contract And Recommendation Rules
+current_phase: 94
+current_phase_name: Family Matching And Review/Apply CLI
 current_plan: null
 status: ready_to_discuss
-stopped_at: Milestone v4.6 started
-last_updated: "2026-04-04T17:00:00Z"
+stopped_at: Phase 93 complete
+last_updated: "2026-04-04T18:20:00Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 25
 ---
 
 # State: v4.6 Regression Governance And Recommendation Layer
@@ -30,25 +30,25 @@ review/apply workflows.
 
 ## Current Focus
 
-- next_action: discuss Phase `93`
-- status: milestone started; requirements and roadmap are defined
+- next_action: discuss Phase `94`
+- status: Phase `93` complete; next phase ready to discuss
 
 ## Current Position
 
 Milestone: `v4.6`
-Phase: `93` — ready to discuss
+Phase: `94` — ready to discuss
 
 ## Workflow State
 
-**Current Phase:** `93`
-**Current Phase Name:** `Policy Contract And Recommendation Rules`
+**Current Phase:** `94`
+**Current Phase Name:** `Family Matching And Review/Apply CLI`
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
 **Status:** Ready to discuss
-**Progress:** [░░░░░░░░░░] 0%
+**Progress:** [██░░░░░░░░] 25%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Started milestone `v4.6` and defined regression governance requirements
+**Last Activity Description:** Completed Phase `93` governance policy contract and recommendation rules
 
 ## Recent Decisions
 
@@ -69,19 +69,21 @@ Phase: `93` — ready to discuss
 - The next user bottleneck is governance:
   deciding which regressions deserve action, which family should absorb them, and how to keep
   evolving packs high-signal over time.
+- Phase `93` now provides the deterministic backend contract for governance recommendations,
+  including policy, matched-family context, and no-write evidence preview.
 
 ## Session
 
 **Last Date:** 2026-04-04T17:00:00Z
-**Stopped At:** Milestone v4.6 started
+**Stopped At:** Phase 93 complete
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-discuss-phase 93
-$gsd-plan-phase 93
+$gsd-discuss-phase 94
+$gsd-plan-phase 94
 ```
 
 ---
-*State updated: 2026-04-04 for milestone v4.6 initialization*
+*State updated: 2026-04-04 after Phase 93 completion*

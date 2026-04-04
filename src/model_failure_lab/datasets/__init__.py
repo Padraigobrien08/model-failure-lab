@@ -17,9 +17,11 @@ from .evolution import (
     DatasetVersionRecord,
     RegressionPackDraftSummary,
     RegressionPackPolicy,
+    RegressionPackSelectionSummary,
     evolve_dataset_family,
     generate_regression_pack,
     list_dataset_versions,
+    preview_regression_pack,
     suggest_dataset_family_id,
 )
 from .local import LocalDatasetSummary, available_local_datasets
@@ -62,6 +64,7 @@ __all__ = [
     "LocalDatasetSummary",
     "RegressionPackDraftSummary",
     "RegressionPackPolicy",
+    "RegressionPackSelectionSummary",
     "UnknownBundledDatasetError",
     "available_bundled_datasets",
     "available_bundled_dataset_ids",
@@ -76,5 +79,6 @@ __all__ = [
     "load_bundled_dataset",
     "load_demo_dataset",
     "parse_dataset_payload",
+    "preview_regression_pack",
     "suggest_dataset_family_id",
 ]

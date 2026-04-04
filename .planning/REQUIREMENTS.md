@@ -8,11 +8,11 @@ interpretable, reusable, and actionable from local artifacts.
 
 ### Governance Policy
 
-- [ ] **GOV-01**: User can evaluate a saved comparison and receive a deterministic recommendation to
+- [x] **GOV-01**: User can evaluate a saved comparison and receive a deterministic recommendation to
   `create`, `evolve`, or `ignore`.
-- [ ] **GOV-02**: Every governance recommendation includes explicit rationale covering severity,
+- [x] **GOV-02**: Every governance recommendation includes explicit rationale covering severity,
   matched family (if any), policy rule, and evidence-linked context.
-- [ ] **GOV-03**: User can configure or select local governance policy inputs such as minimum
+- [x] **GOV-03**: User can configure or select local governance policy inputs such as minimum
   severity, top-N limits, failure-type filters, family caps, and duplicate-growth controls.
 
 ### Review And Apply
@@ -67,9 +67,9 @@ interpretable, reusable, and actionable from local artifacts.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GOV-01 | Phase 93 | Pending |
-| GOV-02 | Phase 93 | Pending |
-| GOV-03 | Phase 93 | Pending |
+| GOV-01 | Phase 93 | Complete |
+| GOV-02 | Phase 93 | Complete |
+| GOV-03 | Phase 93 | Complete |
 | REC-01 | Phase 94 | Pending |
 | REC-02 | Phase 94 | Pending |
 | REC-03 | Phase 94 | Pending |

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -85,6 +85,30 @@ class RegressionPackDraftSummary:
             "comparison_id": self.comparison_id,
             "suggested_family_id": self.suggested_family_id,
             "output_path": str(self.output_path),
+            "selected_case_count": self.selected_case_count,
+            "policy": self.policy.to_payload(),
+            "signal": dict(self.signal),
+            "preview_cases": [entry.to_payload() for entry in self.preview_cases],
+        }
+
+
+@dataclass(slots=True, frozen=True)
+class RegressionPackSelectionSummary:
+    comparison_id: str
+    suggested_family_id: str
+    policy: RegressionPackPolicy
+    signal: dict[str, JsonValue]
+    preview_cases: tuple[RegressionPackPreviewCase, ...]
+    selected_rows: tuple[dict[str, Any], ...] = field(default_factory=tuple, repr=False)
+
+    @property
+    def selected_case_count(self) -> int:
+        return len(self.selected_rows)
+
+    def to_payload(self) -> dict[str, JsonValue]:
+        return {
+            "comparison_id": self.comparison_id,
+            "suggested_family_id": self.suggested_family_id,
             "selected_case_count": self.selected_case_count,
             "policy": self.policy.to_payload(),
             "signal": dict(self.signal),
@@ -176,45 +200,34 @@ def generate_regression_pack(
     now: datetime | None = None,
 ) -> RegressionPackDraftSummary:
     artifact_root = project_root(root).resolve()
-    signal_row, delta_rows = _comparison_signal_source(
+    selection = preview_regression_pack(
         comparison_id=comparison_id,
         root=artifact_root,
-    )
-    suggested_family_id = _normalize_family_id(
-        family_id
-        or suggest_dataset_family_id(
-            dataset_id=_string_or_none(signal_row.get("dataset")),
-            signal=signal_row,
-            failure_type=failure_type,
-        )
-    )
-    policy = RegressionPackPolicy(
-        top_n=max(int(top_n), 1),
-        failure_type=failure_type.strip() if isinstance(failure_type, str) and failure_type.strip() else None,
+        family_id=family_id,
+        failure_type=failure_type,
+        top_n=top_n,
     )
     created_at = _timestamp(now)
-    selected_rows, preview_cases = _select_regression_rows(
-        comparison_id=comparison_id,
-        signal_row=signal_row,
-        delta_rows=delta_rows,
-        policy=policy,
-    )
     cases = tuple(
         _build_generated_prompt_case(
             row=row,
             root=artifact_root,
-            comparison_id=comparison_id,
+            comparison_id=selection.comparison_id,
             created_at=created_at,
-            draft_case_id=_stable_entry_id("signal_pack", comparison_id, str(row["case_id"])),
+            draft_case_id=_stable_entry_id(
+                "signal_pack",
+                selection.comparison_id,
+                str(row["case_id"]),
+            ),
         )
-        for row in selected_rows
+        for row in selection.selected_rows
     )
     target_path = _resolve_draft_output_path(
         root=artifact_root,
-        family_id=suggested_family_id,
+        family_id=selection.suggested_family_id,
         output_path=output_path,
     )
-    dataset_id = _normalize_dataset_id(f"{suggested_family_id}-draft")
+    dataset_id = _normalize_dataset_id(f"{selection.suggested_family_id}-draft")
     dataset = FailureDataset(
         dataset_id=dataset_id,
         name=_titleize(dataset_id),
@@ -228,16 +241,16 @@ def generate_regression_pack(
             "mode": "deltas",
             "origin": "regression_signal_pack",
             "artifact_root": str(artifact_root),
-            "comparison_report_id": comparison_id,
-            "suggested_family_id": suggested_family_id,
+            "comparison_report_id": selection.comparison_id,
+            "suggested_family_id": selection.suggested_family_id,
             "filters": {
-                "report_id": comparison_id,
-                "delta": policy.delta_kind,
-                "failure_type": policy.failure_type,
-                "limit": policy.top_n,
+                "report_id": selection.comparison_id,
+                "delta": selection.policy.delta_kind,
+                "failure_type": selection.policy.failure_type,
+                "limit": selection.policy.top_n,
             },
-            "signal": _signal_payload(signal_row),
-            "policy": policy.to_payload(),
+            "signal": dict(selection.signal),
+            "policy": selection.policy.to_payload(),
         },
         cases=cases,
         metadata={
@@ -252,11 +265,11 @@ def generate_regression_pack(
     return RegressionPackDraftSummary(
         dataset=dataset,
         output_path=target_path,
-        comparison_id=comparison_id,
-        suggested_family_id=suggested_family_id,
-        policy=policy,
-        signal=_signal_payload(signal_row),
-        preview_cases=preview_cases,
+        comparison_id=selection.comparison_id,
+        suggested_family_id=selection.suggested_family_id,
+        policy=selection.policy,
+        signal=dict(selection.signal),
+        preview_cases=selection.preview_cases,
     )
 
 
@@ -272,21 +285,14 @@ def evolve_dataset_family(
 ) -> DatasetEvolutionSummary:
     artifact_root = project_root(root).resolve()
     normalized_family_id = _normalize_family_id(family_id)
-    signal_row, delta_rows = _comparison_signal_source(
+    selection = preview_regression_pack(
         comparison_id=comparison_id,
         root=artifact_root,
-    )
-    policy = RegressionPackPolicy(
-        top_n=max(int(top_n), 1),
-        failure_type=failure_type.strip() if isinstance(failure_type, str) and failure_type.strip() else None,
+        family_id=normalized_family_id,
+        failure_type=failure_type,
+        top_n=top_n,
     )
     created_at = _timestamp(now)
-    selected_rows, preview_cases = _select_regression_rows(
-        comparison_id=comparison_id,
-        signal_row=signal_row,
-        delta_rows=delta_rows,
-        policy=policy,
-    )
 
     existing_versions = list_dataset_versions(normalized_family_id, root=artifact_root)
     parent_dataset = (
@@ -306,7 +312,7 @@ def evolve_dataset_family(
     canonical_keys = {_canonical_case_key(case) for case in combined_cases}
     added_case_count = 0
     duplicate_case_count = 0
-    for row in selected_rows:
+    for row in selection.selected_rows:
         source_case = _build_generated_prompt_case(
             row=row,
             root=artifact_root,
@@ -367,8 +373,8 @@ def evolve_dataset_family(
                 "family_id": normalized_family_id,
                 "comparison_report_id": comparison_id,
                 "parent_dataset_id": parent_dataset_id,
-                "signal": _signal_payload(signal_row),
-                "policy": policy.to_payload(),
+                "signal": dict(selection.signal),
+                "policy": selection.policy.to_payload(),
             }
         ),
         cases=tuple(sorted(combined_cases, key=lambda case: case.id)),
@@ -392,12 +398,64 @@ def evolve_dataset_family(
         parent_dataset_id=parent_dataset_id,
         previous_case_count=len(parent_dataset.cases) if parent_dataset is not None else 0,
         added_case_count=added_case_count,
-        selected_case_count=len(selected_rows),
+        selected_case_count=selection.selected_case_count,
         duplicate_case_count=duplicate_case_count,
         comparison_id=comparison_id,
-        signal=_signal_payload(signal_row),
+        signal=dict(selection.signal),
+        policy=selection.policy,
+        preview_cases=selection.preview_cases,
+    )
+
+
+def preview_regression_pack(
+    *,
+    comparison_id: str,
+    root: str | Path | None = None,
+    family_id: str | None = None,
+    failure_type: str | None = None,
+    top_n: int = _DEFAULT_SIGNAL_PACK_LIMIT,
+    allow_empty: bool = False,
+) -> RegressionPackSelectionSummary:
+    artifact_root = project_root(root).resolve()
+    signal_row, delta_rows = _comparison_signal_source(
+        comparison_id=comparison_id,
+        root=artifact_root,
+    )
+    suggested_family_id = _normalize_family_id(
+        family_id
+        or suggest_dataset_family_id(
+            dataset_id=_string_or_none(signal_row.get("dataset")),
+            signal=signal_row,
+            failure_type=failure_type,
+        )
+    )
+    policy = RegressionPackPolicy(
+        top_n=max(int(top_n), 1),
+        failure_type=(
+            failure_type.strip()
+            if isinstance(failure_type, str) and failure_type.strip()
+            else None
+        ),
+    )
+    try:
+        selected_rows, preview_cases = _select_regression_rows(
+            comparison_id=comparison_id,
+            signal_row=signal_row,
+            delta_rows=delta_rows,
+            policy=policy,
+        )
+    except ValueError:
+        if not allow_empty:
+            raise
+        selected_rows = []
+        preview_cases = ()
+    return RegressionPackSelectionSummary(
+        comparison_id=comparison_id,
+        suggested_family_id=suggested_family_id,
         policy=policy,
+        signal=_signal_payload(signal_row),
         preview_cases=preview_cases,
+        selected_rows=tuple(selected_rows),
     )
 
 
