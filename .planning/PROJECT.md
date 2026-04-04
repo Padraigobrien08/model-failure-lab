@@ -10,7 +10,7 @@ artifact contract.
 ## Current State
 
 - Latest shipped milestone: `v4.4`
-- Active milestone: none
+- Active milestone: `v4.5 Dataset Evolution And Regression Pack Automation`
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -28,6 +28,7 @@ artifact contract.
   - `v4.3` added failure harvesting, deterministic dataset promotion, debugger export, and a
     proven replay loop
   - `v4.4` added deterministic regression/improvement signals with CLI and debugger severity views
+  - `v4.5` will turn those signals into versioned regression packs and evolving datasets
 
 ## Latest Completed Milestone: v4.4 Regression Detection And Signal Layer
 
@@ -44,15 +45,26 @@ artifacts.
 - Stability proof across repeated compare operations, index rebuilds, debugger routes, and
   real-artifact smoke.
 
-## Current Milestone
+## Current Milestone: v4.5 Dataset Evolution And Regression Pack Automation
 
-No active milestone is defined yet.
+**Goal:** Turn detected regressions into versioned evaluation datasets that evolve deterministically
+from real comparison signals.
+
+**Target features:**
+- Automatic regression-pack generation from saved comparison signals using deterministic pack
+  policies.
+- Immutable dataset version history with provenance back to source comparisons, signals, and cases.
+- Incremental dataset evolution commands that compose new regressions without mutating prior
+  versions.
+- Debugger affordances for pack generation, version inspection, and provenance drillback.
+- End-to-end proof that generated packs rerun through the standard `run -> compare -> insight`
+  workflow without custom handling.
 
 ## Next Milestone Goals
 
-- Generate regression packs automatically from high-signal comparison changes.
-- Add dataset versioning and evolution over curated harvested packs.
-- Use recurring signal patterns to drive more proactive recommendations and debugging workflows.
+- Use evolving regression packs to drive more proactive alerting and enforcement workflows.
+- Add pack-policy tuning and recommendation layers over recurring signal clusters.
+- Strengthen dataset governance around growth, pruning, and long-term pack quality.
 
 ## Core Value
 
@@ -80,33 +92,40 @@ and actionable from local artifacts.
 
 ### Active
 
-No active milestone requirements yet.
+- Regression signals should generate deterministic draft packs without manual case picking.
+- Dataset packs should become immutable, versioned artifacts with traceable lineage.
+- Existing packs should evolve incrementally from new comparisons without rewriting old versions.
+- Generated packs should remain compatible with the standard CLI, query, insight, and debugger
+  workflow.
 
 ### Out of Scope
 
-- Hosted services, background workers, or external alert pipelines.
-- Learned or opaque scoring models replacing deterministic signal computation.
-- Natural-language regression detection as the primary interface; quantitative surfaces come first.
-- A new provider-specific UI branch; the signal layer must reuse the shared artifact-backed
-  debugger posture.
+- Hosted services, background workers, or external dataset automation pipelines.
+- Learned or opaque pack-composition policies replacing deterministic rules.
+- A full browser-side dataset editor; `v4.5` focuses on lightweight generation and inspection.
+- Silent mutation of published dataset versions.
 
 ## Context
 
 - The product now covers execution, reporting, comparison, query, grounded interpretation, failure
-  harvesting, dataset curation, and replayable evaluation loops.
-- The product now supports execution, reporting, comparison, query, grounded interpretation,
-  harvesting, dataset promotion, and deterministic change signals over the same artifact contract.
-- The next product pressure is how to act on those signals automatically over time rather than
-  detecting them manually.
+  harvesting, dataset curation, replayable evaluation loops, and deterministic change signals.
+- `v4.3` proved users can turn saved failures into curated datasets, but the capture step is still
+  explicit and manual.
+- `v4.4` proved the system can identify what changed and how severe it is without manual
+  comparison-by-comparison inspection.
+- The next product pressure is enforcement:
+  high-signal regressions should become future evaluation inputs automatically and traceably.
 
 ## Constraints
 
-- **Storage:** Filesystem artifacts remain canonical.
-- **Determinism:** Core behavior should remain reproducible and inspectable from local artifacts.
-- **Grounding:** Higher-level interpretation must stay tied to concrete evidence and drillthrough.
-- **Compatibility:** New layers should keep working over the shared artifact contract.
-- **Complexity:** Avoid background services or hosted infrastructure unless a milestone explicitly
-  justifies them.
+- **Storage:** Filesystem artifacts remain canonical — dataset evolution must stay artifact-native.
+- **Determinism:** Pack composition and versioning rules must be reproducible from local artifacts.
+- **Immutability:** Published dataset versions cannot be rewritten in place.
+- **Grounding:** Every generated pack must retain provenance back to source comparisons, signals,
+  and cases.
+- **Compatibility:** Evolved datasets must run through the standard engine and debugger surfaces
+  unchanged.
+- **Complexity:** Avoid hosted services, background workers, or opaque policy engines in `v4.5`.
 
 ## Key Decisions
 
@@ -118,6 +137,8 @@ No active milestone requirements yet.
 | Keep debugger export lightweight and route-local | Review and promotion belong in explicit lifecycle steps, not a browser editor | ✓ Validated in `v4.3` |
 | Compute change signals deterministically from comparison artifacts before any LLM enrichment | Users need stable quantitative answers to “what changed?” first | ✓ Validated in `v4.4` |
 | Persist signal blocks directly in comparison artifacts and expose them through CLI and debugger | Signals should be artifact-native and queryable without new infrastructure | ✓ Validated in `v4.4` |
+| Turn high-signal regressions into generated dataset packs instead of alert-only outputs | Enforcement only matters if regressions become future evaluation inputs | — Targeted in `v4.5` |
+| Make dataset versions immutable and explicitly linked to source signals and comparisons | Evolution needs traceability and reproducibility, not silent mutation | — Targeted in `v4.5` |
 
 ---
-*Last updated: 2026-04-04 after v4.4 completion*
+*Last updated: 2026-04-04 for milestone v4.5 initialization*

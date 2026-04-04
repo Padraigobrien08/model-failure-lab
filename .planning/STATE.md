@@ -1,98 +1,89 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.4
-milestone_name: Regression Detection And Signal Layer
-current_phase: null
-current_phase_name: null
+milestone: v4.5
+milestone_name: Dataset Evolution And Regression Pack Automation
+current_phase: 89
+current_phase_name: Signal-To-Pack Generation
 current_plan: null
-status: milestone_completed
-stopped_at: Milestone archived
-last_updated: "2026-04-04T14:34:26Z"
+status: ready_to_discuss
+stopped_at: Milestone v4.5 started
+last_updated: "2026-04-04T15:01:42Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# State: v4.4 Regression Detection And Signal Layer
+# State: v4.5 Dataset Evolution And Regression Pack Automation
 
 ## Project Reference
 
 See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PROJECT.md) (updated 2026-04-04)
 
-**Core value:** Make behavior changes explicit, deterministic, and actionable from local
-artifacts.
-**Current focus:** Await the next milestone definition.
+**Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
+interpretable, reusable, and actionable from local artifacts.
+**Current focus:** Turn comparison signals into versioned regression packs that re-enter the
+evaluation loop.
 
 ## Current Focus
 
-- next_action: define the next milestone
-- status: `v4.4` archived locally
+- next_action: discuss Phase `89`
+- status: milestone started; requirements and roadmap are defined
 
 ## Current Position
 
-Milestone: `v4.4`
-Phase: none
+Milestone: `v4.5`
+Phase: `89` — ready to discuss
 
 ## Workflow State
 
-**Current Phase:** none
-**Current Phase Name:** none
+**Current Phase:** `89`
+**Current Phase Name:** `Signal-To-Pack Generation`
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
-**Status:** Milestone completed
-**Progress:** [██████████] 100%
+**Status:** Ready to discuss
+**Progress:** [░░░░░░░░░░] 0%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Archived milestone `v4.4`
+**Last Activity Description:** Started milestone `v4.5` and defined dataset evolution requirements
 
 ## Recent Decisions
 
-- Use `v4.4` as the next version because this milestone extends the shipped `v4.3` artifact and
-  harvesting stack with a new signal layer rather than resetting product scope.
-- Keep signal computation deterministic and quantitative first; LLM interpretation remains an
-  optional extension through the existing insight layer.
-- Persist signals directly inside comparison artifacts so they remain artifact-native, reproducible,
-  and queryable.
-- Reuse the current CLI, query, and debugger surfaces instead of introducing a separate alerting
-  service or provider-specific UI branch.
-- Mirror persisted signal fields into the SQLite query index, with a compatibility fallback that
-  derives signals from older comparison artifacts when the signal block is absent.
-- Keep the CLI alert surface directional-only so neutral comparisons remain queryable without
-  producing noisy automated alerts.
-- Keep debugger signal views quantitative first:
-  verdict, severity, top drivers, then drillthrough into existing evidence routes.
-- Treat `/analysis?mode=signals` as a ranking view rather than an insight or harvesting surface,
-  so it does not show heuristic summaries or draft-export actions.
-- Treat repeated comparison generation over the same saved runs as deterministic:
-  persisted signal payloads must remain stable and index rebuilds must not drift the listing layer.
+- Use the user-specified `v4.5` version and milestone framing directly because it follows
+  naturally from the archived `v4.4` signal layer.
+- Skip optional domain research for this milestone because the scope is already concrete and
+  continuous with shipped harvesting and signal capabilities.
+- Keep regression-pack generation deterministic and artifact-native rather than introducing a
+  hosted scheduler or opaque policy layer.
+- Make dataset versions immutable and explicitly linked to source comparisons and signal context.
+- Treat debugger support as lightweight generation and provenance inspection, not a full browser
+  dataset editor.
 
 ## Accumulated Context
 
 - The product already supports execution, reporting, comparison, cross-run query, grounded
   insight, failure harvesting, dataset curation, and replayable evaluation loops.
-- `v4.3` closed the reuse loop:
-  users can now turn saved failures into curated datasets and rerun them through the standard
-  engine.
-- The next user bottleneck is not “can I inspect or reuse failures?” It is “can the system tell me
-  what materially changed between runs and how severe it is without manual digging?”
-- `v4.4` addresses that directly through deterministic comparison scoring, persisted signal blocks,
-  CLI surfacing, and debugger severity views.
+- `v4.4` closed the awareness loop:
+  users can now see what changed, how severe it is, and which evidence drove the shift.
+- The next user bottleneck is enforcement:
+  regressions should become future evaluation inputs automatically and traceably, not only after
+  manual harvesting.
 
 ## Session
 
-**Last Date:** 2026-04-04T14:04:56Z
-**Stopped At:** Milestone archived
+**Last Date:** 2026-04-04T15:01:42Z
+**Stopped At:** Milestone v4.5 started
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 89
+$gsd-plan-phase 89
 ```
 
 ---
-*State updated: 2026-04-04 after v4.4 archive*
+*State updated: 2026-04-04 for milestone v4.5 initialization*

@@ -24,11 +24,60 @@
 - [x] [v1.1 Live Benchmark Validation And Research Packaging](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.1-ROADMAP.md) - shipped 2026-03-20; real-run validation and reproducibility packaging.
 - [x] [v1.0 MVP](/Users/padraigobrien/model-failure-lab/.planning/milestones/v1.0-ROADMAP.md) - shipped 2026-03-20; benchmark pipeline, baselines, evaluation, and reporting contract.
 
+## Active Milestone: v4.5 Dataset Evolution And Regression Pack Automation
+
+**Goal:** Turn detected regressions into versioned evaluation datasets that evolve deterministically
+from real comparison signals and re-enter the standard enforcement loop.
+
+### Phase 89: Signal-To-Pack Generation
+- Status: pending
+- Requirements: `PACK-01`, `PACK-02`
+- Goal: generate deterministic draft regression packs directly from comparison signals and persist
+  the required provenance contract.
+- Success criteria:
+  - Users can generate a draft regression pack from a saved comparison without manual case
+    selection.
+  - Generated packs retain source comparison, signal, driver, and evidence provenance for every
+    harvested case.
+  - Pack composition follows deterministic selection rules instead of ad hoc ordering.
+
+### Phase 90: Versioned Dataset Evolution CLI
+- Status: pending
+- Requirements: `VERS-01`, `VERS-02`, `EVOL-01`, `EVOL-02`
+- Goal: add immutable dataset versioning and deterministic evolution commands over generated
+  regression packs.
+- Success criteria:
+  - Users can create immutable versioned dataset artifacts from draft packs.
+  - Users can inspect dataset version history and lineage from the CLI.
+  - Existing datasets can evolve from a new comparison without mutating older versions.
+  - Stable evolution policies keep repeated runs over the same inputs identical.
+
+### Phase 91: Debugger Pack Generation And Version Provenance
+- Status: pending
+- Requirements: `UI-01`, `UI-02`
+- Goal: expose dataset generation, version inspection, and provenance drillback in the debugger.
+- Success criteria:
+  - Signal surfaces in the debugger can trigger regression-pack generation.
+  - Dataset views show version lineage and source-comparison provenance.
+  - Users can drill from a versioned dataset item back to the comparison signal and case evidence
+    that introduced it.
+
+### Phase 92: Enforcement Loop Verification
+- Status: pending
+- Requirements: `LOOP-01`
+- Goal: prove the automated enforcement loop from comparison signal to versioned dataset to rerun
+  and compare.
+- Success criteria:
+  - Generated and evolved packs run through the standard engine without special-case handling.
+  - Verification proves the full `compare -> signal -> generate/evolve -> run -> compare` loop.
+  - Dataset version history and provenance remain reproducible throughout the workflow.
+
 ## Next Action
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 89
+$gsd-plan-phase 89
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after v4.4 archive*
+*Roadmap updated: 2026-04-04 for milestone v4.5 initialization*
