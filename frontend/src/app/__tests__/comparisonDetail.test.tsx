@@ -532,9 +532,7 @@ function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unk
 }
 
 function mockComparisonDetail(detail: ComparisonDetail) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: string | URL | Request) => {
+  const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       if (url.includes(`/__failure_lab__/artifacts/comparison-detail.json?reportId=${detail.comparison.reportId}`)) {
         return {
@@ -544,13 +542,213 @@ function mockComparisonDetail(detail: ComparisonDetail) {
         } as Response;
       }
 
+      if (url.includes("/__failure_lab__/artifacts/dataset-versions.json")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            source: DEFAULT_SOURCE,
+            family_id: "regression-reasoning-failures-v1-reasoning",
+            versions: [],
+          }),
+        } as Response;
+      }
+
+      if (url.includes("/__failure_lab__/artifacts/regression-pack.json")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            source: DEFAULT_SOURCE,
+            dataset_id: "regression-reasoning-failures-v1-reasoning-draft",
+            lifecycle: "draft",
+            comparison_id: "compare_alpha_to_beta",
+            suggested_family_id: "regression-reasoning-failures-v1-reasoning",
+            output_path:
+              "datasets/harvested/regression-reasoning-failures-v1-reasoning-draft.json",
+            selected_case_count: 1,
+            policy: {
+              top_n: 10,
+              failure_type: null,
+              strategy: "top_signal_driver_cases",
+              delta_kind: "regression",
+            },
+            signal: {
+              verdict: detail.signal.verdict,
+              reason: detail.signal.reason,
+              regression_score: detail.signal.regressionScore,
+              improvement_score: detail.signal.improvementScore,
+              net_score: detail.signal.netScore,
+              severity: detail.signal.severity,
+              top_drivers: detail.signal.topDrivers.map((driver) => ({
+                driver_rank: driver.driverRank,
+                failure_type: driver.failureType,
+                delta: driver.delta,
+                direction: driver.direction,
+                case_ids: driver.caseIds,
+              })),
+            },
+            preview_cases: [
+              {
+                case_id: "regression-pack-case-001",
+                prompt_id: "case-004",
+                prompt: "Use only the provided evidence bullets.",
+                source_case_id: "case-004",
+                source_report_id: "compare_alpha_to_beta",
+                source_run_id: "run_beta",
+                driver_failure_type: "reasoning",
+                driver_rank: 1,
+                transition_type: "no_failure_to_failure",
+              },
+            ],
+          }),
+        } as Response;
+      }
+
       return {
         ok: false,
         status: 404,
         json: async () => ({ message: `Unexpected request: ${url}` }),
       } as Response;
-    }),
-  );
+    });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function mockComparisonDetailWithVersionHistory(detail: ComparisonDetail) {
+  let versions: Array<{
+    family_id: string;
+    dataset_id: string;
+    version_number: number;
+    version_tag: string;
+    created_at: string;
+    case_count: number;
+    path: string;
+    parent_dataset_id: string | null;
+    source_comparison_id: string;
+    signal_verdict: string;
+    severity: number;
+  }> = [
+    {
+      family_id: "regression-reasoning-failures-v1-reasoning",
+      dataset_id: "regression-reasoning-failures-v1-reasoning-v1",
+      version_number: 1,
+      version_tag: "v1",
+      created_at: "2026-04-03T11:00:00Z",
+      case_count: 1,
+      path: "datasets/harvested/regression-reasoning-failures-v1-reasoning-v1.json",
+      parent_dataset_id: null,
+      source_comparison_id: "compare_alpha_to_beta",
+      signal_verdict: "improvement",
+      severity: 0.25,
+    },
+  ];
+
+  const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes(`/__failure_lab__/artifacts/comparison-detail.json?reportId=${detail.comparison.reportId}`)) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => serializeComparisonDetail(detail),
+        } as Response;
+      }
+
+      if (url.includes("/__failure_lab__/artifacts/dataset-versions.json")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            source: DEFAULT_SOURCE,
+            family_id: "regression-reasoning-failures-v1-reasoning",
+            versions,
+          }),
+        } as Response;
+      }
+
+      if (url.includes("/__failure_lab__/artifacts/dataset-evolve.json")) {
+        versions = [
+          ...versions,
+          {
+            family_id: "regression-reasoning-failures-v1-reasoning",
+            dataset_id: "regression-reasoning-failures-v1-reasoning-v2",
+            version_number: 2,
+            version_tag: "v2",
+            created_at: "2026-04-04T09:30:00Z",
+            case_count: 2,
+            path: "datasets/harvested/regression-reasoning-failures-v1-reasoning-v2.json",
+            parent_dataset_id: "regression-reasoning-failures-v1-reasoning-v1",
+            source_comparison_id: "compare_alpha_to_beta",
+            signal_verdict: "improvement",
+            severity: 0.25,
+          },
+        ];
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            source: DEFAULT_SOURCE,
+            dataset_id: "regression-reasoning-failures-v1-reasoning-v2",
+            family_id: "regression-reasoning-failures-v1-reasoning",
+            version_number: 2,
+            version_tag: "v2",
+            parent_dataset_id: "regression-reasoning-failures-v1-reasoning-v1",
+            output_path:
+              "datasets/harvested/regression-reasoning-failures-v1-reasoning-v2.json",
+            previous_case_count: 1,
+            added_case_count: 1,
+            selected_case_count: 1,
+            duplicate_case_count: 0,
+            total_case_count: 2,
+            comparison_id: "compare_alpha_to_beta",
+            policy: {
+              top_n: 10,
+              failure_type: null,
+              strategy: "top_signal_driver_cases",
+              delta_kind: "regression",
+            },
+            signal: {
+              verdict: detail.signal.verdict,
+              reason: detail.signal.reason,
+              regression_score: detail.signal.regressionScore,
+              improvement_score: detail.signal.improvementScore,
+              net_score: detail.signal.netScore,
+              severity: detail.signal.severity,
+              top_drivers: detail.signal.topDrivers.map((driver) => ({
+                driver_rank: driver.driverRank,
+                failure_type: driver.failureType,
+                delta: driver.delta,
+                direction: driver.direction,
+                case_ids: driver.caseIds,
+              })),
+            },
+            preview_cases: [
+              {
+                case_id: "case-004",
+                prompt_id: "case-004",
+                prompt: "Use only the provided evidence bullets.",
+                source_case_id: "case-004",
+                source_report_id: "compare_alpha_to_beta",
+                source_run_id: "run_beta",
+                driver_failure_type: "reasoning",
+                driver_rank: 1,
+                transition_type: "no_failure_to_failure",
+              },
+            ],
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ message: `Unexpected request: ${url}` }),
+      } as Response;
+    });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 function buildLinkedRunDetail(runId: string, dataset: string): RunDetail {
@@ -935,6 +1133,56 @@ describe("comparison detail route", () => {
           limit: 2,
         },
         outputStem: "comparison-compare-alpha-to-beta-failure-to-no-failure",
+      });
+    });
+  });
+
+  it("shows regression family history and can evolve the dataset family", async () => {
+    const detail = buildCompatibleDetail();
+    const fetchMock = mockComparisonDetailWithVersionHistory(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("regression-reasoning-failures-v1-reasoning-v1"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Evolve family" }));
+
+    expect(
+      await screen.findAllByText("regression-reasoning-failures-v1-reasoning-v2"),
+    ).toHaveLength(2);
+    expect(screen.getByText("1 new")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const evolveCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).includes("/__failure_lab__/artifacts/dataset-evolve.json"),
+      ) as [string | URL | Request, RequestInit?] | undefined;
+      expect(evolveCall).toBeTruthy();
+      const init = evolveCall?.[1];
+      expect(init).toBeDefined();
+      if (!init) {
+        throw new Error("Expected dataset evolve request init");
+      }
+      expect(init).toMatchObject({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(JSON.parse(String(init.body))).toEqual({
+        familyId: "regression-reasoning-failures-v1-reasoning",
+        comparisonId: "compare_alpha_to_beta",
+        failureType: null,
       });
     });
   });

@@ -8,6 +8,7 @@ import { ComparisonCoverageSummary } from "@/components/comparisons/ComparisonCo
 import { ComparisonDeltaStrip } from "@/components/comparisons/ComparisonDeltaStrip";
 import { ComparisonDetailHeader } from "@/components/comparisons/ComparisonDetailHeader";
 import { ComparisonTransitionGroups } from "@/components/comparisons/ComparisonTransitionGroups";
+import { SignalDatasetAutomationPanel } from "@/components/datasets/SignalDatasetAutomationPanel";
 import { InsightPanel } from "@/components/insights/InsightPanel";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -635,6 +636,15 @@ export function ComparisonDetailPage() {
                     },
                   );
                 }}
+              />
+
+              <SignalDatasetAutomationPanel
+                comparisonId={detail.comparison.reportId}
+                dataset={detail.comparison.dataset}
+                signal={detail.signal}
+                returnState={detailReturnState}
+                autoLoadVersions
+                title="Regression enforcement surface"
               />
 
               <InsightPanel

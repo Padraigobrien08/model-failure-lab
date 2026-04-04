@@ -372,6 +372,71 @@ function mockSignalAnalysisQuery() {
       } as Response;
     }
 
+    if (url.includes("/__failure_lab__/artifacts/regression-pack.json")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          source: DEFAULT_SOURCE,
+          dataset_id: "regression-query-fixture-v1-hallucination-draft",
+          lifecycle: "draft",
+          comparison_id: "compare_alpha_to_beta",
+          suggested_family_id: "regression-query-fixture-v1-hallucination",
+          output_path:
+            "datasets/harvested/regression-query-fixture-v1-hallucination-draft.json",
+          selected_case_count: 1,
+          policy: {
+            top_n: 10,
+            failure_type: "hallucination",
+            strategy: "top_signal_driver_cases",
+            delta_kind: "regression",
+          },
+          signal: {
+            verdict: "regression",
+            reason: null,
+            regression_score: 0.27,
+            improvement_score: 0.08,
+            net_score: 0.19,
+            severity: 0.27,
+            top_drivers: [
+              {
+                driver_rank: 0,
+                failure_type: "hallucination",
+                delta: 0.18,
+                direction: "regression",
+                case_ids: ["case-regression"],
+              },
+            ],
+          },
+          preview_cases: [
+            {
+              case_id: "case-regression-pack-001",
+              prompt_id: "case-regression",
+              prompt: "Regression case",
+              source_case_id: "case-regression",
+              source_report_id: "compare_alpha_to_beta",
+              source_run_id: "run_beta",
+              driver_failure_type: "hallucination",
+              driver_rank: 0,
+              transition_type: "no_failure_to_failure",
+            },
+          ],
+        }),
+      } as Response;
+    }
+
+    if (url.includes("/__failure_lab__/artifacts/dataset-versions.json")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          source: DEFAULT_SOURCE,
+          family_id: "regression-query-fixture-v1-hallucination",
+          versions: [],
+        }),
+      } as Response;
+    }
+
     return {
       ok: false,
       status: 404,
@@ -530,5 +595,59 @@ describe("analysis route", () => {
         "/__failure_lab__/artifacts/query.json?mode=signals&signalDirection=regression&failureType=hallucination&lastN=10&limit=20&summarize=1",
       ),
     );
+  });
+
+  it("can turn a signal row into a draft regression pack", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockSignalAnalysisQuery();
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/analysis?mode=signals&signalDirection=regression&failureType=hallucination&lastN=10"]}
+        initialArtifactState={buildReadyArtifactState()}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Cross-run artifact analysis." }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Generate draft pack" }),
+    );
+
+    expect(
+      await screen.findByText("regression-query-fixture-v1-hallucination-draft"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "datasets/harvested/regression-query-fixture-v1-hallucination-draft.json",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("No immutable versions exist yet for regression-query-fixture-v1-hallucination.")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const packCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).includes("/__failure_lab__/artifacts/regression-pack.json"),
+      ) as [string | URL | Request, RequestInit?] | undefined;
+      expect(packCall).toBeTruthy();
+      const init = packCall?.[1];
+      expect(init).toBeDefined();
+      if (!init) {
+        throw new Error("Expected regression pack request init");
+      }
+      expect(init).toMatchObject({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(JSON.parse(String(init.body))).toEqual({
+        comparisonId: "compare_alpha_to_beta",
+        familyId: "regression-query-fixture-v1-hallucination",
+        failureType: "hallucination",
+      });
+    });
   });
 });

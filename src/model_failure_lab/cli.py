@@ -9,10 +9,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
 from model_failure_lab.datasets import (
+    DatasetEvolutionSummary,
+    DatasetVersionRecord,
+    RegressionPackDraftSummary,
     available_bundled_dataset_ids,
     available_bundled_datasets,
     available_local_datasets,
+    evolve_dataset_family,
+    generate_regression_pack,
     has_bundled_dataset,
+    list_dataset_versions,
     load_bundled_dataset,
     load_dataset,
     load_demo_dataset,
@@ -279,6 +285,46 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dataset_promote_parser.set_defaults(handler=_handle_dataset_promote)
 
+    dataset_versions_parser = dataset_subparsers.add_parser(
+        "versions",
+        help="List immutable versions for one evolved dataset family.",
+    )
+    dataset_versions_parser.add_argument("dataset_id")
+    dataset_versions_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_versions_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_versions_parser.set_defaults(handler=_handle_dataset_versions)
+
+    dataset_evolve_parser = dataset_subparsers.add_parser(
+        "evolve",
+        help="Create the next immutable dataset version from one saved comparison signal.",
+    )
+    dataset_evolve_parser.add_argument("dataset_id")
+    dataset_evolve_parser.add_argument("--from-comparison", required=True, dest="comparison_id")
+    dataset_evolve_parser.add_argument("--failure-type", dest="failure_type")
+    dataset_evolve_parser.add_argument("--top-n", type=int, default=10)
+    dataset_evolve_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_evolve_parser.add_argument(
+        "--out",
+        type=Path,
+        help="Optional output path for the new immutable dataset version JSON file.",
+    )
+    dataset_evolve_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_evolve_parser.set_defaults(handler=_handle_dataset_evolve)
+
     index_parser = subparsers.add_parser(
         "index",
         help="Manage the derived local query index over saved artifacts.",
@@ -333,6 +379,7 @@ def build_parser() -> argparse.ArgumentParser:
         "regressions",
         help="List recent saved comparison signals ordered by severity.",
     )
+    regressions_subparsers = regressions_parser.add_subparsers(dest="regressions_command")
     regressions_parser.add_argument(
         "--root",
         type=Path,
@@ -358,6 +405,30 @@ def build_parser() -> argparse.ArgumentParser:
     regressions_parser.add_argument("--limit", type=int, default=10)
     regressions_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_parser.set_defaults(handler=_handle_regressions)
+
+    regressions_generate_parser = regressions_subparsers.add_parser(
+        "generate",
+        help="Generate a deterministic draft regression pack from one saved comparison signal.",
+    )
+    regressions_generate_parser.add_argument("--comparison", required=True, dest="comparison_id")
+    regressions_generate_parser.add_argument("--family-id")
+    regressions_generate_parser.add_argument("--failure-type", dest="failure_type")
+    regressions_generate_parser.add_argument("--top-n", type=int, default=10)
+    regressions_generate_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    regressions_generate_parser.add_argument(
+        "--out",
+        type=Path,
+        help="Optional output path for the generated draft regression pack JSON file.",
+    )
+    regressions_generate_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_generate_parser.set_defaults(handler=_handle_regressions_generate)
 
     harvest_parser = subparsers.add_parser(
         "harvest",
@@ -595,6 +666,38 @@ def _handle_dataset_promote(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_dataset_versions(args: argparse.Namespace) -> int:
+    rows = list_dataset_versions(args.dataset_id, root=_normalized_root(args.root))
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "dataset_family_id": args.dataset_id,
+                    "versions": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_dataset_versions(args.dataset_id, rows))
+    return 0
+
+
+def _handle_dataset_evolve(args: argparse.Namespace) -> int:
+    summary = evolve_dataset_family(
+        args.dataset_id,
+        comparison_id=args.comparison_id,
+        root=_normalized_root(args.root),
+        failure_type=args.failure_type,
+        top_n=args.top_n,
+        output_path=args.out,
+    )
+    if args.as_json:
+        print(_render_json_payload(summary.to_payload()))
+        return 0
+    print(_render_dataset_evolution(summary))
+    return 0
+
+
 def _handle_index_rebuild(args: argparse.Namespace) -> int:
     root = _normalized_root(args.root)
     summary = rebuild_query_index(root=root)
@@ -703,6 +806,22 @@ def _handle_regressions(args: argparse.Namespace) -> int:
         )
         return 0
     print(_render_signal_rows(rows, direction=args.direction))
+    return 0
+
+
+def _handle_regressions_generate(args: argparse.Namespace) -> int:
+    summary = generate_regression_pack(
+        comparison_id=args.comparison_id,
+        root=_normalized_root(args.root),
+        family_id=args.family_id,
+        failure_type=args.failure_type,
+        top_n=args.top_n,
+        output_path=args.out,
+    )
+    if args.as_json:
+        print(_render_json_payload(summary.to_payload()))
+        return 0
+    print(_render_regression_pack(summary))
     return 0
 
 
@@ -967,6 +1086,38 @@ def _render_harvest_summary(summary) -> str:
     )
 
 
+def _render_regression_pack(summary: RegressionPackDraftSummary) -> str:
+    lines = [
+        "Failure Lab Regression Pack",
+        f"Comparison: {summary.comparison_id}",
+        f"Dataset: {summary.dataset.dataset_id}",
+        f"Suggested family: {summary.suggested_family_id}",
+        f"Cases: {summary.selected_case_count}",
+        f"Policy: top_n={summary.policy.top_n} failure_type={summary.policy.failure_type or 'all'}",
+        f"Output: {summary.output_path}",
+    ]
+    top_driver = _first_signal_driver({"top_drivers": summary.signal.get("top_drivers", [])})
+    lines.append(f"Primary driver: {top_driver}")
+    if summary.preview_cases:
+        lines.append(
+            _render_table(
+                [
+                    ("case_id", "prompt_id", "driver", "transition"),
+                    *[
+                        (
+                            entry.case_id,
+                            entry.prompt_id,
+                            entry.driver_failure_type or "n/a",
+                            entry.transition_type,
+                        )
+                        for entry in summary.preview_cases
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
 def _render_dataset_review(review) -> str:
     lines = [
         "Failure Lab Dataset Review",
@@ -1005,6 +1156,76 @@ def _render_dataset_promotion(summary) -> str:
             f"Output: {summary.output_path}",
         ]
     )
+
+
+def _render_dataset_versions(
+    dataset_family_id: str,
+    rows: tuple[DatasetVersionRecord, ...],
+) -> str:
+    if not rows:
+        return (
+            "Failure Lab Dataset Versions\n"
+            f"Family: {dataset_family_id}\n"
+            "No immutable versions exist for this dataset family."
+        )
+    table_rows = [
+        ("dataset_id", "version", "cases", "parent", "comparison", "severity"),
+        *[
+            (
+                row.dataset_id,
+                row.version_tag,
+                str(row.case_count),
+                row.parent_dataset_id or "root",
+                row.source_comparison_id or "n/a",
+                _format_rate(row.severity),
+            )
+            for row in rows
+        ],
+    ]
+    return "\n".join(
+        [
+            "Failure Lab Dataset Versions",
+            f"Family: {rows[0].family_id}",
+            _render_table(table_rows),
+        ]
+    )
+
+
+def _render_dataset_evolution(summary: DatasetEvolutionSummary) -> str:
+    lines = [
+        "Failure Lab Dataset Evolution",
+        f"Family: {summary.family_id}",
+        f"Dataset: {summary.dataset.dataset_id}",
+        f"Version: {summary.version_tag}",
+        f"Parent: {summary.parent_dataset_id or 'none'}",
+        (
+            "Cases: "
+            f"selected={summary.selected_case_count} "
+            f"added={summary.added_case_count} "
+            f"duplicates={summary.duplicate_case_count} "
+            f"total={summary.total_case_count}"
+        ),
+        f"Comparison: {summary.comparison_id}",
+        f"Output: {summary.output_path}",
+    ]
+    if summary.preview_cases:
+        lines.append(
+            _render_table(
+                [
+                    ("source_case", "prompt_id", "driver", "transition"),
+                    *[
+                        (
+                            entry.source_case_id,
+                            entry.prompt_id,
+                            entry.driver_failure_type or "n/a",
+                            entry.transition_type,
+                        )
+                        for entry in summary.preview_cases[: min(len(summary.preview_cases), 5)]
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
 
 
 def _render_case_rows(rows: list[dict[str, object]]) -> str:

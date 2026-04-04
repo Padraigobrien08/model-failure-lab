@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
+import { SignalDatasetAutomationPanel } from "@/components/datasets/SignalDatasetAutomationPanel";
 import { InsightPanel } from "@/components/insights/InsightPanel";
 import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
 import { Badge } from "@/components/ui/badge";
@@ -577,6 +578,22 @@ export function AnalysisPage() {
                       {primaryCaseId ? "Inspect strongest driver" : "Open comparison"}
                     </Link>
                   </div>
+                  <SignalDatasetAutomationPanel
+                    comparisonId={row.reportId}
+                    dataset={row.dataset}
+                    signal={{
+                      verdict: row.signalVerdict,
+                      reason: null,
+                      regressionScore: row.regressionScore,
+                      improvementScore: row.improvementScore,
+                      netScore: row.netScore,
+                      severity: row.severity,
+                      topDrivers: row.topDrivers,
+                    }}
+                    driverFilter={failureType || null}
+                    returnState={returnState}
+                    title="Turn this signal into a dataset"
+                  />
                 </CardContent>
               </Card>
             );

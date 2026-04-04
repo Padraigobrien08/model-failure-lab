@@ -13,6 +13,9 @@ const COMPARISON_DETAIL_PATH = "/__failure_lab__/artifacts/comparison-detail.jso
 const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
 const ARTIFACT_QUERY_PATH = "/__failure_lab__/artifacts/query.json";
 const ARTIFACT_HARVEST_PATH = "/__failure_lab__/artifacts/harvest.json";
+const ARTIFACT_REGRESSION_PACK_PATH = "/__failure_lab__/artifacts/regression-pack.json";
+const ARTIFACT_DATASET_EVOLVE_PATH = "/__failure_lab__/artifacts/dataset-evolve.json";
+const ARTIFACT_DATASET_VERSIONS_PATH = "/__failure_lab__/artifacts/dataset-versions.json";
 const ARTIFACT_ROOT_ENV = "FAILURE_LAB_ARTIFACT_ROOT";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
@@ -1822,6 +1825,129 @@ function failureLabArtifactsPlugin(): Plugin {
     }
   }
 
+  async function handleRegressionPack(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    if ((req.method ?? "GET").toUpperCase() !== "POST") {
+      res.statusCode = 405;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message: "regression pack endpoint requires POST" }));
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const comparisonId = requireStringField(body, "comparisonId", "regression_pack.comparisonId");
+      const args = ["--comparison-id", comparisonId];
+      const familyId = optionalStringField(body, "familyId", "regression_pack.familyId");
+      if (familyId) {
+        args.push("--family-id", familyId);
+      }
+      const failureType = optionalStringField(
+        body,
+        "failureType",
+        "regression_pack.failureType",
+      );
+      if (failureType) {
+        args.push("--failure-type", failureType);
+      }
+      const topN = body.topN;
+      if (typeof topN === "number" && Number.isInteger(topN) && topN > 0) {
+        args.push("--top-n", String(topN));
+      }
+      const outputPath = optionalStringField(body, "outputPath", "regression_pack.outputPath");
+      if (outputPath) {
+        args.push("--out", outputPath);
+      }
+
+      const payload = await invokeQueryBridge("regression-pack", args);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "regression pack generation failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
+  async function handleDatasetEvolve(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    if ((req.method ?? "GET").toUpperCase() !== "POST") {
+      res.statusCode = 405;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message: "dataset evolve endpoint requires POST" }));
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const familyId = requireStringField(body, "familyId", "dataset_evolve.familyId");
+      const comparisonId = requireStringField(
+        body,
+        "comparisonId",
+        "dataset_evolve.comparisonId",
+      );
+      const args = ["--dataset-family", familyId, "--comparison-id", comparisonId];
+      const failureType = optionalStringField(
+        body,
+        "failureType",
+        "dataset_evolve.failureType",
+      );
+      if (failureType) {
+        args.push("--failure-type", failureType);
+      }
+      const topN = body.topN;
+      if (typeof topN === "number" && Number.isInteger(topN) && topN > 0) {
+        args.push("--top-n", String(topN));
+      }
+      const outputPath = optionalStringField(body, "outputPath", "dataset_evolve.outputPath");
+      if (outputPath) {
+        args.push("--out", outputPath);
+      }
+
+      const payload = await invokeQueryBridge("dataset-evolve", args);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "dataset evolution failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
+  async function handleDatasetVersions(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const requestUrl = new URL(req.url ?? ARTIFACT_DATASET_VERSIONS_PATH, "http://failure-lab.local");
+    const familyId = requestUrl.searchParams.get("familyId");
+    if (!familyId) {
+      res.statusCode = 400;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message: "familyId query parameter is required" }));
+      return;
+    }
+
+    try {
+      const payload = await invokeQueryBridge("dataset-versions", ["--dataset-family", familyId]);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "dataset versions failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
   async function handleComparisonDetail(
     req: IncomingMessage,
     res: ServerResponse,
@@ -1946,6 +2072,21 @@ function failureLabArtifactsPlugin(): Plugin {
 
       if (pathname === ARTIFACT_HARVEST_PATH) {
         void handleArtifactHarvest(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_REGRESSION_PACK_PATH) {
+        void handleRegressionPack(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_DATASET_EVOLVE_PATH) {
+        void handleDatasetEvolve(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_DATASET_VERSIONS_PATH) {
+        void handleDatasetVersions(req, res).catch(next);
         return;
       }
 

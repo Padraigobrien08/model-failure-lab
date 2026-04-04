@@ -216,6 +216,53 @@ def test_dataset_promote_help_describes_curated_dataset_output_surface() -> None
     assert "--out" in result.stdout
 
 
+def test_dataset_versions_help_describes_version_history_surface() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "dataset", "versions", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--root" in result.stdout
+    assert "--json" in result.stdout
+
+
+def test_dataset_evolve_help_describes_signal_driven_version_creation() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "dataset", "evolve", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--from-comparison" in result.stdout
+    assert "--top-n" in result.stdout
+    assert "--json" in result.stdout
+
+
+def test_regressions_generate_help_describes_signal_pack_generation() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "regressions", "generate", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--comparison" in result.stdout
+    assert "--family-id" in result.stdout
+    assert "--top-n" in result.stdout
+
+
 def test_index_rebuild_help_is_exposed() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "model_failure_lab", "index", "rebuild", "--help"],

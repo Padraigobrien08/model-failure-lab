@@ -5,6 +5,9 @@ export const COMPARISON_DETAIL_PATH = "/__failure_lab__/artifacts/comparison-det
 export const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
 export const ARTIFACT_QUERY_PATH = "/__failure_lab__/artifacts/query.json";
 export const ARTIFACT_HARVEST_PATH = "/__failure_lab__/artifacts/harvest.json";
+export const ARTIFACT_REGRESSION_PACK_PATH = "/__failure_lab__/artifacts/regression-pack.json";
+export const ARTIFACT_DATASET_EVOLVE_PATH = "/__failure_lab__/artifacts/dataset-evolve.json";
+export const ARTIFACT_DATASET_VERSIONS_PATH = "/__failure_lab__/artifacts/dataset-versions.json";
 
 export type ArtifactOverviewStatus = "ready" | "empty" | "incompatible";
 
@@ -271,6 +274,77 @@ export type ArtifactHarvestResponse = {
   mode: "cases" | "deltas";
   outputPath: string;
   selectedCaseCount: number;
+};
+
+export type ArtifactDatasetPolicy = {
+  topN: number;
+  failureType: string | null;
+  strategy: string;
+  deltaKind: string;
+};
+
+export type ArtifactRegressionPreviewCase = {
+  caseId: string;
+  promptId: string;
+  prompt: string;
+  sourceCaseId: string;
+  sourceReportId: string;
+  sourceRunId: string;
+  driverFailureType: string | null;
+  driverRank: number | null;
+  transitionType: string;
+};
+
+export type ArtifactRegressionPackResponse = {
+  source: ArtifactSourceDescriptor;
+  datasetId: string;
+  lifecycle: string | null;
+  comparisonId: string;
+  suggestedFamilyId: string;
+  outputPath: string;
+  selectedCaseCount: number;
+  policy: ArtifactDatasetPolicy;
+  signal: ComparisonSignal;
+  previewCases: ArtifactRegressionPreviewCase[];
+};
+
+export type ArtifactDatasetVersionRecord = {
+  familyId: string;
+  datasetId: string;
+  versionNumber: number;
+  versionTag: string;
+  createdAt: string | null;
+  caseCount: number;
+  path: string;
+  parentDatasetId: string | null;
+  sourceComparisonId: string | null;
+  signalVerdict: string | null;
+  severity: number | null;
+};
+
+export type ArtifactDatasetVersionsResponse = {
+  source: ArtifactSourceDescriptor;
+  familyId: string;
+  versions: ArtifactDatasetVersionRecord[];
+};
+
+export type ArtifactDatasetEvolutionResponse = {
+  source: ArtifactSourceDescriptor;
+  datasetId: string;
+  familyId: string;
+  versionNumber: number;
+  versionTag: string;
+  parentDatasetId: string | null;
+  outputPath: string;
+  previousCaseCount: number;
+  addedCaseCount: number;
+  selectedCaseCount: number;
+  duplicateCaseCount: number;
+  totalCaseCount: number;
+  comparisonId: string;
+  policy: ArtifactDatasetPolicy;
+  signal: ComparisonSignal;
+  previewCases: ArtifactRegressionPreviewCase[];
 };
 
 export type ArtifactQueryFilters = {

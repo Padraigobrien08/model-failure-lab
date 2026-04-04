@@ -12,6 +12,16 @@ from .bundled import (
     load_bundled_dataset,
 )
 from .contracts import FailureDataset
+from .evolution import (
+    DatasetEvolutionSummary,
+    DatasetVersionRecord,
+    RegressionPackDraftSummary,
+    RegressionPackPolicy,
+    evolve_dataset_family,
+    generate_regression_pack,
+    list_dataset_versions,
+    suggest_dataset_family_id,
+)
 from .local import LocalDatasetSummary, available_local_datasets
 from .load import load_dataset, parse_dataset_payload
 
@@ -47,16 +57,24 @@ def load_demo_dataset() -> FailureDataset:
 __all__ = [
     "BundledDatasetSummary",
     "FailureDataset",
+    "DatasetEvolutionSummary",
+    "DatasetVersionRecord",
     "LocalDatasetSummary",
+    "RegressionPackDraftSummary",
+    "RegressionPackPolicy",
     "UnknownBundledDatasetError",
     "available_bundled_datasets",
     "available_bundled_dataset_ids",
     "available_local_datasets",
     "demo_dataset_path",
     "describe_bundled_dataset",
+    "evolve_dataset_family",
+    "generate_regression_pack",
     "has_bundled_dataset",
+    "list_dataset_versions",
     "load_dataset",
     "load_bundled_dataset",
     "load_demo_dataset",
     "parse_dataset_payload",
+    "suggest_dataset_family_id",
 ]

@@ -1,6 +1,9 @@
 import {
+  ARTIFACT_DATASET_EVOLVE_PATH,
+  ARTIFACT_DATASET_VERSIONS_PATH,
   ARTIFACT_HARVEST_PATH,
   ARTIFACT_QUERY_PATH,
+  ARTIFACT_REGRESSION_PACK_PATH,
   ARTIFACT_OVERVIEW_PATH,
   COMPARISON_DETAIL_PATH,
   COMPARISONS_INDEX_PATH,
@@ -12,6 +15,10 @@ import {
   type ArtifactInsightPattern,
   type ArtifactInsightReport,
   type ArtifactInsightSampling,
+  type ArtifactDatasetEvolutionResponse,
+  type ArtifactDatasetPolicy,
+  type ArtifactDatasetVersionRecord,
+  type ArtifactDatasetVersionsResponse,
   type ArtifactHarvestResponse,
   type ArtifactQueryAggregateRow,
   type ArtifactQueryCaseRow,
@@ -20,6 +27,8 @@ import {
   type ArtifactQueryFacets,
   type ArtifactQueryFilters,
   type ArtifactQueryResponse,
+  type ArtifactRegressionPackResponse,
+  type ArtifactRegressionPreviewCase,
   type ArtifactOverview,
   type ArtifactOverviewStatus,
   type ComparisonCaseDeltaRecord,
@@ -131,6 +140,155 @@ function requireArtifactHarvestResponse(payload: unknown): ArtifactHarvestRespon
     selectedCaseCount: requireCount(
       data.selected_case_count,
       "harvest.selected_case_count",
+    ),
+  };
+}
+
+function requireArtifactDatasetPolicy(value: unknown, field: string): ArtifactDatasetPolicy {
+  const data = requireObject(value, field);
+  return {
+    topN: requireCount(data.top_n, `${field}.top_n`),
+    failureType: requireStringOrNull(data.failure_type, `${field}.failure_type`),
+    strategy: requireString(data.strategy, `${field}.strategy`),
+    deltaKind: requireString(data.delta_kind, `${field}.delta_kind`),
+  };
+}
+
+function requireArtifactRegressionPreviewCases(
+  value: unknown,
+  field: string,
+): ArtifactRegressionPreviewCase[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      caseId: requireString(row.case_id, `${field}[${index}].case_id`),
+      promptId: requireString(row.prompt_id, `${field}[${index}].prompt_id`),
+      prompt: requireString(row.prompt, `${field}[${index}].prompt`),
+      sourceCaseId: requireString(row.source_case_id, `${field}[${index}].source_case_id`),
+      sourceReportId: requireString(
+        row.source_report_id,
+        `${field}[${index}].source_report_id`,
+      ),
+      sourceRunId: requireString(row.source_run_id, `${field}[${index}].source_run_id`),
+      driverFailureType: requireStringOrNull(
+        row.driver_failure_type,
+        `${field}[${index}].driver_failure_type`,
+      ),
+      driverRank: row.driver_rank == null ? null : requireCount(row.driver_rank, `${field}[${index}].driver_rank`),
+      transitionType: requireString(row.transition_type, `${field}[${index}].transition_type`),
+    };
+  });
+}
+
+function requireArtifactRegressionPackResponse(payload: unknown): ArtifactRegressionPackResponse {
+  const data = requireObject(payload, "regression_pack");
+  return {
+    source: requireSource(data.source, "regression_pack.source"),
+    datasetId: requireString(data.dataset_id, "regression_pack.dataset_id"),
+    lifecycle: requireStringOrNull(data.lifecycle, "regression_pack.lifecycle"),
+    comparisonId: requireString(data.comparison_id, "regression_pack.comparison_id"),
+    suggestedFamilyId: requireString(
+      data.suggested_family_id,
+      "regression_pack.suggested_family_id",
+    ),
+    outputPath: requireString(data.output_path, "regression_pack.output_path"),
+    selectedCaseCount: requireCount(
+      data.selected_case_count,
+      "regression_pack.selected_case_count",
+    ),
+    policy: requireArtifactDatasetPolicy(data.policy, "regression_pack.policy"),
+    signal: requireComparisonSignal(data.signal, "regression_pack.signal"),
+    previewCases: requireArtifactRegressionPreviewCases(
+      data.preview_cases,
+      "regression_pack.preview_cases",
+    ),
+  };
+}
+
+function requireArtifactDatasetVersionRecords(
+  value: unknown,
+  field: string,
+): ArtifactDatasetVersionRecord[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      familyId: requireString(row.family_id, `${field}[${index}].family_id`),
+      datasetId: requireString(row.dataset_id, `${field}[${index}].dataset_id`),
+      versionNumber: requireCount(row.version_number, `${field}[${index}].version_number`),
+      versionTag: requireString(row.version_tag, `${field}[${index}].version_tag`),
+      createdAt: requireStringOrNull(row.created_at, `${field}[${index}].created_at`),
+      caseCount: requireCount(row.case_count, `${field}[${index}].case_count`),
+      path: requireString(row.path, `${field}[${index}].path`),
+      parentDatasetId: requireStringOrNull(
+        row.parent_dataset_id,
+        `${field}[${index}].parent_dataset_id`,
+      ),
+      sourceComparisonId: requireStringOrNull(
+        row.source_comparison_id,
+        `${field}[${index}].source_comparison_id`,
+      ),
+      signalVerdict: requireStringOrNull(
+        row.signal_verdict,
+        `${field}[${index}].signal_verdict`,
+      ),
+      severity: requireNumberOrNull(row.severity, `${field}[${index}].severity`),
+    };
+  });
+}
+
+function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatasetVersionsResponse {
+  const data = requireObject(payload, "dataset_versions");
+  return {
+    source: requireSource(data.source, "dataset_versions.source"),
+    familyId: requireString(data.family_id, "dataset_versions.family_id"),
+    versions: requireArtifactDatasetVersionRecords(
+      data.versions,
+      "dataset_versions.versions",
+    ),
+  };
+}
+
+function requireArtifactDatasetEvolutionResponse(
+  payload: unknown,
+): ArtifactDatasetEvolutionResponse {
+  const data = requireObject(payload, "dataset_evolution");
+  return {
+    source: requireSource(data.source, "dataset_evolution.source"),
+    datasetId: requireString(data.dataset_id, "dataset_evolution.dataset_id"),
+    familyId: requireString(data.family_id, "dataset_evolution.family_id"),
+    versionNumber: requireCount(data.version_number, "dataset_evolution.version_number"),
+    versionTag: requireString(data.version_tag, "dataset_evolution.version_tag"),
+    parentDatasetId: requireStringOrNull(
+      data.parent_dataset_id,
+      "dataset_evolution.parent_dataset_id",
+    ),
+    outputPath: requireString(data.output_path, "dataset_evolution.output_path"),
+    previousCaseCount: requireCount(
+      data.previous_case_count,
+      "dataset_evolution.previous_case_count",
+    ),
+    addedCaseCount: requireCount(data.added_case_count, "dataset_evolution.added_case_count"),
+    selectedCaseCount: requireCount(
+      data.selected_case_count,
+      "dataset_evolution.selected_case_count",
+    ),
+    duplicateCaseCount: requireCount(
+      data.duplicate_case_count,
+      "dataset_evolution.duplicate_case_count",
+    ),
+    totalCaseCount: requireCount(data.total_case_count, "dataset_evolution.total_case_count"),
+    comparisonId: requireString(data.comparison_id, "dataset_evolution.comparison_id"),
+    policy: requireArtifactDatasetPolicy(data.policy, "dataset_evolution.policy"),
+    signal: requireComparisonSignal(data.signal, "dataset_evolution.signal"),
+    previewCases: requireArtifactRegressionPreviewCases(
+      data.preview_cases,
+      "dataset_evolution.preview_cases",
     ),
   };
 }
@@ -559,6 +717,95 @@ export async function createArtifactHarvestDraft(
   }
   const payload = await response.json();
   return requireArtifactHarvestResponse(payload);
+}
+
+export async function createArtifactRegressionPack(
+  request: {
+    comparisonId: string;
+    familyId?: string | null;
+    failureType?: string | null;
+    topN?: number;
+    outputPath?: string | null;
+  },
+  fetchImpl: typeof fetch = fetch,
+): Promise<ArtifactRegressionPackResponse> {
+  const response = await fetchImpl(ARTIFACT_REGRESSION_PACK_PATH, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    let message = `regression pack request failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload === "object" && typeof payload.message === "string") {
+        message = payload.message;
+      }
+    } catch {
+      // Keep the status-based fallback message.
+    }
+    throw new Error(message);
+  }
+  const payload = await response.json();
+  return requireArtifactRegressionPackResponse(payload);
+}
+
+export async function evolveArtifactDataset(
+  request: {
+    familyId: string;
+    comparisonId: string;
+    failureType?: string | null;
+    topN?: number;
+    outputPath?: string | null;
+  },
+  fetchImpl: typeof fetch = fetch,
+): Promise<ArtifactDatasetEvolutionResponse> {
+  const response = await fetchImpl(ARTIFACT_DATASET_EVOLVE_PATH, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    let message = `dataset evolution request failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload === "object" && typeof payload.message === "string") {
+        message = payload.message;
+      }
+    } catch {
+      // Keep the status-based fallback message.
+    }
+    throw new Error(message);
+  }
+  const payload = await response.json();
+  return requireArtifactDatasetEvolutionResponse(payload);
+}
+
+export async function loadArtifactDatasetVersions(
+  familyId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ArtifactDatasetVersionsResponse> {
+  const requestUrl = new URL(ARTIFACT_DATASET_VERSIONS_PATH, "http://failure-lab.local");
+  requestUrl.searchParams.set("familyId", familyId);
+  const response = await fetchImpl(`${requestUrl.pathname}${requestUrl.search}`);
+  if (!response.ok) {
+    let message = `dataset versions request failed with status ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload === "object" && typeof payload.message === "string") {
+        message = payload.message;
+      }
+    } catch {
+      // Keep the status-based fallback message.
+    }
+    throw new Error(message);
+  }
+  const payload = await response.json();
+  return requireArtifactDatasetVersionsResponse(payload);
 }
 
 export function validateArtifactOverview(payload: unknown): ArtifactOverview {

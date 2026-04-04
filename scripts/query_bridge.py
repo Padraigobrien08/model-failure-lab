@@ -27,6 +27,11 @@ from model_failure_lab.analysis import (  # noqa: E402
     explain_comparison_report,
 )
 from model_failure_lab.harvest import harvest_artifact_cases  # noqa: E402
+from model_failure_lab.datasets import (  # noqa: E402
+    evolve_dataset_family,
+    generate_regression_pack,
+    list_dataset_versions,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -146,6 +151,39 @@ def main(argv: list[str] | None = None) -> int:
             "output_path": str(summary.output_path),
             "selected_case_count": summary.selected_case_count,
         }
+    elif args.command == "regression-pack":
+        summary = generate_regression_pack(
+            comparison_id=args.comparison_id,
+            root=root,
+            family_id=args.family_id,
+            failure_type=args.failure_type,
+            top_n=args.top_n,
+            output_path=args.out,
+        )
+        payload = {
+            "source": build_source_descriptor(root),
+            **summary.to_payload(),
+        }
+    elif args.command == "dataset-evolve":
+        summary = evolve_dataset_family(
+            args.dataset_family,
+            comparison_id=args.comparison_id,
+            root=root,
+            failure_type=args.failure_type,
+            top_n=args.top_n,
+            output_path=args.out,
+        )
+        payload = {
+            "source": build_source_descriptor(root),
+            **summary.to_payload(),
+        }
+    elif args.command == "dataset-versions":
+        versions = list_dataset_versions(args.dataset_family, root=root)
+        payload = {
+            "source": build_source_descriptor(root),
+            "family_id": args.dataset_family,
+            "versions": [version.to_payload() for version in versions],
+        }
     else:
         raise ValueError(f"Unsupported query bridge command: {args.command}")
 
@@ -220,6 +258,26 @@ def build_parser() -> argparse.ArgumentParser:
     harvest_parser.add_argument("--until")
     harvest_parser.add_argument("--limit", type=int, default=200)
     harvest_parser.add_argument("--output-stem")
+
+    regression_pack_parser = subparsers.add_parser("regression-pack")
+    regression_pack_parser.add_argument("--root", required=True)
+    regression_pack_parser.add_argument("--comparison-id", required=True)
+    regression_pack_parser.add_argument("--family-id")
+    regression_pack_parser.add_argument("--failure-type")
+    regression_pack_parser.add_argument("--top-n", type=int, default=10)
+    regression_pack_parser.add_argument("--out")
+
+    dataset_evolve_parser = subparsers.add_parser("dataset-evolve")
+    dataset_evolve_parser.add_argument("--root", required=True)
+    dataset_evolve_parser.add_argument("--dataset-family", required=True)
+    dataset_evolve_parser.add_argument("--comparison-id", required=True)
+    dataset_evolve_parser.add_argument("--failure-type")
+    dataset_evolve_parser.add_argument("--top-n", type=int, default=10)
+    dataset_evolve_parser.add_argument("--out")
+
+    dataset_versions_parser = subparsers.add_parser("dataset-versions")
+    dataset_versions_parser.add_argument("--root", required=True)
+    dataset_versions_parser.add_argument("--dataset-family", required=True)
 
     return parser
 
