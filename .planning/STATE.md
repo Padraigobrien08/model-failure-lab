@@ -1,24 +1,24 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
-current_phase: null
-current_phase_name: null
+milestone: v4.7
+milestone_name: Model Behavior Tracking And Dataset Health Over Time
+current_phase: 97
+current_phase_name: History Index And Timeline Contract
 current_plan: null
-status: ready_for_new_milestone
-stopped_at: Milestone v4.6 summary generated
-resume_file: .planning/reports/MILESTONE_SUMMARY-v4.6.md
-last_updated: "2026-04-04T19:15:00Z"
+status: ready_to_discuss
+stopped_at: Milestone v4.7 started
+resume_file: null
+last_updated: "2026-04-04T19:25:00Z"
 last_activity: 2026-04-04
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
 ---
 
-# State: Awaiting Next Milestone
+# State: v4.7 Model Behavior Tracking And Dataset Health Over Time
 
 ## Project Reference
 
@@ -26,29 +26,30 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, and actionable from local artifacts.
-**Current focus:** Define the next milestone from the shipped `v4.6` platform state.
+**Current focus:** Add deterministic temporal tracking so the system can reason about behavior and
+dataset health across time.
 
 ## Current Focus
 
-- next_action: define the next milestone
-- status: no active milestone; `v4.6` archived
+- next_action: discuss Phase `97`
+- status: milestone initialized; requirements and roadmap defined
 
 ## Current Position
 
-Milestone: none
-Phase: none
+Milestone: `v4.7`
+Phase: `97` — ready to discuss
 
 ## Workflow State
 
-**Current Phase:** none
-**Current Phase Name:** none
-**Total Phases:** 0
+**Current Phase:** `97`
+**Current Phase Name:** `History Index And Timeline Contract`
+**Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
-**Status:** Ready for new milestone
+**Status:** Ready to discuss
 **Progress:** [░░░░░░░░░░] 0%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Generated onboarding summary for archived milestone `v4.6`
+**Last Activity Description:** Started milestone `v4.7` and defined the history/trend roadmap
 
 ## Recent Decisions
 
@@ -59,6 +60,8 @@ Phase: none
 - Keep governance recommendations deterministic, local, and inspectable rather than introducing a
   hosted policy service or opaque ranking model.
 - Treat review/apply as an explicit user-facing workflow with dry-run surfaces before writes.
+- Use `v4.7` as the next milestone because the main missing layer after governance is temporal
+  tracking across runs, comparisons, and dataset families.
 
 ## Accumulated Context
 
@@ -66,28 +69,28 @@ Phase: none
   harvesting, regression signals, and versioned regression-pack enforcement over local artifacts.
 - `v4.5` closed the enforcement loop:
   saved regressions can become future evaluation datasets automatically and reproducibly.
-- The next user bottleneck is governance:
-  deciding which regressions deserve action, which family should absorb them, and how to keep
-  evolving packs high-signal over time.
-- Phase `93` now provides the deterministic backend contract for governance recommendations,
-  including policy, matched-family context, and no-write evidence preview.
 - `v4.6` is shipped and archived.
 - The platform now covers execution, reporting, comparison, query, grounded interpretation,
   harvesting, signal scoring, dataset evolution, and governance recommendations over local
   artifacts.
-- The next milestone can now build from a clean post-governance baseline.
+- The next bottleneck is temporal context:
+  whether behavior is getting better or worse over time, whether regression packs remain useful,
+  and whether the same failure classes keep returning.
+- `v4.7` is scoped to solve that with deterministic history, trend, recurrence, and dataset-health
+  signals before any proactive automation.
 
 ## Session
 
-**Last Date:** 2026-04-04T19:03:00Z
-**Stopped At:** Milestone v4.6 summary generated
-**Resume File:** [.planning/reports/MILESTONE_SUMMARY-v4.6.md](/Users/padraigobrien/model-failure-lab/.planning/reports/MILESTONE_SUMMARY-v4.6.md)
+**Last Date:** 2026-04-04T19:25:00Z
+**Stopped At:** Milestone v4.7 started
+**Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 97
+$gsd-plan-phase 97
 ```
 
 ---
-*State updated: 2026-04-04 after archiving v4.6*
+*State updated: 2026-04-04 for milestone v4.7 initialization*

@@ -10,7 +10,7 @@ saved artifact contract.
 ## Current State
 
 - Latest shipped milestone: `v4.6`
-- Active milestone: none
+- Active milestone: `v4.7 Model Behavior Tracking And Dataset Health Over Time`
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -47,19 +47,29 @@ policy-driven recommendations and review/apply workflows.
 - End-to-end governance proof across fresh compare artifacts, repeat apply stability, frontend
   regressions, production build, and real-artifact smoke.
 
-## Current Milestone
+## Current Milestone: v4.7 Model Behavior Tracking And Dataset Health Over Time
 
-No active milestone is defined. The roadmap is ready for the next milestone to be scoped from the
-post-`v4.6` platform state.
+**Goal:** Add deterministic temporal tracking so the system can evaluate model behavior, dataset
+health, and recurring regressions across time instead of only per comparison.
+
+**Target features:**
+- Artifact-derived history and timeline queries over runs, comparisons, and dataset families.
+- Deterministic trend and recurrence signals such as improving/degrading/stable, recent delta
+  direction, and recurring regression counts.
+- Dataset health summaries for versioned evaluation packs, including recent fail-rate movement and
+  volatility.
+- CLI history surfaces and governance context that incorporate historical state, not just the
+  latest comparison.
+- Lightweight debugger timeline and trend indicators on existing analysis and comparison surfaces.
 
 ## Next Milestone Goals
 
-- Build on deterministic governance with more proactive alerting, policy automation, or family
-  lifecycle controls.
-- Extend the enforcement loop without giving up local artifact truth, deterministic policy, or
-  debugger grounding.
-- Keep the next milestone artifact-native unless a clear structural limit forces broader
-  infrastructure.
+- Build on temporal tracking with clustering, pattern mining, or longer-horizon dataset-health
+  management.
+- Extend governance with history-aware automation only after deterministic timeline signals are
+  proven.
+- Keep future behavior-management work artifact-native unless a clear structural limit forces
+  broader infrastructure.
 
 ## Core Value
 
@@ -89,7 +99,16 @@ and actionable from local artifacts.
 
 ### Active
 
-- No active milestone. Define the next requirement set with `$gsd-new-milestone`.
+- Users should be able to inspect run, comparison, and dataset behavior across time, not just one
+  comparison at a time.
+- Trend labels such as improving, degrading, stable, and volatile should be computed
+  deterministically from saved artifacts.
+- The system should detect recurring regressions or repeated failure patterns across recent
+  history.
+- Governance should be able to consume historical context while staying deterministic and fully
+  inspectable.
+- The debugger should expose lightweight timeline and dataset-health context without turning into a
+  dashboard product.
 
 ### Out of Scope
 
@@ -109,8 +128,9 @@ and actionable from local artifacts.
 - `v4.5` proved those regressions can become future evaluation inputs automatically and traceably.
 - `v4.6` proved governance decisions can now be deterministic, explainable, reviewable, and stable
   over local artifacts.
-- The next product pressure is what to do beyond deterministic governance:
-  alerting, policy automation, or longer-term family lifecycle management.
+- The next product pressure is time and continuity:
+  whether behavior is improving or degrading over time, whether datasets are still pulling their
+  weight, and whether the same regression classes keep returning.
 
 ## Constraints
 
@@ -138,6 +158,7 @@ and actionable from local artifacts.
 | Turn high-signal regressions into generated dataset packs instead of alert-only outputs | Enforcement only matters if regressions become future evaluation inputs | ✓ Validated in `v4.5` |
 | Make dataset versions immutable and explicitly linked to source signals and comparisons | Evolution needs traceability and reproducibility, not silent mutation | ✓ Validated in `v4.5` |
 | Make governance decisions explicit, deterministic, and reviewable before writing dataset changes | Recommendation quality matters only if users can trust and inspect the policy basis | ✓ Validated in `v4.6` |
+| Add temporal intelligence as a deterministic artifact-derived layer before introducing proactive automation | Governance is still correct locally but blind globally without longitudinal context | — Targeted in `v4.7` |
 
 ---
-*Last updated: 2026-04-04 after archiving milestone v4.6*
+*Last updated: 2026-04-04 for milestone v4.7 initialization*

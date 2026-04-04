@@ -1,0 +1,82 @@
+# Requirements: v4.7 Model Behavior Tracking And Dataset Health Over Time
+
+**Defined:** 2026-04-04
+**Core Value:** Make structured LLM failure analysis simple, reproducible, queryable,
+interpretable, reusable, actionable, and now time-aware from local artifacts.
+
+## v4.7 Requirements
+
+### History And Timeline
+
+- [ ] **HIST-01**: User can inspect ordered run and comparison history for a dataset, model, or
+  dataset family using only saved local artifacts.
+- [ ] **HIST-02**: Historical tracking remains artifact-derived and reproducible, with no external
+  service or hidden state.
+
+### Trend And Recurrence Signals
+
+- [ ] **TREND-01**: The system computes deterministic trend labels such as `improving`,
+  `degrading`, or `stable` from recent artifact history.
+- [ ] **TREND-02**: The system computes deterministic volatility and recurrence indicators so users
+  can see when failures or regressions keep returning.
+- [ ] **HEALTH-01**: Versioned evaluation datasets expose a health summary over time, including
+  recent fail-rate movement and stability.
+
+### CLI And Governance Context
+
+- [ ] **CLI-01**: User can inspect history and trend summaries through the CLI by dataset, model,
+  or dataset family.
+- [ ] **GOV-01**: Governance workflows can incorporate historical context while remaining
+  deterministic and inspectable.
+
+### Debugger Support
+
+- [ ] **UI-01**: The debugger shows lightweight timeline and trend context on existing analysis or
+  comparison surfaces without introducing a new dashboard-style route.
+
+### Workflow Verification
+
+- [ ] **FLOW-01**: The full temporal loop from artifact history to trend signal to history-aware
+  governance context is verified and reproducible on local artifacts.
+
+## vNext Requirements
+
+### Pattern Intelligence
+
+- **CLUSTER-01**: The system can group recurring failures into higher-level recurring behavior
+  clusters across time.
+- **AUTO-01**: High-confidence temporal signals can drive proactive recommendations or alerts under
+  explicit local policy.
+- **PRUNE-01**: Dataset-family health can recommend pruning, consolidation, or retirement when
+  packs go stale or overly volatile.
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Hosted trend store, telemetry service, or background worker | `v4.7` keeps time-awareness fully local and artifact-native |
+| Statistical forecasting or learned trend prediction | This milestone starts with deterministic signals, not predictive models |
+| Full dashboard-style observability workspace | UI stays lightweight and route-local |
+| Automatic governance mutation based on history alone | Historical context should inform decisions before it automates them |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| HIST-01 | Phase 97 | Pending |
+| HIST-02 | Phase 97 | Pending |
+| TREND-01 | Phase 98 | Pending |
+| TREND-02 | Phase 98 | Pending |
+| HEALTH-01 | Phase 98 | Pending |
+| CLI-01 | Phase 99 | Pending |
+| GOV-01 | Phase 99 | Pending |
+| UI-01 | Phase 100 | Pending |
+| FLOW-01 | Phase 100 | Pending |
+
+**Coverage:**
+- v4.7 requirements: 9 total
+- Mapped to phases: 9
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-04 for milestone v4.7*
