@@ -22,6 +22,7 @@ from .query import (
     list_run_inventory,
     query_case_deltas,
     query_cases,
+    query_comparison_signals,
 )
 
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "list_run_inventory",
     "query_case_deltas",
     "query_cases",
+    "query_comparison_signals",
     "query_index_dir",
     "query_index_path",
     "rebuild_query_index",

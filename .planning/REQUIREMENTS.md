@@ -8,9 +8,9 @@ comparison artifacts.
 
 ### Comparison Signal Contract
 
-- [ ] **SIG-01**: Every comparison artifact persists a deterministic signal block with explicit
+- [x] **SIG-01**: Every comparison artifact persists a deterministic signal block with explicit
   verdict, regression score, improvement score, and top drivers.
-- [ ] **SIG-02**: Signal scoring and top-driver detection are reproducible from saved comparison
+- [x] **SIG-02**: Signal scoring and top-driver detection are reproducible from saved comparison
   artifacts and remain independent of LLM behavior.
 
 ### CLI Signal Surfaces
@@ -57,8 +57,8 @@ comparison artifacts.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SIG-01 | Phase 85 | Pending |
-| SIG-02 | Phase 85 | Pending |
+| SIG-01 | Phase 85 | Complete |
+| SIG-02 | Phase 85 | Complete |
 | CLI-01 | Phase 86 | Pending |
 | CLI-02 | Phase 86 | Pending |
 | CLI-03 | Phase 86 | Pending |

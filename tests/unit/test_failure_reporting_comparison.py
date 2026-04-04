@@ -28,6 +28,8 @@ class ComparisonClassifier:
         output = classifier_input.output.text.lower()
         if "shared improvement" in output and "baseline-model" in output:
             return ClassifierResult(failure_type="reasoning", confidence=0.8)
+        if "shared regression" in output and "candidate-model" in output:
+            return ClassifierResult(failure_type="hallucination", confidence=0.86)
         if "shared stable failure" in output:
             return ClassifierResult(failure_type="hallucination", confidence=0.7)
         return ClassifierResult(failure_type="no_failure", confidence=0.2)
@@ -88,16 +90,14 @@ def test_build_comparison_report_surfaces_shared_and_missing_case_accounting(tmp
         now=datetime(2026, 3, 30, 12, 45, 0, tzinfo=timezone.utc),
     )
 
-    assert built.report.comparison == {
-        "baseline_run_id": baseline_run_id,
-        "candidate_run_id": candidate_run_id,
-        "dataset_id": "reasoning-basics-v1",
-        "compatible": True,
-        "shared_case_count": 2,
-        "baseline_only_case_count": 1,
-        "candidate_only_case_count": 1,
-        "metrics_computed_on": "shared_cases_only",
-    }
+    assert built.report.comparison["baseline_run_id"] == baseline_run_id
+    assert built.report.comparison["candidate_run_id"] == candidate_run_id
+    assert built.report.comparison["dataset_id"] == "reasoning-basics-v1"
+    assert built.report.comparison["compatible"] is True
+    assert built.report.comparison["shared_case_count"] == 2
+    assert built.report.comparison["baseline_only_case_count"] == 1
+    assert built.report.comparison["candidate_only_case_count"] == 1
+    assert built.report.comparison["metrics_computed_on"] == "shared_cases_only"
     assert built.report.total_cases == 2
     assert built.report.failure_counts["reasoning"] == -1
     assert built.report.failure_rates["reasoning"] == -0.5
@@ -105,8 +105,24 @@ def test_build_comparison_report_surfaces_shared_and_missing_case_accounting(tmp
     assert built.report.metrics["candidate"]["failure_rate"] == 0.5
     assert built.report.metrics["delta"]["failure_rate"] == -0.5
     assert built.report.status == {"overall": "improved"}
+    assert built.report.comparison["signal"] == {
+        "verdict": "improvement",
+        "regression_score": 0.0,
+        "improvement_score": 0.5,
+        "net_score": 0.5,
+        "severity": 0.5,
+        "top_drivers": [
+            {
+                "failure_type": "reasoning",
+                "delta": -0.5,
+                "direction": "improvement",
+                "case_ids": ["case-002"],
+            }
+        ],
+    }
     assert built.details["baseline_only_case_ids"] == ["case-001"]
     assert built.details["candidate_only_case_ids"] == ["case-004"]
+    assert built.details["signal"] == built.report.comparison["signal"]
     assert built.details["case_transition_counts"] == {
         "improvements": 1,
         "regressions": 0,
@@ -200,6 +216,62 @@ def test_build_comparison_report_surfaces_error_state_changes(tmp_path) -> None:
     assert built.details["case_deltas"][0]["candidate_error_stage"] is None
 
 
+def test_build_comparison_report_persists_regression_signal_drivers(tmp_path) -> None:
+    adapter_id = "unit-comparison-adapter-regression"
+    classifier_id = "unit-comparison-classifier-regression"
+    register_model(adapter_id, ComparisonAdapter)
+    register_classifier(classifier_id, ComparisonClassifier())
+
+    baseline_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-009", prompt="shared regression"),),
+        ),
+        model="baseline-model",
+        seed=61,
+        suffix_minutes=0,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+    candidate_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-009", prompt="shared regression"),),
+        ),
+        model="candidate-model",
+        seed=62,
+        suffix_minutes=1,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+
+    built = build_comparison_report(
+        load_saved_run_artifacts(baseline_run_id, root=tmp_path),
+        load_saved_run_artifacts(candidate_run_id, root=tmp_path),
+        now=datetime(2026, 3, 30, 12, 49, 0, tzinfo=timezone.utc),
+    )
+
+    assert built.report.status == {"overall": "regressed"}
+    assert built.report.comparison["signal"] == {
+        "verdict": "regression",
+        "regression_score": 1.0,
+        "improvement_score": 0.0,
+        "net_score": -1.0,
+        "severity": 1.0,
+        "top_drivers": [
+            {
+                "failure_type": "hallucination",
+                "delta": 1.0,
+                "direction": "regression",
+                "case_ids": ["case-009"],
+            }
+        ],
+    }
+    assert built.details["signal"] == built.report.comparison["signal"]
+
+
 def test_build_comparison_report_flags_incompatible_datasets(tmp_path) -> None:
     adapter_id = "unit-comparison-adapter-incompatible"
     classifier_id = "unit-comparison-classifier-incompatible"
@@ -239,9 +311,19 @@ def test_build_comparison_report_flags_incompatible_datasets(tmp_path) -> None:
 
     assert built.report.comparison["compatible"] is False
     assert built.report.comparison["reason"] == "dataset_mismatch"
+    assert built.report.comparison["signal"] == {
+        "verdict": "incompatible",
+        "reason": "dataset_mismatch",
+        "regression_score": 0.0,
+        "improvement_score": 0.0,
+        "net_score": 0.0,
+        "severity": 0.0,
+        "top_drivers": [],
+    }
     assert built.report.status == {"overall": "incompatible_dataset"}
     assert built.details["compatibility"]["baseline_dataset_id"] == "reasoning-basics-v1"
     assert built.details["compatibility"]["candidate_dataset_id"] == "hallucination-basics-v1"
+    assert built.details["signal"] == built.report.comparison["signal"]
 
 
 def test_write_comparison_report_artifacts_persists_summary_and_detail_payloads(tmp_path) -> None:
@@ -298,7 +380,9 @@ def test_write_comparison_report_artifacts_persists_summary_and_detail_payloads(
 
     assert Report.from_payload(report_payload).comparison["baseline_run_id"] == baseline_run_id
     assert report_payload["status"]["overall"] == "improved"
+    assert report_payload["comparison"]["signal"]["verdict"] == "improvement"
     assert details_payload["comparison_mode"] == "baseline_to_candidate"
+    assert details_payload["signal"]["top_drivers"][0]["failure_type"] == "reasoning"
     assert details_payload["compatibility"]["shared_case_count"] == 2
     assert details_payload["case_transition_counts"]["improvements"] == 1
 

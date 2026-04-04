@@ -9,6 +9,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import time
 
+from model_failure_lab.reporting.signals import build_comparison_signal, build_incompatible_signal
 from model_failure_lab.reporting.load import load_saved_run_artifacts
 from model_failure_lab.storage.layout import (
     REPORT_DETAILS_FILENAME,
@@ -20,7 +21,7 @@ from model_failure_lab.storage.layout import (
     runs_root,
 )
 
-QUERY_INDEX_SCHEMA_VERSION = "query_index_v1"
+QUERY_INDEX_SCHEMA_VERSION = "query_index_v2"
 QUERY_INDEX_DIRNAME = ".failure_lab"
 QUERY_INDEX_FILENAME = "query_index.sqlite3"
 
@@ -110,6 +111,7 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
 
     comparison_rows: list[dict[str, object]] = []
     delta_rows: list[dict[str, object]] = []
+    signal_driver_rows: list[dict[str, object]] = []
     for report_dir in _artifact_directories(reports_root(root=artifact_root, create=False)):
         report_path = report_dir / REPORT_FILENAME
         details_path = report_dir / REPORT_DETAILS_FILENAME
@@ -135,6 +137,7 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
         )
         baseline_row = run_lookup.get(baseline_run_id)
         candidate_row = run_lookup.get(candidate_run_id)
+        signal = _read_comparison_signal(report_payload, details_payload, report_id=report_id)
         comparison_rows.append(
             {
                 "report_id": report_id,
@@ -150,8 +153,24 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                 "compatible": _require_bool(
                     comparison.get("compatible"), f"{report_id}.comparison.compatible"
                 ),
+                "signal_verdict": _require_string(
+                    signal.get("verdict"), f"{report_id}.signal.verdict"
+                ),
+                "regression_score": _require_number(
+                    signal.get("regression_score"), f"{report_id}.signal.regression_score"
+                ),
+                "improvement_score": _require_number(
+                    signal.get("improvement_score"), f"{report_id}.signal.improvement_score"
+                ),
+                "net_score": _require_number(
+                    signal.get("net_score"), f"{report_id}.signal.net_score"
+                ),
+                "severity": _require_number(
+                    signal.get("severity"), f"{report_id}.signal.severity"
+                ),
             }
         )
+        signal_driver_rows.extend(_signal_driver_rows(report_id=report_id, signal=signal))
 
         case_deltas = details_payload.get("case_deltas")
         if case_deltas is None:
@@ -244,10 +263,12 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                 """
                 INSERT INTO comparisons(
                     report_id, created_at, dataset, baseline_run_id, candidate_run_id,
-                    baseline_model, candidate_model, status, compatible
+                    baseline_model, candidate_model, status, compatible, signal_verdict,
+                    regression_score, improvement_score, net_score, severity
                 ) VALUES(
                     :report_id, :created_at, :dataset, :baseline_run_id, :candidate_run_id,
-                    :baseline_model, :candidate_model, :status, :compatible
+                    :baseline_model, :candidate_model, :status, :compatible, :signal_verdict,
+                    :regression_score, :improvement_score, :net_score, :severity
                 )
                 """,
                 comparison_rows,
@@ -269,6 +290,16 @@ def rebuild_query_index(*, root: str | Path | None = None) -> QueryIndexSummary:
                 )
                 """,
                 delta_rows,
+            )
+            connection.executemany(
+                """
+                INSERT INTO signal_drivers(
+                    report_id, driver_rank, failure_type, delta, direction, case_ids_json
+                ) VALUES(
+                    :report_id, :driver_rank, :failure_type, :delta, :direction, :case_ids_json
+                )
+                """,
+                signal_driver_rows,
             )
             connection.commit()
         temp_path.replace(final_path)
@@ -389,7 +420,12 @@ def _create_schema(connection: sqlite3.Connection) -> None:
             baseline_model TEXT,
             candidate_model TEXT,
             status TEXT NOT NULL,
-            compatible INTEGER NOT NULL
+            compatible INTEGER NOT NULL,
+            signal_verdict TEXT NOT NULL,
+            regression_score REAL NOT NULL,
+            improvement_score REAL NOT NULL,
+            net_score REAL NOT NULL,
+            severity REAL NOT NULL
         );
 
         CREATE TABLE case_deltas (
@@ -416,12 +452,25 @@ def _create_schema(connection: sqlite3.Connection) -> None:
             PRIMARY KEY (report_id, case_id, transition_type)
         );
 
+        CREATE TABLE signal_drivers (
+            report_id TEXT NOT NULL,
+            driver_rank INTEGER NOT NULL,
+            failure_type TEXT NOT NULL,
+            delta REAL NOT NULL,
+            direction TEXT NOT NULL,
+            case_ids_json TEXT NOT NULL,
+            PRIMARY KEY (report_id, driver_rank)
+        );
+
         CREATE INDEX idx_cases_failure_type ON cases(failure_type);
         CREATE INDEX idx_cases_created_at ON cases(created_at DESC);
         CREATE INDEX idx_cases_model_dataset ON cases(model, dataset);
         CREATE INDEX idx_comparisons_created_at ON comparisons(created_at DESC);
+        CREATE INDEX idx_comparisons_signal_verdict ON comparisons(signal_verdict);
+        CREATE INDEX idx_comparisons_severity ON comparisons(severity DESC);
         CREATE INDEX idx_case_deltas_delta_kind ON case_deltas(delta_kind);
         CREATE INDEX idx_case_deltas_transition_type ON case_deltas(transition_type);
+        CREATE INDEX idx_signal_drivers_failure_type ON signal_drivers(failure_type);
         """
     )
 
@@ -468,6 +517,12 @@ def _require_bool(value: object, label: str) -> bool:
     return value
 
 
+def _require_number(value: object, label: str) -> float:
+    if not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be a number")
+    return float(value)
+
+
 def _read_report_status(report_payload: dict[str, object]) -> str:
     status = report_payload.get("status")
     if isinstance(status, dict):
@@ -475,3 +530,120 @@ def _read_report_status(report_payload: dict[str, object]) -> str:
         if isinstance(overall, str) and overall.strip():
             return overall
     return "comparison_ready"
+
+
+def _read_comparison_signal(
+    report_payload: dict[str, object],
+    details_payload: dict[str, object],
+    *,
+    report_id: str,
+) -> dict[str, JsonValue]:
+    comparison = _require_mapping(report_payload.get("comparison"), f"{report_id}.comparison")
+    raw_signal = comparison.get("signal")
+    if raw_signal is None:
+        raw_signal = details_payload.get("signal")
+    if isinstance(raw_signal, dict):
+        return _normalize_signal_payload(raw_signal, f"{report_id}.signal")
+
+    compatible = _require_bool(comparison.get("compatible"), f"{report_id}.comparison.compatible")
+    if not compatible:
+        reason = _optional_string(comparison.get("reason")) or "incompatible"
+        return build_incompatible_signal(reason=reason)
+
+    case_deltas = details_payload.get("case_deltas")
+    if not isinstance(case_deltas, list):
+        raise ValueError(f"{report_id} comparison details case_deltas must be a list")
+    return build_comparison_signal(
+        failure_rate_deltas=_require_float_mapping(
+            report_payload.get("failure_rates"), f"{report_id}.failure_rates"
+        ),
+        case_deltas=[_require_mapping(row, f"{report_id}.case_delta") for row in case_deltas],
+    )
+
+
+def _normalize_signal_payload(
+    payload: dict[str, object],
+    label: str,
+) -> dict[str, JsonValue]:
+    normalized: dict[str, JsonValue] = {
+        "verdict": _require_string(payload.get("verdict"), f"{label}.verdict"),
+        "regression_score": _require_number(
+            payload.get("regression_score"), f"{label}.regression_score"
+        ),
+        "improvement_score": _require_number(
+            payload.get("improvement_score"), f"{label}.improvement_score"
+        ),
+        "net_score": _require_number(payload.get("net_score"), f"{label}.net_score"),
+        "severity": _require_number(payload.get("severity"), f"{label}.severity"),
+    }
+    reason = payload.get("reason")
+    if reason is not None:
+        normalized["reason"] = _require_string(reason, f"{label}.reason")
+
+    raw_drivers = payload.get("top_drivers")
+    if raw_drivers is None:
+        normalized["top_drivers"] = []
+        return normalized
+    if not isinstance(raw_drivers, list):
+        raise ValueError(f"{label}.top_drivers must be a list")
+    drivers: list[dict[str, JsonValue]] = []
+    for index, raw_driver in enumerate(raw_drivers):
+        driver = _require_mapping(raw_driver, f"{label}.top_drivers[{index}]")
+        drivers.append(
+            {
+                "failure_type": _require_string(
+                    driver.get("failure_type"), f"{label}.top_drivers[{index}].failure_type"
+                ),
+                "delta": _require_number(driver.get("delta"), f"{label}.top_drivers[{index}].delta"),
+                "direction": _require_string(
+                    driver.get("direction"), f"{label}.top_drivers[{index}].direction"
+                ),
+                "case_ids": _require_string_list(
+                    driver.get("case_ids"), f"{label}.top_drivers[{index}].case_ids"
+                ),
+            }
+        )
+    normalized["top_drivers"] = drivers
+    return normalized
+
+
+def _require_float_mapping(value: object, label: str) -> dict[str, float]:
+    mapping = _require_mapping(value, label)
+    normalized: dict[str, float] = {}
+    for key, item in mapping.items():
+        normalized[_require_string(key, label)] = _require_number(item, f"{label}.{key}")
+    return normalized
+
+
+def _signal_driver_rows(
+    *,
+    report_id: str,
+    signal: dict[str, JsonValue],
+) -> list[dict[str, object]]:
+    raw_drivers = signal.get("top_drivers")
+    if not isinstance(raw_drivers, list):
+        return []
+    rows: list[dict[str, object]] = []
+    for index, raw_driver in enumerate(raw_drivers):
+        if not isinstance(raw_driver, dict):
+            continue
+        failure_type = raw_driver.get("failure_type")
+        delta = raw_driver.get("delta")
+        direction = raw_driver.get("direction")
+        case_ids = raw_driver.get("case_ids")
+        if not isinstance(failure_type, str) or not isinstance(direction, str):
+            continue
+        if not isinstance(delta, (int, float)):
+            continue
+        case_ids_json = json.dumps(_require_string_list(case_ids, "signal_driver.case_ids"))
+        rows.append(
+            {
+                "report_id": report_id,
+                "driver_rank": index,
+                "failure_type": failure_type,
+                "delta": float(delta),
+                "direction": direction,
+                "case_ids_json": case_ids_json,
+            }
+        )
+    return rows

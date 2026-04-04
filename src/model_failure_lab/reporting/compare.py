@@ -10,6 +10,7 @@ from model_failure_lab.schemas import NO_FAILURE_TYPE, JsonValue, Report
 
 from .core import BuiltReport, summarize_case_executions
 from .load import SavedRunArtifacts
+from .signals import build_comparison_signal, build_incompatible_signal
 
 TRANSITION_LABELS = {
     "failure_to_no_failure": "failure -> no_failure",
@@ -27,8 +28,6 @@ TRANSITION_ORDER = (
     "new_error",
     "error_stage_changed",
 )
-
-
 def build_comparison_report(
     baseline: SavedRunArtifacts,
     candidate: SavedRunArtifacts,
@@ -47,6 +46,7 @@ def build_comparison_report(
     candidate_only_case_ids = tuple(sorted(set(candidate.case_ids) - set(baseline.case_ids)))
 
     if baseline.dataset_id != candidate.dataset_id:
+        signal = build_incompatible_signal(reason="dataset_mismatch")
         report = Report(
             report_id=report_id,
             run_ids=(baseline.run.run_id, candidate.run.run_id),
@@ -64,6 +64,7 @@ def build_comparison_report(
                 "shared_case_count": 0,
                 "baseline_only_case_count": len(baseline.case_ids),
                 "candidate_only_case_count": len(candidate.case_ids),
+                "signal": signal,
             },
             metrics={
                 "baseline": baseline_full.metrics_payload(),
@@ -86,6 +87,7 @@ def build_comparison_report(
             "candidate_full_metrics": candidate_full.metrics_payload(),
             "baseline_case_ids": list(baseline.case_ids),
             "candidate_case_ids": list(candidate.case_ids),
+            "signal": signal,
             "case_transition_counts": {},
             "case_transition_summary": [],
             "case_deltas": [],
@@ -126,6 +128,12 @@ def build_comparison_report(
         coverage_delta=delta_metrics["classification_coverage"],
     )
 
+    case_deltas = _case_deltas(shared_case_ids, baseline_map, candidate_map)
+    signal = build_comparison_signal(
+        failure_rate_deltas=failure_rate_deltas,
+        case_deltas=case_deltas,
+    )
+
     report = Report(
         report_id=report_id,
         run_ids=(baseline.run.run_id, candidate.run.run_id),
@@ -142,6 +150,7 @@ def build_comparison_report(
             "baseline_only_case_count": len(baseline_only_case_ids),
             "candidate_only_case_count": len(candidate_only_case_ids),
             "metrics_computed_on": "shared_cases_only",
+            "signal": signal,
         },
         metrics={
             "baseline": baseline_shared.metrics_payload(),
@@ -155,12 +164,12 @@ def build_comparison_report(
             "detail_artifact": "report_details.json",
         },
     )
-    case_deltas = _case_deltas(shared_case_ids, baseline_map, candidate_map)
     details: dict[str, JsonValue] = {
         "report_id": report_id,
         "report_kind": "comparison",
         "comparison_mode": "baseline_to_candidate",
         "compatibility": dict(report.comparison),
+        "signal": signal,
         "shared_case_ids": list(shared_case_ids),
         "baseline_only_case_ids": list(baseline_only_case_ids),
         "candidate_only_case_ids": list(candidate_only_case_ids),

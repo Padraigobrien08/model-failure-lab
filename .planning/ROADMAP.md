@@ -28,7 +28,7 @@ meaningful regressions and improvements, and directs users to the most important
 without manual inspection.
 
 ### Phase 85: Comparison Signal Contract And Artifact Persistence
-- Status: pending
+- Status: complete
 - Requirements: `SIG-01`, `SIG-02`
 - Goal: compute deterministic verdicts, scores, and top drivers at comparison time and persist
   them in comparison artifacts.
@@ -77,9 +77,9 @@ without manual inspection.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 85
-$gsd-plan-phase 85
+$gsd-plan-phase 86
+$gsd-execute-phase 86
 ```
 
 ---
-*Roadmap updated: 2026-04-04 for milestone v4.4 initialization*
+*Roadmap updated: 2026-04-04 after Phase 85 completion*

@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Regression Detection And Signal Layer
-current_phase: 85
-current_phase_name: Comparison Signal Contract And Artifact Persistence
+current_phase: 86
+current_phase_name: CLI Signal Surfaces And Regression Listings
 current_plan: null
-status: ready_to_discuss
-stopped_at: Milestone defined
-last_updated: "2026-04-04T13:40:54Z"
+status: ready_to_plan
+stopped_at: Phase 85 complete
+last_updated: "2026-04-04T13:59:15Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 25
 ---
 
 # State: v4.4 Regression Detection And Signal Layer
@@ -25,30 +25,30 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 
 **Core value:** Make behavior changes explicit, deterministic, and actionable from local
 artifacts.
-**Current focus:** Define and ship the persisted comparison signal contract before opening new UI
-surfaces.
+**Current focus:** Expose the persisted signal contract through CLI score, summary, alert, and
+severity listing surfaces.
 
 ## Current Focus
 
-- next_action: discuss Phase `85`
-- status: milestone initialized; requirements and roadmap are ready
+- next_action: plan Phase `86`
+- status: Phase 85 complete; CLI signal surfacing is next
 
 ## Current Position
 
 Milestone: `v4.4`
-Phase: `85` — ready to discuss
+Phase: `86` — ready to plan
 
 ## Workflow State
 
-**Current Phase:** `85`
-**Current Phase Name:** `Comparison Signal Contract And Artifact Persistence`
+**Current Phase:** `86`
+**Current Phase Name:** `CLI Signal Surfaces And Regression Listings`
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
-**Status:** Ready to discuss
-**Progress:** [░░░░░░░░░░] 0%
+**Status:** Ready to plan
+**Progress:** [██░░░░░░░░] 25%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Started milestone v4.4 and defined requirements and roadmap
+**Last Activity Description:** Completed Phase 85 persisted comparison signal contract and index mirroring
 
 ## Recent Decisions
 
@@ -60,6 +60,8 @@ Phase: `85` — ready to discuss
   and queryable.
 - Reuse the current CLI, query, and debugger surfaces instead of introducing a separate alerting
   service or provider-specific UI branch.
+- Mirror persisted signal fields into the SQLite query index, with a compatibility fallback that
+  derives signals from older comparison artifacts when the signal block is absent.
 
 ## Accumulated Context
 
@@ -75,16 +77,16 @@ Phase: `85` — ready to discuss
 
 ## Session
 
-**Last Date:** 2026-04-04T13:40:54Z
-**Stopped At:** Milestone defined
+**Last Date:** 2026-04-04T13:59:15Z
+**Stopped At:** Phase 85 complete
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-discuss-phase 85
-$gsd-plan-phase 85
+$gsd-plan-phase 86
+$gsd-execute-phase 86
 ```
 
 ---
-*State updated: 2026-04-04 for milestone v4.4 initialization*
+*State updated: 2026-04-04 after Phase 85 completion*

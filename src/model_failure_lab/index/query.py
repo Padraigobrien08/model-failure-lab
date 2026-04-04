@@ -17,6 +17,7 @@ DeltaAggregateKey = Literal[
     "baseline_failure_type",
     "candidate_failure_type",
 ]
+SignalDirection = Literal["regression", "improvement", "neutral", "incompatible"]
 
 
 @dataclass(slots=True, frozen=True)
@@ -73,12 +74,82 @@ def list_comparison_inventory(*, root: str | Path | None = None) -> list[dict[st
         rows = connection.execute(
             """
             SELECT report_id, baseline_run_id, candidate_run_id, dataset, created_at, status,
-                   compatible
+                   compatible, signal_verdict, regression_score, improvement_score, net_score,
+                   severity
             FROM comparisons
-            ORDER BY created_at DESC, report_id DESC
+            ORDER BY severity DESC, created_at DESC, report_id DESC
             """
         ).fetchall()
-    return [dict(row) for row in rows]
+    hydrated = [dict(row) for row in rows]
+    _attach_signal_drivers(connection=None, rows=hydrated, root=root)
+    return hydrated
+
+
+def query_comparison_signals(
+    filters: QueryFilters | None = None,
+    *,
+    verdict: SignalDirection | None = "regression",
+    root: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    filters = filters or QueryFilters()
+    ensure_query_index(root=root)
+    with _connection(root=root) as connection:
+        selected_report_ids = _selected_report_ids(connection, filters)
+        query = [
+            """
+            SELECT report_id, created_at, dataset, baseline_run_id, candidate_run_id,
+                   baseline_model, candidate_model, status, compatible, signal_verdict,
+                   regression_score, improvement_score, net_score, severity
+            FROM comparisons
+            WHERE 1 = 1
+            """
+        ]
+        params: list[Any] = []
+        if verdict is not None:
+            query.append("AND signal_verdict = ?")
+            params.append(verdict)
+        if filters.dataset is not None:
+            query.append("AND dataset = ?")
+            params.append(filters.dataset)
+        if filters.report_id is not None:
+            query.append("AND report_id = ?")
+            params.append(filters.report_id)
+        if filters.baseline_run_id is not None:
+            query.append("AND baseline_run_id = ?")
+            params.append(filters.baseline_run_id)
+        if filters.candidate_run_id is not None:
+            query.append("AND candidate_run_id = ?")
+            params.append(filters.candidate_run_id)
+        if filters.model is not None:
+            query.append("AND (baseline_model = ? OR candidate_model = ?)")
+            params.extend([filters.model, filters.model])
+        if filters.since is not None:
+            query.append("AND created_at >= ?")
+            params.append(filters.since)
+        if filters.until is not None:
+            query.append("AND created_at <= ?")
+            params.append(filters.until)
+        if filters.failure_type is not None:
+            query.append(
+                """
+                AND EXISTS (
+                    SELECT 1
+                    FROM signal_drivers
+                    WHERE signal_drivers.report_id = comparisons.report_id
+                      AND signal_drivers.failure_type = ?
+                )
+                """
+            )
+            params.append(filters.failure_type)
+        if selected_report_ids is not None:
+            query.append(f"AND report_id IN ({','.join('?' for _ in selected_report_ids)})")
+            params.extend(selected_report_ids)
+        query.append("ORDER BY severity DESC, created_at DESC, report_id DESC")
+        query.append("LIMIT ?")
+        params.append(max(filters.limit, 1))
+        rows = [dict(row) for row in connection.execute(" ".join(query), params).fetchall()]
+        _attach_signal_drivers(connection=connection, rows=rows, root=root)
+    return rows
 
 
 def list_query_facets(*, root: str | Path | None = None) -> dict[str, list[str]]:
@@ -345,6 +416,39 @@ def _hydrate_delta_row(row: sqlite3.Row) -> dict[str, Any]:
     payload = dict(row)
     payload["tags"] = json.loads(payload.pop("tags_json"))
     return payload
+
+
+def _attach_signal_drivers(
+    *,
+    connection: sqlite3.Connection | None,
+    rows: list[dict[str, Any]],
+    root: str | Path | None = None,
+) -> None:
+    report_ids = [str(row["report_id"]) for row in rows if row.get("report_id") is not None]
+    if not report_ids:
+        return
+    should_close = connection is None
+    conn = connection or _connection(root=root)
+    try:
+        driver_rows = conn.execute(
+            f"""
+            SELECT report_id, driver_rank, failure_type, delta, direction, case_ids_json
+            FROM signal_drivers
+            WHERE report_id IN ({','.join('?' for _ in report_ids)})
+            ORDER BY report_id ASC, driver_rank ASC
+            """,
+            report_ids,
+        ).fetchall()
+        by_report: dict[str, list[dict[str, Any]]] = {}
+        for row in driver_rows:
+            payload = dict(row)
+            payload["case_ids"] = json.loads(payload.pop("case_ids_json"))
+            by_report.setdefault(str(payload.pop("report_id")), []).append(payload)
+        for row in rows:
+            row["top_drivers"] = by_report.get(str(row["report_id"]), [])
+    finally:
+        if should_close:
+            conn.close()
 
 
 def _scalar_int(connection: sqlite3.Connection, query: str) -> int:

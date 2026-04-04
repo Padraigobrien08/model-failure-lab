@@ -23,6 +23,7 @@ from model_failure_lab.index import (
     list_run_inventory,
     query_case_deltas,
     query_cases,
+    query_comparison_signals,
     query_index_path,
     rebuild_query_index,
 )
@@ -187,6 +188,26 @@ def test_rebuild_query_index_creates_expected_rows(tmp_path: Path) -> None:
     ]
     comparison_inventory = list_comparison_inventory(root=tmp_path)
     assert [row["report_id"] for row in comparison_inventory] == [ids["comparison_report_id"]]
+    assert comparison_inventory[0]["signal_verdict"] == "neutral"
+    assert comparison_inventory[0]["regression_score"] == 0.25
+    assert comparison_inventory[0]["improvement_score"] == 0.25
+    assert comparison_inventory[0]["severity"] == 0.25
+    assert comparison_inventory[0]["top_drivers"] == [
+        {
+            "driver_rank": 0,
+            "failure_type": "instruction_following",
+            "delta": 0.25,
+            "direction": "regression",
+            "case_ids": ["case-swap"],
+        },
+        {
+            "driver_rank": 1,
+            "failure_type": "reasoning",
+            "delta": -0.25,
+            "direction": "improvement",
+            "case_ids": ["case-swap"],
+        },
+    ]
 
 
 def test_query_index_rebuild_is_deterministic(tmp_path: Path) -> None:
@@ -301,6 +322,28 @@ def test_query_case_deltas_returns_regressions_and_improvements(tmp_path: Path) 
     assert [(row["report_id"], row["case_id"]) for row in pair_filtered] == [
         (ids["comparison_report_id"], "case-swap"),
     ]
+
+
+def test_query_comparison_signals_orders_by_severity_and_supports_failure_type_filters(
+    tmp_path: Path,
+) -> None:
+    ids = _materialize_workspace(tmp_path)
+    rebuild_query_index(root=tmp_path)
+
+    neutral_rows = query_comparison_signals(
+        QueryFilters(limit=10),
+        verdict="neutral",
+        root=tmp_path,
+    )
+    assert [row["report_id"] for row in neutral_rows] == [ids["comparison_report_id"]]
+    assert neutral_rows[0]["top_drivers"][0]["failure_type"] == "instruction_following"
+
+    filtered_rows = query_comparison_signals(
+        QueryFilters(failure_type="instruction_following", limit=10),
+        verdict="neutral",
+        root=tmp_path,
+    )
+    assert [row["report_id"] for row in filtered_rows] == [ids["comparison_report_id"]]
 
 
 def test_local_query_operations_finish_quickly(tmp_path: Path) -> None:
