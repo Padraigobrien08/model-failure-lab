@@ -5,16 +5,16 @@ milestone_name: Regression Governance And Recommendation Layer
 current_phase: 96
 current_phase_name: Governance Stability And Workflow Verification
 current_plan: null
-status: ready_to_discuss
+status: ready_to_complete
 stopped_at: Phase 95 complete
-last_updated: "2026-04-04T17:55:00Z"
+last_updated: "2026-04-04T18:59:00Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 75
+  completed_phases: 4
+  total_plans: 8
+  completed_plans: 8
+  percent: 100
 ---
 
 # State: v4.6 Regression Governance And Recommendation Layer
@@ -30,13 +30,13 @@ review/apply workflows.
 
 ## Current Focus
 
-- next_action: discuss Phase `96`
-- status: Phase `95` complete; final verification phase ready to discuss
+- next_action: complete milestone `v4.6`
+- status: Phase `96` complete; milestone ready to archive
 
 ## Current Position
 
 Milestone: `v4.6`
-Phase: `96` — ready to discuss
+Phase: `96` — complete
 
 ## Workflow State
 
@@ -44,11 +44,11 @@ Phase: `96` — ready to discuss
 **Current Phase Name:** `Governance Stability And Workflow Verification`
 **Total Phases:** 4
 **Current Plan:** none
-**Total Plans in Phase:** 0
-**Status:** Ready to discuss
-**Progress:** [████████░░] 75%
+**Total Plans in Phase:** 2
+**Status:** Ready to complete
+**Progress:** [██████████] 100%
 **Last Activity:** 2026-04-04
-**Last Activity Description:** Completed Phase `95` debugger recommendation surfacing and frontend verification
+**Last Activity Description:** Completed Phase `96` governance workflow proof across CLI, smoke, and frontend verification
 
 ## Recent Decisions
 
@@ -74,20 +74,20 @@ Phase: `96` — ready to discuss
 - Phase `94` now provides CLI review/apply flows and dataset-family health.
 - Phase `95` now surfaces recommendation action, rationale, and matched-family context directly on
   debugger signal surfaces without introducing a new governance route.
-- The remaining gap is end-to-end governance workflow proof across repeated local artifact runs.
+- Phase `96` now proves the end-to-end governance loop across repeated local artifact runs, so the
+  milestone is ready to archive.
 
 ## Session
 
 **Last Date:** 2026-04-04T17:00:00Z
-**Stopped At:** Phase 95 complete
+**Stopped At:** Phase 96 complete
 **Resume File:** None
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-discuss-phase 96
-$gsd-plan-phase 96
+$gsd-complete-milestone
 ```
 
 ---
-*State updated: 2026-04-04 after Phase 95 completion*
+*State updated: 2026-04-04 after Phase 96 completion*

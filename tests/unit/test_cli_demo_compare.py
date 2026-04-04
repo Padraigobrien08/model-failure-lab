@@ -818,6 +818,168 @@ def test_compare_signal_outputs_stay_stable_across_repeat_compare_and_index_rebu
     }
 
 
+def test_governance_loop_stays_stable_from_compare_to_apply(tmp_path, capsys) -> None:
+    adapter_id = "unit-cli-governance-loop-adapter"
+    classifier_id = "unit-cli-governance-loop-classifier"
+    register_model(adapter_id, CompareCliAdapter)
+    register_classifier(classifier_id, CompareCliClassifier())
+
+    baseline_path = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+        model="candidate-model",
+        seed=67,
+        suffix_minutes=0,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+    candidate_path = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(
+                PromptCase(id="case-001", prompt="shared improvement"),
+                PromptCase(id="case-002", prompt="shared stable failure"),
+            ),
+        ),
+        model="baseline-model",
+        seed=68,
+        suffix_minutes=1,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+
+    reports_before = _entry_names(tmp_path / "reports")
+    compare_exit = main(
+        [
+            "compare",
+            str(baseline_path),
+            str(candidate_path),
+            "--root",
+            str(tmp_path),
+        ]
+    )
+    compare_output = capsys.readouterr().out
+    comparison_id = _new_entry_name(
+        before=reports_before,
+        after=_entry_names(tmp_path / "reports"),
+    )
+    comparison_details = read_json(tmp_path / "reports" / comparison_id / "report_details.json")
+
+    recommend_exit = main(
+        [
+            "regressions",
+            "recommend",
+            "--comparison",
+            comparison_id,
+            "--root",
+            str(tmp_path),
+            "--min-severity",
+            "0",
+            "--json",
+        ]
+    )
+    recommend_payload = json.loads(capsys.readouterr().out)
+
+    review_exit = main(
+        [
+            "regressions",
+            "review",
+            "--root",
+            str(tmp_path),
+            "--min-severity",
+            "0",
+            "--json",
+        ]
+    )
+    review_payload = json.loads(capsys.readouterr().out)
+
+    apply_exit = main(
+        [
+            "regressions",
+            "apply",
+            "--root",
+            str(tmp_path),
+            "--min-severity",
+            "0",
+            "--json",
+        ]
+    )
+    apply_payload = json.loads(capsys.readouterr().out)
+
+    second_apply_exit = main(
+        [
+            "regressions",
+            "apply",
+            "--root",
+            str(tmp_path),
+            "--min-severity",
+            "0",
+            "--include-ignored",
+            "--json",
+        ]
+    )
+    second_apply_payload = json.loads(capsys.readouterr().out)
+
+    families_exit = main(
+        [
+            "dataset",
+            "families",
+            "--root",
+            str(tmp_path),
+            "--json",
+        ]
+    )
+    families_payload = json.loads(capsys.readouterr().out)
+
+    assert compare_exit == 0
+    assert "Failure Lab Compare" in compare_output
+    assert comparison_details["signal"]["verdict"] == "regression"
+    assert comparison_details["signal"]["top_drivers"][0]["direction"] == "regression"
+
+    assert recommend_exit == 0
+    assert recommend_payload["comparison_id"] == comparison_id
+    assert recommend_payload["action"] == "create"
+    assert recommend_payload["policy_rule"] == "new_family_required"
+
+    assert review_exit == 0
+    reviewed = next(
+        row for row in review_payload["rows"] if row["comparison_id"] == comparison_id
+    )
+    assert reviewed["action"] == recommend_payload["action"]
+    assert reviewed["matched_family"]["family_id"] == recommend_payload["matched_family"]["family_id"]
+
+    assert apply_exit == 0
+    applied = next(
+        row for row in apply_payload["rows"] if row["comparison_id"] == comparison_id
+    )
+    assert applied["status"] == "created"
+    assert applied["dataset_id"].endswith("-v1")
+    assert Path(applied["output_path"]).exists()
+
+    assert second_apply_exit == 0
+    second_applied = next(
+        row for row in second_apply_payload["rows"] if row["comparison_id"] == comparison_id
+    )
+    assert second_applied["status"] == "skipped"
+    assert second_applied["action"] == "ignore"
+
+    assert families_exit == 0
+    family = next(
+        row
+        for row in families_payload["rows"]
+        if row["family_id"] == recommend_payload["matched_family"]["family_id"]
+    )
+    assert family["latest_comparison_id"] == comparison_id
+    assert family["latest_signal_verdict"] == "regression"
+
+
 def test_cli_ollama_stub_loop_runs_report_and_compare(tmp_path, capsys) -> None:
     classifier_id = "unit-cli-ollama-compare-classifier"
     register_classifier(classifier_id, CompareCliClassifier())

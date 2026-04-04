@@ -743,6 +743,12 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
     if (!comparisonDetail.signal || typeof comparisonDetail.signal.verdict !== "string") {
       throw new Error("Comparison detail did not expose the persisted signal block");
     }
+    if (
+      !comparisonDetail.governanceRecommendation ||
+      typeof comparisonDetail.governanceRecommendation.action !== "string"
+    ) {
+      throw new Error("Comparison detail did not expose the persisted governance recommendation");
+    }
     if (!runIds.includes(runId) || !runsInventory.runs.some((row) => row.run_id === runId)) {
       throw new Error(`Runs inventory did not include ${runId}`);
     }
@@ -784,6 +790,20 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
     if (!Array.isArray(analysisSignals.json.rows)) {
       throw new Error("Analysis signal query did not return rows");
     }
+    if (
+      !analysisSignals.json.rows.some(
+        (row) =>
+          row &&
+          typeof row.report_id === "string" &&
+          row.report_id === comparisonReportId &&
+          row.governance_recommendation &&
+          typeof row.governance_recommendation.action === "string",
+      )
+    ) {
+      throw new Error(
+        "Analysis signal query did not expose a governance recommendation for the saved comparison",
+      );
+    }
     for (const [label, durationMs] of [
       ["cases", analysisCases.durationMs],
       ["deltas", analysisDeltas.durationMs],
@@ -820,6 +840,7 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         "- analysis query (deltas)",
         "- analysis query (aggregates)",
         "- analysis query (signals)",
+        "- governance recommendation payloads",
       ].join("\n") + "\n",
     );
   } finally {

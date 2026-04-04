@@ -552,8 +552,6 @@ def _comparison_signal_source(
         QueryFilters(report_id=comparison_id, limit=1000),
         root=root,
     )
-    if not delta_rows:
-        raise ValueError(f"comparison {comparison_id} does not contain any case deltas")
     return signal_rows[0], delta_rows
 
 

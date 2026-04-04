@@ -40,7 +40,7 @@ interpretable, reusable, and actionable from local artifacts.
 
 ### Workflow Verification
 
-- [ ] **FLOW-01**: The governance loop from comparison signal to recommendation to applied dataset
+- [x] **FLOW-01**: The governance loop from comparison signal to recommendation to applied dataset
   action is verified and reproducible on local artifacts.
 
 ## vNext Requirements
@@ -77,7 +77,7 @@ interpretable, reusable, and actionable from local artifacts.
 | FAM-02 | Phase 94 | Complete |
 | UI-01 | Phase 95 | Complete |
 | UI-02 | Phase 95 | Complete |
-| FLOW-01 | Phase 96 | Pending |
+| FLOW-01 | Phase 96 | Complete |
 
 **Coverage:**
 - v4.6 requirements: 11 total

@@ -65,7 +65,7 @@ policy-driven recommendations and review/apply workflows.
     from the debugger.
 
 ### Phase 96: Governance Stability And Workflow Verification
-- Status: ready
+- Status: complete
 - Requirements: `FLOW-01`
 - Goal: prove the full governance loop from comparison signal to recommendation to applied dataset
   action.
@@ -77,9 +77,8 @@ policy-driven recommendations and review/apply workflows.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 96
-$gsd-plan-phase 96
+$gsd-complete-milestone
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after Phase 95 completion*
+*Roadmap updated: 2026-04-04 after Phase 96 completion*
