@@ -8,6 +8,7 @@ import { ComparisonCoverageSummary } from "@/components/comparisons/ComparisonCo
 import { ComparisonDeltaStrip } from "@/components/comparisons/ComparisonDeltaStrip";
 import { ComparisonDetailHeader } from "@/components/comparisons/ComparisonDetailHeader";
 import { ComparisonTransitionGroups } from "@/components/comparisons/ComparisonTransitionGroups";
+import { InsightPanel } from "@/components/insights/InsightPanel";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -27,12 +28,20 @@ import {
   type ComparisonDetailSectionKey,
 } from "@/lib/artifacts/detailRouteState";
 import { createSearchString, resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
-import { loadComparisonDetail } from "@/lib/artifacts/load";
+import { createArtifactHarvestDraft, loadComparisonDetail } from "@/lib/artifacts/load";
 import type {
+  ArtifactHarvestResponse,
+  ArtifactInsightEvidenceRef,
   ComparisonCaseDeltaRecord,
   ComparisonDetailState,
 } from "@/lib/artifacts/types";
 import { cn } from "@/lib/utils";
+
+type ExportState =
+  | { status: "idle"; response: null; message: null }
+  | { status: "loading"; response: null; message: null }
+  | { status: "ready"; response: ArtifactHarvestResponse; message: string | null }
+  | { status: "error"; response: null; message: string };
 
 function selectCasesByOrder(
   orderedCaseIds: string[],
@@ -71,6 +80,13 @@ function buildRunCaseDrillthroughHref(runId: string, caseId: string): string {
   return `/runs/${encodeURIComponent(runId)}${createSearchString(search)}`;
 }
 
+function buildComparisonExportStem(reportId: string, transitionType: string): string {
+  return `comparison-${reportId}-${transitionType}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function ComparisonDetailPage() {
   const { reportId } = useParams();
   const location = useLocation();
@@ -80,6 +96,11 @@ export function ComparisonDetailPage() {
   const [detailState, setDetailState] = useState<ComparisonDetailState>({
     status: "idle",
     detail: null,
+    message: null,
+  });
+  const [exportState, setExportState] = useState<ExportState>({
+    status: "idle",
+    response: null,
     message: null,
   });
 
@@ -207,6 +228,10 @@ export function ComparisonDetailPage() {
   }, [orderedCases, resolvedSelection.caseId]);
 
   const selectedCaseId = resolvedSelection.caseId;
+
+  useEffect(() => {
+    setExportState({ status: "idle", response: null, message: null });
+  }, [reportId, selectedCaseId, resolvedSelection.transition]);
 
   const resolvedSection = useMemo(
     () =>
@@ -543,6 +568,29 @@ export function ComparisonDetailPage() {
           selectedCase.caseId,
         )
       : null;
+  const renderInsightEvidenceLink = (reference: ArtifactInsightEvidenceRef) => {
+    if (reference.kind !== "comparison_case" || !reference.caseId) {
+      return null;
+    }
+    const search = buildComparisonDetailSearchParams(new URLSearchParams(searchParams), {
+      section: reference.section === "transitions" ? "transitions" : "transitions",
+      caseId: reference.caseId,
+      transition: reference.transitionType,
+    }).toString();
+    return (
+      <Link
+        key={`${reference.kind}:${reference.reportId ?? "local"}:${reference.caseId}`}
+        className="inline-flex rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground no-underline transition-colors hover:bg-background"
+        to={{
+          pathname: location.pathname,
+          search: search.length > 0 ? `?${search}` : "",
+        }}
+        state={location.state}
+      >
+        {reference.label}
+      </Link>
+    );
+  };
 
   return (
     <section className="space-y-8">
@@ -570,6 +618,14 @@ export function ComparisonDetailPage() {
               <ComparisonDeltaStrip
                 metrics={detail.metrics}
                 compatible={detail.comparison.compatible}
+              />
+
+              <InsightPanel
+                badgeLabel="Insights"
+                title="Grounded comparison explanation"
+                description="This heuristic insight layer explains the saved comparison in-place and keeps every pattern attached to the same transition evidence route."
+                report={detail.insightReport}
+                renderEvidenceLink={renderInsightEvidenceLink}
               />
             </div>
           </section>
@@ -865,6 +921,53 @@ export function ComparisonDetailPage() {
                       baselineRunId: detail.comparison.baselineRunId,
                       candidateRunId: detail.comparison.candidateRunId,
                       sourcePath: detail.source.path,
+                    }
+                  : null
+              }
+              exportAction={
+                selectedCase
+                  ? {
+                      label: `Export ${selectedCase.transitionLabel} draft`,
+                      status: exportState.status,
+                      message:
+                        exportState.status === "ready"
+                          ? `${exportState.response.datasetId} written to ${exportState.response.outputPath}.`
+                          : exportState.status === "error"
+                            ? exportState.message
+                            : null,
+                      onExport: () => {
+                        setExportState({ status: "loading", response: null, message: null });
+                        void createArtifactHarvestDraft({
+                          mode: "deltas",
+                          filters: {
+                            comparisonId: detail.comparison.reportId,
+                            reportId: detail.comparison.reportId,
+                            delta: selectedCase.transitionType,
+                            limit: detail.caseDeltas.length,
+                          },
+                          outputStem: buildComparisonExportStem(
+                            detail.comparison.reportId,
+                            selectedCase.transitionType,
+                          ),
+                        })
+                          .then((harvestResponse) => {
+                            setExportState({
+                              status: "ready",
+                              response: harvestResponse,
+                              message: null,
+                            });
+                          })
+                          .catch((error: unknown) => {
+                            setExportState({
+                              status: "error",
+                              response: null,
+                              message:
+                                error instanceof Error
+                                  ? error.message
+                                  : "Failed to export a comparison draft dataset pack",
+                            });
+                          });
+                      },
                     }
                   : null
               }

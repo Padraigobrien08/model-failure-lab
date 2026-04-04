@@ -11,10 +11,24 @@ from typing import TYPE_CHECKING, Sequence
 from model_failure_lab.datasets import (
     available_bundled_dataset_ids,
     available_bundled_datasets,
+    available_local_datasets,
     has_bundled_dataset,
     load_bundled_dataset,
     load_dataset,
     load_demo_dataset,
+)
+from model_failure_lab.analysis import build_query_insight_report, explain_comparison_report
+from model_failure_lab.harvest import (
+    harvest_artifact_cases,
+    promote_harvest_dataset,
+    review_harvest_dataset,
+)
+from model_failure_lab.index import (
+    QueryFilters,
+    aggregate_case_query,
+    query_case_deltas,
+    query_cases,
+    rebuild_query_index,
 )
 from model_failure_lab.runner.artifacts import write_run_artifacts
 from model_failure_lab.runner.execute import DatasetRunExecution, execute_dataset_run
@@ -170,6 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
             "directory."
         ),
     )
+    _add_analysis_arguments(compare_parser, verb="explain")
     compare_parser.set_defaults(handler=_handle_compare)
 
     demo_parser = subparsers.add_parser(
@@ -196,7 +211,142 @@ def build_parser() -> argparse.ArgumentParser:
         "list",
         help="List bundled datasets available by canonical ID.",
     )
+    datasets_list_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
     datasets_list_parser.set_defaults(handler=_handle_datasets_list)
+
+    dataset_parser = subparsers.add_parser(
+        "dataset",
+        help="Review or promote harvested dataset packs.",
+    )
+    dataset_subparsers = dataset_parser.add_subparsers(dest="dataset_command")
+
+    dataset_review_parser = dataset_subparsers.add_parser(
+        "review",
+        help="Inspect deterministic duplicate groups inside one harvested draft dataset pack.",
+    )
+    dataset_review_parser.add_argument("draft_path", type=Path)
+    dataset_review_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_review_parser.set_defaults(handler=_handle_dataset_review)
+
+    dataset_promote_parser = dataset_subparsers.add_parser(
+        "promote",
+        help="Promote one harvested draft dataset pack into a curated dataset file.",
+    )
+    dataset_promote_parser.add_argument("draft_path", type=Path)
+    dataset_promote_parser.add_argument("--dataset-id", required=True)
+    dataset_promote_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_promote_parser.add_argument(
+        "--out",
+        type=Path,
+        help="Optional output path for the curated dataset JSON file.",
+    )
+    dataset_promote_parser.set_defaults(handler=_handle_dataset_promote)
+
+    index_parser = subparsers.add_parser(
+        "index",
+        help="Manage the derived local query index over saved artifacts.",
+    )
+    index_subparsers = index_parser.add_subparsers(dest="index_command")
+
+    index_rebuild_parser = index_subparsers.add_parser(
+        "rebuild",
+        help="Rebuild the derived local query index from saved artifacts.",
+        description="Rebuild the derived local query index from saved artifacts.",
+    )
+    index_rebuild_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    index_rebuild_parser.set_defaults(handler=_handle_index_rebuild)
+
+    query_parser = subparsers.add_parser(
+        "query",
+        help="Run structured cross-run queries over the derived local index.",
+    )
+    query_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    query_parser.add_argument("--failure-type", dest="failure_type")
+    query_parser.add_argument("--model")
+    query_parser.add_argument("--dataset")
+    query_parser.add_argument("--run", dest="run_id")
+    query_parser.add_argument("--report-id")
+    query_parser.add_argument("--baseline-run")
+    query_parser.add_argument("--candidate-run")
+    query_parser.add_argument("--delta")
+    query_parser.add_argument("--aggregate-by", choices=["failure_type", "model", "dataset", "prompt_id"])
+    query_parser.add_argument("--last-n", type=int)
+    query_parser.add_argument("--since")
+    query_parser.add_argument("--until")
+    query_parser.add_argument("--limit", type=int, default=20)
+    _add_analysis_arguments(query_parser, verb="summarize")
+    query_parser.add_argument("--json", action="store_true", dest="as_json")
+    query_parser.set_defaults(handler=_handle_query)
+
+    harvest_parser = subparsers.add_parser(
+        "harvest",
+        help="Harvest saved artifact cases into a draft dataset pack.",
+    )
+    harvest_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    harvest_parser.add_argument("--failure-type", dest="failure_type")
+    harvest_parser.add_argument("--model")
+    harvest_parser.add_argument("--dataset")
+    harvest_parser.add_argument("--run", dest="run_id")
+    harvest_parser.add_argument("--prompt-id")
+    harvest_parser.add_argument("--report-id")
+    harvest_parser.add_argument(
+        "--comparison",
+        dest="comparison_id",
+        help="Saved comparison report ID to harvest delta cases from.",
+    )
+    harvest_parser.add_argument("--baseline-run")
+    harvest_parser.add_argument("--candidate-run")
+    harvest_parser.add_argument("--delta")
+    harvest_parser.add_argument("--last-n", type=int)
+    harvest_parser.add_argument("--since")
+    harvest_parser.add_argument("--until")
+    harvest_parser.add_argument("--limit", type=int, default=200)
+    harvest_parser.add_argument(
+        "--dataset-id",
+        help="Optional draft dataset ID. Defaults to the output filename stem.",
+    )
+    harvest_parser.add_argument(
+        "--out",
+        required=True,
+        type=Path,
+        help="Write the harvested draft dataset pack to this JSON path.",
+    )
+    harvest_parser.set_defaults(handler=_handle_harvest)
 
     return parser
 
@@ -262,7 +412,23 @@ def _handle_compare(args: argparse.Namespace) -> int:
         built.details,
         root=root,
     )
-    print(_render_compare_summary(built.report, built.details, report_path, details_path))
+    compare_summary = _render_compare_summary(built.report, built.details, report_path, details_path)
+    if not args.explain:
+        print(compare_summary)
+        return 0
+
+    rebuild_query_index(root=root)
+    analysis_adapter_id, analysis_model_name, analysis_options = _resolve_analysis_request(args)
+    insight_report = explain_comparison_report(
+        report_id=built.report.report_id,
+        root=root,
+        analysis_mode=args.analysis_mode,
+        analysis_adapter_id=analysis_adapter_id,
+        analysis_model=analysis_model_name,
+        analysis_system_prompt=args.analysis_system_prompt,
+        analysis_options=analysis_options,
+    )
+    print("\n\n".join([compare_summary, _render_insight_report(insight_report)]))
     return 0
 
 
@@ -300,8 +466,150 @@ def _handle_demo(args: argparse.Namespace) -> int:
 
 
 def _handle_datasets_list(args: argparse.Namespace) -> int:
-    del args
-    print(_render_bundled_dataset_list())
+    print(_render_dataset_catalog(root=_normalized_root(args.root)))
+    return 0
+
+
+def _handle_dataset_review(args: argparse.Namespace) -> int:
+    review = review_harvest_dataset(args.draft_path)
+    if args.as_json:
+        payload = {
+            "dataset_id": review.dataset.dataset_id,
+            "lifecycle": review.dataset.lifecycle,
+            "total_cases": review.total_cases,
+            "unique_case_count": review.unique_case_count,
+            "duplicate_case_count": review.duplicate_case_count,
+            "duplicate_groups": [
+                {
+                    "canonical_case_id": group.canonical_case_id,
+                    "kept_case_id": group.kept_case_id,
+                    "case_ids": list(group.case_ids),
+                    "source_case_ids": list(group.source_case_ids),
+                    "size": group.size,
+                    "match_kind": group.match_kind,
+                }
+                for group in review.duplicate_groups
+            ],
+        }
+        print(_render_json_payload(payload))
+        return 0
+    print(_render_dataset_review(review))
+    return 0
+
+
+def _handle_dataset_promote(args: argparse.Namespace) -> int:
+    summary = promote_harvest_dataset(
+        args.draft_path,
+        dataset_id=args.dataset_id,
+        root=_normalized_root(args.root),
+        output_path=args.out,
+    )
+    print(_render_dataset_promotion(summary))
+    return 0
+
+
+def _handle_index_rebuild(args: argparse.Namespace) -> int:
+    root = _normalized_root(args.root)
+    summary = rebuild_query_index(root=root)
+    print(_render_index_rebuild_summary(summary))
+    return 0
+
+
+def _handle_query(args: argparse.Namespace) -> int:
+    if args.delta and args.aggregate_by:
+        raise ValueError("`--delta` and `--aggregate-by` cannot be combined in one query")
+
+    root = _normalized_root(args.root)
+    filters = QueryFilters(
+        failure_type=args.failure_type,
+        model=args.model,
+        dataset=args.dataset,
+        run_id=args.run_id,
+        report_id=args.report_id,
+        baseline_run_id=args.baseline_run,
+        candidate_run_id=args.candidate_run,
+        delta=args.delta,
+        last_n=args.last_n,
+        since=args.since,
+        until=args.until,
+        limit=args.limit,
+    )
+    if args.aggregate_by:
+        rows = aggregate_case_query(args.aggregate_by, filters, root=root)
+        query_kind = "aggregate"
+    elif args.delta:
+        rows = query_case_deltas(filters, root=root)
+        query_kind = "delta"
+    else:
+        rows = query_cases(filters, root=root)
+        query_kind = "cases"
+
+    insight_report = None
+    if args.summarize:
+        analysis_adapter_id, analysis_model_name, analysis_options = _resolve_analysis_request(args)
+        insight_report = build_query_insight_report(
+            mode="aggregates" if args.aggregate_by else ("deltas" if args.delta else "cases"),
+            filters=filters,
+            aggregate_by=args.aggregate_by or "failure_type",
+            root=root,
+            analysis_mode=args.analysis_mode,
+            analysis_adapter_id=analysis_adapter_id,
+            analysis_model=analysis_model_name,
+            analysis_system_prompt=args.analysis_system_prompt,
+            analysis_options=analysis_options,
+        )
+
+    if args.as_json:
+        payload = {
+            "query_kind": query_kind,
+            "filters": _query_filters_payload(filters, aggregate_by=args.aggregate_by),
+            "rows": rows,
+        }
+        if insight_report is not None:
+            payload["insight_report"] = insight_report.to_payload()
+        print(
+            _render_json_payload(payload)
+        )
+        return 0
+
+    if insight_report is not None:
+        print(_render_insight_report(insight_report))
+        return 0
+
+    if query_kind == "aggregate":
+        print(_render_aggregate_rows(rows))
+    elif query_kind == "delta":
+        print(_render_delta_rows(rows))
+    else:
+        print(_render_case_rows(rows))
+    return 0
+
+
+def _handle_harvest(args: argparse.Namespace) -> int:
+    root = _normalized_root(args.root)
+    filters = QueryFilters(
+        failure_type=args.failure_type,
+        model=args.model,
+        dataset=args.dataset,
+        run_id=args.run_id,
+        prompt_id=args.prompt_id,
+        report_id=args.report_id,
+        baseline_run_id=args.baseline_run,
+        candidate_run_id=args.candidate_run,
+        delta=args.delta,
+        last_n=args.last_n,
+        since=args.since,
+        until=args.until,
+        limit=args.limit,
+    )
+    summary = harvest_artifact_cases(
+        filters=filters,
+        output_path=args.out,
+        root=root,
+        dataset_id=args.dataset_id,
+        comparison_id=args.comparison_id,
+    )
+    print(_render_harvest_summary(summary))
     return 0
 
 
@@ -453,49 +761,292 @@ def _write_dataset_snapshot(dataset: FailureDataset, *, root: Path | None) -> Pa
     return dataset_path
 
 
-def _render_bundled_dataset_list() -> str:
+def _render_dataset_catalog(*, root: Path | None) -> str:
     summaries = available_bundled_datasets()
-    if not summaries:
-        return "Failure Lab Datasets\nNo bundled datasets registered."
+    local_summaries = available_local_datasets(root=root)
+    lines = ["Failure Lab Datasets"]
 
-    rows = [
-        (
-            "id",
-            "name",
-            "target",
-            "scope",
-            "core",
-            "full",
-            "description",
-        )
-    ]
-    for summary in summaries:
-        rows.append(
+    if summaries:
+        rows = [
             (
-                summary.dataset_id,
-                _truncate(summary.name, 24),
-                summary.target_failure_type,
-                summary.default_scope,
-                str(summary.core_case_count),
-                str(summary.full_case_count),
-                _truncate(summary.description, 68),
+                "id",
+                "name",
+                "target",
+                "scope",
+                "core",
+                "full",
+                "description",
             )
+        ]
+        for summary in summaries:
+            rows.append(
+                (
+                    summary.dataset_id,
+                    _truncate(summary.name, 24),
+                    summary.target_failure_type,
+                    summary.default_scope,
+                    str(summary.core_case_count),
+                    str(summary.full_case_count),
+                    _truncate(summary.description, 68),
+                )
+            )
+        lines.append(_render_table(rows))
+    else:
+        lines.append("No bundled datasets registered.")
+
+    if local_summaries:
+        lines.extend(
+            [
+                "",
+                "Local dataset packs",
+                _render_table(
+                    [
+                        ("id", "name", "lifecycle", "cases", "description"),
+                        *[
+                            (
+                                summary.dataset_id,
+                                _truncate(summary.name, 24),
+                                summary.lifecycle,
+                                str(summary.case_count),
+                                _truncate(summary.description, 68),
+                            )
+                            for summary in local_summaries
+                        ],
+                    ]
+                ),
+            ]
         )
 
-    widths = [max(len(row[index]) for row in rows) for index in range(len(rows[0]))]
-    rendered_rows = []
-    for index, row in enumerate(rows):
-        rendered_row = "  ".join(
-            value.ljust(widths[column_index])
-            for column_index, value in enumerate(row)
-        ).rstrip()
-        rendered_rows.append(rendered_row)
-        if index == 0:
-            rendered_rows.append(
-                "  ".join("-" * widths[column_index] for column_index in range(len(widths)))
-            )
+    return "\n".join(lines)
 
-    return "\n".join(["Failure Lab Datasets", *rendered_rows])
+
+def _render_index_rebuild_summary(summary) -> str:
+    return "\n".join(
+        [
+            "Failure Lab Index",
+            f"Path: {summary.path}",
+            f"Runs: {summary.run_count}",
+            f"Cases: {summary.case_count}",
+            f"Comparisons: {summary.comparison_count}",
+            f"Case deltas: {summary.case_delta_count}",
+        ]
+    )
+
+
+def _render_harvest_summary(summary) -> str:
+    return "\n".join(
+        [
+            "Failure Lab Harvest",
+            f"Dataset: {summary.dataset.dataset_id}",
+            f"Lifecycle: {summary.dataset.lifecycle or 'draft'}",
+            f"Mode: {summary.mode}",
+            f"Cases: {summary.selected_case_count}",
+            f"Output: {summary.output_path}",
+        ]
+    )
+
+
+def _render_dataset_review(review) -> str:
+    lines = [
+        "Failure Lab Dataset Review",
+        f"Dataset: {review.dataset.dataset_id}",
+        f"Lifecycle: {review.dataset.lifecycle or 'draft'}",
+        f"Draft path: {review.draft_path}",
+        f"Cases: total={review.total_cases} unique={review.unique_case_count} duplicates={review.duplicate_case_count}",
+    ]
+    if review.duplicate_groups:
+        lines.append(
+            _render_table(
+                [
+                    ("canonical_case", "kept_case", "group_size", "match_kind"),
+                    *[
+                        (
+                            group.canonical_case_id,
+                            group.kept_case_id,
+                            str(group.size),
+                            group.match_kind,
+                        )
+                        for group in review.duplicate_groups
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _render_dataset_promotion(summary) -> str:
+    return "\n".join(
+        [
+            "Failure Lab Dataset Promotion",
+            f"Dataset: {summary.dataset.dataset_id}",
+            f"Lifecycle: {summary.dataset.lifecycle or 'curated'}",
+            f"Cases: total={summary.total_cases} unique={summary.unique_case_count} duplicates={summary.duplicate_case_count}",
+            f"Output: {summary.output_path}",
+        ]
+    )
+
+
+def _render_case_rows(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return "Failure Lab Query\nNo matching cross-run cases."
+    table_rows = [("run_id", "dataset", "model", "case_id", "failure_type", "prompt")]
+    for row in rows:
+        table_rows.append(
+            (
+                str(row.get("run_id", "")),
+                str(row.get("dataset", "")),
+                str(row.get("model", "")),
+                str(row.get("case_id", "")),
+                str(row.get("failure_type", "")),
+                _truncate(str(row.get("prompt", "")), 48),
+            )
+        )
+    return "\n".join(["Failure Lab Query", _render_table(table_rows)])
+
+
+def _render_delta_rows(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return "Failure Lab Query\nNo matching saved deltas."
+    table_rows = [("report_id", "delta_kind", "case_id", "baseline_run", "candidate_run", "prompt")]
+    for row in rows:
+        table_rows.append(
+            (
+                str(row.get("report_id", "")),
+                str(row.get("delta_kind", "")),
+                str(row.get("case_id", "")),
+                str(row.get("baseline_run_id", "")),
+                str(row.get("candidate_run_id", "")),
+                _truncate(str(row.get("prompt", "")), 40),
+            )
+        )
+    return "\n".join(["Failure Lab Query", _render_table(table_rows)])
+
+
+def _render_aggregate_rows(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return "Failure Lab Query\nNo aggregate rows matched the current filters."
+    table_rows = [("group", "label", "case_count")]
+    for row in rows:
+        table_rows.append(
+            (
+                str(row.get("group_key", "")),
+                str(row.get("group_label", "")),
+                str(row.get("case_count", "")),
+            )
+        )
+    return "\n".join(["Failure Lab Query", _render_table(table_rows)])
+
+
+def _render_table(rows: list[tuple[str, ...]]) -> str:
+    widths = [max(len(row[index]) for row in rows) for index in range(len(rows[0]))]
+    rendered: list[str] = []
+    for index, row in enumerate(rows):
+        rendered.append(
+            "  ".join(value.ljust(widths[column_index]) for column_index, value in enumerate(row))
+        )
+        if index == 0:
+            rendered.append("  ".join("-" * width for width in widths))
+    return "\n".join(rendered)
+
+
+def _query_filters_payload(
+    filters: QueryFilters,
+    *,
+    aggregate_by: str | None = None,
+) -> dict[str, object]:
+    return {
+        "failure_type": filters.failure_type,
+        "model": filters.model,
+        "dataset": filters.dataset,
+        "run_id": filters.run_id,
+        "prompt_id": filters.prompt_id,
+        "report_id": filters.report_id,
+        "baseline_run_id": filters.baseline_run_id,
+        "candidate_run_id": filters.candidate_run_id,
+        "delta": filters.delta,
+        "aggregate_by": aggregate_by,
+        "last_n": filters.last_n,
+        "since": filters.since,
+        "until": filters.until,
+        "limit": filters.limit,
+    }
+
+
+def _render_json_payload(payload: dict[str, object]) -> str:
+    return json.dumps(payload, indent=2, sort_keys=True)
+
+
+def _render_insight_report(report) -> str:
+    lines = [
+        "Failure Lab Insights",
+        f"Mode: {report.analysis_mode}",
+        f"Source: {report.source_kind}",
+        f"Generated by: {report.generated_by}",
+        f"Summary: {report.summary}",
+        (
+            "Sampling: "
+            f"sampled={report.sampling.sampled_matches}/{report.sampling.total_matches} "
+            f"limit={report.sampling.sample_limit} truncated={report.sampling.truncated}"
+        ),
+    ]
+    if report.patterns:
+        lines.append("Patterns:")
+        for pattern in report.patterns:
+            share = f"{pattern.share * 100:.1f}%" if pattern.share is not None else "n/a"
+            lines.append(
+                f"- {pattern.label} [{pattern.kind}] count={pattern.count} share={share}: "
+                f"{pattern.summary}"
+            )
+            if pattern.evidence_refs:
+                lines.append(
+                    "  evidence: "
+                    + ", ".join(reference.label for reference in pattern.evidence_refs)
+                )
+    if report.anomalies:
+        lines.append("Anomalies:")
+        for anomaly in report.anomalies:
+            lines.append(f"- {anomaly.label}: {anomaly.summary}")
+    return "\n".join(lines)
+
+
+def _add_analysis_arguments(parser: argparse.ArgumentParser, *, verb: str) -> None:
+    parser.add_argument(
+        f"--{verb}",
+        action="store_true",
+        help=f"Produce a structured insight report that {verb}s the current result set.",
+    )
+    parser.add_argument(
+        "--analysis-mode",
+        choices=["heuristic", "llm"],
+        default="heuristic",
+        help="Choose deterministic heuristic analysis or opt-in llm enrichment.",
+    )
+    parser.add_argument(
+        "--analysis-model",
+        help="Explicit model target used only when `--analysis-mode llm`, for example `anthropic:claude-sonnet-4-0`.",
+    )
+    parser.add_argument(
+        "--analysis-system-prompt",
+        help="Optional system prompt applied only to llm analysis requests.",
+    )
+    parser.add_argument(
+        "--analysis-option",
+        action="append",
+        default=[],
+        metavar="KEY=JSON_VALUE",
+        help="Attach one JSON-valued adapter option used only for llm analysis. Repeat as needed.",
+    )
+
+
+def _resolve_analysis_request(
+    args: argparse.Namespace,
+) -> tuple[str | None, str | None, dict[str, object]]:
+    if args.analysis_mode != "llm":
+        return None, None, {}
+    if not args.analysis_model:
+        raise ValueError("`--analysis-model` is required when `--analysis-mode llm`")
+    adapter_id, model_name = _resolve_model_target(args.analysis_model)
+    return adapter_id, model_name, _parse_model_options(args.analysis_option)
 
 
 def _build_run_report(saved_run: SavedRunArtifacts):

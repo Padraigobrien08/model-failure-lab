@@ -9,7 +9,7 @@ import {
 import type { ArtifactShellState } from "@/lib/artifacts/types";
 
 type ArtifactStatePanelProps = {
-  area: "Runs" | "Comparisons";
+  area: "Runs" | "Comparisons" | "Analysis";
   state: ArtifactShellState;
 };
 

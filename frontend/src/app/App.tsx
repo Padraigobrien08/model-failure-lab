@@ -2,6 +2,7 @@ import { startTransition, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import type { AppRouteContext } from "@/app/router";
+import { AnalysisPage } from "@/app/routes/AnalysisPage";
 import { ComparisonsPage } from "@/app/routes/ComparisonsPage";
 import { ComparisonDetailPage } from "@/app/routes/ComparisonDetailPage";
 import { RunDetailPage } from "@/app/routes/RunDetailPage";
@@ -294,6 +295,7 @@ function AppFrame({
   return (
     <Routes>
       <Route element={<TraceShell routeContext={routeContext} />}>
+        <Route path="/analysis" element={<AnalysisPage />} />
         <Route path="/" element={<RunsPage />} />
         <Route path="/runs" element={<Navigate to="/" replace />} />
         <Route path="/runs/:runId" element={<RunDetailPage />} />

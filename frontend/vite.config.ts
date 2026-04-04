@@ -1,6 +1,8 @@
 import path from "node:path";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { promisify } from "node:util";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -9,11 +11,14 @@ const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
 const COMPARISONS_INDEX_PATH = "/__failure_lab__/artifacts/comparisons.json";
 const COMPARISON_DETAIL_PATH = "/__failure_lab__/artifacts/comparison-detail.json";
 const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
+const ARTIFACT_QUERY_PATH = "/__failure_lab__/artifacts/query.json";
+const ARTIFACT_HARVEST_PATH = "/__failure_lab__/artifacts/harvest.json";
 const ARTIFACT_ROOT_ENV = "FAILURE_LAB_ARTIFACT_ROOT";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
 const REPORT_FILENAME = "report.json";
 const REPORT_DETAILS_FILENAME = "report_details.json";
+const execFileAsync = promisify(execFile);
 
 type ArtifactSourceConfig = {
   label: string;
@@ -120,6 +125,7 @@ type ComparisonDetailPayload = {
     summary: ComparisonTransitionSummaryRowPayload[];
   };
   caseDeltas: ComparisonCaseDeltaPayload[];
+  insightReport: Record<string, unknown> | null;
 };
 
 type FailureLabelPayload = {
@@ -212,6 +218,7 @@ type RunDetailPayload = {
 function failureLabArtifactsPlugin(): Plugin {
   const repoRoot = path.resolve(__dirname, "..");
   const artifactSource = resolveArtifactSource(repoRoot);
+  const queryBridgePath = path.join(repoRoot, "scripts", "query_bridge.py");
 
   function resolveArtifactSource(rootPath: string): ArtifactSourceConfig {
     const override = process.env[ARTIFACT_ROOT_ENV]?.trim();
@@ -233,6 +240,50 @@ function failureLabArtifactsPlugin(): Plugin {
       runsPath: source.runsPath,
       reportsPath: source.reportsPath,
     };
+  }
+
+  async function invokeQueryBridge<T>(
+    command: string,
+    args: string[] = [],
+  ): Promise<T> {
+    const pythonPathEntries = [path.join(repoRoot, "src")];
+    if (process.env.PYTHONPATH) {
+      pythonPathEntries.push(process.env.PYTHONPATH);
+    }
+
+    const { stdout, stderr } = await execFileAsync(
+      "python3",
+      [queryBridgePath, command, "--root", artifactSource.path, ...args],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          PYTHONPATH: pythonPathEntries.join(path.delimiter),
+        },
+      },
+    );
+
+    if (stderr.trim().length > 0) {
+      process.stderr.write(stderr);
+    }
+
+    return JSON.parse(stdout) as T;
+  }
+
+  async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const rawBody = Buffer.concat(chunks).toString("utf-8").trim();
+    if (rawBody.length === 0) {
+      throw new Error("request body must be a JSON object");
+    }
+    const payload = JSON.parse(rawBody) as unknown;
+    if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new Error("request body must be a JSON object");
+    }
+    return payload as Record<string, unknown>;
   }
 
   function requireStringField(
@@ -869,6 +920,7 @@ function failureLabArtifactsPlugin(): Plugin {
         reportDetailsPayload.case_deltas,
         `${reportId}.report_details.case_deltas`,
       ),
+      insightReport: null,
     };
   }
 
@@ -1314,16 +1366,16 @@ function failureLabArtifactsPlugin(): Plugin {
   }
 
   async function buildArtifactOverview() {
-    const [runInventory, comparisonInventory] = await Promise.all([
-      collectRunInventory(artifactSource.runsPath),
-      collectComparisonInventory(artifactSource.reportsPath),
+    const [overview, runInventory, comparisonInventory] = await Promise.all([
+      invokeQueryBridge<{ comparison_count: number; run_count: number }>("overview"),
+      invokeQueryBridge<RunInventoryRow[]>("runs"),
+      invokeQueryBridge<ComparisonInventoryRow[]>("comparisons"),
     ]);
-
-    const issues = [...runInventory.issues, ...comparisonInventory.issues];
+    const issues: string[] = [];
     const status =
       issues.length > 0
         ? "incompatible"
-        : runInventory.rows.length === 0 && comparisonInventory.rows.length === 0
+        : overview.run_count === 0 && overview.comparison_count === 0
           ? "empty"
           : "ready";
 
@@ -1331,12 +1383,12 @@ function failureLabArtifactsPlugin(): Plugin {
       status,
       source: sourcePayload(artifactSource),
       runs: {
-        count: runInventory.rows.length,
-        ids: runInventory.rows.map((row) => row.run_id),
+        count: overview.run_count,
+        ids: runInventory.map((row) => row.run_id),
       },
       comparisons: {
-        count: comparisonInventory.rows.length,
-        ids: comparisonInventory.rows.map((row) => row.report_id),
+        count: overview.comparison_count,
+        ids: comparisonInventory.map((row) => row.report_id),
       },
       issues,
       message:
@@ -1380,26 +1432,14 @@ function failureLabArtifactsPlugin(): Plugin {
     res: ServerResponse,
   ): Promise<void> {
     try {
-      const runInventory = await collectRunInventory(artifactSource.runsPath);
-      if (runInventory.issues.length > 0) {
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            source: sourcePayload(artifactSource),
-            runs: [],
-            issues: runInventory.issues,
-          }),
-        );
-        return;
-      }
+      const runInventory = await invokeQueryBridge<RunInventoryRow[]>("runs");
 
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify({
           source: sourcePayload(artifactSource),
-          runs: runInventory.rows,
+          runs: runInventory,
         }),
       );
     } catch (error) {
@@ -1420,27 +1460,16 @@ function failureLabArtifactsPlugin(): Plugin {
     res: ServerResponse,
   ): Promise<void> {
     try {
-      const comparisonInventory = await collectComparisonInventory(artifactSource.reportsPath);
-      if (comparisonInventory.issues.length > 0) {
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            source: sourcePayload(artifactSource),
-            comparisons: [],
-            message: comparisonInventory.issues[0],
-            issues: comparisonInventory.issues,
-          }),
-        );
-        return;
-      }
+      const comparisonInventory = await invokeQueryBridge<ComparisonInventoryRow[]>(
+        "comparisons",
+      );
 
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json");
       res.end(
         JSON.stringify({
           source: sourcePayload(artifactSource),
-          comparisons: comparisonInventory.rows,
+          comparisons: comparisonInventory,
         }),
       );
     } catch (error) {
@@ -1456,6 +1485,114 @@ function failureLabArtifactsPlugin(): Plugin {
           issues: [message],
         }),
       );
+    }
+  }
+
+  async function handleArtifactQuery(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const requestUrl = new URL(req.url ?? ARTIFACT_QUERY_PATH, "http://failure-lab.local");
+    const mode = requestUrl.searchParams.get("mode") ?? "cases";
+    const args = ["--mode", mode];
+    const optionMap: Array<[string, string]> = [
+      ["failureType", "--failure-type"],
+      ["model", "--model"],
+      ["dataset", "--dataset"],
+      ["runId", "--run-id"],
+      ["promptId", "--prompt-id"],
+      ["reportId", "--report-id"],
+      ["baselineRunId", "--baseline-run-id"],
+      ["candidateRunId", "--candidate-run-id"],
+      ["delta", "--delta"],
+      ["aggregateBy", "--aggregate-by"],
+      ["lastN", "--last-n"],
+      ["since", "--since"],
+      ["until", "--until"],
+      ["limit", "--limit"],
+    ];
+
+    for (const [searchKey, argName] of optionMap) {
+      const value = requestUrl.searchParams.get(searchKey);
+      if (value && value.trim().length > 0) {
+        args.push(argName, value);
+      }
+    }
+    args.push("--summarize");
+
+    try {
+      const payload = await invokeQueryBridge("query", args);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "artifact query failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
+  async function handleArtifactHarvest(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    if ((req.method ?? "GET").toUpperCase() !== "POST") {
+      res.statusCode = 405;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message: "harvest endpoint requires POST" }));
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const mode = requireStringField(body, "mode", "harvest.mode");
+      if (mode !== "cases" && mode !== "deltas") {
+        throw new Error("harvest.mode must be cases or deltas");
+      }
+      const filters =
+        body.filters !== null && typeof body.filters === "object" && !Array.isArray(body.filters)
+          ? (body.filters as Record<string, unknown>)
+          : {};
+      const args = ["--mode", mode];
+      const optionMap: Array<[string, string]> = [
+        ["failureType", "--failure-type"],
+        ["model", "--model"],
+        ["dataset", "--dataset"],
+        ["runId", "--run-id"],
+        ["promptId", "--prompt-id"],
+        ["reportId", "--report-id"],
+        ["comparisonId", "--comparison-id"],
+        ["baselineRunId", "--baseline-run-id"],
+        ["candidateRunId", "--candidate-run-id"],
+        ["delta", "--delta"],
+        ["lastN", "--last-n"],
+        ["since", "--since"],
+        ["until", "--until"],
+        ["limit", "--limit"],
+      ];
+      for (const [bodyKey, argName] of optionMap) {
+        const value = filters[bodyKey];
+        if (typeof value === "number") {
+          args.push(argName, String(value));
+        } else if (typeof value === "string" && value.trim().length > 0) {
+          args.push(argName, value);
+        }
+      }
+      const outputStem = body.outputStem;
+      if (typeof outputStem === "string" && outputStem.trim().length > 0) {
+        args.push("--output-stem", outputStem);
+      }
+
+      const payload = await invokeQueryBridge("harvest", args);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "artifact harvest failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
     }
   }
 
@@ -1478,9 +1615,17 @@ function failureLabArtifactsPlugin(): Plugin {
         artifactSource.reportsPath,
         artifactSource.runsPath,
       );
+      const insightPayload = await invokeQueryBridge<{
+        insight_report: Record<string, unknown> | null;
+      }>("comparison-insight", ["--report-id", reportId]);
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify(payload));
+      res.end(
+        JSON.stringify({
+          ...payload,
+          insightReport: insightPayload.insight_report,
+        }),
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "comparison detail failed";
       const statusCode =
@@ -1565,6 +1710,16 @@ function failureLabArtifactsPlugin(): Plugin {
 
       if (pathname === RUN_DETAIL_PATH) {
         void handleRunDetail(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_QUERY_PATH) {
+        void handleArtifactQuery(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_HARVEST_PATH) {
+        void handleArtifactHarvest(req, res).catch(next);
         return;
       }
 

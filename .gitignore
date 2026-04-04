@@ -13,8 +13,9 @@ node_modules/
 *.egg-info/
 artifacts/*
 !artifacts/.gitkeep
-runs/
-reports/
+/runs/
+/reports/
+/.failure_lab/
 uivenv/
 frontend/public/artifacts/
 frontend/*.config.d.ts

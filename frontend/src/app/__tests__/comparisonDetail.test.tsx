@@ -216,6 +216,86 @@ function buildCompatibleDetail(source = DEFAULT_SOURCE): ComparisonDetail {
         candidateExplanation: "Reasoning chain diverged from the rubric.",
       },
     ],
+    insightReport: {
+      analysisMode: "heuristic",
+      sourceKind: "comparison",
+      title: "Comparison insight report",
+      summary: "Comparison compare_alpha_to_beta. improvement drives most of the matched comparison deltas.",
+      generatedBy: "heuristic_v1",
+      sampling: {
+        totalMatches: 2,
+        sampledMatches: 2,
+        sampleLimit: 12,
+        truncated: false,
+        strategy: "ranked_representative_groups",
+      },
+      patterns: [
+        {
+          kind: "delta_kind",
+          label: "improvement",
+          summary: "improvement drives most of the matched comparison deltas (1 cases).",
+          groupKey: "improvement",
+          count: 1,
+          share: 0.5,
+          evidenceRefs: [
+            {
+              kind: "comparison_case",
+              label: "compare_alpha_to_beta:case-002",
+              runId: null,
+              reportId: "compare_alpha_to_beta",
+              caseId: "case-002",
+              promptId: "case-002",
+              section: "transitions",
+              transitionType: "failure_to_no_failure",
+            },
+          ],
+        },
+      ],
+      anomalies: [
+        {
+          kind: "outlier_delta",
+          label: "case-004",
+          summary: "case-004 remains a low-frequency regression outlier.",
+          groupKey: "case-004",
+          count: 1,
+          share: 0.5,
+          evidenceRefs: [
+            {
+              kind: "comparison_case",
+              label: "compare_alpha_to_beta:case-004",
+              runId: null,
+              reportId: "compare_alpha_to_beta",
+              caseId: "case-004",
+              promptId: "case-004",
+              section: "transitions",
+              transitionType: "no_failure_to_failure",
+            },
+          ],
+        },
+      ],
+      evidenceLinks: [
+        {
+          kind: "comparison_case",
+          label: "compare_alpha_to_beta:case-002",
+          runId: null,
+          reportId: "compare_alpha_to_beta",
+          caseId: "case-002",
+          promptId: "case-002",
+          section: "transitions",
+          transitionType: "failure_to_no_failure",
+        },
+        {
+          kind: "comparison_case",
+          label: "compare_alpha_to_beta:case-004",
+          runId: null,
+          reportId: "compare_alpha_to_beta",
+          caseId: "case-004",
+          promptId: "case-004",
+          section: "transitions",
+          transitionType: "no_failure_to_failure",
+        },
+      ],
+    },
   };
 }
 
@@ -286,6 +366,76 @@ function buildIncompatibleDetail(): ComparisonDetail {
       summary: [],
     },
     caseDeltas: [],
+    insightReport: null,
+  };
+}
+
+function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unknown> {
+  return {
+    ...detail,
+    insightReport:
+      detail.insightReport === null
+        ? null
+        : {
+            analysis_mode: detail.insightReport.analysisMode,
+            source_kind: detail.insightReport.sourceKind,
+            title: detail.insightReport.title,
+            summary: detail.insightReport.summary,
+            generated_by: detail.insightReport.generatedBy,
+            sampling: {
+              total_matches: detail.insightReport.sampling.totalMatches,
+              sampled_matches: detail.insightReport.sampling.sampledMatches,
+              sample_limit: detail.insightReport.sampling.sampleLimit,
+              truncated: detail.insightReport.sampling.truncated,
+              strategy: detail.insightReport.sampling.strategy,
+            },
+            patterns: detail.insightReport.patterns.map((pattern) => ({
+              kind: pattern.kind,
+              label: pattern.label,
+              summary: pattern.summary,
+              group_key: pattern.groupKey,
+              count: pattern.count,
+              share: pattern.share,
+              evidence_refs: pattern.evidenceRefs.map((reference) => ({
+                kind: reference.kind,
+                label: reference.label,
+                run_id: reference.runId,
+                report_id: reference.reportId,
+                case_id: reference.caseId,
+                prompt_id: reference.promptId,
+                section: reference.section,
+                transition_type: reference.transitionType,
+              })),
+            })),
+            anomalies: detail.insightReport.anomalies.map((pattern) => ({
+              kind: pattern.kind,
+              label: pattern.label,
+              summary: pattern.summary,
+              group_key: pattern.groupKey,
+              count: pattern.count,
+              share: pattern.share,
+              evidence_refs: pattern.evidenceRefs.map((reference) => ({
+                kind: reference.kind,
+                label: reference.label,
+                run_id: reference.runId,
+                report_id: reference.reportId,
+                case_id: reference.caseId,
+                prompt_id: reference.promptId,
+                section: reference.section,
+                transition_type: reference.transitionType,
+              })),
+            })),
+            evidence_links: detail.insightReport.evidenceLinks.map((reference) => ({
+              kind: reference.kind,
+              label: reference.label,
+              run_id: reference.runId,
+              report_id: reference.reportId,
+              case_id: reference.caseId,
+              prompt_id: reference.promptId,
+              section: reference.section,
+              transition_type: reference.transitionType,
+            })),
+          },
   };
 }
 
@@ -298,7 +448,7 @@ function mockComparisonDetail(detail: ComparisonDetail) {
         return {
           ok: true,
           status: 200,
-          json: async () => detail,
+          json: async () => serializeComparisonDetail(detail),
         } as Response;
       }
 
@@ -468,7 +618,6 @@ function mockComparisonAndRunDetails(
     ["run_beta", buildLinkedRunDetail("run_beta", "reasoning-failures-v1")],
   ]),
 ) {
-
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request) => {
@@ -477,7 +626,23 @@ function mockComparisonAndRunDetails(
         return {
           ok: true,
           status: 200,
-          json: async () => detail,
+          json: async () => serializeComparisonDetail(detail),
+        } as Response;
+      }
+
+      if (url.includes("/__failure_lab__/artifacts/harvest.json")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            source: detail.source,
+            dataset_id: "comparison-compare-alpha-to-beta-failure-to-no-failure",
+            lifecycle: "draft",
+            mode: "deltas",
+            output_path:
+              "datasets/harvested/comparison-compare-alpha-to-beta-failure-to-no-failure.json",
+            selected_case_count: 1,
+          }),
         } as Response;
       }
 
@@ -550,6 +715,14 @@ describe("comparison detail route", () => {
       screen.getByRole("heading", { name: "Directional change at a glance" }),
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("heading", { name: "Grounded comparison explanation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Comparison compare_alpha_to_beta. improvement drives most of the matched comparison deltas.",
+      ),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("heading", { name: "Scope and compatibility" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Shared-case analysis only")).toBeInTheDocument();
@@ -581,6 +754,17 @@ describe("comparison detail route", () => {
       await screen.findByText("Unsupported factual framing detected."),
     ).toBeInTheDocument();
 
+    fireEvent.click(
+      screen.getByRole("link", { name: "compare_alpha_to_beta:case-004" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Inspect transition case case-004" }),
+      ).toHaveAttribute("data-active-case", "true");
+    });
+    expect(screen.getByText("Reasoning chain diverged from the rubric.")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "Inspect transition case case-004" }));
 
     expect(
@@ -590,6 +774,64 @@ describe("comparison detail route", () => {
     expect(
       screen.getByRole("heading", { name: "Use only the provided evidence bullets." }),
     ).toBeInTheDocument();
+  });
+
+  it("exports the selected transition slice as a draft dataset", async () => {
+    const detail = buildCompatibleDetail();
+    mockComparisonAndRunDetails(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Reasoning Failures V1" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /export failure -> no_failure draft/i,
+      }),
+    );
+
+    expect(
+      await screen.findByText(
+        /comparison-compare-alpha-to-beta-failure-to-no-failure written to datasets\/harvested\/comparison-compare-alpha-to-beta-failure-to-no-failure\.json\./i,
+      ),
+    ).toBeInTheDocument();
+
+    const fetchMock = vi.mocked(globalThis.fetch);
+    await waitFor(() => {
+      const harvestCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).includes("/__failure_lab__/artifacts/harvest.json"),
+      ) as [string | URL | Request, RequestInit?] | undefined;
+      expect(harvestCall).toBeTruthy();
+      const init = harvestCall?.[1];
+      expect(init).toBeDefined();
+      if (!init) {
+        throw new Error("Expected harvest request init");
+      }
+      expect(init).toMatchObject({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(JSON.parse(String(init.body))).toEqual({
+        mode: "deltas",
+        filters: {
+          comparisonId: "compare_alpha_to_beta",
+          reportId: "compare_alpha_to_beta",
+          delta: "failure_to_no_failure",
+          limit: 2,
+        },
+        outputStem: "comparison-compare-alpha-to-beta-failure-to-no-failure",
+      });
+    });
   });
 
   it("keeps incompatible comparisons openable with explicit coverage semantics", async () => {

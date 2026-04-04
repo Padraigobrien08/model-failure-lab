@@ -28,6 +28,24 @@ type RouteMeta = {
 };
 
 function resolveRouteMeta(pathname: string): RouteMeta {
+  if (pathname.startsWith("/analysis")) {
+    return {
+      eyebrow: "Analysis debugger",
+      title: "Ask cross-run questions before opening evidence.",
+      description:
+        "Start from the local query layer when you need answers across runs, then drill into the saved evidence routes once the result set is focused.",
+      focusTitle: "Cross-run interrogation path",
+      focusDescription:
+        "Ask first, then inspect evidence. Filter cases, deltas, or aggregates across the artifact workspace and move directly into the matching run or comparison route.",
+      pathway: [
+        "Query artifact index",
+        "Filter cross-run results",
+        "Open evidence",
+        "Return to analysis",
+      ],
+    };
+  }
+
   if (pathname.startsWith("/comparisons/")) {
     return {
       eyebrow: "Comparison debugger",

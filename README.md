@@ -174,6 +174,52 @@ The package also exposes simple registration seams for future extension:
 - `register_model(...)`
 - `register_classifier(...)`
 
+## Deterministic Insight Test Data
+
+If you want a reusable local workspace for `/analysis`, comparison explanation, and insight
+drillthrough without depending on external models, generate the checked-in fixture workspace:
+
+```bash
+python3 scripts/generate_insight_fixture.py
+```
+
+By default that writes a deterministic artifact root at
+`artifacts/insight-fixture-workspace` with:
+
+- 1 dataset snapshot
+- 4 compatible runs
+- 4 run reports
+- 3 comparison reports
+- a rebuilt local query index
+
+Then point the debugger at it:
+
+```bash
+export FAILURE_LAB_ARTIFACT_ROOT="$(pwd)/artifacts/insight-fixture-workspace"
+npm --prefix frontend run dev
+```
+
+Useful smoke commands against that workspace:
+
+```bash
+failure-lab query --root artifacts/insight-fixture-workspace --failure-type hallucination --last-n 4 --summarize
+failure-lab compare <baseline-run-id> <candidate-run-id> --root artifacts/insight-fixture-workspace --explain
+```
+
+Closed-loop harvest replay over the same workspace:
+
+```bash
+failure-lab harvest --root artifacts/insight-fixture-workspace --comparison <comparison-report-id> --delta regression --out artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json
+failure-lab dataset review artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json
+failure-lab dataset promote artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json --dataset-id fixture-regression-pack-v1 --root artifacts/insight-fixture-workspace
+failure-lab run --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --model insight_fixture_v1:candidate-model --classifier insight_fixture_classifier_v1
+failure-lab run --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --model insight_fixture_v1:stable-model --classifier insight_fixture_classifier_v1
+failure-lab report --root artifacts/insight-fixture-workspace --run <candidate-rerun-id>
+failure-lab report --root artifacts/insight-fixture-workspace --run <stable-rerun-id>
+failure-lab compare <candidate-rerun-id> <stable-rerun-id> --root artifacts/insight-fixture-workspace --explain
+failure-lab query --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --summarize
+```
+
 ## Development Setup
 
 Editable install:

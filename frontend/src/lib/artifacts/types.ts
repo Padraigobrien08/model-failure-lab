@@ -3,6 +3,8 @@ export const RUNS_INDEX_PATH = "/__failure_lab__/artifacts/runs.json";
 export const COMPARISONS_INDEX_PATH = "/__failure_lab__/artifacts/comparisons.json";
 export const COMPARISON_DETAIL_PATH = "/__failure_lab__/artifacts/comparison-detail.json";
 export const RUN_DETAIL_PATH = "/__failure_lab__/artifacts/run-detail.json";
+export const ARTIFACT_QUERY_PATH = "/__failure_lab__/artifacts/query.json";
+export const ARTIFACT_HARVEST_PATH = "/__failure_lab__/artifacts/harvest.json";
 
 export type ArtifactOverviewStatus = "ready" | "empty" | "incompatible";
 
@@ -140,6 +142,47 @@ export type ComparisonCaseDeltaRecord = {
   candidateExplanation: string | null;
 };
 
+export type ArtifactInsightEvidenceRef = {
+  kind: "run_case" | "comparison_case";
+  label: string;
+  runId: string | null;
+  reportId: string | null;
+  caseId: string | null;
+  promptId: string | null;
+  section: string | null;
+  transitionType: string | null;
+};
+
+export type ArtifactInsightPattern = {
+  kind: string;
+  label: string;
+  summary: string;
+  groupKey: string | null;
+  count: number;
+  share: number | null;
+  evidenceRefs: ArtifactInsightEvidenceRef[];
+};
+
+export type ArtifactInsightSampling = {
+  totalMatches: number;
+  sampledMatches: number;
+  sampleLimit: number;
+  truncated: boolean;
+  strategy: string;
+};
+
+export type ArtifactInsightReport = {
+  analysisMode: "heuristic" | "llm";
+  sourceKind: "cases" | "deltas" | "aggregates" | "comparison";
+  title: string;
+  summary: string;
+  generatedBy: string;
+  sampling: ArtifactInsightSampling;
+  patterns: ArtifactInsightPattern[];
+  anomalies: ArtifactInsightPattern[];
+  evidenceLinks: ArtifactInsightEvidenceRef[];
+};
+
 export type ComparisonDetail = {
   source: ArtifactSourceDescriptor;
   comparison: {
@@ -174,6 +217,7 @@ export type ComparisonDetail = {
     summary: ComparisonTransitionSummaryRow[];
   };
   caseDeltas: ComparisonCaseDeltaRecord[];
+  insightReport: ArtifactInsightReport | null;
 };
 
 export type ComparisonDetailState =
@@ -190,6 +234,130 @@ export type ComparisonDetailState =
   | {
       status: "incompatible";
       detail: null;
+      message: string;
+    };
+
+export type ArtifactQueryMode = "cases" | "deltas" | "aggregates";
+
+export type ArtifactHarvestResponse = {
+  source: ArtifactSourceDescriptor;
+  datasetId: string;
+  lifecycle: string | null;
+  mode: "cases" | "deltas";
+  outputPath: string;
+  selectedCaseCount: number;
+};
+
+export type ArtifactQueryFilters = {
+  failureType: string | null;
+  model: string | null;
+  dataset: string | null;
+  runId: string | null;
+  promptId?: string | null;
+  reportId: string | null;
+  baselineRunId: string | null;
+  candidateRunId: string | null;
+  delta: string | null;
+  aggregateBy: string | null;
+  lastN: number | null;
+  since: string | null;
+  until: string | null;
+  limit: number;
+};
+
+export type ArtifactQueryFacets = {
+  models: string[];
+  datasets: string[];
+  failureTypes: string[];
+  deltaTypes: string[];
+};
+
+export type ArtifactQueryCaseRow = {
+  runId: string;
+  dataset: string;
+  model: string;
+  createdAt: string;
+  caseId: string;
+  promptId: string;
+  prompt: string;
+  tags: string[];
+  failureType: string | null;
+  expectationVerdict: string | null;
+  explanation: string | null;
+  confidence: number | null;
+  errorStage: string | null;
+};
+
+export type ArtifactQueryDeltaRow = {
+  reportId: string;
+  createdAt: string;
+  dataset: string | null;
+  caseId: string;
+  promptId: string;
+  prompt: string;
+  tags: string[];
+  transitionType: string;
+  transitionLabel: string;
+  deltaKind: string;
+  baselineRunId: string;
+  candidateRunId: string;
+  baselineModel: string | null;
+  candidateModel: string | null;
+  baselineFailureType: string | null;
+  candidateFailureType: string | null;
+  baselineExpectationVerdict: string | null;
+  candidateExpectationVerdict: string | null;
+  baselineExplanation: string | null;
+  candidateExplanation: string | null;
+};
+
+export type ArtifactQueryAggregateRow = {
+  groupKey: string;
+  groupLabel: string;
+  caseCount: number;
+};
+
+type ArtifactQueryBase = {
+  source: ArtifactSourceDescriptor;
+  filters: ArtifactQueryFilters;
+  facets: ArtifactQueryFacets;
+  insightReport: ArtifactInsightReport | null;
+};
+
+export type ArtifactQueryCasesResponse = ArtifactQueryBase & {
+  mode: "cases";
+  rows: ArtifactQueryCaseRow[];
+};
+
+export type ArtifactQueryDeltasResponse = ArtifactQueryBase & {
+  mode: "deltas";
+  rows: ArtifactQueryDeltaRow[];
+};
+
+export type ArtifactQueryAggregatesResponse = ArtifactQueryBase & {
+  mode: "aggregates";
+  rows: ArtifactQueryAggregateRow[];
+};
+
+export type ArtifactQueryResponse =
+  | ArtifactQueryCasesResponse
+  | ArtifactQueryDeltasResponse
+  | ArtifactQueryAggregatesResponse;
+
+export type ArtifactQueryState =
+  | {
+      status: "idle" | "loading";
+      response: null;
+      message: null;
+    }
+  | {
+      status: "ready";
+      response: ArtifactQueryResponse;
+      message: null;
+    }
+  | {
+      status: "incompatible";
+      response: null;
       message: string;
     };
 

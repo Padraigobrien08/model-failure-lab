@@ -22,6 +22,12 @@ def test_parse_dataset_payload_accepts_envelope_shape() -> None:
             "name": "Reasoning Basics",
             "description": "Small baseline set",
             "version": "1",
+            "created_at": "2026-04-03T00:00:00Z",
+            "lifecycle": "draft",
+            "source": {
+                "type": "artifact_harvest",
+                "filters": {"failure_type": "reasoning"},
+            },
             "cases": [
                 {
                     "id": "case-001",
@@ -37,6 +43,12 @@ def test_parse_dataset_payload_accepts_envelope_shape() -> None:
         name="Reasoning Basics",
         description="Small baseline set",
         version="1",
+        created_at="2026-04-03T00:00:00Z",
+        lifecycle="draft",
+        source={
+            "type": "artifact_harvest",
+            "filters": {"failure_type": "reasoning"},
+        },
         cases=(
             PromptCase(
                 id="case-001",
@@ -45,6 +57,31 @@ def test_parse_dataset_payload_accepts_envelope_shape() -> None:
             ),
         ),
     )
+
+
+def test_failure_dataset_to_payload_preserves_harvest_fields() -> None:
+    dataset = FailureDataset(
+        dataset_id="harvested-pack-v1",
+        created_at="2026-04-03T00:00:00Z",
+        lifecycle="curated",
+        source={"type": "artifact_harvest", "filters": {"delta": "regression"}},
+        cases=(PromptCase(id="case-001", prompt="Prompt"),),
+    )
+
+    assert dataset.to_payload() == {
+        "dataset_id": "harvested-pack-v1",
+        "created_at": "2026-04-03T00:00:00Z",
+        "lifecycle": "curated",
+        "source": {"type": "artifact_harvest", "filters": {"delta": "regression"}},
+        "cases": [
+            {
+                "id": "case-001",
+                "prompt": "Prompt",
+                "tags": [],
+                "metadata": {},
+            }
+        ],
+    }
 
 
 def test_parse_dataset_payload_accepts_bare_case_list_with_fallback_metadata() -> None:

@@ -21,6 +21,11 @@ export type NavigationItem = {
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
+    label: "Analysis",
+    path: "/analysis",
+    description: "Cross-run artifact analysis backed by the derived local index",
+  },
+  {
     label: "Runs",
     path: "/",
     description: "Saved run artifacts from the local engine contract",

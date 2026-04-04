@@ -13,11 +13,13 @@ const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)), "..");
 const frontendRoot = path.join(repoRoot, "frontend");
 const pyPath = path.join(repoRoot, "src");
+const ARTIFACT_QUERY_PATH = "/__failure_lab__/artifacts/query.json";
 const ANTHROPIC_SYSTEM_PROMPT = "Be concise.";
 const ANTHROPIC_MAX_TOKENS = 256;
 const CLI_LABEL = "failure-lab";
 const OLLAMA_SYSTEM_PROMPT = "Be concise.";
 const OLLAMA_TEMPERATURE = 0;
+const QUERY_LATENCY_BUDGET_MS = 2_000;
 
 function parseLabel(output, label) {
   const pattern = new RegExp(`^${label}:\\s+(.+)$`, "m");
@@ -56,10 +58,6 @@ function parseArgs(argv) {
   if (!["demo", "existing", "ollama-stub", "anthropic-stub"].includes(options.mode)) {
     throw new Error(`Unsupported mode: ${options.mode}`);
   }
-  if (options.mode === "existing" && !options.artifactRoot) {
-    throw new Error("--artifact-root is required when --mode existing");
-  }
-
   return options;
 }
 
@@ -70,7 +68,7 @@ function printHelp() {
       "",
       "Modes:",
       "  demo         Generate demo artifacts with the repo-local python module and inspect them.",
-      "  existing     Inspect an existing artifact root without generating new artifacts.",
+      "  existing     Inspect an existing artifact root without generating new artifacts. Defaults to the repo root.",
       "  ollama-stub  Generate artifacts through the ollama:<model> CLI path against a localhost stub.",
       "  anthropic-stub  Generate artifacts through the anthropic:<model> CLI path against a localhost stub and shim SDK.",
     ].join("\n") + "\n",
@@ -302,6 +300,12 @@ async function createAnthropicSdkShim(rootDir) {
 }
 
 async function fetchJsonFromMiddleware(server, pathname) {
+  const { json } = await fetchTimedJsonFromMiddleware(server, pathname);
+  return json;
+}
+
+async function fetchTimedJsonFromMiddleware(server, pathname) {
+  const startedAt = performance.now();
   return new Promise((resolve, reject) => {
     const chunks = [];
     let settled = false;
@@ -353,7 +357,11 @@ async function fetchJsonFromMiddleware(server, pathname) {
         return;
       }
       try {
-        resolve(JSON.parse(body));
+        const parsed = JSON.parse(body);
+        resolve({
+          durationMs: performance.now() - startedAt,
+          json: parsed,
+        });
       } catch (error) {
         reject(
           error instanceof Error
@@ -690,6 +698,18 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         comparisonReportId,
       )}`,
     );
+    const analysisCases = await fetchTimedJsonFromMiddleware(
+      server,
+      `${ARTIFACT_QUERY_PATH}?mode=cases&limit=10`,
+    );
+    const analysisDeltas = await fetchTimedJsonFromMiddleware(
+      server,
+      `${ARTIFACT_QUERY_PATH}?mode=deltas&limit=10`,
+    );
+    const analysisAggregates = await fetchTimedJsonFromMiddleware(
+      server,
+      `${ARTIFACT_QUERY_PATH}?mode=aggregates&aggregateBy=failure_type&limit=10`,
+    );
 
     const runIds = await listDirectoryIds(path.join(normalizedArtifactRoot, "runs"));
     const reportIds = await listDirectoryIds(path.join(normalizedArtifactRoot, "reports"));
@@ -731,6 +751,37 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
     if (comparisonDetail.comparison.reportId !== comparisonReportId) {
       throw new Error("Comparison detail payload did not match the selected report");
     }
+    if (analysisCases.json.source.path !== normalizedArtifactRoot) {
+      throw new Error("Analysis case query source path did not use the configured artifact root");
+    }
+    if (analysisDeltas.json.source.path !== normalizedArtifactRoot) {
+      throw new Error("Analysis delta query source path did not use the configured artifact root");
+    }
+    if (analysisAggregates.json.source.path !== normalizedArtifactRoot) {
+      throw new Error(
+        "Analysis aggregate query source path did not use the configured artifact root",
+      );
+    }
+    if (!Array.isArray(analysisCases.json.rows)) {
+      throw new Error("Analysis case query did not return rows");
+    }
+    if (!Array.isArray(analysisDeltas.json.rows)) {
+      throw new Error("Analysis delta query did not return rows");
+    }
+    if (!Array.isArray(analysisAggregates.json.rows)) {
+      throw new Error("Analysis aggregate query did not return rows");
+    }
+    for (const [label, durationMs] of [
+      ["cases", analysisCases.durationMs],
+      ["deltas", analysisDeltas.durationMs],
+      ["aggregates", analysisAggregates.durationMs],
+    ]) {
+      if (durationMs > QUERY_LATENCY_BUDGET_MS) {
+        throw new Error(
+          `Analysis ${label} query exceeded ${QUERY_LATENCY_BUDGET_MS}ms (${durationMs.toFixed(1)}ms)`,
+        );
+      }
+    }
 
     process.stdout.write(
       [
@@ -741,12 +792,18 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
         `Run: ${runId}`,
         `Comparison: ${comparisonReportId}`,
         ...extraLines,
+        `Query latency (cases): ${analysisCases.durationMs.toFixed(1)}ms`,
+        `Query latency (deltas): ${analysisDeltas.durationMs.toFixed(1)}ms`,
+        `Query latency (aggregates): ${analysisAggregates.durationMs.toFixed(1)}ms`,
         "Verified endpoints:",
         "- overview",
         "- runs inventory",
         "- run detail",
         "- comparisons inventory",
         "- comparison detail",
+        "- analysis query (cases)",
+        "- analysis query (deltas)",
+        "- analysis query (aggregates)",
       ].join("\n") + "\n",
     );
   } finally {
@@ -761,10 +818,12 @@ async function inspectArtifactRoot({ artifactRoot, comparisonReportId, mode, run
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const ownsArtifactRoot = !options.artifactRoot;
-  const artifactRoot = path.resolve(
-    options.artifactRoot ?? (await mkdtemp(path.join(tmpdir(), "failure-lab-ui-smoke-"))),
-  );
+  const ownsArtifactRoot = !options.artifactRoot && options.mode !== "existing";
+  const artifactRoot = options.artifactRoot
+    ? path.resolve(options.artifactRoot)
+    : options.mode === "existing"
+      ? repoRoot
+      : path.resolve(await mkdtemp(path.join(tmpdir(), "failure-lab-ui-smoke-")));
 
   try {
     let selection;

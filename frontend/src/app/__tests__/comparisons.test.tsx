@@ -177,6 +177,7 @@ function buildComparisonDetail(reportId: string): ComparisonDetail {
         candidateExplanation: "No heuristic failure signal detected.",
       },
     ],
+    insightReport: null,
   };
 }
 
