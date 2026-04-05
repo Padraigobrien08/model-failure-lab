@@ -408,6 +408,129 @@ export type ArtifactLifecycleActionRecord = {
   escalationScore: number | null;
 };
 
+export type ArtifactPortfolioComparisonReference = {
+  comparisonId: string;
+  createdAt: string;
+  dataset: string | null;
+  baselineModel: string | null;
+  candidateModel: string | null;
+  severity: number;
+  signalVerdict: string;
+  recurringClusterIds: string[];
+};
+
+export type ArtifactDatasetPortfolioItem = {
+  familyId: string;
+  priorityRank: number;
+  priorityBand: string;
+  priorityScore: number;
+  actionability: string;
+  rationale: string;
+  lifecycleAction: string;
+  healthCondition: string;
+  healthLabel: string;
+  trendLabel: string;
+  versionCount: number;
+  latestDatasetId: string;
+  latestVersionTag: string;
+  latestComparisonId: string | null;
+  sourceDatasetId: string | null;
+  primaryFailureType: string | null;
+  recentFailRate: number | null;
+  projectedCaseCount: number | null;
+  escalationStatus: string | null;
+  escalationScore: number | null;
+  recentRegressionCount: number;
+  recurringClusterCount: number;
+  targetFamilyId: string | null;
+  relatedFamilyIds: string[];
+  comparisonRefs: ArtifactPortfolioComparisonReference[];
+  clusterIds: string[];
+  datasets: string[];
+  models: string[];
+  activeLifecycleActionId: string | null;
+  activeLifecycleAction: string | null;
+  activeLifecycleCondition: string | null;
+  activeLifecycleAppliedAt: string | null;
+};
+
+export type ArtifactPlanningUnitMember = {
+  familyId: string;
+  priorityRank: number;
+  priorityBand: string;
+  priorityScore: number;
+  actionability: string;
+  lifecycleAction: string;
+  healthCondition: string;
+  versionCount: number;
+  sourceDatasetId: string | null;
+  primaryFailureType: string | null;
+  latestDatasetId: string | null;
+  projectedCaseCount: number | null;
+  recentFailRate: number | null;
+  datasets: string[];
+  models: string[];
+  targetFamilyId: string | null;
+  relatedFamilyIds: string[];
+};
+
+export type ArtifactDatasetPlanningUnit = {
+  unitId: string;
+  unitKind: string;
+  priorityBand: string;
+  priorityScore: number;
+  rationale: string;
+  familyIds: string[];
+  comparisonIds: string[];
+  clusterIds: string[];
+  members: ArtifactPlanningUnitMember[];
+};
+
+export type ArtifactPortfolioPlanAction = {
+  familyId: string;
+  action: string;
+  healthCondition: string;
+  rationale: string;
+  priorityRank: number;
+  priorityBand: string;
+  priorityScore: number;
+  versionCount: number;
+  sourceDatasetId: string | null;
+  primaryFailureType: string | null;
+  latestDatasetId: string | null;
+  projectedCaseCount: number | null;
+  targetFamilyId: string | null;
+  relatedFamilyIds: string[];
+  dependencyFamilyIds: string[];
+  comparisonIds: string[];
+  clusterIds: string[];
+  datasets: string[];
+  models: string[];
+  recentFailRate: number | null;
+};
+
+export type ArtifactPortfolioPlanImpact = {
+  affectedFamilyCount: number;
+  actionCount: number;
+  projectedCaseCount: number;
+  actionCounts: Record<string, number>;
+};
+
+export type ArtifactSavedPortfolioPlan = {
+  planId: string;
+  createdAt: string;
+  status: string;
+  rationale: string;
+  familyIds: string[];
+  datasets: string[];
+  models: string[];
+  failureTypes: string[];
+  priorityBands: string[];
+  units: ArtifactDatasetPlanningUnit[];
+  actions: ArtifactPortfolioPlanAction[];
+  impact: ArtifactPortfolioPlanImpact;
+};
+
 export type ArtifactMetricTrend = {
   label: string;
   delta: number | null;
@@ -585,6 +708,8 @@ export type ArtifactDatasetVersionsResponse = {
   versions: ArtifactDatasetVersionRecord[];
   history: ArtifactHistorySnapshot;
   lifecycleActions: ArtifactLifecycleActionRecord[];
+  portfolioItem: ArtifactDatasetPortfolioItem | null;
+  portfolioPlans: ArtifactSavedPortfolioPlan[];
 };
 
 export type ArtifactDatasetEvolutionResponse = {

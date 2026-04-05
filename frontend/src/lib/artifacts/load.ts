@@ -35,7 +35,13 @@ import {
   type ArtifactDatasetVersionRecord,
   type ArtifactDatasetVersionsResponse,
   type ArtifactDatasetHealthSummary,
+  type ArtifactDatasetPlanningUnit,
+  type ArtifactDatasetPortfolioItem,
   type ArtifactHarvestResponse,
+  type ArtifactPlanningUnitMember,
+  type ArtifactPortfolioComparisonReference,
+  type ArtifactPortfolioPlanAction,
+  type ArtifactPortfolioPlanImpact,
   type ArtifactQueryAggregateRow,
   type ArtifactQueryCaseRow,
   type ArtifactQueryClusterRow,
@@ -48,6 +54,7 @@ import {
   type ArtifactRegressionPreviewCase,
   type ArtifactOverview,
   type ArtifactOverviewStatus,
+  type ArtifactSavedPortfolioPlan,
   type ComparisonCaseDeltaRecord,
   type ComparisonDetail,
   type ComparisonDeltaMetrics,
@@ -503,6 +510,310 @@ function requireArtifactLifecycleActionRecords(
   });
 }
 
+function requireArtifactPortfolioComparisonReferences(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioComparisonReference[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      comparisonId: requireString(row.comparison_id, `${field}[${index}].comparison_id`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      dataset: requireStringOrNull(row.dataset, `${field}[${index}].dataset`),
+      baselineModel: requireStringOrNull(
+        row.baseline_model,
+        `${field}[${index}].baseline_model`,
+      ),
+      candidateModel: requireStringOrNull(
+        row.candidate_model,
+        `${field}[${index}].candidate_model`,
+      ),
+      severity: requireNumber(row.severity, `${field}[${index}].severity`),
+      signalVerdict: requireString(row.signal_verdict, `${field}[${index}].signal_verdict`),
+      recurringClusterIds: requireStringArray(
+        row.recurring_cluster_ids ?? [],
+        `${field}[${index}].recurring_cluster_ids`,
+      ),
+    };
+  });
+}
+
+function requireArtifactDatasetPortfolioItem(
+  value: unknown,
+  field: string,
+): ArtifactDatasetPortfolioItem {
+  const data = requireObject(value, field);
+  return {
+    familyId: requireString(data.family_id, `${field}.family_id`),
+    priorityRank: requireCount(data.priority_rank, `${field}.priority_rank`),
+    priorityBand: requireString(data.priority_band, `${field}.priority_band`),
+    priorityScore: requireNumber(data.priority_score, `${field}.priority_score`),
+    actionability: requireString(data.actionability, `${field}.actionability`),
+    rationale: requireString(data.rationale, `${field}.rationale`),
+    lifecycleAction: requireString(data.lifecycle_action, `${field}.lifecycle_action`),
+    healthCondition: requireString(data.health_condition, `${field}.health_condition`),
+    healthLabel: requireString(data.health_label, `${field}.health_label`),
+    trendLabel: requireString(data.trend_label, `${field}.trend_label`),
+    versionCount: requireCount(data.version_count, `${field}.version_count`),
+    latestDatasetId: requireString(data.latest_dataset_id, `${field}.latest_dataset_id`),
+    latestVersionTag: requireString(data.latest_version_tag, `${field}.latest_version_tag`),
+    latestComparisonId: requireStringOrNull(
+      data.latest_comparison_id,
+      `${field}.latest_comparison_id`,
+    ),
+    sourceDatasetId: requireStringOrNull(data.source_dataset_id, `${field}.source_dataset_id`),
+    primaryFailureType: requireStringOrNull(
+      data.primary_failure_type,
+      `${field}.primary_failure_type`,
+    ),
+    recentFailRate: requireNumberOrNull(data.recent_fail_rate, `${field}.recent_fail_rate`),
+    projectedCaseCount:
+      data.projected_case_count == null
+        ? null
+        : requireCount(data.projected_case_count, `${field}.projected_case_count`),
+    escalationStatus: requireStringOrNull(data.escalation_status, `${field}.escalation_status`),
+    escalationScore: requireNumberOrNull(data.escalation_score, `${field}.escalation_score`),
+    recentRegressionCount: requireCount(
+      data.recent_regression_count,
+      `${field}.recent_regression_count`,
+    ),
+    recurringClusterCount: requireCount(
+      data.recurring_cluster_count,
+      `${field}.recurring_cluster_count`,
+    ),
+    targetFamilyId: requireStringOrNull(data.target_family_id, `${field}.target_family_id`),
+    relatedFamilyIds: requireStringArray(
+      data.related_family_ids ?? [],
+      `${field}.related_family_ids`,
+    ),
+    comparisonRefs: requireArtifactPortfolioComparisonReferences(
+      data.comparison_refs ?? [],
+      `${field}.comparison_refs`,
+    ),
+    clusterIds: requireStringArray(data.cluster_ids ?? [], `${field}.cluster_ids`),
+    datasets: requireStringArray(data.datasets ?? [], `${field}.datasets`),
+    models: requireStringArray(data.models ?? [], `${field}.models`),
+    activeLifecycleActionId: requireStringOrNull(
+      data.active_lifecycle_action_id,
+      `${field}.active_lifecycle_action_id`,
+    ),
+    activeLifecycleAction: requireStringOrNull(
+      data.active_lifecycle_action,
+      `${field}.active_lifecycle_action`,
+    ),
+    activeLifecycleCondition: requireStringOrNull(
+      data.active_lifecycle_condition,
+      `${field}.active_lifecycle_condition`,
+    ),
+    activeLifecycleAppliedAt: requireStringOrNull(
+      data.active_lifecycle_applied_at,
+      `${field}.active_lifecycle_applied_at`,
+    ),
+  };
+}
+
+function requireArtifactPlanningUnitMembers(
+  value: unknown,
+  field: string,
+): ArtifactPlanningUnitMember[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      familyId: requireString(row.family_id, `${field}[${index}].family_id`),
+      priorityRank: requireCount(row.priority_rank, `${field}[${index}].priority_rank`),
+      priorityBand: requireString(row.priority_band, `${field}[${index}].priority_band`),
+      priorityScore: requireNumber(row.priority_score, `${field}[${index}].priority_score`),
+      actionability: requireString(row.actionability, `${field}[${index}].actionability`),
+      lifecycleAction: requireString(row.lifecycle_action, `${field}[${index}].lifecycle_action`),
+      healthCondition: requireString(row.health_condition, `${field}[${index}].health_condition`),
+      versionCount: requireCount(row.version_count ?? 0, `${field}[${index}].version_count`),
+      sourceDatasetId: requireStringOrNull(
+        row.source_dataset_id,
+        `${field}[${index}].source_dataset_id`,
+      ),
+      primaryFailureType: requireStringOrNull(
+        row.primary_failure_type,
+        `${field}[${index}].primary_failure_type`,
+      ),
+      latestDatasetId: requireStringOrNull(
+        row.latest_dataset_id,
+        `${field}[${index}].latest_dataset_id`,
+      ),
+      projectedCaseCount:
+        row.projected_case_count == null
+          ? null
+          : requireCount(row.projected_case_count, `${field}[${index}].projected_case_count`),
+      recentFailRate: requireNumberOrNull(
+        row.recent_fail_rate,
+        `${field}[${index}].recent_fail_rate`,
+      ),
+      datasets: requireStringArray(row.datasets ?? [], `${field}[${index}].datasets`),
+      models: requireStringArray(row.models ?? [], `${field}[${index}].models`),
+      targetFamilyId: requireStringOrNull(
+        row.target_family_id,
+        `${field}[${index}].target_family_id`,
+      ),
+      relatedFamilyIds: requireStringArray(
+        row.related_family_ids ?? [],
+        `${field}[${index}].related_family_ids`,
+      ),
+    };
+  });
+}
+
+function requireArtifactDatasetPlanningUnits(
+  value: unknown,
+  field: string,
+): ArtifactDatasetPlanningUnit[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      unitId: requireString(row.unit_id, `${field}[${index}].unit_id`),
+      unitKind: requireString(row.unit_kind, `${field}[${index}].unit_kind`),
+      priorityBand: requireString(row.priority_band, `${field}[${index}].priority_band`),
+      priorityScore: requireNumber(row.priority_score, `${field}[${index}].priority_score`),
+      rationale: requireString(row.rationale, `${field}[${index}].rationale`),
+      familyIds: requireStringArray(row.family_ids ?? [], `${field}[${index}].family_ids`),
+      comparisonIds: requireStringArray(
+        row.comparison_ids ?? [],
+        `${field}[${index}].comparison_ids`,
+      ),
+      clusterIds: requireStringArray(row.cluster_ids ?? [], `${field}[${index}].cluster_ids`),
+      members: requireArtifactPlanningUnitMembers(row.members ?? [], `${field}[${index}].members`),
+    };
+  });
+}
+
+function requireArtifactPortfolioPlanActions(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioPlanAction[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      familyId: requireString(row.family_id, `${field}[${index}].family_id`),
+      action: requireString(row.action, `${field}[${index}].action`),
+      healthCondition: requireString(row.health_condition, `${field}[${index}].health_condition`),
+      rationale: requireString(row.rationale, `${field}[${index}].rationale`),
+      priorityRank: requireCount(row.priority_rank, `${field}[${index}].priority_rank`),
+      priorityBand: requireString(row.priority_band, `${field}[${index}].priority_band`),
+      priorityScore: requireNumber(row.priority_score, `${field}[${index}].priority_score`),
+      versionCount: requireCount(row.version_count ?? 0, `${field}[${index}].version_count`),
+      sourceDatasetId: requireStringOrNull(
+        row.source_dataset_id,
+        `${field}[${index}].source_dataset_id`,
+      ),
+      primaryFailureType: requireStringOrNull(
+        row.primary_failure_type,
+        `${field}[${index}].primary_failure_type`,
+      ),
+      latestDatasetId: requireStringOrNull(
+        row.latest_dataset_id,
+        `${field}[${index}].latest_dataset_id`,
+      ),
+      projectedCaseCount:
+        row.projected_case_count == null
+          ? null
+          : requireCount(row.projected_case_count, `${field}[${index}].projected_case_count`),
+      targetFamilyId: requireStringOrNull(
+        row.target_family_id,
+        `${field}[${index}].target_family_id`,
+      ),
+      relatedFamilyIds: requireStringArray(
+        row.related_family_ids ?? [],
+        `${field}[${index}].related_family_ids`,
+      ),
+      dependencyFamilyIds: requireStringArray(
+        row.dependency_family_ids ?? [],
+        `${field}[${index}].dependency_family_ids`,
+      ),
+      comparisonIds: requireStringArray(
+        row.comparison_ids ?? [],
+        `${field}[${index}].comparison_ids`,
+      ),
+      clusterIds: requireStringArray(row.cluster_ids ?? [], `${field}[${index}].cluster_ids`),
+      datasets: requireStringArray(row.datasets ?? [], `${field}[${index}].datasets`),
+      models: requireStringArray(row.models ?? [], `${field}[${index}].models`),
+      recentFailRate: requireNumberOrNull(
+        row.recent_fail_rate,
+        `${field}[${index}].recent_fail_rate`,
+      ),
+    };
+  });
+}
+
+function requireArtifactPortfolioPlanImpact(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioPlanImpact {
+  const data = requireObject(value, field);
+  const actionCounts = requireObject(data.action_counts ?? {}, `${field}.action_counts`);
+  return {
+    affectedFamilyCount: requireCount(
+      data.affected_family_count,
+      `${field}.affected_family_count`,
+    ),
+    actionCount: requireCount(data.action_count, `${field}.action_count`),
+    projectedCaseCount: requireCount(
+      data.projected_case_count,
+      `${field}.projected_case_count`,
+    ),
+    actionCounts: Object.fromEntries(
+      Object.entries(actionCounts).map(([key, value]) => [
+        key,
+        requireCount(value, `${field}.action_counts.${key}`),
+      ]),
+    ),
+  };
+}
+
+function requireArtifactSavedPortfolioPlans(
+  value: unknown,
+  field: string,
+): ArtifactSavedPortfolioPlan[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      planId: requireString(row.plan_id, `${field}[${index}].plan_id`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      status: requireString(row.status, `${field}[${index}].status`),
+      rationale: requireString(row.rationale, `${field}[${index}].rationale`),
+      familyIds: requireStringArray(row.family_ids ?? [], `${field}[${index}].family_ids`),
+      datasets: requireStringArray(row.datasets ?? [], `${field}[${index}].datasets`),
+      models: requireStringArray(row.models ?? [], `${field}[${index}].models`),
+      failureTypes: requireStringArray(
+        row.failure_types ?? [],
+        `${field}[${index}].failure_types`,
+      ),
+      priorityBands: requireStringArray(
+        row.priority_bands ?? [],
+        `${field}[${index}].priority_bands`,
+      ),
+      units: requireArtifactDatasetPlanningUnits(row.units ?? [], `${field}[${index}].units`),
+      actions: requireArtifactPortfolioPlanActions(
+        row.actions ?? [],
+        `${field}[${index}].actions`,
+      ),
+      impact: requireArtifactPortfolioPlanImpact(row.impact, `${field}[${index}].impact`),
+    };
+  });
+}
+
 function requireArtifactMetricTrend(value: unknown, field: string): ArtifactMetricTrend {
   const data = requireObject(value, field);
   return {
@@ -917,6 +1228,17 @@ function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatas
     lifecycleActions: requireArtifactLifecycleActionRecords(
       data.lifecycle_actions ?? [],
       "dataset_versions.lifecycle_actions",
+    ),
+    portfolioItem:
+      data.portfolio_item == null
+        ? null
+        : requireArtifactDatasetPortfolioItem(
+            data.portfolio_item,
+            "dataset_versions.portfolio_item",
+          ),
+    portfolioPlans: requireArtifactSavedPortfolioPlans(
+      data.portfolio_plans ?? [],
+      "dataset_versions.portfolio_plans",
     ),
   };
 }

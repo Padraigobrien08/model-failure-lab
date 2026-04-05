@@ -1079,6 +1079,133 @@ function mockComparisonDetailWithVersionHistory(detail: ComparisonDetail) {
             family_id: "regression-reasoning-failures-v1-reasoning",
             versions,
             lifecycle_actions: [],
+            portfolio_item: {
+              family_id: "regression-reasoning-failures-v1-reasoning",
+              priority_rank: 1,
+              priority_band: "high",
+              priority_score: 48.5,
+              actionability: "actionable",
+              rationale:
+                "lifecycle=prune, health=stable, escalation=elevated (0.310), recent_regressions=2, recurring_clusters=1",
+              lifecycle_action: "prune",
+              health_condition: "overgrown",
+              health_label: "stable",
+              trend_label: "stable",
+              version_count: versions.length,
+              latest_dataset_id: versions[versions.length - 1]?.dataset_id ?? "regression-reasoning-failures-v1-reasoning-v1",
+              latest_version_tag: versions[versions.length - 1]?.version_tag ?? "v1",
+              latest_comparison_id: "compare_alpha_to_beta",
+              source_dataset_id: "reasoning-failures-v1",
+              primary_failure_type: "reasoning",
+              recent_fail_rate: 0.25,
+              projected_case_count: 12,
+              escalation_status: "elevated",
+              escalation_score: 0.31,
+              recent_regression_count: 2,
+              recurring_cluster_count: 1,
+              target_family_id: null,
+              related_family_ids: [],
+              comparison_refs: [
+                {
+                  comparison_id: "compare_alpha_to_beta",
+                  created_at: "2026-04-03T11:10:00Z",
+                  dataset: "reasoning-failures-v1",
+                  baseline_model: "model-alpha",
+                  candidate_model: "model-beta",
+                  severity: 0.25,
+                  signal_verdict: "regression",
+                  recurring_cluster_ids: ["cluster_reasoning_failure"],
+                },
+              ],
+              cluster_ids: ["cluster_reasoning_failure"],
+              datasets: ["reasoning-failures-v1"],
+              models: ["model-alpha", "model-beta"],
+              active_lifecycle_action_id: null,
+              active_lifecycle_action: null,
+              active_lifecycle_condition: null,
+              active_lifecycle_applied_at: null,
+            },
+            portfolio_plans: [
+              {
+                plan_id: "portfolio-plan-fixture",
+                created_at: "2026-04-05T14:00:00Z",
+                status: "draft",
+                rationale: "Saved deterministic portfolio draft covering one planning unit and one family action.",
+                family_ids: ["regression-reasoning-failures-v1-reasoning"],
+                datasets: ["reasoning-failures-v1"],
+                models: ["model-alpha", "model-beta"],
+                failure_types: ["reasoning"],
+                priority_bands: ["high"],
+                units: [
+                  {
+                    unit_id: "family:regression-reasoning-failures-v1-reasoning",
+                    unit_kind: "family_review",
+                    priority_band: "high",
+                    priority_score: 48.5,
+                    rationale: "Family remains a standalone review unit in the current portfolio queue.",
+                    family_ids: ["regression-reasoning-failures-v1-reasoning"],
+                    comparison_ids: ["compare_alpha_to_beta"],
+                    cluster_ids: ["cluster_reasoning_failure"],
+                    members: [
+                      {
+                        family_id: "regression-reasoning-failures-v1-reasoning",
+                        priority_rank: 1,
+                        priority_band: "high",
+                        priority_score: 48.5,
+                        actionability: "actionable",
+                        lifecycle_action: "prune",
+                        health_condition: "overgrown",
+                        version_count: versions.length,
+                        source_dataset_id: "reasoning-failures-v1",
+                        primary_failure_type: "reasoning",
+                        latest_dataset_id: versions[versions.length - 1]?.dataset_id ?? "regression-reasoning-failures-v1-reasoning-v1",
+                        projected_case_count: 12,
+                        recent_fail_rate: 0.25,
+                        datasets: ["reasoning-failures-v1"],
+                        models: ["model-alpha", "model-beta"],
+                        target_family_id: null,
+                        related_family_ids: [],
+                      },
+                    ],
+                  },
+                ],
+                actions: [
+                  {
+                    family_id: "regression-reasoning-failures-v1-reasoning",
+                    action: "prune",
+                    health_condition: "overgrown",
+                    rationale: "Family remains a standalone review unit in the current portfolio queue.",
+                    priority_rank: 1,
+                    priority_band: "high",
+                    priority_score: 48.5,
+                    version_count: versions.length,
+                    source_dataset_id: "reasoning-failures-v1",
+                    primary_failure_type: "reasoning",
+                    latest_dataset_id: versions[versions.length - 1]?.dataset_id ?? "regression-reasoning-failures-v1-reasoning-v1",
+                    projected_case_count: 12,
+                    target_family_id: null,
+                    related_family_ids: [],
+                    dependency_family_ids: [],
+                    comparison_ids: ["compare_alpha_to_beta"],
+                    cluster_ids: ["cluster_reasoning_failure"],
+                    datasets: ["reasoning-failures-v1"],
+                    models: ["model-alpha", "model-beta"],
+                    recent_fail_rate: 0.25,
+                  },
+                ],
+                impact: {
+                  affected_family_count: 1,
+                  action_count: 1,
+                  projected_case_count: 12,
+                  action_counts: {
+                    keep: 0,
+                    prune: 1,
+                    merge_candidate: 0,
+                    retire: 0,
+                  },
+                },
+              },
+            ],
             history: {
               scope_kind: "family",
               scope_value: "regression-reasoning-failures-v1-reasoning",
@@ -1726,6 +1853,26 @@ describe("comparison detail route", () => {
     expect(
       screen.getByText("Projected family growth crosses the deterministic overgrowth threshold."),
     ).toBeInTheDocument();
+  });
+
+  it("shows portfolio priority and saved plan context on the comparison route", async () => {
+    const detail = buildCompatibleDetail();
+    mockComparisonDetailWithVersionHistory(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(await screen.findByText("Portfolio priority")).toBeInTheDocument();
+    expect(screen.getByText(/rank 1/i)).toBeInTheDocument();
+    expect(screen.getByText("Saved plans")).toBeInTheDocument();
+    expect(screen.getByText("portfolio-plan-fixture")).toBeInTheDocument();
   });
 
   it("keeps incompatible comparisons openable with explicit coverage semantics", async () => {

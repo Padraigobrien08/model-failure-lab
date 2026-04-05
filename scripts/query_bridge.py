@@ -36,7 +36,10 @@ from model_failure_lab.datasets import (  # noqa: E402
     list_dataset_versions,
 )
 from model_failure_lab.governance import (  # noqa: E402
+    PortfolioFilters,
+    get_dataset_portfolio_item,
     list_dataset_lifecycle_actions,
+    list_saved_portfolio_plans,
     recommend_dataset_action,
 )
 from model_failure_lab.history import query_history_snapshot  # noqa: E402
@@ -221,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
             root=root,
             limit=args.limit,
         )
+        portfolio_item = get_dataset_portfolio_item(args.dataset_family, root=root)
         payload = {
             "source": build_source_descriptor(root),
             "family_id": args.dataset_family,
@@ -229,6 +233,16 @@ def main(argv: list[str] | None = None) -> int:
             "lifecycle_actions": [
                 row.to_payload()
                 for row in list_dataset_lifecycle_actions(args.dataset_family, root=root)
+            ],
+            "portfolio_item": (
+                portfolio_item.to_payload() if portfolio_item is not None else None
+            ),
+            "portfolio_plans": [
+                row.to_payload()
+                for row in list_saved_portfolio_plans(
+                    root=root,
+                    filters=PortfolioFilters(family_id=args.dataset_family, limit=5),
+                )
             ],
         }
     elif args.command == "history":

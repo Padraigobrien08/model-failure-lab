@@ -9,6 +9,8 @@ from model_failure_lab.governance import (
     apply_dataset_actions,
     apply_dataset_lifecycle_action,
     describe_dataset_family_lifecycle,
+    list_dataset_planning_units,
+    list_dataset_portfolio,
     list_dataset_family_health,
     list_dataset_lifecycle_actions,
     recommend_dataset_action,
@@ -416,6 +418,62 @@ def test_lifecycle_action_rules_cover_prune_retire_and_keep(tmp_path: Path) -> N
     assert overgrown.action == "prune"
     assert retire.action == "retire"
     assert keep.action == "keep"
+
+
+def test_dataset_portfolio_ranks_existing_family_with_deterministic_evidence(
+    tmp_path: Path,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_comparison(workspace.root, minimum_cases=2)
+    recommendation = recommend_dataset_action(comparison_id, root=workspace.root)
+    family_id = recommendation.matched_family.family_id
+
+    evolve_dataset_family(
+        family_id,
+        comparison_id=comparison_id,
+        root=workspace.root,
+        top_n=2,
+    )
+
+    first = list_dataset_portfolio(root=workspace.root)
+    second = list_dataset_portfolio(root=workspace.root)
+
+    assert first
+    assert first[0].family_id == family_id
+    assert first[0].priority_rank == 1
+    assert first[0].comparison_refs
+    assert first[0].comparison_refs[0].comparison_id == comparison_id
+    assert first[0].escalation_status in {"watch", "elevated", "critical", "suppressed"}
+    assert "lifecycle=" in first[0].rationale
+    assert [row.to_payload() for row in first] == [row.to_payload() for row in second]
+
+
+def test_dataset_planning_units_group_merge_candidates_together(tmp_path: Path) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_comparison(workspace.root, minimum_cases=2)
+    family_ids = ("fixture-related-family-a", "fixture-related-family-b")
+
+    for family_id in family_ids:
+        evolve_dataset_family(
+            family_id,
+            comparison_id=comparison_id,
+            root=workspace.root,
+            top_n=1,
+        )
+
+    portfolio_rows = list_dataset_portfolio(root=workspace.root)
+    related_rows = [row for row in portfolio_rows if row.family_id in family_ids]
+    units = list_dataset_planning_units(root=workspace.root)
+    merge_unit = next(
+        unit
+        for unit in units
+        if set(family_ids).issubset(set(unit.family_ids))
+    )
+
+    assert len(related_rows) == 2
+    assert all(row.lifecycle_action == "merge_candidate" for row in related_rows)
+    assert merge_unit.unit_kind == "merge_review"
+    assert set(merge_unit.family_ids) == set(family_ids)
 
 
 def test_describe_dataset_family_lifecycle_surfaces_merge_candidates_and_provenance(

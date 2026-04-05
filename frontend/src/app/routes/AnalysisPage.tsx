@@ -655,6 +655,7 @@ export function AnalysisPage() {
                     recommendation={row.governanceRecommendation}
                     historyContext={historyContext}
                     returnState={returnState}
+                    autoLoadVersions={row.governanceRecommendation?.matchedFamily.exists ?? false}
                     title="Turn this signal into a dataset"
                   />
                 </CardContent>

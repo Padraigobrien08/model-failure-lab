@@ -98,6 +98,10 @@ function formatLifecycleLabel(value: string): string {
   return value.replace(/_/g, " ");
 }
 
+function formatPriorityBand(value: string): string {
+  return value.replace(/_/g, " ");
+}
+
 export function SignalDatasetAutomationPanel({
   comparisonId,
   dataset,
@@ -174,6 +178,10 @@ export function SignalDatasetAutomationPanel({
   const activeLifecycleAction =
     lifecycleActions.length > 0 ? lifecycleActions[lifecycleActions.length - 1] : null;
   const familyHealth = loadedFamilyHealth ?? activeHistoryContext?.familyHealth ?? null;
+  const portfolioItem =
+    versionsState.status === "ready" ? versionsState.value.portfolioItem : null;
+  const portfolioPlans =
+    versionsState.status === "ready" ? versionsState.value.portfolioPlans : [];
 
   return (
     <Card className="border-border/70 bg-card/70">
@@ -378,6 +386,96 @@ export function SignalDatasetAutomationPanel({
                 {activeLifecycleAction.appliedAt}
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {portfolioItem ? (
+          <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="accent">Portfolio priority</Badge>
+              <Badge tone="muted">
+                rank {portfolioItem.priorityRank}
+              </Badge>
+              <Badge tone="muted">{formatPriorityBand(portfolioItem.priorityBand)}</Badge>
+              <Badge tone="muted">
+                {portfolioItem.lifecycleAction} · {portfolioItem.healthCondition}
+              </Badge>
+              {portfolioItem.escalationStatus ? (
+                <Badge tone={portfolioItem.priorityBand === "urgent" ? "default" : "muted"}>
+                  {portfolioItem.escalationStatus}
+                </Badge>
+              ) : null}
+            </div>
+            <p className="text-sm text-muted-foreground">{portfolioItem.rationale}</p>
+            <p className="text-xs text-muted-foreground">
+              Score {portfolioItem.priorityScore.toFixed(3)} · {portfolioItem.recentRegressionCount} recent regressions ·{" "}
+              {portfolioItem.recurringClusterCount} recurring clusters
+            </p>
+            {portfolioItem.comparisonRefs.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {portfolioItem.comparisonRefs.slice(0, 3).map((reference) =>
+                  renderPreviewLink(
+                    reference.comparisonId,
+                    null,
+                    reference.comparisonId,
+                    returnState,
+                  ),
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {portfolioPlans.length > 0 ? (
+          <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="accent">Saved plans</Badge>
+              <Badge tone="muted">{portfolioPlans.length} linked</Badge>
+            </div>
+            <div className="space-y-3">
+              {portfolioPlans.map((plan) => {
+                const familyAction =
+                  plan.actions.find((action) => action.familyId === targetFamilyId) ?? null;
+                return (
+                  <div
+                    key={plan.planId}
+                    className="rounded-[16px] border border-border/60 bg-card/70 p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="muted">{plan.planId}</Badge>
+                      <Badge tone="muted">{plan.createdAt}</Badge>
+                      <Badge tone="muted">
+                        {plan.impact.actionCount} actions
+                      </Badge>
+                      {familyAction ? (
+                        <Badge tone="accent">{formatLifecycleLabel(familyAction.action)}</Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">{plan.rationale}</p>
+                    {familyAction ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        This family is included as {formatLifecycleLabel(familyAction.action)}
+                        {familyAction.dependencyFamilyIds.length > 0
+                          ? ` with dependencies on ${familyAction.dependencyFamilyIds.join(", ")}`
+                          : ""}.
+                      </p>
+                    ) : null}
+                    {familyAction?.comparisonIds.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {familyAction.comparisonIds.slice(0, 3).map((comparisonId) =>
+                          renderPreviewLink(
+                            comparisonId,
+                            null,
+                            comparisonId,
+                            returnState,
+                          ),
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : null}
 

@@ -36,16 +36,28 @@ from model_failure_lab.harvest import (
     review_harvest_dataset,
 )
 from model_failure_lab.governance import (
+    DatasetPlanningUnit,
+    DatasetPortfolioItem,
     DatasetLifecycleAlert,
     DatasetFamilyHealth,
     GovernanceApplyResult,
     GovernancePolicy,
     GovernanceRecommendation,
     LifecycleApplyResult,
+    PortfolioFilters,
+    PortfolioPlanApplyResult,
+    PortfolioPlanSaveResult,
+    SavedPortfolioPlan,
+    apply_saved_portfolio_plan_action,
     apply_dataset_lifecycle_action,
     apply_dataset_actions,
+    create_saved_portfolio_plan,
+    get_saved_portfolio_plan,
+    list_dataset_planning_units,
+    list_dataset_portfolio,
     review_dataset_lifecycle,
     list_dataset_family_health,
+    list_saved_portfolio_plans,
     recommend_dataset_action,
     review_dataset_actions,
 )
@@ -380,6 +392,110 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dataset_lifecycle_apply_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_lifecycle_apply_parser.set_defaults(handler=_handle_dataset_lifecycle_apply)
+
+    dataset_portfolio_parser = dataset_subparsers.add_parser(
+        "portfolio",
+        help="List deterministic portfolio-priority items for existing dataset families.",
+    )
+    dataset_portfolio_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_portfolio_filter_arguments(dataset_portfolio_parser)
+    dataset_portfolio_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_portfolio_parser.set_defaults(handler=_handle_dataset_portfolio)
+
+    dataset_planning_units_parser = dataset_subparsers.add_parser(
+        "planning-units",
+        help="Inspect deterministic planning units derived from the portfolio queue.",
+    )
+    dataset_planning_units_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_portfolio_filter_arguments(dataset_planning_units_parser)
+    dataset_planning_units_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_planning_units_parser.set_defaults(handler=_handle_dataset_planning_units)
+
+    dataset_plan_create_parser = dataset_subparsers.add_parser(
+        "plan-create",
+        help="Create one deterministic saved portfolio draft from the current queue.",
+    )
+    dataset_plan_create_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_portfolio_filter_arguments(dataset_plan_create_parser)
+    dataset_plan_create_parser.add_argument("--max-units", type=int, default=5)
+    dataset_plan_create_parser.add_argument("--max-actions", type=int, default=10)
+    dataset_plan_create_parser.add_argument(
+        "--include-keep",
+        action="store_true",
+        help="Include neutral `keep` actions in the saved portfolio draft.",
+    )
+    dataset_plan_create_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_plan_create_parser.set_defaults(handler=_handle_dataset_plan_create)
+
+    dataset_plans_parser = dataset_subparsers.add_parser(
+        "plans",
+        help="List saved deterministic portfolio drafts.",
+    )
+    dataset_plans_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_portfolio_filter_arguments(dataset_plans_parser)
+    dataset_plans_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_plans_parser.set_defaults(handler=_handle_dataset_plans)
+
+    dataset_plan_show_parser = dataset_subparsers.add_parser(
+        "plan-show",
+        help="Inspect one saved portfolio draft with units and family actions.",
+    )
+    dataset_plan_show_parser.add_argument("plan_id")
+    dataset_plan_show_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_plan_show_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_plan_show_parser.set_defaults(handler=_handle_dataset_plan_show)
+
+    dataset_plan_promote_parser = dataset_subparsers.add_parser(
+        "plan-promote",
+        help="Promote one saved portfolio action into the explicit lifecycle apply workflow.",
+    )
+    dataset_plan_promote_parser.add_argument("plan_id")
+    dataset_plan_promote_parser.add_argument("dataset_id")
+    dataset_plan_promote_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_plan_promote_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_plan_promote_parser.set_defaults(handler=_handle_dataset_plan_promote)
 
     dataset_evolve_parser = dataset_subparsers.add_parser(
         "evolve",
@@ -773,6 +889,24 @@ def _add_governance_policy_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_portfolio_filter_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--family", dest="family_id")
+    parser.add_argument("--model")
+    parser.add_argument("--dataset")
+    parser.add_argument("--failure-type", dest="failure_type")
+    parser.add_argument(
+        "--actionability",
+        choices=["all", "actionable", "neutral"],
+        default="all",
+        help="Filter portfolio items or plans by whether they carry non-keep actions.",
+    )
+    parser.add_argument(
+        "--priority-band",
+        choices=["urgent", "high", "medium", "low"],
+    )
+    parser.add_argument("--limit", type=int, default=20)
+
+
 def _build_signal_filters(args: argparse.Namespace) -> QueryFilters:
     return QueryFilters(
         failure_type=args.failure_type,
@@ -784,6 +918,18 @@ def _build_signal_filters(args: argparse.Namespace) -> QueryFilters:
         last_n=args.last_n,
         since=args.since,
         until=args.until,
+        limit=args.limit,
+    )
+
+
+def _build_portfolio_filters(args: argparse.Namespace) -> PortfolioFilters:
+    return PortfolioFilters(
+        family_id=args.family_id,
+        model=args.model,
+        dataset=args.dataset,
+        failure_type=args.failure_type,
+        actionability=args.actionability,
+        priority_band=args.priority_band,
         limit=args.limit,
     )
 
@@ -1360,6 +1506,108 @@ def _handle_dataset_lifecycle_apply(args: argparse.Namespace) -> int:
         print(_render_json_payload(result.to_payload()))
         return 0
     print(_render_dataset_lifecycle_apply(result))
+    return 0
+
+
+def _handle_dataset_portfolio(args: argparse.Namespace) -> int:
+    rows = list_dataset_portfolio(
+        root=_normalized_root(args.root),
+        filters=_build_portfolio_filters(args),
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "dataset_portfolio",
+                    "filters": _build_portfolio_filters(args).to_payload(),
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    if args.family_id and rows:
+        print(_render_dataset_portfolio_item(rows[0]))
+        return 0
+    print(_render_dataset_portfolio(rows))
+    return 0
+
+
+def _handle_dataset_planning_units(args: argparse.Namespace) -> int:
+    rows = list_dataset_planning_units(
+        root=_normalized_root(args.root),
+        filters=_build_portfolio_filters(args),
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "dataset_planning_units",
+                    "filters": _build_portfolio_filters(args).to_payload(),
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_dataset_planning_units(rows))
+    return 0
+
+
+def _handle_dataset_plan_create(args: argparse.Namespace) -> int:
+    result = create_saved_portfolio_plan(
+        root=_normalized_root(args.root),
+        filters=_build_portfolio_filters(args),
+        max_units=args.max_units,
+        max_actions=args.max_actions,
+        include_keep=args.include_keep,
+    )
+    if args.as_json:
+        print(_render_json_payload(result.to_payload()))
+        return 0
+    print(_render_portfolio_plan_save(result))
+    return 0
+
+
+def _handle_dataset_plans(args: argparse.Namespace) -> int:
+    rows = list_saved_portfolio_plans(
+        root=_normalized_root(args.root),
+        filters=_build_portfolio_filters(args),
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "dataset_portfolio_plans",
+                    "filters": _build_portfolio_filters(args).to_payload(),
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_saved_portfolio_plans(rows))
+    return 0
+
+
+def _handle_dataset_plan_show(args: argparse.Namespace) -> int:
+    plan = get_saved_portfolio_plan(args.plan_id, root=_normalized_root(args.root))
+    if plan is None:
+        raise ValueError(f"portfolio plan not found: {args.plan_id}")
+    if args.as_json:
+        print(_render_json_payload(plan.to_payload()))
+        return 0
+    print(_render_saved_portfolio_plan(plan))
+    return 0
+
+
+def _handle_dataset_plan_promote(args: argparse.Namespace) -> int:
+    result = apply_saved_portfolio_plan_action(
+        args.plan_id,
+        args.dataset_id,
+        root=_normalized_root(args.root),
+    )
+    if args.as_json:
+        print(_render_json_payload(result.to_payload()))
+        return 0
+    print(_render_portfolio_plan_apply(result))
     return 0
 
 
@@ -2142,6 +2390,219 @@ def _render_dataset_lifecycle_apply(result: LifecycleApplyResult) -> str:
         lines.append(f"Target family: {record.target_family_id}")
     if record.latest_dataset_id is not None:
         lines.append(f"Latest dataset: {record.latest_dataset_id}")
+    return "\n".join(lines)
+
+
+def _render_dataset_portfolio(rows: tuple[DatasetPortfolioItem, ...]) -> str:
+    if not rows:
+        return "Failure Lab Dataset Portfolio\nNo portfolio items matched the current filters."
+    return "\n".join(
+        [
+            "Failure Lab Dataset Portfolio",
+            _render_table(
+                [
+                    (
+                        "rank",
+                        "band",
+                        "family_id",
+                        "actionability",
+                        "lifecycle",
+                        "health",
+                        "escalation",
+                        "comparisons",
+                        "clusters",
+                    ),
+                    *[
+                        (
+                            str(row.priority_rank),
+                            row.priority_band,
+                            row.family_id,
+                            row.actionability,
+                            f"{row.lifecycle_action}:{row.health_condition}",
+                            row.health_label,
+                            (
+                                f"{row.escalation_status}:{_format_rate(row.escalation_score)}"
+                                if row.escalation_status is not None
+                                else "n/a"
+                            ),
+                            str(len(row.comparison_refs)),
+                            str(len(row.cluster_ids)),
+                        )
+                        for row in rows
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
+def _render_dataset_portfolio_item(row: DatasetPortfolioItem) -> str:
+    lines = [
+        "Failure Lab Dataset Portfolio Item",
+        f"Family: {row.family_id}",
+        f"Priority: rank={row.priority_rank} band={row.priority_band} score={row.priority_score:.3f}",
+        f"Lifecycle: {row.lifecycle_action} ({row.health_condition})",
+        f"Health: {row.health_label} trend={row.trend_label} versions={row.version_count}",
+        f"Rationale: {row.rationale}",
+    ]
+    if row.escalation_status is not None:
+        lines.append(
+            f"Escalation: {row.escalation_status} score={_format_rate(row.escalation_score)}"
+        )
+    if row.datasets:
+        lines.append(f"Datasets: {', '.join(row.datasets)}")
+    if row.models:
+        lines.append(f"Models: {', '.join(row.models)}")
+    if row.related_family_ids:
+        lines.append(f"Related families: {', '.join(row.related_family_ids)}")
+    if row.active_lifecycle_action is not None:
+        lines.append(
+            "Active lifecycle action: "
+            f"{row.active_lifecycle_action}:{row.active_lifecycle_condition or 'n/a'}"
+        )
+    if row.comparison_refs:
+        lines.append(
+            _render_table(
+                [
+                    ("comparison", "created_at", "dataset", "baseline", "candidate", "severity"),
+                    *[
+                        (
+                            reference.comparison_id,
+                            reference.created_at,
+                            reference.dataset or "n/a",
+                            reference.baseline_model or "n/a",
+                            reference.candidate_model or "n/a",
+                            _format_rate(reference.severity),
+                        )
+                        for reference in row.comparison_refs
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _render_dataset_planning_units(rows: tuple[DatasetPlanningUnit, ...]) -> str:
+    if not rows:
+        return "Failure Lab Dataset Planning Units\nNo planning units matched the current filters."
+    lines = [
+        "Failure Lab Dataset Planning Units",
+        _render_table(
+            [
+                ("unit_id", "kind", "band", "score", "families", "comparisons", "clusters"),
+                *[
+                    (
+                        row.unit_id,
+                        row.unit_kind,
+                        row.priority_band,
+                        _format_rate(row.priority_score),
+                        ",".join(row.family_ids),
+                        str(len(row.comparison_ids)),
+                        str(len(row.cluster_ids)),
+                    )
+                    for row in rows
+                ],
+            ]
+        ),
+    ]
+    if len(rows) == 1:
+        lines.append(f"Rationale: {rows[0].rationale}")
+    return "\n".join(lines)
+
+
+def _render_portfolio_plan_save(result: PortfolioPlanSaveResult) -> str:
+    plan = result.plan
+    return "\n".join(
+        [
+            "Failure Lab Portfolio Plan",
+            f"Plan: {plan.plan_id}",
+            f"Status: {result.status}",
+            f"Families: {len(plan.family_ids)}",
+            f"Actions: {plan.impact.action_count}",
+            f"Priority bands: {', '.join(plan.priority_bands) or 'n/a'}",
+            f"Output: {result.output_path}",
+        ]
+    )
+
+
+def _render_saved_portfolio_plans(rows: tuple[SavedPortfolioPlan, ...]) -> str:
+    if not rows:
+        return "Failure Lab Portfolio Plans\nNo saved portfolio plans matched the current filters."
+    return "\n".join(
+        [
+            "Failure Lab Portfolio Plans",
+            _render_table(
+                [
+                    ("plan_id", "created_at", "bands", "actions", "families", "datasets"),
+                    *[
+                        (
+                            row.plan_id,
+                            row.created_at,
+                            ",".join(row.priority_bands) or "n/a",
+                            str(row.impact.action_count),
+                            str(len(row.family_ids)),
+                            ",".join(row.datasets) or "n/a",
+                        )
+                        for row in rows
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
+def _render_saved_portfolio_plan(plan: SavedPortfolioPlan) -> str:
+    lines = [
+        "Failure Lab Portfolio Plan",
+        f"Plan: {plan.plan_id}",
+        f"Created at: {plan.created_at}",
+        f"Status: {plan.status}",
+        f"Rationale: {plan.rationale}",
+        f"Families: {', '.join(plan.family_ids)}",
+        f"Impact: actions={plan.impact.action_count} projected_cases={plan.impact.projected_case_count}",
+        _render_table(
+            [
+                ("unit_id", "kind", "families", "band"),
+                *[
+                    (
+                        unit.unit_id,
+                        unit.unit_kind,
+                        ",".join(unit.family_ids),
+                        unit.priority_band,
+                    )
+                    for unit in plan.units
+                ],
+            ]
+        ),
+        _render_table(
+            [
+                ("family_id", "action", "band", "dependencies", "datasets", "models"),
+                *[
+                    (
+                        action.family_id,
+                        action.action,
+                        action.priority_band,
+                        ",".join(action.dependency_family_ids) or "n/a",
+                        ",".join(action.datasets) or "n/a",
+                        ",".join(action.models) or "n/a",
+                    )
+                    for action in plan.actions
+                ],
+            ]
+        ),
+    ]
+    return "\n".join(lines)
+
+
+def _render_portfolio_plan_apply(result: PortfolioPlanApplyResult) -> str:
+    lines = [
+        "Failure Lab Portfolio Plan Promote",
+        f"Plan: {result.plan_id}",
+        f"Family: {result.family_id}",
+        f"Action: {result.action}",
+        f"Status: {result.status}",
+    ]
+    lines.append(_render_dataset_lifecycle_apply(result.result))
     return "\n".join(lines)
 
 
