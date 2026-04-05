@@ -3,14 +3,14 @@
 ## What This Is
 
 Model Failure Lab is a local, artifact-native system for evaluating, debugging, comparing,
-querying, interpreting, harvesting, replaying, enforcing, tracking, and now clustering recurring
-LLM failure behavior. It is built around reproducible filesystem artifacts, a CLI-first workflow,
-and a React debugger that reads the same saved artifact contract.
+querying, interpreting, harvesting, replaying, enforcing, tracking, clustering, escalating, and
+lifecycle-managing recurring LLM failure behavior. It is built around reproducible filesystem
+artifacts, a CLI-first workflow, and a React debugger that reads the same saved artifact contract.
 
 ## Current State
 
-- Latest shipped milestone: `v4.8`
-- Active milestone: `v4.9`
+- Latest shipped milestone: `v4.9`
+- Active milestone: none
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -36,38 +36,36 @@ and a React debugger that reads the same saved artifact contract.
     history-aware governance context, and lightweight debugger timeline surfacing
   - `v4.8` added deterministic recurring cluster identity, cluster summaries/history, debugger
     cluster context, and governance rationale enriched with recurring-pattern evidence
+  - `v4.9` added deterministic escalation statuses, explicit dataset-family lifecycle review/apply,
+    debugger lifecycle surfacing, and end-to-end workflow proof
 
-## Latest Completed Milestone: v4.8 Recurring Failure Clusters And Pattern Mining
-
-**Goal:** Add deterministic recurring-failure clusters so the system can recognize when the same
-underlying issue is coming back across runs, comparisons, and governance decisions.
-
-**Delivered:**
-- Stable deterministic cluster ids over recurring failures and comparison deltas.
-- Cluster summaries with recurrence count, recent severity, affected datasets/models, and
-  representative evidence.
-- CLI surfaces for listing clusters, inspecting detail, and reading cluster history.
-- Lightweight debugger cluster context on `/analysis` and comparison enforcement surfaces.
-- Governance rationale that can reference recurring clusters explicitly and deterministically.
-
-## Current Milestone: v4.9 Proactive Escalation And Dataset Lifecycle Management
+## Latest Completed Milestone: v4.9 Proactive Escalation And Dataset Lifecycle Management
 
 **Goal:** Turn recurring clusters and temporal governance context into explicit lifecycle actions
 over dataset families, so the system can escalate, prune, merge, retire, or keep packs with a
 deterministic local policy.
 
-**Target features:**
-- Deterministic escalation rules over recurring clusters, history, and dataset-family health.
-- CLI alerting and review/apply flows for lifecycle actions such as `keep`, `prune`,
+**Delivered:**
+- Stable deterministic escalation statuses and provenance-rich lifecycle recommendations over
+  recurring clusters, family history, and dataset-health evidence.
+- CLI lifecycle review/apply flows with explicit persisted action records for `keep`, `prune`,
   `merge_candidate`, and `retire`.
-- Lightweight debugger surfacing for escalation status, family-health rationale, and action
-  drillthrough.
-- Full artifact-native audit trail for why a lifecycle action was recommended or applied.
+- Lightweight debugger escalation and lifecycle surfacing on `/analysis` and comparison detail,
+  backed by the same stored governance payloads.
+- Verified workflow stability across backend policy, CLI apply, frontend rendering, and real
+  artifact smoke.
+
+## Next Milestone Direction
+
+The next layer should only broaden beyond explicit local lifecycle management if it improves the
+operator workflow without breaking the artifact-native, review-first contract. Good candidates are
+portfolio-level prioritization, richer cross-family planning, or carefully bounded local
+automation.
 
 ## Core Value
 
 Make structured LLM failure analysis simple, reproducible, queryable, interpretable, reusable,
-and actionable from local artifacts.
+actionable, time-aware, pattern-aware, and lifecycle-manageable from local artifacts.
 
 ## Requirements
 
@@ -89,17 +87,21 @@ and actionable from local artifacts.
   stability proof — `v4.4`
 - ✓ Signal-driven regression-pack generation, immutable dataset evolution, debugger enforcement
   surfaces, and enforced replay-loop proof — `v4.5`
+- ✓ Deterministic governance recommendations, review/apply workflows, and debugger recommendation
+  surfacing — `v4.6`
+- ✓ Artifact-derived history, recurring cluster identity, proactive escalation, and explicit
+  dataset-family lifecycle management — `v4.7` to `v4.9`
 
 ### Active
 
-- The next milestone should turn recurring cluster identity into deterministic lifecycle management
-  rather than reopen point-in-time comparison workflows.
+- The next milestone should build on explicit lifecycle management only if it materially improves
+  the local operator workflow rather than reopening one-off comparison workflows.
 - Future behavior-management work should stay artifact-native unless a clear structural limit
   forces broader infrastructure.
 - The debugger should keep escalation and lifecycle context compact and route-local rather than
   turning into a full observability dashboard.
-- Lifecycle actions must remain explicit and reviewable; no silent mutation of published dataset
-  families.
+- Any future automation must preserve explicit reviewability; no silent mutation of published
+  dataset families.
 
 ### Out of Scope
 
@@ -120,9 +122,11 @@ and actionable from local artifacts.
 - `v4.6` proved governance decisions can now be deterministic, explainable, reviewable, and stable
   over local artifacts.
 - The core system now covers execution, comparison, insight, harvesting, enforcement, governance,
-  history, and recurring cluster identity over local artifacts.
-- The next missing layer is proactive escalation and lifecycle management over those recurring
-  patterns, not more point-in-time retrieval.
+  history, recurring clusters, proactive escalation, and explicit dataset-family lifecycle
+  management over local artifacts.
+- The next missing layer is not more local policy detail; it is deciding whether higher-level
+  portfolio management or bounded automation is worth adding without weakening the review-first
+  contract.
 
 ## Constraints
 
@@ -135,8 +139,8 @@ and actionable from local artifacts.
   unchanged.
 - **Complexity:** Keep the next milestone local and artifact-native unless a real structural limit
   forces broader infrastructure.
-- **Explainability:** Governance decisions and cluster identities must be deterministic and
-  inspectable, not opaque.
+- **Explainability:** Governance decisions, escalation statuses, and cluster identities must be
+  deterministic and inspectable, not opaque.
 
 ## Key Decisions
 
@@ -153,7 +157,7 @@ and actionable from local artifacts.
 | Make governance decisions explicit, deterministic, and reviewable before writing dataset changes | Recommendation quality matters only if users can trust and inspect the policy basis | ✓ Validated in `v4.6` |
 | Add temporal intelligence as a deterministic artifact-derived layer before introducing proactive automation | Governance is still correct locally but blind globally without longitudinal context | ✓ Validated in `v4.7` |
 | Add recurring cluster identity before proactive alerts or pruning | The system needs to know whether the same problem is returning before escalating or consolidating | ✓ Validated in `v4.8` |
-| Keep proactive escalation and dataset lifecycle actions local, deterministic, and explicitly reviewable | Maintenance decisions matter only if users can audit why a family should be kept, pruned, merged, or retired | In progress in `v4.9` |
+| Keep proactive escalation and dataset lifecycle actions local, deterministic, and explicitly reviewable | Maintenance decisions matter only if users can audit why a family should be kept, pruned, merged, or retired | ✓ Validated in `v4.9` |
 
 ---
-*Last updated: 2026-04-05 for v4.9 initialization*
+*Last updated: 2026-04-05 after v4.9 archive*

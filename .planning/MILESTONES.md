@@ -1,5 +1,21 @@
 # Milestones
 
+## v4.9 Proactive Escalation And Dataset Lifecycle Management (Shipped: 2026-04-05)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Added deterministic escalation statuses and dataset-family lifecycle recommendations over
+  recurring clusters, history, and family-health evidence.
+- Added explicit CLI lifecycle review/apply flows with persisted lifecycle action records and
+  active family-state inspection.
+- Surfaced escalation and lifecycle context on existing debugger analysis and comparison routes,
+  with family lifecycle history available through the artifact bridge.
+- Proved the full `history -> cluster -> escalation -> lifecycle action -> family state` loop with
+  Python tests, frontend regressions, build, and real-artifact smoke.
+
+---
+
 ## v4.8 Recurring Failure Clusters And Pattern Mining (Shipped: 2026-04-04)
 
 **Phases completed:** 4 phases, 4 plans

@@ -1,24 +1,24 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.9
-milestone_name: Proactive Escalation And Dataset Lifecycle Management
-current_phase: 108
-current_phase_name: Lifecycle Stability And Workflow Verification
-current_plan: 01
-status: ready_to_audit
-stopped_at: All v4.9 phases summarized and verified; milestone audit is next
-resume_file: /Users/padraigobrien/model-failure-lab/.planning/phases/108-lifecycle-stability-and-workflow-verification/108-VERIFICATION.md
-last_updated: "2026-04-05T12:49:00Z"
+milestone: null
+milestone_name: null
+current_phase: null
+current_phase_name: null
+current_plan: null
+status: ready_for_new_milestone
+stopped_at: Milestone v4.9 archived
+resume_file: /Users/padraigobrien/model-failure-lab/.planning/v4.9-MILESTONE-AUDIT.md
+last_updated: "2026-04-05T12:53:20Z"
 last_activity: 2026-04-05
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 100
 ---
 
-# State: v4.9 Ready To Audit
+# State: Ready For New Milestone
 
 ## Project Reference
 
@@ -27,30 +27,29 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** Audit and close `v4.9` after completing the escalation, lifecycle, CLI, and
-debugger workflow.
+**Current focus:** Start the next milestone from a clean post-archive planning state.
 
 ## Current Focus
 
-- next_action: audit milestone
-- status: all phase plans complete and verified
+- next_action: initialize the next milestone
+- status: `v4.9` archived and verified
 
 ## Current Position
 
-Milestone: `v4.9`
-Phase: `108` — Lifecycle Stability And Workflow Verification
+Milestone: none
+Phase: none
 
 ## Workflow State
 
-**Current Phase:** 108
-**Current Phase Name:** Lifecycle Stability And Workflow Verification
-**Total Phases:** 4
-**Current Plan:** 01
-**Total Plans in Phase:** 1
-**Status:** Ready to audit
+**Current Phase:** none
+**Current Phase Name:** none
+**Total Phases:** 0
+**Current Plan:** none
+**Total Plans in Phase:** 0
+**Status:** Ready for new milestone
 **Progress:** [██████████] 100%
 **Last Activity:** 2026-04-05
-**Last Activity Description:** Completed and verified phases `105-108`
+**Last Activity Description:** Archived milestone `v4.9`
 
 ## Recent Decisions
 
@@ -69,23 +68,23 @@ Phase: `108` — Lifecycle Stability And Workflow Verification
   cluster identity over local artifacts.
 - `v4.8` proved the system can tell when the same underlying issue is coming back across runs,
   comparisons, and governance decisions.
-- `v4.9` now adds proactive escalation, persisted lifecycle actions, CLI review/apply flows, and
+- `v4.9` shipped proactive escalation, persisted lifecycle actions, CLI review/apply flows, and
   debugger lifecycle surfacing on top of the existing history, signal, governance, and
   recurring-cluster layers.
-- The remaining milestone work is lifecycle closeout: audit the completed requirements, archive the
-  milestone, and clean planning residue if desired.
+- The next milestone can build on explicit local lifecycle management once there is a clearer need
+  for broader portfolio views or bounded automation.
 
 ## Session
 
-**Last Date:** 2026-04-05T12:49:00Z
-**Stopped At:** All v4.9 phases summarized and verified; milestone audit is next
-**Resume File:** [108-VERIFICATION.md](/Users/padraigobrien/model-failure-lab/.planning/phases/108-lifecycle-stability-and-workflow-verification/108-VERIFICATION.md)
+**Last Date:** 2026-04-05T12:53:20Z
+**Stopped At:** Milestone v4.9 archived
+**Resume File:** [v4.9-MILESTONE-AUDIT.md](/Users/padraigobrien/model-failure-lab/.planning/v4.9-MILESTONE-AUDIT.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-audit-milestone
+$gsd-new-milestone
 ```
 
 ---
-*State updated: 2026-04-05 for Phase 108 completion*
+*State updated: 2026-04-05 after v4.9 archive*
