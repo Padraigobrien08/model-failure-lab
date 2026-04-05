@@ -40,11 +40,59 @@
   deterministic escalation statuses, lifecycle review/apply CLI, debugger lifecycle surfacing,
   and full `history -> cluster -> escalation -> lifecycle action -> family state` proof.
 
+## Active Milestone: v5.0 Portfolio Prioritization And Guided Lifecycle Planning
+
+**Goal:** Turn per-family lifecycle signals into a deterministic operator queue and saved
+lifecycle plans, so users can prioritize and execute family-management work across the portfolio
+without background automation.
+
+### Phase 109: Portfolio Priority Contract And Planning Units
+- Status: pending
+- Requirements: `PORT-01`, `PORT-02`, `PLAN-01`
+- Goal: define deterministic portfolio ranking and grouping rules over escalation, recurrence,
+  lifecycle health, and related family context.
+- Success criteria:
+  - Dataset families can be ranked in a stable priority order with explicit artifact-derived
+    rationale.
+  - Related families or merge candidates can be grouped into inspectable planning units without
+    opaque clustering or manual spreadsheets.
+
+### Phase 110: CLI Queue And Plan Draft Surfaces
+- Status: pending
+- Requirements: `PLAN-02`, `PLAN-03`, `CLI-01`, `CLI-02`, `CLI-03`
+- Goal: expose the portfolio queue, saved plan drafts, and explicit plan-to-apply handoff through
+  the CLI.
+- Success criteria:
+  - Users can list and inspect priority items and saved plans directly from the CLI.
+  - Users can generate a dry-run plan and promote one planned action into the existing explicit
+    review/apply workflow without background execution.
+
+### Phase 111: Debugger Priority And Plan Context Surfacing
+- Status: pending
+- Requirements: `UI-01`, `UI-02`
+- Goal: surface priority and plan context on existing debugger routes with drillthrough into the
+  relevant families, clusters, and evidence.
+- Success criteria:
+  - Existing family and comparison routes show why an item is high priority or included in a plan
+    without becoming dashboard-like.
+  - Users can move from surfaced priority or plan context directly into the underlying family,
+    cluster, comparison, and lifecycle evidence.
+
+### Phase 112: Portfolio Workflow Verification And Stability
+- Status: pending
+- Requirements: `FLOW-01`
+- Goal: verify the full local workflow from portfolio queue to saved plan to explicit apply and
+  updated family state.
+- Success criteria:
+  - Verification proves the full `queue -> plan -> review/apply -> family state` loop is stable
+    and reproducible.
+  - Saved plan artifacts remain deterministic, inspectable, and consistent across rebuilds.
+
 ## Next Action
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 109
 ```
 
 ---
-*Roadmap updated: 2026-04-05 after v4.9 archive*
+*Roadmap updated: 2026-04-05 for v5.0 initialization*

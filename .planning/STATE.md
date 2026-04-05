@@ -1,24 +1,24 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
-current_phase: null
-current_phase_name: null
+milestone: v5.0
+milestone_name: Portfolio Prioritization And Guided Lifecycle Planning
+current_phase: 109
+current_phase_name: Portfolio Priority Contract And Planning Units
 current_plan: null
-status: ready_for_new_milestone
-stopped_at: Milestone v4.9 archived
-resume_file: /Users/padraigobrien/model-failure-lab/.planning/v4.9-MILESTONE-AUDIT.md
-last_updated: "2026-04-05T12:53:20Z"
+status: ready_to_discuss
+stopped_at: Milestone v5.0 initialized
+resume_file: /Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md
+last_updated: "2026-04-05T13:18:29Z"
 last_activity: 2026-04-05
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 100
+  percent: 0
 ---
 
-# State: Ready For New Milestone
+# State: v5.0 Ready To Discuss
 
 ## Project Reference
 
@@ -27,38 +27,37 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** Start the next milestone from a clean post-archive planning state.
+**Current focus:** Define the deterministic portfolio queue and planning-unit contract for `v5.0`.
 
 ## Current Focus
 
-- next_action: initialize the next milestone
-- status: `v4.9` archived and verified
+- next_action: discuss Phase 109
+- status: `v5.0` initialized
 
 ## Current Position
 
-Milestone: none
-Phase: none
+Milestone: `v5.0`
+Phase: `109` — Portfolio Priority Contract And Planning Units
 
 ## Workflow State
 
-**Current Phase:** none
-**Current Phase Name:** none
-**Total Phases:** 0
+**Current Phase:** 109
+**Current Phase Name:** Portfolio Priority Contract And Planning Units
+**Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 0
-**Status:** Ready for new milestone
-**Progress:** [██████████] 100%
+**Status:** Ready to discuss
+**Progress:** [░░░░░░░░░░] 0%
 **Last Activity:** 2026-04-05
-**Last Activity Description:** Archived milestone `v4.9`
+**Last Activity Description:** Initialized milestone `v5.0`
 
 ## Recent Decisions
 
-- Keep proactive escalation and lifecycle actions deterministic, local, and artifact-derived rather
-  than learned or hosted.
-- Keep CLI lifecycle apply explicit and idempotent; published dataset families must not mutate
-  silently.
-- Keep debugger escalation surfacing on existing routes instead of creating a dedicated lifecycle
-  dashboard.
+- Build portfolio prioritization on top of the shipped lifecycle signals rather than reopening
+  one-off family actions.
+- Keep planning outputs explicit, saved, bounded, and review-first; no background execution.
+- Keep priority and plan surfacing on existing CLI and debugger routes instead of creating a
+  separate control-center dashboard.
 
 ## Accumulated Context
 
@@ -71,20 +70,23 @@ Phase: none
 - `v4.9` shipped proactive escalation, persisted lifecycle actions, CLI review/apply flows, and
   debugger lifecycle surfacing on top of the existing history, signal, governance, and
   recurring-cluster layers.
-- The next milestone can build on explicit local lifecycle management once there is a clearer need
-  for broader portfolio views or bounded automation.
+- The next bottleneck is operator prioritization across many families:
+  which families deserve attention first, which related items should be handled together, and how
+  to save that work as an explicit plan.
+- `v5.0` will add deterministic portfolio prioritization and guided lifecycle planning while
+  preserving the local, artifact-native, review-first contract.
 
 ## Session
 
-**Last Date:** 2026-04-05T12:53:20Z
-**Stopped At:** Milestone v4.9 archived
-**Resume File:** [v4.9-MILESTONE-AUDIT.md](/Users/padraigobrien/model-failure-lab/.planning/v4.9-MILESTONE-AUDIT.md)
+**Last Date:** 2026-04-05T13:18:29Z
+**Stopped At:** Milestone v5.0 initialized
+**Resume File:** [ROADMAP.md](/Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 109
 ```
 
 ---
-*State updated: 2026-04-05 after v4.9 archive*
+*State updated: 2026-04-05 for v5.0 initialization*

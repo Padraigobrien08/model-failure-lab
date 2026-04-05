@@ -10,7 +10,7 @@ artifacts, a CLI-first workflow, and a React debugger that reads the same saved 
 ## Current State
 
 - Latest shipped milestone: `v4.9`
-- Active milestone: none
+- Active milestone: `v5.0`
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -55,12 +55,17 @@ deterministic local policy.
 - Verified workflow stability across backend policy, CLI apply, frontend rendering, and real
   artifact smoke.
 
-## Next Milestone Direction
+## Current Milestone: v5.0 Portfolio Prioritization And Guided Lifecycle Planning
 
-The next layer should only broaden beyond explicit local lifecycle management if it improves the
-operator workflow without breaking the artifact-native, review-first contract. Good candidates are
-portfolio-level prioritization, richer cross-family planning, or carefully bounded local
-automation.
+**Goal:** Turn the per-family lifecycle signals from `v4.9` into a deterministic operator queue
+and saved plan artifacts, so users can prioritize and execute lifecycle work across many families
+without background automation.
+
+**Target features:**
+- Deterministic portfolio ranking across dataset families from escalation, recurrence, and health.
+- Explicit planning-unit grouping for related families and merge candidates.
+- Saved dry-run lifecycle plans with projected impact and stepwise explicit apply handoff.
+- Lightweight debugger priority and plan context on existing routes.
 
 ## Core Value
 
@@ -94,12 +99,14 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 
 ### Active
 
-- The next milestone should build on explicit lifecycle management only if it materially improves
-  the local operator workflow rather than reopening one-off comparison workflows.
+- Operators need a deterministic portfolio queue over many dataset families rather than only
+  per-family lifecycle surfaces.
+- Cross-family planning should stay explicit, saved, bounded, and artifact-native rather than
+  becoming background automation.
 - Future behavior-management work should stay artifact-native unless a clear structural limit
   forces broader infrastructure.
-- The debugger should keep escalation and lifecycle context compact and route-local rather than
-  turning into a full observability dashboard.
+- The debugger should keep priority and plan context compact and route-local rather than turning
+  into a full observability dashboard.
 - Any future automation must preserve explicit reviewability; no silent mutation of published
   dataset families.
 
@@ -124,9 +131,11 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 - The core system now covers execution, comparison, insight, harvesting, enforcement, governance,
   history, recurring clusters, proactive escalation, and explicit dataset-family lifecycle
   management over local artifacts.
-- The next missing layer is not more local policy detail; it is deciding whether higher-level
-  portfolio management or bounded automation is worth adding without weakening the review-first
-  contract.
+- The next missing layer is not more family-level policy detail; it is helping operators decide
+  which families deserve attention first and how related actions should be grouped into explicit
+  plans.
+- `v5.0` should solve that prioritization and planning problem before any future bounded
+  automation work is considered.
 
 ## Constraints
 
@@ -159,5 +168,4 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 | Add recurring cluster identity before proactive alerts or pruning | The system needs to know whether the same problem is returning before escalating or consolidating | ✓ Validated in `v4.8` |
 | Keep proactive escalation and dataset lifecycle actions local, deterministic, and explicitly reviewable | Maintenance decisions matter only if users can audit why a family should be kept, pruned, merged, or retired | ✓ Validated in `v4.9` |
 
----
-*Last updated: 2026-04-05 after v4.9 archive*
+*Last updated: 2026-04-05 for v5.0 initialization*
