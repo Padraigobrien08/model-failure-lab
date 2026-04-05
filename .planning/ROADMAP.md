@@ -37,11 +37,60 @@
   recurring cluster identity, cluster CLI/detail/history surfaces, lightweight debugger cluster
   context, and governance rationale enriched with recurring cluster evidence.
 
+## Active Milestone: v4.9 Proactive Escalation And Dataset Lifecycle Management
+
+**Goal:** Turn recurring clusters and temporal governance context into explicit lifecycle actions
+over dataset families, so the system can escalate, prune, merge, retire, or keep packs with a
+deterministic local policy.
+
+### Phase 105: Escalation Contract And Lifecycle Policy
+- Status: pending
+- Requirements: `ESC-01`, `ESC-02`, `HEALTH-01`, `HEALTH-02`
+- Goal: define deterministic escalation statuses and dataset-family health semantics over
+  recurring clusters, temporal history, and lifecycle provenance.
+- Success criteria:
+  - Repeated problematic behavior can be classified into a stable escalation status without
+    hosted services or opaque ranking.
+  - Dataset families expose deterministic health states such as stale, overgrown,
+    merge-candidate, or keepable with explicit artifact-backed rationale.
+
+### Phase 106: CLI Alerting And Family Health Actions
+- Status: pending
+- Requirements: `CLI-01`, `CLI-02`, `CLI-03`
+- Goal: expose escalation listings, inspectable family-health rationale, and explicit
+  review/apply lifecycle actions in the CLI.
+- Success criteria:
+  - Users can list and filter recent escalations or lifecycle alerts without opening individual
+    comparisons or families manually.
+  - Users can inspect one alert or recommendation and explicitly review/apply a lifecycle action
+    from the CLI.
+
+### Phase 107: Debugger Escalation Surfacing
+- Status: pending
+- Requirements: `UI-01`, `UI-02`
+- Goal: surface escalation status and lifecycle recommendations on existing debugger routes with
+  direct drillthrough into affected clusters, families, and evidence.
+- Success criteria:
+  - Analysis and comparison routes show escalation and family-health context without becoming a
+    dashboard-style control center.
+  - Users can move from a surfaced escalation item directly into the relevant cluster, family
+    history, or evidence route.
+
+### Phase 108: Lifecycle Stability And Workflow Verification
+- Status: pending
+- Requirements: `FLOW-01`
+- Goal: verify the full local workflow from recurring pattern detection to escalation to dataset
+  lifecycle review/apply and resulting family state.
+- Success criteria:
+  - Verification proves the full `history -> cluster -> escalation -> lifecycle action -> family
+    state` loop is stable and reproducible.
+  - Stored escalation and lifecycle outputs remain artifact-derived and consistent across rebuilds.
+
 ## Next Action
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 105
 ```
 
 ---
-*Roadmap updated: 2026-04-04 after v4.8 archive*
+*Roadmap updated: 2026-04-05 for v4.9 initialization*

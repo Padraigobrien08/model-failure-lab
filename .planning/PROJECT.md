@@ -10,7 +10,7 @@ and a React debugger that reads the same saved artifact contract.
 ## Current State
 
 - Latest shipped milestone: `v4.8`
-- Active milestone: none
+- Active milestone: `v4.9`
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -34,6 +34,8 @@ and a React debugger that reads the same saved artifact contract.
     recommendation surfacing, and proven governance-loop stability
   - `v4.7` added artifact-derived history, deterministic trend and dataset-health signals,
     history-aware governance context, and lightweight debugger timeline surfacing
+  - `v4.8` added deterministic recurring cluster identity, cluster summaries/history, debugger
+    cluster context, and governance rationale enriched with recurring-pattern evidence
 
 ## Latest Completed Milestone: v4.8 Recurring Failure Clusters And Pattern Mining
 
@@ -48,11 +50,19 @@ underlying issue is coming back across runs, comparisons, and governance decisio
 - Lightweight debugger cluster context on `/analysis` and comparison enforcement surfaces.
 - Governance rationale that can reference recurring clusters explicitly and deterministically.
 
-## Next Milestone Direction
+## Current Milestone: v4.9 Proactive Escalation And Dataset Lifecycle Management
 
-The next layer should build on the shipped time-aware and cluster-aware system with higher-level
-behavior management such as proactive recommendations, alerting, or dataset-family pruning only
-once deterministic cluster identity is proven useful.
+**Goal:** Turn recurring clusters and temporal governance context into explicit lifecycle actions
+over dataset families, so the system can escalate, prune, merge, retire, or keep packs with a
+deterministic local policy.
+
+**Target features:**
+- Deterministic escalation rules over recurring clusters, history, and dataset-family health.
+- CLI alerting and review/apply flows for lifecycle actions such as `keep`, `prune`,
+  `merge_candidate`, and `retire`.
+- Lightweight debugger surfacing for escalation status, family-health rationale, and action
+  drillthrough.
+- Full artifact-native audit trail for why a lifecycle action was recommended or applied.
 
 ## Core Value
 
@@ -82,12 +92,14 @@ and actionable from local artifacts.
 
 ### Active
 
-- The next milestone should build on recurring cluster identity rather than reopening one-off
-  comparison workflows.
+- The next milestone should turn recurring cluster identity into deterministic lifecycle management
+  rather than reopen point-in-time comparison workflows.
 - Future behavior-management work should stay artifact-native unless a clear structural limit
   forces broader infrastructure.
-- The debugger should keep higher-level pattern and recommendation context compact and route-local
-  rather than turning into a full observability dashboard.
+- The debugger should keep escalation and lifecycle context compact and route-local rather than
+  turning into a full observability dashboard.
+- Lifecycle actions must remain explicit and reviewable; no silent mutation of published dataset
+  families.
 
 ### Out of Scope
 
@@ -109,8 +121,8 @@ and actionable from local artifacts.
   over local artifacts.
 - The core system now covers execution, comparison, insight, harvesting, enforcement, governance,
   history, and recurring cluster identity over local artifacts.
-- The next missing layer is likely proactive or longitudinal action over those recurring patterns,
-  not more point-in-time retrieval.
+- The next missing layer is proactive escalation and lifecycle management over those recurring
+  patterns, not more point-in-time retrieval.
 
 ## Constraints
 
@@ -141,6 +153,7 @@ and actionable from local artifacts.
 | Make governance decisions explicit, deterministic, and reviewable before writing dataset changes | Recommendation quality matters only if users can trust and inspect the policy basis | ✓ Validated in `v4.6` |
 | Add temporal intelligence as a deterministic artifact-derived layer before introducing proactive automation | Governance is still correct locally but blind globally without longitudinal context | ✓ Validated in `v4.7` |
 | Add recurring cluster identity before proactive alerts or pruning | The system needs to know whether the same problem is returning before escalating or consolidating | ✓ Validated in `v4.8` |
+| Keep proactive escalation and dataset lifecycle actions local, deterministic, and explicitly reviewable | Maintenance decisions matter only if users can audit why a family should be kept, pruned, merged, or retired | In progress in `v4.9` |
 
 ---
-*Last updated: 2026-04-04 after v4.8 completion*
+*Last updated: 2026-04-05 for v4.9 initialization*
