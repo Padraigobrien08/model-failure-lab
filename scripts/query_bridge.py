@@ -35,7 +35,10 @@ from model_failure_lab.datasets import (  # noqa: E402
     generate_regression_pack,
     list_dataset_versions,
 )
-from model_failure_lab.governance import recommend_dataset_action  # noqa: E402
+from model_failure_lab.governance import (  # noqa: E402
+    list_dataset_lifecycle_actions,
+    recommend_dataset_action,
+)
 from model_failure_lab.history import query_history_snapshot  # noqa: E402
 
 
@@ -223,6 +226,10 @@ def main(argv: list[str] | None = None) -> int:
             "family_id": args.dataset_family,
             "versions": [version.to_payload() for version in versions],
             "history": history.to_payload(),
+            "lifecycle_actions": [
+                row.to_payload()
+                for row in list_dataset_lifecycle_actions(args.dataset_family, root=root)
+            ],
         }
     elif args.command == "history":
         history = query_history_snapshot(

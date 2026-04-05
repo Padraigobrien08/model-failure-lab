@@ -104,6 +104,8 @@ function buildGovernanceRecommendation(
     evidenceCaseIds: [],
     previewCases: [],
     historyContext: null,
+    escalation: null,
+    lifecycleRecommendation: null,
     ...overrides,
   };
 }
@@ -894,6 +896,51 @@ function serializeComparisonDetail(detail: ComparisonDetail): Record<string, unk
                   transition_type: reference.transitionType,
                 })),
               })) ?? [],
+            escalation:
+              detail.governanceRecommendation.escalation === null
+              || detail.governanceRecommendation.escalation === undefined
+                ? null
+                : {
+                    status: detail.governanceRecommendation.escalation.status,
+                    score: detail.governanceRecommendation.escalation.score,
+                    severity_band: detail.governanceRecommendation.escalation.severityBand,
+                    reason: detail.governanceRecommendation.escalation.reason,
+                    recent_regression_count:
+                      detail.governanceRecommendation.escalation.recentRegressionCount,
+                    recurring_cluster_count:
+                      detail.governanceRecommendation.escalation.recurringClusterCount,
+                    family_health_label:
+                      detail.governanceRecommendation.escalation.familyHealthLabel,
+                  },
+            lifecycle_recommendation:
+              detail.governanceRecommendation.lifecycleRecommendation === null
+              || detail.governanceRecommendation.lifecycleRecommendation === undefined
+                ? null
+                : {
+                    family_id: detail.governanceRecommendation.lifecycleRecommendation.familyId,
+                    action: detail.governanceRecommendation.lifecycleRecommendation.action,
+                    health_condition:
+                      detail.governanceRecommendation.lifecycleRecommendation.healthCondition,
+                    rationale: detail.governanceRecommendation.lifecycleRecommendation.rationale,
+                    target_family_id:
+                      detail.governanceRecommendation.lifecycleRecommendation.targetFamilyId,
+                    related_family_ids:
+                      detail.governanceRecommendation.lifecycleRecommendation.relatedFamilyIds,
+                    source_dataset_id:
+                      detail.governanceRecommendation.lifecycleRecommendation.sourceDatasetId,
+                    primary_failure_type:
+                      detail.governanceRecommendation.lifecycleRecommendation.primaryFailureType,
+                    latest_dataset_id:
+                      detail.governanceRecommendation.lifecycleRecommendation.latestDatasetId,
+                    version_count:
+                      detail.governanceRecommendation.lifecycleRecommendation.versionCount,
+                    evaluation_run_count:
+                      detail.governanceRecommendation.lifecycleRecommendation.evaluationRunCount,
+                    recent_fail_rate:
+                      detail.governanceRecommendation.lifecycleRecommendation.recentFailRate,
+                    projected_case_count:
+                      detail.governanceRecommendation.lifecycleRecommendation.projectedCaseCount,
+                  },
           },
   };
 }
@@ -917,6 +964,7 @@ function mockComparisonDetail(detail: ComparisonDetail) {
             source: DEFAULT_SOURCE,
             family_id: "regression-reasoning-failures-v1-reasoning",
             versions: [],
+            lifecycle_actions: [],
           }),
         } as Response;
       }
@@ -1030,6 +1078,7 @@ function mockComparisonDetailWithVersionHistory(detail: ComparisonDetail) {
             source: DEFAULT_SOURCE,
             family_id: "regression-reasoning-failures-v1-reasoning",
             versions,
+            lifecycle_actions: [],
             history: {
               scope_kind: "family",
               scope_value: "regression-reasoning-failures-v1-reasoning",
@@ -1625,6 +1674,58 @@ describe("comparison detail route", () => {
             "/comparisons/compare_alpha_to_beta?section=transitions&case=case-002",
         ),
     ).toBe(true);
+  });
+
+  it("shows escalation and lifecycle recommendation context on the comparison route", async () => {
+    const detail = buildCompatibleDetail();
+    detail.governanceRecommendation = buildGovernanceRecommendation({
+      action: "create",
+      policyRule: "new_family_required",
+      escalation: {
+        status: "critical",
+        score: 0.41,
+        severityBand: "high",
+        reason: "severity=0.270, recent_regressions=2, recurring_clusters=1",
+        recentRegressionCount: 2,
+        recurringClusterCount: 1,
+        familyHealthLabel: "degrading",
+      },
+      lifecycleRecommendation: {
+        familyId: "regression-reasoning-failures-v1-reasoning",
+        action: "prune",
+        healthCondition: "overgrown",
+        rationale: "Projected family growth crosses the deterministic overgrowth threshold.",
+        targetFamilyId: null,
+        relatedFamilyIds: [],
+        sourceDatasetId: "reasoning-failures-v1",
+        primaryFailureType: "reasoning",
+        latestDatasetId: "regression-reasoning-failures-v1-reasoning-v1",
+        versionCount: 4,
+        evaluationRunCount: 3,
+        recentFailRate: 0.25,
+        projectedCaseCount: 32,
+      },
+    });
+    mockComparisonDetailWithVersionHistory(detail);
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons/compare_alpha_to_beta"]}
+        initialArtifactState={buildReadyArtifactState(["compare_alpha_to_beta"])}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    expect(
+      await screen.findByText("Lifecycle recommendation"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("critical").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("prune").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Projected family growth crosses the deterministic overgrowth threshold."),
+    ).toBeInTheDocument();
   });
 
   it("keeps incompatible comparisons openable with explicit coverage semantics", async () => {

@@ -247,6 +247,36 @@ def test_dataset_evolve_help_describes_signal_driven_version_creation() -> None:
     assert "--json" in result.stdout
 
 
+def test_dataset_lifecycle_review_help_describes_family_lifecycle_surface() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "dataset", "lifecycle-review", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--include-keep" in result.stdout
+    assert "--root" in result.stdout
+
+
+def test_dataset_lifecycle_apply_help_describes_explicit_action_surface() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "model_failure_lab", "dataset", "lifecycle-apply", "--help"],
+        cwd=PROJECT_ROOT,
+        env=_module_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--action" in result.stdout
+    assert "--json" in result.stdout
+
+
 def test_regressions_generate_help_describes_signal_pack_generation() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "model_failure_lab", "regressions", "generate", "--help"],

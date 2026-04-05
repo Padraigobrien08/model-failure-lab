@@ -46,6 +46,26 @@ def reports_root(*, root: str | Path | None = None, create: bool = False) -> Pat
     return _ensure_dir(project_root(root) / "reports", create=create)
 
 
+def governance_root(*, root: str | Path | None = None, create: bool = False) -> Path:
+    return _ensure_dir(project_root(root) / "governance", create=create)
+
+
+def lifecycle_actions_root(*, root: str | Path | None = None, create: bool = False) -> Path:
+    return _ensure_dir(governance_root(root=root, create=create) / "lifecycle_actions", create=create)
+
+
+def lifecycle_family_directory(
+    family_id: str,
+    *,
+    root: str | Path | None = None,
+    create: bool = False,
+) -> Path:
+    return _ensure_dir(
+        lifecycle_actions_root(root=root, create=create) / _normalize_segment(family_id),
+        create=create,
+    )
+
+
 def dataset_file(
     dataset_name: str, *, root: str | Path | None = None, create: bool = False
 ) -> Path:

@@ -101,6 +101,22 @@ export function ComparisonDetailHeader({
               {formatLabel(governanceRecommendation.action)}
             </Badge>
           ) : null}
+          {governanceRecommendation?.escalation ? (
+            <Badge
+              tone={
+                governanceRecommendation.escalation.status === "critical"
+                  ? "default"
+                  : "accent"
+              }
+            >
+              {formatLabel(governanceRecommendation.escalation.status)}
+            </Badge>
+          ) : null}
+          {governanceRecommendation?.lifecycleRecommendation ? (
+            <Badge tone="muted">
+              {formatLabel(governanceRecommendation.lifecycleRecommendation.action)}
+            </Badge>
+          ) : null}
         </div>
 
         <div className="space-y-3">
@@ -117,6 +133,11 @@ export function ComparisonDetailHeader({
           {governanceRecommendation ? (
             <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
               Recommendation: {governanceRecommendation.rationale}
+            </p>
+          ) : null}
+          {governanceRecommendation?.lifecycleRecommendation ? (
+            <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
+              Lifecycle: {governanceRecommendation.lifecycleRecommendation.rationale}
             </p>
           ) : null}
         </div>

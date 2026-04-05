@@ -17,7 +17,20 @@ from model_failure_lab.schemas import JsonValue
 from model_failure_lab.storage import datasets_root
 from model_failure_lab.storage.layout import project_root
 
-from .policy import GovernancePolicy, GovernanceRecommendation, recommend_dataset_action
+from .lifecycle import (
+    LifecycleActionRecord,
+    LifecycleApplyResult,
+    apply_lifecycle_action,
+    get_active_lifecycle_action,
+    list_lifecycle_action_records,
+)
+from .policy import (
+    GovernancePolicy,
+    GovernanceRecommendation,
+    LifecycleRecommendation,
+    describe_dataset_family_lifecycle,
+    recommend_dataset_action,
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -39,6 +52,9 @@ class DatasetFamilyHealth:
     previous_fail_rate: float | None
     volatility_label: str
     evaluation_run_count: int
+    active_lifecycle_action: str | None = None
+    active_lifecycle_condition: str | None = None
+    active_lifecycle_applied_at: str | None = None
 
     def to_payload(self) -> dict[str, JsonValue]:
         payload: dict[str, JsonValue] = {
@@ -58,6 +74,9 @@ class DatasetFamilyHealth:
             "previous_fail_rate": self.previous_fail_rate,
             "volatility_label": self.volatility_label,
             "evaluation_run_count": self.evaluation_run_count,
+            "active_lifecycle_action": self.active_lifecycle_action,
+            "active_lifecycle_condition": self.active_lifecycle_condition,
+            "active_lifecycle_applied_at": self.active_lifecycle_applied_at,
         }
         if self.latest_created_at is not None:
             payload["latest_created_at"] = self.latest_created_at
@@ -94,6 +113,20 @@ class GovernanceApplyResult:
         if self.output_path is not None:
             payload["output_path"] = self.output_path
         return payload
+
+
+@dataclass(slots=True, frozen=True)
+class DatasetLifecycleAlert:
+    family_id: str
+    recommendation: LifecycleRecommendation
+    active_action: LifecycleActionRecord | None = None
+
+    def to_payload(self) -> dict[str, JsonValue]:
+        return {
+            "family_id": self.family_id,
+            "recommendation": self.recommendation.to_payload(),
+            "active_action": self.active_action.to_payload() if self.active_action is not None else None,
+        }
 
 
 def list_dataset_family_health(
@@ -147,7 +180,16 @@ def review_dataset_actions(
         )
         if include_ignored or recommendation.action != "ignore":
             recommendations.append(recommendation)
-    return tuple(recommendations)
+    return tuple(
+        sorted(
+            recommendations,
+            key=lambda recommendation: (
+                -(recommendation.escalation.score if recommendation.escalation is not None else 0.0),
+                -float(recommendation.signal.get("severity", 0.0) or 0.0),
+                recommendation.comparison_id,
+            ),
+        )
+    )
 
 
 def apply_dataset_actions(
@@ -218,7 +260,108 @@ def get_dataset_family_health(
     if health_summary is None or not versions:
         return None
     latest = versions[-1]
-    return _build_dataset_family_health_record(health_summary, latest)
+    active_action = get_active_lifecycle_action(family_id, root=artifact_root)
+    return _build_dataset_family_health_record(
+        health_summary,
+        latest,
+        active_action=active_action,
+    )
+
+
+def review_dataset_lifecycle(
+    *,
+    root: str | Path | None = None,
+    family_id: str | None = None,
+    include_keep: bool = True,
+) -> tuple[DatasetLifecycleAlert, ...]:
+    artifact_root = project_root(root).resolve()
+    rows = list_dataset_family_health(root=artifact_root)
+    if family_id is not None:
+        rows = tuple(row for row in rows if row.family_id == family_id)
+    alerts: list[DatasetLifecycleAlert] = []
+    for row in rows:
+        recommendation = describe_dataset_family_lifecycle(
+            row.family_id,
+            root=artifact_root,
+            projected_case_count=row.latest_case_count,
+        )
+        if recommendation is None:
+            continue
+        if not include_keep and recommendation.action == "keep":
+            continue
+        alerts.append(
+            DatasetLifecycleAlert(
+                family_id=row.family_id,
+                recommendation=recommendation,
+                active_action=get_active_lifecycle_action(row.family_id, root=artifact_root),
+            )
+        )
+    return tuple(
+        sorted(
+            alerts,
+            key=lambda alert: (
+                -(alert.recommendation.projected_case_count or 0),
+                -(alert.recommendation.version_count or 0),
+                alert.family_id,
+            ),
+        )
+    )
+
+
+def apply_dataset_lifecycle_action(
+    family_id: str,
+    *,
+    root: str | Path | None = None,
+    action: str | None = None,
+    source: str = "cli",
+) -> LifecycleApplyResult:
+    artifact_root = project_root(root).resolve()
+    recommendation = describe_dataset_family_lifecycle(family_id, root=artifact_root)
+    if recommendation is None:
+        raise ValueError(f"family {family_id} has no lifecycle recommendation to apply")
+    return apply_lifecycle_action(
+        family_id=family_id,
+        recommendation=recommendation,
+        root=artifact_root,
+        action=action,
+        source=source,
+    )
+
+
+def apply_comparison_lifecycle_action(
+    comparison_id: str,
+    *,
+    root: str | Path | None = None,
+    policy: GovernancePolicy | None = None,
+    action: str | None = None,
+    source: str = "cli",
+) -> LifecycleApplyResult:
+    artifact_root = project_root(root).resolve()
+    recommendation = recommend_dataset_action(
+        comparison_id,
+        root=artifact_root,
+        policy=policy,
+    )
+    lifecycle = recommendation.lifecycle_recommendation
+    if lifecycle is None:
+        raise ValueError(f"comparison {comparison_id} has no lifecycle recommendation")
+    return apply_lifecycle_action(
+        family_id=lifecycle.family_id,
+        recommendation=lifecycle,
+        root=artifact_root,
+        action=action,
+        comparison_id=comparison_id,
+        escalation=recommendation.escalation,
+        source=source,
+    )
+
+
+def list_dataset_lifecycle_actions(
+    family_id: str,
+    *,
+    root: str | Path | None = None,
+) -> tuple[LifecycleActionRecord, ...]:
+    return list_lifecycle_action_records(family_id, root=root)
 
 
 def _apply_recommendation(
@@ -281,6 +424,8 @@ def _primary_regression_failure_type(signal: dict[str, JsonValue]) -> str | None
 def _build_dataset_family_health_record(
     health_summary: DatasetHealthSummary,
     latest,
+    *,
+    active_action: LifecycleActionRecord | None = None,
 ) -> DatasetFamilyHealth:
     return DatasetFamilyHealth(
         family_id=health_summary.family_id,
@@ -300,6 +445,13 @@ def _build_dataset_family_health_record(
         previous_fail_rate=health_summary.previous_fail_rate,
         volatility_label=health_summary.trend.volatility_label,
         evaluation_run_count=health_summary.evaluation_run_count,
+        active_lifecycle_action=active_action.action if active_action is not None else None,
+        active_lifecycle_condition=(
+            active_action.health_condition if active_action is not None else None
+        ),
+        active_lifecycle_applied_at=(
+            active_action.applied_at if active_action is not None else None
+        ),
     )
 
 

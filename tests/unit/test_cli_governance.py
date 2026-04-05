@@ -81,6 +81,18 @@ def test_cli_governance_recommend_review_apply_and_family_health(
     assert recommend_payload["comparison_id"] == comparison_id
     assert recommend_payload["action"] in {"create", "evolve", "ignore"}
     assert recommend_payload["matched_family"]["family_id"].startswith("regression-")
+    assert recommend_payload["escalation"]["status"] in {
+        "suppressed",
+        "watch",
+        "elevated",
+        "critical",
+    }
+    assert recommend_payload["lifecycle_recommendation"]["action"] in {
+        "keep",
+        "prune",
+        "merge_candidate",
+        "retire",
+    }
 
     assert review_exit == 0
     assert review_payload["query_kind"] == "governance_review"
@@ -95,3 +107,77 @@ def test_cli_governance_recommend_review_apply_and_family_health(
     assert families_exit == 0
     assert families_payload["query_kind"] == "dataset_family_health"
     assert families_payload["rows"]
+
+
+def test_cli_dataset_lifecycle_review_and_apply(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_report_id(workspace.root)
+    family_id = "fixture-lifecycle-family"
+
+    evolve_exit = main(
+        [
+            "dataset",
+            "evolve",
+            family_id,
+            "--from-comparison",
+            comparison_id,
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    _ = json.loads(capsys.readouterr().out)
+
+    review_exit = main(
+        [
+            "dataset",
+            "lifecycle-review",
+            family_id,
+            "--include-keep",
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    review_payload = json.loads(capsys.readouterr().out)
+
+    apply_exit = main(
+        [
+            "dataset",
+            "lifecycle-apply",
+            family_id,
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    apply_payload = json.loads(capsys.readouterr().out)
+
+    families_exit = main(
+        [
+            "dataset",
+            "families",
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    families_payload = json.loads(capsys.readouterr().out)
+
+    assert evolve_exit == 0
+    assert review_exit == 0
+    assert review_payload["query_kind"] == "dataset_lifecycle_review"
+    assert review_payload["rows"]
+    assert review_payload["rows"][0]["family_id"] == family_id
+
+    assert apply_exit == 0
+    assert apply_payload["family_id"] == family_id
+    assert apply_payload["status"] in {"applied", "already_applied"}
+    assert apply_payload["record"]["action"] in {"keep", "prune", "merge_candidate", "retire"}
+
+    assert families_exit == 0
+    family_row = next(row for row in families_payload["rows"] if row["family_id"] == family_id)
+    assert family_row["active_lifecycle_action"] == apply_payload["record"]["action"]

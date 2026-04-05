@@ -461,6 +461,31 @@ function mockSignalAnalysisQuery() {
                     transition_type: "no_failure_to_failure",
                   },
                 ],
+                escalation: {
+                  status: "critical",
+                  score: 0.41,
+                  severity_band: "high",
+                  reason: "severity=0.270, recent_regressions=2, recurring_clusters=1",
+                  recent_regression_count: 2,
+                  recurring_cluster_count: 1,
+                  family_health_label: "degrading",
+                },
+                lifecycle_recommendation: {
+                  family_id: "regression-query-fixture-v1-hallucination",
+                  action: "prune",
+                  health_condition: "overgrown",
+                  rationale:
+                    "Projected family growth crosses the deterministic overgrowth threshold.",
+                  target_family_id: null,
+                  related_family_ids: [],
+                  source_dataset_id: "query-fixture-v1",
+                  primary_failure_type: "hallucination",
+                  latest_dataset_id: "regression-query-fixture-v1-hallucination-v4",
+                  version_count: 4,
+                  evaluation_run_count: 4,
+                  recent_fail_rate: 0.35,
+                  projected_case_count: 32,
+                },
                 cluster_context: [buildClusterSummaryPayload()],
                 history_context: {
                   scope_kind: "dataset",
@@ -844,6 +869,8 @@ describe("analysis route", () => {
     expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
     expect(screen.getByText("27.0% severity")).toBeInTheDocument();
     expect(screen.getAllByText("create").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("critical").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("prune").length).toBeGreaterThan(0);
     expect(screen.getAllByText("degrading trend").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2 recent regressions").length).toBeGreaterThan(0);
     expect(screen.getByText("1 recurring clusters")).toBeInTheDocument();
@@ -852,6 +879,11 @@ describe("analysis route", () => {
     expect(
       screen.getAllByText(
         "Qualifying regression has no existing family match, so governance recommends creating `regression-query-fixture-v1-hallucination`.",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(
+        "Projected family growth crosses the deterministic overgrowth threshold.",
       ).length,
     ).toBeGreaterThan(0);
     expect(

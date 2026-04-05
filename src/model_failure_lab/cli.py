@@ -36,11 +36,15 @@ from model_failure_lab.harvest import (
     review_harvest_dataset,
 )
 from model_failure_lab.governance import (
+    DatasetLifecycleAlert,
     DatasetFamilyHealth,
     GovernanceApplyResult,
     GovernancePolicy,
     GovernanceRecommendation,
+    LifecycleApplyResult,
+    apply_dataset_lifecycle_action,
     apply_dataset_actions,
+    review_dataset_lifecycle,
     list_dataset_family_health,
     recommend_dataset_action,
     review_dataset_actions,
@@ -334,6 +338,48 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dataset_families_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_families_parser.set_defaults(handler=_handle_dataset_families)
+
+    dataset_lifecycle_review_parser = dataset_subparsers.add_parser(
+        "lifecycle-review",
+        help="Review deterministic lifecycle recommendations for dataset families.",
+    )
+    dataset_lifecycle_review_parser.add_argument("dataset_id", nargs="?")
+    dataset_lifecycle_review_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_lifecycle_review_parser.add_argument(
+        "--include-keep",
+        action="store_true",
+        help="Include neutral `keep` recommendations in the lifecycle review output.",
+    )
+    dataset_lifecycle_review_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_lifecycle_review_parser.set_defaults(handler=_handle_dataset_lifecycle_review)
+
+    dataset_lifecycle_apply_parser = dataset_subparsers.add_parser(
+        "lifecycle-apply",
+        help="Apply one deterministic lifecycle action for a dataset family.",
+    )
+    dataset_lifecycle_apply_parser.add_argument("dataset_id")
+    dataset_lifecycle_apply_parser.add_argument(
+        "--action",
+        choices=["keep", "prune", "merge_candidate", "retire"],
+        help="Override the recommended lifecycle action before persisting it.",
+    )
+    dataset_lifecycle_apply_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_lifecycle_apply_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_lifecycle_apply_parser.set_defaults(handler=_handle_dataset_lifecycle_apply)
 
     dataset_evolve_parser = dataset_subparsers.add_parser(
         "evolve",
@@ -1282,6 +1328,41 @@ def _handle_dataset_families(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_dataset_lifecycle_review(args: argparse.Namespace) -> int:
+    rows = review_dataset_lifecycle(
+        root=_normalized_root(args.root),
+        family_id=args.dataset_id,
+        include_keep=args.include_keep,
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "dataset_lifecycle_review",
+                    "family_id": args.dataset_id,
+                    "include_keep": args.include_keep,
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_dataset_lifecycle_review(rows, include_keep=args.include_keep))
+    return 0
+
+
+def _handle_dataset_lifecycle_apply(args: argparse.Namespace) -> int:
+    result = apply_dataset_lifecycle_action(
+        args.dataset_id,
+        root=_normalized_root(args.root),
+        action=args.action,
+    )
+    if args.as_json:
+        print(_render_json_payload(result.to_payload()))
+        return 0
+    print(_render_dataset_lifecycle_apply(result))
+    return 0
+
+
 def _load_dataset_reference(
     reference: str,
     *,
@@ -1631,6 +1712,7 @@ def _render_dataset_family_health(rows: tuple[DatasetFamilyHealth, ...]) -> str:
                     (
                         "family_id",
                         "health",
+                        "lifecycle",
                         "trend",
                         "versions",
                         "latest",
@@ -1643,6 +1725,12 @@ def _render_dataset_family_health(rows: tuple[DatasetFamilyHealth, ...]) -> str:
                         (
                             row.family_id,
                             row.health_label,
+                            (
+                                f"{row.active_lifecycle_action}:{row.active_lifecycle_condition}"
+                                if row.active_lifecycle_action is not None
+                                and row.active_lifecycle_condition is not None
+                                else row.active_lifecycle_action or "n/a"
+                            ),
                             row.trend_label,
                             str(row.version_count),
                             row.latest_version_tag,
@@ -1717,6 +1805,29 @@ def _render_governance_recommendation(recommendation: GovernanceRecommendation) 
         ),
         f"Rationale: {recommendation.rationale}",
     ]
+    if recommendation.escalation is not None:
+        lines.append(
+            (
+                "Escalation: "
+                f"{recommendation.escalation.status} "
+                f"(score={recommendation.escalation.score:.3f} "
+                f"severity_band={recommendation.escalation.severity_band})"
+            )
+        )
+    if recommendation.lifecycle_recommendation is not None:
+        lifecycle = recommendation.lifecycle_recommendation
+        lines.append(
+            (
+                "Lifecycle: "
+                f"{lifecycle.action} "
+                f"(condition={lifecycle.health_condition} "
+                f"projected_cases={lifecycle.projected_case_count or 'n/a'} "
+                f"versions={lifecycle.version_count or 'n/a'})"
+            )
+        )
+        lines.append(f"Lifecycle rationale: {lifecycle.rationale}")
+        if lifecycle.target_family_id is not None:
+            lines.append(f"Lifecycle target: {lifecycle.target_family_id}")
     if recommendation.history_context is not None:
         lines.extend(
             [
@@ -1896,20 +2007,26 @@ def _render_governance_review(
                 [
                     (
                         "comparison",
+                        "escalation",
+                        "lifecycle",
                         "action",
                         "family",
                         "rule",
                         "severity",
-                        "cases",
                     ),
                     *[
                         (
                             recommendation.comparison_id,
+                            recommendation.escalation.status
+                            if recommendation.escalation is not None
+                            else "n/a",
+                            recommendation.lifecycle_recommendation.action
+                            if recommendation.lifecycle_recommendation is not None
+                            else "n/a",
                             recommendation.action,
                             recommendation.matched_family.family_id,
                             recommendation.policy_rule,
                             _format_rate(recommendation.signal.get("severity")),
-                            str(recommendation.selected_case_count),
                         )
                         for recommendation in recommendations
                     ],
@@ -1955,6 +2072,77 @@ def _render_governance_apply(
             ),
         ]
     )
+
+
+def _render_dataset_lifecycle_review(
+    rows: tuple[DatasetLifecycleAlert, ...],
+    *,
+    include_keep: bool,
+) -> str:
+    if not rows:
+        label = " including keep recommendations" if include_keep else ""
+        return f"Failure Lab Dataset Lifecycle Review\nNo lifecycle recommendations matched the current filters{label}."
+    lines = [
+        "Failure Lab Dataset Lifecycle Review",
+        _render_table(
+            [
+                (
+                    "family_id",
+                    "recommended",
+                    "condition",
+                    "active",
+                    "latest",
+                    "versions",
+                    "fail_rate",
+                ),
+                *[
+                    (
+                        row.family_id,
+                        row.recommendation.action,
+                        row.recommendation.health_condition,
+                        row.active_action.action if row.active_action is not None else "n/a",
+                        row.recommendation.latest_dataset_id or "n/a",
+                        str(row.recommendation.version_count or 0),
+                        _format_rate(row.recommendation.recent_fail_rate),
+                    )
+                    for row in rows
+                ],
+            ]
+        ),
+    ]
+    if len(rows) == 1:
+        row = rows[0]
+        lines.extend(
+            [
+                f"Rationale: {row.recommendation.rationale}",
+            ]
+        )
+        if row.recommendation.target_family_id is not None:
+            lines.append(f"Target family: {row.recommendation.target_family_id}")
+        if row.active_action is not None:
+            lines.append(
+                f"Active action: {row.active_action.action} at {row.active_action.applied_at}"
+            )
+    return "\n".join(lines)
+
+
+def _render_dataset_lifecycle_apply(result: LifecycleApplyResult) -> str:
+    record = result.record
+    lines = [
+        "Failure Lab Dataset Lifecycle Apply",
+        f"Family: {result.family_id}",
+        f"Action: {result.action}",
+        f"Status: {result.status}",
+        f"Condition: {record.health_condition}",
+        f"Applied at: {record.applied_at}",
+        f"Output: {result.output_path}",
+        f"Rationale: {record.rationale}",
+    ]
+    if record.target_family_id is not None:
+        lines.append(f"Target family: {record.target_family_id}")
+    if record.latest_dataset_id is not None:
+        lines.append(f"Latest dataset: {record.latest_dataset_id}")
+    return "\n".join(lines)
 
 
 def _render_case_rows(rows: list[dict[str, object]]) -> str:

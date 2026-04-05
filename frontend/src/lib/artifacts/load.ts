@@ -17,9 +17,12 @@ import {
   type ArtifactInsightSampling,
   type ArtifactDatasetEvolutionResponse,
   type ArtifactDatasetPolicy,
+  type ArtifactGovernanceEscalation,
   type ArtifactGovernanceFamilyMatch,
   type ArtifactGovernancePolicy,
   type ArtifactGovernanceRecommendation,
+  type ArtifactLifecycleActionRecord,
+  type ArtifactLifecycleRecommendation,
   type ArtifactFailureClusterEvidenceRef,
   type ArtifactFailureClusterOccurrence,
   type ArtifactFailureClusterSummary,
@@ -338,7 +341,166 @@ function requireArtifactGovernanceRecommendation(
       data.cluster_context ?? [],
       `${field}.cluster_context`,
     ),
+    escalation:
+      data.escalation == null
+        ? null
+        : requireArtifactGovernanceEscalation(data.escalation, `${field}.escalation`),
+    lifecycleRecommendation:
+      data.lifecycle_recommendation == null
+        ? null
+        : requireArtifactLifecycleRecommendation(
+            data.lifecycle_recommendation,
+            `${field}.lifecycle_recommendation`,
+          ),
   };
+}
+
+function requireArtifactGovernanceEscalation(
+  value: unknown,
+  field: string,
+): ArtifactGovernanceEscalation {
+  const data = requireObject(value, field);
+  return {
+    status: requireString(data.status, `${field}.status`),
+    score: requireNumber(data.score, `${field}.score`),
+    severityBand: requireString(data.severity_band, `${field}.severity_band`),
+    reason: requireString(data.reason, `${field}.reason`),
+    recentRegressionCount: requireCount(
+      data.recent_regression_count,
+      `${field}.recent_regression_count`,
+    ),
+    recurringClusterCount: requireCount(
+      data.recurring_cluster_count,
+      `${field}.recurring_cluster_count`,
+    ),
+    familyHealthLabel: requireStringOrNull(data.family_health_label, `${field}.family_health_label`),
+  };
+}
+
+function requireArtifactLifecycleRecommendation(
+  value: unknown,
+  field: string,
+): ArtifactLifecycleRecommendation {
+  const data = requireObject(value, field);
+  const action = requireString(data.action, `${field}.action`);
+  if (
+    action !== "keep"
+    && action !== "prune"
+    && action !== "merge_candidate"
+    && action !== "retire"
+  ) {
+    throw new Error(`${field}.action must be keep, prune, merge_candidate, or retire`);
+  }
+  return {
+    familyId: requireString(data.family_id, `${field}.family_id`),
+    action,
+    healthCondition: requireString(data.health_condition, `${field}.health_condition`),
+    rationale: requireString(data.rationale, `${field}.rationale`),
+    targetFamilyId: requireStringOrNull(data.target_family_id, `${field}.target_family_id`),
+    relatedFamilyIds: requireStringArray(data.related_family_ids ?? [], `${field}.related_family_ids`),
+    sourceDatasetId: requireStringOrNull(data.source_dataset_id, `${field}.source_dataset_id`),
+    primaryFailureType: requireStringOrNull(
+      data.primary_failure_type,
+      `${field}.primary_failure_type`,
+    ),
+    latestDatasetId: requireStringOrNull(data.latest_dataset_id, `${field}.latest_dataset_id`),
+    versionCount:
+      data.version_count == null ? null : requireCount(data.version_count, `${field}.version_count`),
+    evaluationRunCount:
+      data.evaluation_run_count == null
+        ? null
+        : requireCount(data.evaluation_run_count, `${field}.evaluation_run_count`),
+    recentFailRate: requireNumberOrNull(data.recent_fail_rate, `${field}.recent_fail_rate`),
+    projectedCaseCount:
+      data.projected_case_count == null
+        ? null
+        : requireCount(data.projected_case_count, `${field}.projected_case_count`),
+  };
+}
+
+function requireArtifactLifecycleActionRecords(
+  value: unknown,
+  field: string,
+): ArtifactLifecycleActionRecord[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    const action = requireString(row.action, `${field}[${index}].action`);
+    if (
+      action !== "keep"
+      && action !== "prune"
+      && action !== "merge_candidate"
+      && action !== "retire"
+    ) {
+      throw new Error(`${field}[${index}].action must be keep, prune, merge_candidate, or retire`);
+    }
+    return {
+      actionId: requireString(row.action_id, `${field}[${index}].action_id`),
+      familyId: requireString(row.family_id, `${field}[${index}].family_id`),
+      action,
+      healthCondition: requireString(
+        row.health_condition,
+        `${field}[${index}].health_condition`,
+      ),
+      rationale: requireString(row.rationale, `${field}[${index}].rationale`),
+      appliedAt: requireString(row.applied_at, `${field}[${index}].applied_at`),
+      source: requireString(row.source, `${field}[${index}].source`),
+      status: requireString(row.status, `${field}[${index}].status`),
+      targetFamilyId: requireStringOrNull(
+        row.target_family_id,
+        `${field}[${index}].target_family_id`,
+      ),
+      relatedFamilyIds: requireStringArray(
+        row.related_family_ids ?? [],
+        `${field}[${index}].related_family_ids`,
+      ),
+      sourceDatasetId: requireStringOrNull(
+        row.source_dataset_id,
+        `${field}[${index}].source_dataset_id`,
+      ),
+      primaryFailureType: requireStringOrNull(
+        row.primary_failure_type,
+        `${field}[${index}].primary_failure_type`,
+      ),
+      latestDatasetId: requireStringOrNull(
+        row.latest_dataset_id,
+        `${field}[${index}].latest_dataset_id`,
+      ),
+      versionCount:
+        row.version_count == null
+          ? null
+          : requireCount(row.version_count, `${field}[${index}].version_count`),
+      evaluationRunCount:
+        row.evaluation_run_count == null
+          ? null
+          : requireCount(
+              row.evaluation_run_count,
+              `${field}[${index}].evaluation_run_count`,
+            ),
+      recentFailRate: requireNumberOrNull(
+        row.recent_fail_rate,
+        `${field}[${index}].recent_fail_rate`,
+      ),
+      projectedCaseCount:
+        row.projected_case_count == null
+          ? null
+          : requireCount(
+              row.projected_case_count,
+              `${field}[${index}].projected_case_count`,
+            ),
+      comparisonId: requireStringOrNull(row.comparison_id, `${field}[${index}].comparison_id`),
+      escalationStatus: requireStringOrNull(
+        row.escalation_status,
+        `${field}[${index}].escalation_status`,
+      ),
+      escalationScore: requireNumberOrNull(
+        row.escalation_score,
+        `${field}[${index}].escalation_score`,
+      ),
+    };
+  });
 }
 
 function requireArtifactMetricTrend(value: unknown, field: string): ArtifactMetricTrend {
@@ -752,6 +914,10 @@ function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatas
             datasetHealth: null,
           }
         : requireArtifactHistorySnapshot(data.history, "dataset_versions.history"),
+    lifecycleActions: requireArtifactLifecycleActionRecords(
+      data.lifecycle_actions ?? [],
+      "dataset_versions.lifecycle_actions",
+    ),
   };
 }
 

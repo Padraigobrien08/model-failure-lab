@@ -564,6 +564,22 @@ export function AnalysisPage() {
                         {row.governanceRecommendation.action}
                       </Badge>
                     ) : null}
+                    {row.governanceRecommendation?.escalation ? (
+                      <Badge
+                        tone={
+                          row.governanceRecommendation.escalation.status === "critical"
+                            ? "default"
+                            : "accent"
+                        }
+                      >
+                        {row.governanceRecommendation.escalation.status}
+                      </Badge>
+                    ) : null}
+                    {row.governanceRecommendation?.lifecycleRecommendation ? (
+                      <Badge tone="muted">
+                        {row.governanceRecommendation.lifecycleRecommendation.action}
+                      </Badge>
+                    ) : null}
                     {historyContext ? (
                       <Badge tone="muted">{historyContext.comparisonTrend.label} trend</Badge>
                     ) : null}
@@ -591,6 +607,11 @@ export function AnalysisPage() {
                   {row.governanceRecommendation ? (
                     <p className="text-sm text-muted-foreground">
                       {row.governanceRecommendation.rationale}
+                    </p>
+                  ) : null}
+                  {row.governanceRecommendation?.lifecycleRecommendation ? (
+                    <p className="text-sm text-muted-foreground">
+                      {row.governanceRecommendation.lifecycleRecommendation.rationale}
                     </p>
                   ) : null}
                   {row.topDrivers.length > 0 ? (

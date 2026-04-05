@@ -44,7 +44,7 @@ over dataset families, so the system can escalate, prune, merge, retire, or keep
 deterministic local policy.
 
 ### Phase 105: Escalation Contract And Lifecycle Policy
-- Status: pending
+- Status: complete
 - Requirements: `ESC-01`, `ESC-02`, `HEALTH-01`, `HEALTH-02`
 - Goal: define deterministic escalation statuses and dataset-family health semantics over
   recurring clusters, temporal history, and lifecycle provenance.
@@ -55,7 +55,7 @@ deterministic local policy.
     merge-candidate, or keepable with explicit artifact-backed rationale.
 
 ### Phase 106: CLI Alerting And Family Health Actions
-- Status: pending
+- Status: complete
 - Requirements: `CLI-01`, `CLI-02`, `CLI-03`
 - Goal: expose escalation listings, inspectable family-health rationale, and explicit
   review/apply lifecycle actions in the CLI.
@@ -66,7 +66,7 @@ deterministic local policy.
     from the CLI.
 
 ### Phase 107: Debugger Escalation Surfacing
-- Status: pending
+- Status: complete
 - Requirements: `UI-01`, `UI-02`
 - Goal: surface escalation status and lifecycle recommendations on existing debugger routes with
   direct drillthrough into affected clusters, families, and evidence.
@@ -77,7 +77,7 @@ deterministic local policy.
     history, or evidence route.
 
 ### Phase 108: Lifecycle Stability And Workflow Verification
-- Status: pending
+- Status: complete
 - Requirements: `FLOW-01`
 - Goal: verify the full local workflow from recurring pattern detection to escalation to dataset
   lifecycle review/apply and resulting family state.
@@ -89,8 +89,8 @@ deterministic local policy.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 105
+$gsd-audit-milestone
 ```
 
 ---
-*Roadmap updated: 2026-04-05 for v4.9 initialization*
+*Roadmap updated: 2026-04-05 for Phase 108 completion*

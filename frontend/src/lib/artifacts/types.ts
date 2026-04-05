@@ -355,6 +355,57 @@ export type ArtifactGovernanceRecommendation = {
   previewCases: ArtifactRegressionPreviewCase[];
   historyContext: ArtifactSignalHistoryContext | null;
   clusterContext?: ArtifactFailureClusterSummary[];
+  escalation?: ArtifactGovernanceEscalation | null;
+  lifecycleRecommendation?: ArtifactLifecycleRecommendation | null;
+};
+
+export type ArtifactGovernanceEscalation = {
+  status: string;
+  score: number;
+  severityBand: string;
+  reason: string;
+  recentRegressionCount: number;
+  recurringClusterCount: number;
+  familyHealthLabel: string | null;
+};
+
+export type ArtifactLifecycleRecommendation = {
+  familyId: string;
+  action: "keep" | "prune" | "merge_candidate" | "retire";
+  healthCondition: string;
+  rationale: string;
+  targetFamilyId: string | null;
+  relatedFamilyIds: string[];
+  sourceDatasetId: string | null;
+  primaryFailureType: string | null;
+  latestDatasetId: string | null;
+  versionCount: number | null;
+  evaluationRunCount: number | null;
+  recentFailRate: number | null;
+  projectedCaseCount: number | null;
+};
+
+export type ArtifactLifecycleActionRecord = {
+  actionId: string;
+  familyId: string;
+  action: "keep" | "prune" | "merge_candidate" | "retire";
+  healthCondition: string;
+  rationale: string;
+  appliedAt: string;
+  source: string;
+  status: string;
+  targetFamilyId: string | null;
+  relatedFamilyIds: string[];
+  sourceDatasetId: string | null;
+  primaryFailureType: string | null;
+  latestDatasetId: string | null;
+  versionCount: number | null;
+  evaluationRunCount: number | null;
+  recentFailRate: number | null;
+  projectedCaseCount: number | null;
+  comparisonId: string | null;
+  escalationStatus: string | null;
+  escalationScore: number | null;
 };
 
 export type ArtifactMetricTrend = {
@@ -533,6 +584,7 @@ export type ArtifactDatasetVersionsResponse = {
   familyId: string;
   versions: ArtifactDatasetVersionRecord[];
   history: ArtifactHistorySnapshot;
+  lifecycleActions: ArtifactLifecycleActionRecord[];
 };
 
 export type ArtifactDatasetEvolutionResponse = {

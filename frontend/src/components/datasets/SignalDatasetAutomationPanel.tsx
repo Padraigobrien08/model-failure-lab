@@ -94,6 +94,10 @@ function renderPreviewLink(
   );
 }
 
+function formatLifecycleLabel(value: string): string {
+  return value.replace(/_/g, " ");
+}
+
 export function SignalDatasetAutomationPanel({
   comparisonId,
   dataset,
@@ -161,8 +165,14 @@ export function SignalDatasetAutomationPanel({
     recommendation?.clusterContext ??
     activeHistoryContext?.recurringClusters ??
     [];
+  const activeEscalation = recommendation?.escalation ?? null;
+  const activeLifecycleRecommendation = recommendation?.lifecycleRecommendation ?? null;
   const loadedFamilyHealth =
     versionsState.status === "ready" ? versionsState.value.history.datasetHealth : null;
+  const lifecycleActions =
+    versionsState.status === "ready" ? versionsState.value.lifecycleActions : [];
+  const activeLifecycleAction =
+    lifecycleActions.length > 0 ? lifecycleActions[lifecycleActions.length - 1] : null;
   const familyHealth = loadedFamilyHealth ?? activeHistoryContext?.familyHealth ?? null;
 
   return (
@@ -198,6 +208,16 @@ export function SignalDatasetAutomationPanel({
               <Badge tone="muted">
                 {recommendation.matchedFamily.projectedCaseCount} projected cases
               </Badge>
+              {activeEscalation ? (
+                <Badge tone={activeEscalation.status === "critical" ? "default" : "accent"}>
+                  {activeEscalation.status}
+                </Badge>
+              ) : null}
+              {activeLifecycleRecommendation ? (
+                <Badge tone="muted">
+                  {formatLifecycleLabel(activeLifecycleRecommendation.action)}
+                </Badge>
+              ) : null}
             </div>
             <p className="text-sm text-muted-foreground">{recommendation.rationale}</p>
             <p className="text-xs text-muted-foreground">
@@ -206,6 +226,12 @@ export function SignalDatasetAutomationPanel({
               cap{" "}
               {recommendation.matchedFamily.familyCaseCap ?? "none"}
             </p>
+            {activeEscalation ? (
+              <p className="text-xs text-muted-foreground">
+                Escalation {activeEscalation.status} · score{" "}
+                {activeEscalation.score.toFixed(3)} · {activeEscalation.reason}
+              </p>
+            ) : null}
             {recommendation.previewCases.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {recommendation.previewCases.slice(0, 4).map((entry) =>
@@ -217,6 +243,38 @@ export function SignalDatasetAutomationPanel({
                   ),
                 )}
               </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeLifecycleRecommendation ? (
+          <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="accent">Lifecycle recommendation</Badge>
+              <Badge tone="muted">
+                {formatLifecycleLabel(activeLifecycleRecommendation.action)}
+              </Badge>
+              <Badge tone="muted">
+                {formatLifecycleLabel(activeLifecycleRecommendation.healthCondition)}
+              </Badge>
+              {activeLifecycleRecommendation.projectedCaseCount != null ? (
+                <Badge tone="muted">
+                  {activeLifecycleRecommendation.projectedCaseCount} projected cases
+                </Badge>
+              ) : null}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {activeLifecycleRecommendation.rationale}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Source dataset {activeLifecycleRecommendation.sourceDatasetId ?? "n/a"} · Driver{" "}
+              {activeLifecycleRecommendation.primaryFailureType ?? "n/a"} · Versions{" "}
+              {activeLifecycleRecommendation.versionCount ?? 0}
+            </p>
+            {activeLifecycleRecommendation.targetFamilyId ? (
+              <p className="text-xs text-muted-foreground">
+                Merge target: {activeLifecycleRecommendation.targetFamilyId}
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -305,12 +363,21 @@ export function SignalDatasetAutomationPanel({
               <Badge tone="muted">{familyHealth.healthLabel}</Badge>
               <Badge tone="muted">{familyHealth.trend.label} trend</Badge>
               <Badge tone="muted">{familyHealth.trend.volatilityLabel} volatility</Badge>
+              {activeLifecycleAction ? (
+                <Badge tone="muted">{formatLifecycleLabel(activeLifecycleAction.action)}</Badge>
+              ) : null}
             </div>
             <p className="text-sm text-muted-foreground">
               Recent fail rate {familyHealth.recentFailRate == null ? "n/a" : `${(familyHealth.recentFailRate * 100).toFixed(1)}%`} · Previous{" "}
               {familyHealth.previousFailRate == null ? "n/a" : `${(familyHealth.previousFailRate * 100).toFixed(1)}%`} · Evaluated in{" "}
               {familyHealth.evaluationRunCount} runs.
             </p>
+            {activeLifecycleAction ? (
+              <p className="text-xs text-muted-foreground">
+                Active family state: {formatLifecycleLabel(activeLifecycleAction.action)} at{" "}
+                {activeLifecycleAction.appliedAt}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -433,6 +500,31 @@ export function SignalDatasetAutomationPanel({
                 <Badge tone="muted">{versionsState.value.history.datasetHealth.healthLabel}</Badge>
               ) : null}
             </div>
+            {versionsState.value.lifecycleActions.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Lifecycle actions
+                </p>
+                {versionsState.value.lifecycleActions.map((action) => (
+                  <div
+                    key={action.actionId}
+                    className="rounded-2xl border border-border/60 bg-card/80 p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="accent">{formatLifecycleLabel(action.action)}</Badge>
+                      <Badge tone="muted">{formatLifecycleLabel(action.healthCondition)}</Badge>
+                      <Badge tone="muted">{action.appliedAt}</Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">{action.rationale}</p>
+                    {action.targetFamilyId ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Target family: {action.targetFamilyId}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {versionsState.value.versions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No immutable versions exist yet for {targetFamilyId}.

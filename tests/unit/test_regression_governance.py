@@ -2,14 +2,25 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from model_failure_lab.clusters import FailureClusterSummary
 from model_failure_lab.datasets import evolve_dataset_family, preview_regression_pack
 from model_failure_lab.governance import (
     GovernancePolicy,
     apply_dataset_actions,
+    apply_dataset_lifecycle_action,
+    describe_dataset_family_lifecycle,
     list_dataset_family_health,
+    list_dataset_lifecycle_actions,
     recommend_dataset_action,
     review_dataset_actions,
 )
+from model_failure_lab.governance.policy import (
+    GovernanceFamilyMatch,
+    LifecycleRecommendation,
+    _build_escalation,
+    _recommend_lifecycle_action,
+)
+from model_failure_lab.history import DatasetHealthSummary, MetricTrend, SignalHistoryContext
 from model_failure_lab.index import QueryFilters, query_comparison_signals
 from model_failure_lab.testing import materialize_insight_fixture
 
@@ -39,6 +50,80 @@ def _pick_improvement_comparison(root: Path) -> str:
     )
     assert rows
     return str(rows[0]["report_id"])
+
+
+def _metric_trend(
+    *,
+    label: str = "stable",
+    delta: float | None = 0.0,
+    volatility_label: str = "low",
+) -> MetricTrend:
+    return MetricTrend(
+        label=label,
+        delta=delta,
+        sample_count=3,
+        first_value=0.1,
+        last_value=0.1 if delta is None else 0.1 + delta,
+        volatility=0.0 if volatility_label == "low" else 0.2,
+        volatility_label=volatility_label,
+    )
+
+
+def _cluster_summary() -> FailureClusterSummary:
+    return FailureClusterSummary(
+        cluster_id="cd_fixture",
+        cluster_kind="comparison_delta",
+        label="fixture cluster",
+        summary="fixture cluster summary",
+        occurrence_count=2,
+        scope_count=2,
+        first_seen_at="2026-04-05T10:00:00Z",
+        last_seen_at="2026-04-05T11:00:00Z",
+        datasets=("fixture",),
+        models=("baseline→candidate",),
+        failure_types=("reasoning",),
+        transition_types=("no_failure_to_failure",),
+        recent_severity=0.25,
+        representative_evidence=(),
+    )
+
+
+def _family_match() -> GovernanceFamilyMatch:
+    return GovernanceFamilyMatch(
+        family_id="fixture-family",
+        match_kind="existing_exact",
+        exists=True,
+        version_count=2,
+        latest_dataset_id="fixture-family-v2",
+        current_case_count=4,
+        proposed_addition_count=1,
+        duplicate_case_count=0,
+        duplicate_ratio=0.0,
+        projected_case_count=5,
+        family_case_cap=20,
+        cap_reached=False,
+        duplicate_ratio_exceeded=False,
+    )
+
+
+def _history_context(
+    *,
+    recent_regression_count: int,
+    clusters: tuple[FailureClusterSummary, ...] = (),
+    family_health: DatasetHealthSummary | None = None,
+) -> SignalHistoryContext:
+    return SignalHistoryContext(
+        scope_kind="dataset",
+        scope_value="fixture-dataset",
+        recent_comparison_count=max(recent_regression_count, 1),
+        recent_regression_count=recent_regression_count,
+        comparison_trend=_metric_trend(),
+        candidate_run_trend=None,
+        recurring_failures=(),
+        recurring_clusters=clusters,
+        recent_comparisons=(),
+        family_health=family_health,
+    )
 
 
 def test_preview_regression_pack_does_not_write_dataset_files(tmp_path: Path) -> None:
@@ -203,6 +288,194 @@ def test_recommend_dataset_action_is_deterministic(tmp_path: Path) -> None:
     second = recommend_dataset_action(comparison_id, root=workspace.root, policy=policy)
 
     assert first.to_payload() == second.to_payload()
+    assert first.escalation is not None
+    assert first.lifecycle_recommendation is not None
+    assert first.lifecycle_recommendation.projected_case_count is not None
+
+
+def test_escalation_status_bands_cover_suppressed_watch_elevated_and_critical() -> None:
+    family_match = _family_match()
+    keep = LifecycleRecommendation(
+        family_id="fixture-family",
+        action="keep",
+        health_condition="keepable",
+        rationale="keep the family active",
+    )
+
+    suppressed = _build_escalation(
+        action="ignore",
+        signal_verdict="neutral",
+        severity=0.0,
+        family_match=family_match,
+        history_context=_history_context(recent_regression_count=0),
+        cluster_context=(),
+        lifecycle_recommendation=keep,
+    )
+    watch = _build_escalation(
+        action="create",
+        signal_verdict="regression",
+        severity=0.1,
+        family_match=family_match,
+        history_context=_history_context(recent_regression_count=0),
+        cluster_context=(),
+        lifecycle_recommendation=keep,
+    )
+    elevated = _build_escalation(
+        action="create",
+        signal_verdict="regression",
+        severity=0.23,
+        family_match=family_match,
+        history_context=_history_context(recent_regression_count=0),
+        cluster_context=(),
+        lifecycle_recommendation=keep,
+    )
+    critical = _build_escalation(
+        action="create",
+        signal_verdict="regression",
+        severity=0.25,
+        family_match=family_match,
+        history_context=_history_context(
+            recent_regression_count=2,
+            clusters=(_cluster_summary(),),
+        ),
+        cluster_context=(_cluster_summary(),),
+        lifecycle_recommendation=keep,
+    )
+
+    assert suppressed.status == "suppressed"
+    assert watch.status == "watch"
+    assert elevated.status == "elevated"
+    assert critical.status == "critical"
+
+
+def test_lifecycle_action_rules_cover_prune_retire_and_keep(tmp_path: Path) -> None:
+    overgrown = _recommend_lifecycle_action(
+        family_id="fixture-family",
+        health_summary=DatasetHealthSummary(
+            family_id="fixture-family",
+            health_label="degrading",
+            trend=_metric_trend(label="degrading", delta=0.1, volatility_label="high"),
+            version_count=4,
+            evaluation_run_count=4,
+            recent_fail_rate=0.25,
+            previous_fail_rate=0.15,
+            latest_dataset_id="fixture-family-v4",
+            latest_version_tag="v4",
+            latest_created_at="2026-04-05T10:00:00Z",
+            source_dataset_id="fixture-dataset",
+            primary_failure_type="reasoning",
+        ),
+        latest_case_count=12,
+        projected_case_count=40,
+        latest_dataset_id="fixture-family-v4",
+        root=tmp_path,
+    )
+    retire = _recommend_lifecycle_action(
+        family_id="fixture-family",
+        health_summary=DatasetHealthSummary(
+            family_id="fixture-family",
+            health_label="stable",
+            trend=_metric_trend(label="stable", delta=0.0, volatility_label="low"),
+            version_count=2,
+            evaluation_run_count=3,
+            recent_fail_rate=0.02,
+            previous_fail_rate=0.03,
+            latest_dataset_id="fixture-family-v2",
+            latest_version_tag="v2",
+            latest_created_at="2026-04-05T10:00:00Z",
+            source_dataset_id="fixture-dataset",
+            primary_failure_type="reasoning",
+        ),
+        latest_case_count=8,
+        projected_case_count=8,
+        latest_dataset_id="fixture-family-v2",
+        root=tmp_path,
+    )
+    keep = _recommend_lifecycle_action(
+        family_id="fixture-family",
+        health_summary=DatasetHealthSummary(
+            family_id="fixture-family",
+            health_label="volatile",
+            trend=_metric_trend(label="stable", delta=0.0, volatility_label="medium"),
+            version_count=2,
+            evaluation_run_count=2,
+            recent_fail_rate=0.12,
+            previous_fail_rate=0.1,
+            latest_dataset_id="fixture-family-v2",
+            latest_version_tag="v2",
+            latest_created_at="2026-04-05T10:00:00Z",
+            source_dataset_id="fixture-dataset",
+            primary_failure_type="reasoning",
+        ),
+        latest_case_count=8,
+        projected_case_count=8,
+        latest_dataset_id="fixture-family-v2",
+        root=tmp_path,
+    )
+
+    assert overgrown.action == "prune"
+    assert retire.action == "retire"
+    assert keep.action == "keep"
+
+
+def test_describe_dataset_family_lifecycle_surfaces_merge_candidates_and_provenance(
+    tmp_path: Path,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_comparison(workspace.root)
+
+    evolve_dataset_family(
+        "fixture-merge-a",
+        comparison_id=comparison_id,
+        root=workspace.root,
+        top_n=1,
+    )
+    evolve_dataset_family(
+        "fixture-merge-b",
+        comparison_id=comparison_id,
+        root=workspace.root,
+        top_n=1,
+    )
+
+    recommendation = describe_dataset_family_lifecycle("fixture-merge-a", root=workspace.root)
+
+    assert recommendation is not None
+    assert recommendation.action == "merge_candidate"
+    assert recommendation.target_family_id == "fixture-merge-b"
+    assert recommendation.source_dataset_id == workspace.dataset_id
+    assert recommendation.primary_failure_type is not None
+    assert recommendation.latest_dataset_id == "fixture-merge-a-v1"
+
+
+def test_comparison_to_lifecycle_apply_updates_family_state(tmp_path: Path) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_comparison(workspace.root)
+    family_id = "fixture-lifecycle-loop"
+
+    evolve_dataset_family(
+        family_id,
+        comparison_id=comparison_id,
+        root=workspace.root,
+        top_n=1,
+    )
+    recommendation = recommend_dataset_action(
+        comparison_id,
+        root=workspace.root,
+        policy=GovernancePolicy(family_id=family_id, minimum_severity=0.0),
+    )
+    lifecycle = describe_dataset_family_lifecycle(family_id, root=workspace.root)
+    assert recommendation.history_context is not None
+    assert recommendation.escalation is not None
+    assert lifecycle is not None
+
+    result = apply_dataset_lifecycle_action(family_id, root=workspace.root, action=lifecycle.action)
+
+    assert result.status in {"applied", "already_applied"}
+    assert list_dataset_lifecycle_actions(family_id, root=workspace.root)
+    health = next(
+        row for row in list_dataset_family_health(root=workspace.root) if row.family_id == family_id
+    )
+    assert health.active_lifecycle_action == lifecycle.action
 
 
 def test_list_dataset_family_health_reports_latest_family_state(tmp_path: Path) -> None:
