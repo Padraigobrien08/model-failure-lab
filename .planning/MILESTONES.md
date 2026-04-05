@@ -1,5 +1,22 @@
 # Milestones
 
+## v5.0 Portfolio Prioritization And Guided Lifecycle Planning (Shipped: 2026-04-05)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Added deterministic portfolio ranking across existing dataset families with explicit comparison,
+  cluster, and lifecycle rationale.
+- Added inspectable planning units plus saved dry-run portfolio plans with bounded family actions,
+  dependencies, and projected impact.
+- Added CLI queue, planning-unit, saved-plan, and explicit plan-promotion workflows under the
+  existing dataset command family.
+- Surfaced portfolio priority and saved-plan context on the existing automation panel and proved
+  the full `queue -> saved plan -> explicit promote/apply -> family state` loop with backend and
+  frontend verification.
+
+---
+
 ## v4.9 Proactive Escalation And Dataset Lifecycle Management (Shipped: 2026-04-05)
 
 **Phases completed:** 4 phases, 4 plans

@@ -9,8 +9,8 @@ artifacts, a CLI-first workflow, and a React debugger that reads the same saved 
 
 ## Current State
 
-- Latest shipped milestone: `v4.9`
-- Active milestone: `v5.0`
+- Latest shipped milestone: `v5.0`
+- Active milestone: none
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -38,34 +38,24 @@ artifacts, a CLI-first workflow, and a React debugger that reads the same saved 
     cluster context, and governance rationale enriched with recurring-pattern evidence
   - `v4.9` added deterministic escalation statuses, explicit dataset-family lifecycle review/apply,
     debugger lifecycle surfacing, and end-to-end workflow proof
+  - `v5.0` added deterministic portfolio ranking, saved guided lifecycle plans, explicit plan
+    promotion, and route-local debugger plan context
 
-## Latest Completed Milestone: v4.9 Proactive Escalation And Dataset Lifecycle Management
-
-**Goal:** Turn recurring clusters and temporal governance context into explicit lifecycle actions
-over dataset families, so the system can escalate, prune, merge, retire, or keep packs with a
-deterministic local policy.
-
-**Delivered:**
-- Stable deterministic escalation statuses and provenance-rich lifecycle recommendations over
-  recurring clusters, family history, and dataset-health evidence.
-- CLI lifecycle review/apply flows with explicit persisted action records for `keep`, `prune`,
-  `merge_candidate`, and `retire`.
-- Lightweight debugger escalation and lifecycle surfacing on `/analysis` and comparison detail,
-  backed by the same stored governance payloads.
-- Verified workflow stability across backend policy, CLI apply, frontend rendering, and real
-  artifact smoke.
-
-## Current Milestone: v5.0 Portfolio Prioritization And Guided Lifecycle Planning
+## Latest Completed Milestone: v5.0 Portfolio Prioritization And Guided Lifecycle Planning
 
 **Goal:** Turn the per-family lifecycle signals from `v4.9` into a deterministic operator queue
 and saved plan artifacts, so users can prioritize and execute lifecycle work across many families
 without background automation.
 
-**Target features:**
+**Delivered:**
 - Deterministic portfolio ranking across dataset families from escalation, recurrence, and health.
 - Explicit planning-unit grouping for related families and merge candidates.
 - Saved dry-run lifecycle plans with projected impact and stepwise explicit apply handoff.
-- Lightweight debugger priority and plan context on existing routes.
+- Lightweight debugger priority and saved-plan context on existing routes.
+
+## Current Milestone
+
+No active milestone is defined. `v5.0` is shipped and the next step is to choose the next milestone.
 
 ## Core Value
 
@@ -99,14 +89,9 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 
 ### Active
 
-- Operators need a deterministic portfolio queue over many dataset families rather than only
-  per-family lifecycle surfaces.
-- Cross-family planning should stay explicit, saved, bounded, and artifact-native rather than
-  becoming background automation.
+- No active milestone is defined; use `$gsd-new-milestone` to formalize the next planning cycle.
 - Future behavior-management work should stay artifact-native unless a clear structural limit
   forces broader infrastructure.
-- The debugger should keep priority and plan context compact and route-local rather than turning
-  into a full observability dashboard.
 - Any future automation must preserve explicit reviewability; no silent mutation of published
   dataset families.
 
@@ -131,11 +116,10 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 - The core system now covers execution, comparison, insight, harvesting, enforcement, governance,
   history, recurring clusters, proactive escalation, and explicit dataset-family lifecycle
   management over local artifacts.
-- The next missing layer is not more family-level policy detail; it is helping operators decide
-  which families deserve attention first and how related actions should be grouped into explicit
-  plans.
-- `v5.0` should solve that prioritization and planning problem before any future bounded
-  automation work is considered.
+- `v5.0` solved the operator-prioritization layer with deterministic ranking, explicit planning
+  units, saved portfolio drafts, and route-local debugger context.
+- The next milestone can now build on saved plan artifacts rather than inventing portfolio
+  prioritization from scratch.
 
 ## Constraints
 
@@ -168,4 +152,4 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 | Add recurring cluster identity before proactive alerts or pruning | The system needs to know whether the same problem is returning before escalating or consolidating | ✓ Validated in `v4.8` |
 | Keep proactive escalation and dataset lifecycle actions local, deterministic, and explicitly reviewable | Maintenance decisions matter only if users can audit why a family should be kept, pruned, merged, or retired | ✓ Validated in `v4.9` |
 
-*Last updated: 2026-04-05 for v5.0 initialization*
+*Last updated: 2026-04-05 after v5.0 completion*
