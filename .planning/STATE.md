@@ -5,9 +5,9 @@ milestone_name: Guided Plan Execution And Outcome Verification
 current_phase: 120
 current_phase_name: Workflow Verification And Stability
 current_plan: null
-status: milestone_ready_to_complete
-stopped_at: Phase 120 verified
-resume_file: /Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md
+status: milestone_complete
+stopped_at: Milestone v5.2 completed
+resume_file: /Users/padraigobrien/model-failure-lab/.planning/PROJECT.md
 last_updated: "2026-04-06T18:48:31Z"
 last_activity: 2026-04-06
 progress:
@@ -18,7 +18,7 @@ progress:
   percent: 100
 ---
 
-# State: v5.2 Ready To Complete
+# State: v5.2 Complete
 
 ## Project Reference
 
@@ -27,13 +27,12 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** Close out `v5.2` after verified saved-plan execution and route-local outcome
-surfacing.
+**Current focus:** `v5.2` is shipped; the next step is defining the next milestone.
 
 ## Current Focus
 
-- next_action: complete milestone `v5.2`
-- status: `v5.2` verified and ready to archive
+- next_action: start the next milestone
+- status: `v5.2` completed
 
 ## Current Position
 
@@ -47,10 +46,10 @@ Phase: `120` — Workflow Verification And Stability
 **Total Phases:** 4
 **Current Plan:** none
 **Total Plans in Phase:** 1
-**Status:** Ready to complete
+**Status:** Milestone complete
 **Progress:** [██████████] 100%
 **Last Activity:** 2026-04-06
-**Last Activity Description:** Verified Phase 120 and completed all `v5.2` requirements
+**Last Activity Description:** Completed milestone `v5.2`
 
 ## Recent Decisions
 
@@ -80,22 +79,22 @@ Phase: `120` — Workflow Verification And Stability
   decomposed decision surface for recommendation, family state, actions, and history.
 - `v5.1` added `/analysis` intent presets, clearer shell workspace orientation, and final route
   plus build verification for the full `triage -> detail -> analysis` loop.
-- `v5.2` now closes the saved-plan execution gap with explicit preflight, checkpointed execution,
+- `v5.2` closed the saved-plan execution gap with explicit preflight, checkpointed execution,
   persisted receipts, and route-local before/after outcome context.
-- The milestone is ready for archive; the next product choice is what follows guided plan
-  execution rather than whether execution itself exists.
+- The next product choice now starts from an explicit execution loop rather than needing to invent
+  one.
 
 ## Session
 
 **Last Date:** 2026-04-06T18:48:31Z
-**Stopped At:** Phase 120 verified
-**Resume File:** [ROADMAP.md](/Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md)
+**Stopped At:** Milestone v5.2 completed
+**Resume File:** [PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PROJECT.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-complete-milestone
+$gsd-new-milestone
 ```
 
 ---
-*State updated: 2026-04-06 for v5.2 completion*
+*State updated: 2026-04-06 after v5.2 completion*

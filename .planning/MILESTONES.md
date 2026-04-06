@@ -1,5 +1,21 @@
 # Milestones
 
+## v5.2 Guided Plan Execution And Outcome Verification (Shipped: 2026-04-06)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Added a dedicated saved-plan execution contract with preflight checks, before/after family
+  snapshots, persisted checkpoints, and execution receipts.
+- Added CLI execution surfaces for plan preflight, stepwise or bounded-batch execution, receipt
+  listing, and detailed receipt inspection.
+- Added prepared rerun/compare guidance and rollback messaging to saved-plan execution outcomes so
+  operators can verify results explicitly.
+- Surfaced latest execution context on the existing automation panel and sticky operator summary,
+  then closed the milestone with governance, route-suite, and production-build verification.
+
+---
+
 ## v5.1 Operator Workflow Clarity And Triage Surfaces (Shipped: 2026-04-06)
 
 **Phases completed:** 4 phases, 4 plans
