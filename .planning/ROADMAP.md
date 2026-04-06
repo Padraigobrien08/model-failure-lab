@@ -53,7 +53,7 @@ outcome verification, so operators can safely act on portfolio decisions and mea
 actions improved behavior.
 
 ### Phase 117: Execution Contract And Preflight Checks
-- Status: pending
+- Status: complete
 - Requirements: `EXEC-01`, `VERIFY-01`
 - Goal: define the persisted execution and preflight contract over saved plans, planned lifecycle
   actions, and before/after state capture.
@@ -63,7 +63,7 @@ actions improved behavior.
   - Execution records preserve enough state to inspect what changed before and after each action.
 
 ### Phase 118: CLI Plan Execution, Checkpoints, And Rollback Receipts
-- Status: pending
+- Status: complete
 - Requirements: `EXEC-02`, `EXEC-03`, `VERIFY-02`
 - Goal: expose explicit saved-plan execution, checkpoint progression, compensating-action
   receipts, and rerun/compare handoff through the CLI.
@@ -74,7 +74,7 @@ actions improved behavior.
     including rerun/compare preparation.
 
 ### Phase 119: Debugger Execution Context And Before/After Outcome Views
-- Status: pending
+- Status: complete
 - Requirements: `UI-01`, `UI-02`
 - Goal: surface execution status, receipts, and outcome deltas on existing debugger routes.
 - Success criteria:
@@ -84,7 +84,7 @@ actions improved behavior.
     post-execution evidence.
 
 ### Phase 120: Workflow Verification And Stability
-- Status: pending
+- Status: complete
 - Requirements: `FLOW-01`
 - Goal: verify the full local workflow from triage to saved plan to explicit execution to
   rerun/compare and updated family state.
@@ -97,8 +97,8 @@ actions improved behavior.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 117
+$gsd-complete-milestone
 ```
 
 ---
-*Roadmap updated: 2026-04-06 for v5.2 initialization*
+*Roadmap updated: 2026-04-06 for v5.2 completion*

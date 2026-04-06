@@ -533,6 +533,99 @@ export type ArtifactSavedPortfolioPlan = {
   impact: ArtifactPortfolioPlanImpact;
 };
 
+export type ArtifactPortfolioPlanPreflightCheck = {
+  familyId: string;
+  action: string;
+  status: string;
+  summary: string;
+  blockers: string[];
+  warnings: string[];
+  dependencyFamilyIds: string[];
+  activeLifecycleAction: string | null;
+  activeLifecycleActionId: string | null;
+  currentRecommendationAction: string | null;
+  targetFamilyId: string | null;
+};
+
+export type ArtifactPortfolioPlanPreflight = {
+  planId: string;
+  createdAt: string;
+  status: string;
+  totalActions: number;
+  readyActions: number;
+  blockedActions: number;
+  alreadyAppliedActions: number;
+  checks: ArtifactPortfolioPlanPreflightCheck[];
+};
+
+export type ArtifactPortfolioExecutionSnapshot = {
+  familyId: string;
+  capturedAt: string;
+  healthLabel: string | null;
+  trendLabel: string | null;
+  versionCount: number | null;
+  latestDatasetId: string | null;
+  latestVersionTag: string | null;
+  recentFailRate: number | null;
+  priorityRank: number | null;
+  priorityBand: string | null;
+  priorityScore: number | null;
+  activeLifecycleAction: string | null;
+  activeLifecycleCondition: string | null;
+  activeLifecycleAppliedAt: string | null;
+};
+
+export type ArtifactPortfolioExecutionFollowUp = {
+  status: string;
+  summary: string;
+  datasets: string[];
+  models: string[];
+  comparisonIds: string[];
+  nextSteps: string[];
+};
+
+export type ArtifactPortfolioPlanExecutionCheckpoint = {
+  checkpointIndex: number;
+  familyId: string;
+  action: string;
+  status: string;
+  recordedAt: string;
+  summary: string;
+};
+
+export type ArtifactPortfolioPlanExecutionReceipt = {
+  checkpointIndex: number;
+  familyId: string;
+  action: string;
+  status: string;
+  recordedAt: string;
+  rationale: string;
+  lifecycleActionId: string | null;
+  outputPath: string | null;
+  rollbackGuidance: string;
+  beforeSnapshot: ArtifactPortfolioExecutionSnapshot | null;
+  afterSnapshot: ArtifactPortfolioExecutionSnapshot | null;
+  preflight: ArtifactPortfolioPlanPreflightCheck;
+  followUp: ArtifactPortfolioExecutionFollowUp;
+};
+
+export type ArtifactPortfolioPlanExecution = {
+  executionId: string;
+  planId: string;
+  createdAt: string;
+  completedAt: string | null;
+  mode: string;
+  status: string;
+  rationale: string;
+  selectedFamilyIds: string[];
+  remainingFamilyIds: string[];
+  totalActionCount: number;
+  completedCheckpointCount: number;
+  preflight: ArtifactPortfolioPlanPreflight;
+  checkpoints: ArtifactPortfolioPlanExecutionCheckpoint[];
+  receipts: ArtifactPortfolioPlanExecutionReceipt[];
+};
+
 export type ArtifactMetricTrend = {
   label: string;
   delta: number | null;
@@ -712,6 +805,7 @@ export type ArtifactDatasetVersionsResponse = {
   lifecycleActions: ArtifactLifecycleActionRecord[];
   portfolioItem: ArtifactDatasetPortfolioItem | null;
   portfolioPlans: ArtifactSavedPortfolioPlan[];
+  planExecutions: ArtifactPortfolioPlanExecution[];
 };
 
 export type ArtifactDatasetEvolutionResponse = {

@@ -58,6 +58,17 @@ def portfolio_plans_root(*, root: str | Path | None = None, create: bool = False
     return _ensure_dir(governance_root(root=root, create=create) / "portfolio_plans", create=create)
 
 
+def portfolio_plan_executions_root(
+    *,
+    root: str | Path | None = None,
+    create: bool = False,
+) -> Path:
+    return _ensure_dir(
+        governance_root(root=root, create=create) / "portfolio_plan_executions",
+        create=create,
+    )
+
+
 def lifecycle_family_directory(
     family_id: str,
     *,
@@ -77,6 +88,18 @@ def portfolio_plan_file(
     create: bool = False,
 ) -> Path:
     return portfolio_plans_root(root=root, create=create) / f"{_normalize_segment(plan_id)}.json"
+
+
+def portfolio_plan_execution_file(
+    execution_id: str,
+    *,
+    root: str | Path | None = None,
+    create: bool = False,
+) -> Path:
+    return (
+        portfolio_plan_executions_root(root=root, create=create)
+        / f"{_normalize_segment(execution_id)}.json"
+    )
 
 
 def dataset_file(

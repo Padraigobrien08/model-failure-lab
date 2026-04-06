@@ -1206,6 +1206,136 @@ function mockComparisonDetailWithVersionHistory(detail: ComparisonDetail) {
                 },
               },
             ],
+            plan_executions: [
+              {
+                execution_id: "execution-fixture",
+                plan_id: "portfolio-plan-fixture",
+                created_at: "2026-04-05T14:30:00Z",
+                completed_at: "2026-04-05T14:31:00Z",
+                mode: "stepwise",
+                status: "checkpointed",
+                rationale:
+                  "Executed 1 checkpoints and left 1 ready family actions for the next explicit execution step.",
+                selected_family_ids: ["regression-reasoning-failures-v1-reasoning"],
+                remaining_family_ids: [],
+                total_action_count: 1,
+                completed_checkpoint_count: 1,
+                preflight: {
+                  plan_id: "portfolio-plan-fixture",
+                  created_at: "2026-04-05T14:30:00Z",
+                  status: "ready",
+                  total_actions: 1,
+                  ready_actions: 1,
+                  blocked_actions: 0,
+                  already_applied_actions: 0,
+                  checks: [
+                    {
+                      family_id: "regression-reasoning-failures-v1-reasoning",
+                      action: "prune",
+                      status: "ready",
+                      summary:
+                        "Ready to apply `prune` to `regression-reasoning-failures-v1-reasoning`.",
+                      blockers: [],
+                      warnings: [],
+                      dependency_family_ids: [],
+                      active_lifecycle_action: null,
+                      active_lifecycle_action_id: null,
+                      current_recommendation_action: "prune",
+                      target_family_id: null,
+                    },
+                  ],
+                },
+                checkpoints: [
+                  {
+                    checkpoint_index: 1,
+                    family_id: "regression-reasoning-failures-v1-reasoning",
+                    action: "prune",
+                    status: "applied",
+                    recorded_at: "2026-04-05T14:31:00Z",
+                    summary:
+                      "Ready to apply `prune` to `regression-reasoning-failures-v1-reasoning`.",
+                  },
+                ],
+                receipts: [
+                  {
+                    checkpoint_index: 1,
+                    family_id: "regression-reasoning-failures-v1-reasoning",
+                    action: "prune",
+                    status: "applied",
+                    recorded_at: "2026-04-05T14:31:00Z",
+                    rationale:
+                      "Family remains a standalone review unit in the current portfolio queue.",
+                    lifecycle_action_id: "prune-fixture",
+                    output_path:
+                      "governance/lifecycle_actions/regression-reasoning-failures-v1-reasoning/prune-fixture.json",
+                    rollback_guidance:
+                      "No prior lifecycle action was recorded. Review the family manually before applying an alternative action.",
+                    before_snapshot: {
+                      family_id: "regression-reasoning-failures-v1-reasoning",
+                      captured_at: "2026-04-05T14:30:20Z",
+                      health_label: "stable",
+                      trend_label: "stable",
+                      version_count: versions.length,
+                      latest_dataset_id:
+                        versions[versions.length - 1]?.dataset_id ??
+                        "regression-reasoning-failures-v1-reasoning-v1",
+                      latest_version_tag: versions[versions.length - 1]?.version_tag ?? "v1",
+                      recent_fail_rate: 0.25,
+                      priority_rank: 1,
+                      priority_band: "high",
+                      priority_score: 48.5,
+                      active_lifecycle_action: null,
+                      active_lifecycle_condition: null,
+                      active_lifecycle_applied_at: null,
+                    },
+                    after_snapshot: {
+                      family_id: "regression-reasoning-failures-v1-reasoning",
+                      captured_at: "2026-04-05T14:31:00Z",
+                      health_label: "stable",
+                      trend_label: "stable",
+                      version_count: versions.length,
+                      latest_dataset_id:
+                        versions[versions.length - 1]?.dataset_id ??
+                        "regression-reasoning-failures-v1-reasoning-v1",
+                      latest_version_tag: versions[versions.length - 1]?.version_tag ?? "v1",
+                      recent_fail_rate: 0.25,
+                      priority_rank: 1,
+                      priority_band: "high",
+                      priority_score: 48.5,
+                      active_lifecycle_action: "prune",
+                      active_lifecycle_condition: "overgrown",
+                      active_lifecycle_applied_at: "2026-04-05T14:31:00Z",
+                    },
+                    preflight: {
+                      family_id: "regression-reasoning-failures-v1-reasoning",
+                      action: "prune",
+                      status: "ready",
+                      summary:
+                        "Ready to apply `prune` to `regression-reasoning-failures-v1-reasoning`.",
+                      blockers: [],
+                      warnings: [],
+                      dependency_family_ids: [],
+                      active_lifecycle_action: null,
+                      active_lifecycle_action_id: null,
+                      current_recommendation_action: "prune",
+                      target_family_id: null,
+                    },
+                    follow_up: {
+                      status: "prepared",
+                      summary:
+                        "Prepared deterministic rerun/compare scope from the saved plan action without launching any background work.",
+                      datasets: ["reasoning-failures-v1"],
+                      models: ["model-alpha", "model-beta"],
+                      comparison_ids: ["compare_alpha_to_beta"],
+                      next_steps: [
+                        "Rerun the affected dataset scope against the models already linked to this family (model-alpha, model-beta) over dataset(s) reasoning-failures-v1.",
+                        "Compare the new runs against the source comparison context (compare_alpha_to_beta) to verify health and priority changed as expected.",
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
             history: {
               scope_kind: "family",
               scope_value: "regression-reasoning-failures-v1-reasoning",
@@ -1874,6 +2004,8 @@ describe("comparison detail route", () => {
     expect((await screen.findAllByText("Portfolio priority")).length).toBeGreaterThan(0);
     expect(screen.getByText("Matched family")).toBeInTheDocument();
     expect(screen.getAllByText("Saved plans").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Latest execution").length).toBeGreaterThan(0);
+    expect(screen.getByText("Execution context")).toBeInTheDocument();
   });
 
   it("keeps incompatible comparisons openable with explicit coverage semantics", async () => {

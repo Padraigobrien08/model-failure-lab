@@ -39,6 +39,7 @@ from model_failure_lab.governance import (  # noqa: E402
     PortfolioFilters,
     get_dataset_portfolio_item,
     list_dataset_lifecycle_actions,
+    list_saved_portfolio_plan_executions,
     list_saved_portfolio_plans,
     recommend_dataset_action,
 )
@@ -269,6 +270,14 @@ def main(argv: list[str] | None = None) -> int:
                 for row in list_saved_portfolio_plans(
                     root=root,
                     filters=PortfolioFilters(family_id=args.dataset_family, limit=5),
+                )
+            ],
+            "plan_executions": [
+                row.to_payload()
+                for row in list_saved_portfolio_plan_executions(
+                    root=root,
+                    family_id=args.dataset_family,
+                    limit=5,
                 )
             ],
         }

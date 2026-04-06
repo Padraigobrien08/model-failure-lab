@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from model_failure_lab.cli import main
-from model_failure_lab.datasets import evolve_dataset_family
+from model_failure_lab.datasets import evolve_dataset_family, list_dataset_versions
 from model_failure_lab.governance import recommend_dataset_action
 from model_failure_lab.index import QueryFilters, query_comparison_signals
 from model_failure_lab.testing import materialize_insight_fixture
@@ -250,8 +250,7 @@ def test_cli_dataset_portfolio_and_saved_plan_workflow(
             "plan-create",
             "--root",
             str(workspace.root),
-            "--actionability",
-            "actionable",
+            "--include-keep",
             "--json",
         ]
     )
@@ -337,3 +336,173 @@ def test_cli_dataset_portfolio_and_saved_plan_workflow(
     assert plan_promote_payload["plan_id"] == plan_id
     assert plan_promote_payload["family_id"] == suggested_family_id
     assert plan_promote_payload["result"]["record"]["source"].startswith("portfolio-plan:")
+
+
+def test_cli_dataset_plan_execution_workflow(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_report_id(workspace.root)
+    suggested_family_id = recommend_dataset_action(
+        comparison_id,
+        root=workspace.root,
+    ).matched_family.family_id
+    related_family_id = "fixture-related-family"
+
+    for family_id in (suggested_family_id, related_family_id):
+        evolve_dataset_family(
+            family_id,
+            comparison_id=comparison_id,
+            root=workspace.root,
+            top_n=1,
+        )
+
+    plan_create_exit = main(
+        [
+            "dataset",
+            "plan-create",
+            "--root",
+            str(workspace.root),
+            "--include-keep",
+            "--json",
+        ]
+    )
+    plan_create_payload = json.loads(capsys.readouterr().out)
+    plan_id = plan_create_payload["plan"]["plan_id"]
+
+    preflight_exit = main(
+        [
+            "dataset",
+            "plan-preflight",
+            plan_id,
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    preflight_payload = json.loads(capsys.readouterr().out)
+
+    execute_exit = main(
+        [
+            "dataset",
+            "plan-execute",
+            plan_id,
+            "--root",
+            str(workspace.root),
+            "--mode",
+            "stepwise",
+            "--json",
+        ]
+    )
+    execute_payload = json.loads(capsys.readouterr().out)
+    execution_id = execute_payload["execution"]["execution_id"]
+
+    executions_exit = main(
+        [
+            "dataset",
+            "executions",
+            "--root",
+            str(workspace.root),
+            "--plan",
+            plan_id,
+            "--json",
+        ]
+    )
+    executions_payload = json.loads(capsys.readouterr().out)
+
+    show_exit = main(
+        [
+            "dataset",
+            "execution-show",
+            execution_id,
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    show_payload = json.loads(capsys.readouterr().out)
+
+    assert plan_create_exit == 0
+    assert preflight_exit == 0
+    assert preflight_payload["status"] == "ready"
+    assert preflight_payload["ready_actions"] >= 1
+
+    assert execute_exit == 0
+    assert execute_payload["status"] in {"checkpointed", "executed"}
+    assert Path(execute_payload["output_path"]).exists()
+    assert execute_payload["execution"]["mode"] == "stepwise"
+    assert execute_payload["execution"]["receipts"]
+    assert execute_payload["execution"]["receipts"][0]["follow_up"]["status"] == "prepared"
+    assert (
+        execute_payload["execution"]["receipts"][0]["after_snapshot"]["active_lifecycle_action"]
+        == execute_payload["execution"]["receipts"][0]["action"]
+    )
+
+    assert executions_exit == 0
+    assert executions_payload["query_kind"] == "dataset_portfolio_plan_executions"
+    assert any(row["execution_id"] == execution_id for row in executions_payload["rows"])
+
+    assert show_exit == 0
+    assert show_payload["execution_id"] == execution_id
+    assert show_payload["preflight"]["plan_id"] == plan_id
+    assert show_payload["receipts"][0]["rollback_guidance"]
+
+
+def test_cli_dataset_plan_preflight_blocks_when_family_history_is_missing(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_report_id(workspace.root)
+    family_id = recommend_dataset_action(
+        comparison_id,
+        root=workspace.root,
+    ).matched_family.family_id
+
+    evolve_dataset_family(
+        family_id,
+        comparison_id=comparison_id,
+        root=workspace.root,
+        top_n=1,
+    )
+
+    plan_create_exit = main(
+        [
+            "dataset",
+            "plan-create",
+            "--root",
+            str(workspace.root),
+            "--include-keep",
+            "--json",
+        ]
+    )
+    plan_create_payload = json.loads(capsys.readouterr().out)
+    plan_id = plan_create_payload["plan"]["plan_id"]
+
+    for version in list_dataset_versions(family_id, root=workspace.root):
+        version.path.unlink()
+
+    preflight_exit = main(
+        [
+            "dataset",
+            "plan-preflight",
+            plan_id,
+            "--root",
+            str(workspace.root),
+            "--family",
+            family_id,
+            "--json",
+        ]
+    )
+    preflight_payload = json.loads(capsys.readouterr().out)
+
+    assert plan_create_exit == 0
+    assert any(
+        action["family_id"] == family_id
+        for action in plan_create_payload["plan"]["actions"]
+    )
+    assert preflight_exit == 0
+    assert preflight_payload["status"] == "blocked"
+    assert preflight_payload["blocked_actions"] == 1
+    assert "no longer" in preflight_payload["checks"][0]["summary"].lower()

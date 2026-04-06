@@ -40,8 +40,15 @@ import {
   type ArtifactHarvestResponse,
   type ArtifactPlanningUnitMember,
   type ArtifactPortfolioComparisonReference,
+  type ArtifactPortfolioExecutionFollowUp,
+  type ArtifactPortfolioExecutionSnapshot,
   type ArtifactPortfolioPlanAction,
+  type ArtifactPortfolioPlanExecution,
+  type ArtifactPortfolioPlanExecutionCheckpoint,
+  type ArtifactPortfolioPlanExecutionReceipt,
   type ArtifactPortfolioPlanImpact,
+  type ArtifactPortfolioPlanPreflight,
+  type ArtifactPortfolioPlanPreflightCheck,
   type ArtifactQueryAggregateRow,
   type ArtifactQueryCaseRow,
   type ArtifactQueryClusterRow,
@@ -814,6 +821,248 @@ function requireArtifactSavedPortfolioPlans(
   });
 }
 
+function requireArtifactPortfolioPlanPreflightChecks(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioPlanPreflightCheck[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      familyId: requireString(row.family_id, `${field}[${index}].family_id`),
+      action: requireString(row.action, `${field}[${index}].action`),
+      status: requireString(row.status, `${field}[${index}].status`),
+      summary: requireString(row.summary, `${field}[${index}].summary`),
+      blockers: requireStringArray(row.blockers ?? [], `${field}[${index}].blockers`),
+      warnings: requireStringArray(row.warnings ?? [], `${field}[${index}].warnings`),
+      dependencyFamilyIds: requireStringArray(
+        row.dependency_family_ids ?? [],
+        `${field}[${index}].dependency_family_ids`,
+      ),
+      activeLifecycleAction: requireStringOrNull(
+        row.active_lifecycle_action,
+        `${field}[${index}].active_lifecycle_action`,
+      ),
+      activeLifecycleActionId: requireStringOrNull(
+        row.active_lifecycle_action_id,
+        `${field}[${index}].active_lifecycle_action_id`,
+      ),
+      currentRecommendationAction: requireStringOrNull(
+        row.current_recommendation_action,
+        `${field}[${index}].current_recommendation_action`,
+      ),
+      targetFamilyId: requireStringOrNull(
+        row.target_family_id,
+        `${field}[${index}].target_family_id`,
+      ),
+    };
+  });
+}
+
+function requireArtifactPortfolioPlanPreflightCheck(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioPlanPreflightCheck {
+  return requireArtifactPortfolioPlanPreflightChecks([value], `${field}_wrapper`)[0];
+}
+
+function requireArtifactPortfolioPlanPreflight(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioPlanPreflight {
+  const data = requireObject(value, field);
+  return {
+    planId: requireString(data.plan_id, `${field}.plan_id`),
+    createdAt: requireString(data.created_at, `${field}.created_at`),
+    status: requireString(data.status, `${field}.status`),
+    totalActions: requireCount(data.total_actions, `${field}.total_actions`),
+    readyActions: requireCount(data.ready_actions, `${field}.ready_actions`),
+    blockedActions: requireCount(data.blocked_actions, `${field}.blocked_actions`),
+    alreadyAppliedActions: requireCount(
+      data.already_applied_actions,
+      `${field}.already_applied_actions`,
+    ),
+    checks: requireArtifactPortfolioPlanPreflightChecks(
+      data.checks ?? [],
+      `${field}.checks`,
+    ),
+  };
+}
+
+function requireArtifactPortfolioExecutionSnapshot(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioExecutionSnapshot | null {
+  if (value == null) {
+    return null;
+  }
+  const data = requireObject(value, field);
+  return {
+    familyId: requireString(data.family_id, `${field}.family_id`),
+    capturedAt: requireString(data.captured_at, `${field}.captured_at`),
+    healthLabel: requireStringOrNull(data.health_label, `${field}.health_label`),
+    trendLabel: requireStringOrNull(data.trend_label, `${field}.trend_label`),
+    versionCount:
+      data.version_count == null ? null : requireCount(data.version_count, `${field}.version_count`),
+    latestDatasetId: requireStringOrNull(data.latest_dataset_id, `${field}.latest_dataset_id`),
+    latestVersionTag: requireStringOrNull(data.latest_version_tag, `${field}.latest_version_tag`),
+    recentFailRate: requireNumberOrNull(data.recent_fail_rate, `${field}.recent_fail_rate`),
+    priorityRank:
+      data.priority_rank == null ? null : requireCount(data.priority_rank, `${field}.priority_rank`),
+    priorityBand: requireStringOrNull(data.priority_band, `${field}.priority_band`),
+    priorityScore: requireNumberOrNull(data.priority_score, `${field}.priority_score`),
+    activeLifecycleAction: requireStringOrNull(
+      data.active_lifecycle_action,
+      `${field}.active_lifecycle_action`,
+    ),
+    activeLifecycleCondition: requireStringOrNull(
+      data.active_lifecycle_condition,
+      `${field}.active_lifecycle_condition`,
+    ),
+    activeLifecycleAppliedAt: requireStringOrNull(
+      data.active_lifecycle_applied_at,
+      `${field}.active_lifecycle_applied_at`,
+    ),
+  };
+}
+
+function requireArtifactPortfolioExecutionFollowUp(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioExecutionFollowUp {
+  const data = requireObject(value, field);
+  return {
+    status: requireString(data.status, `${field}.status`),
+    summary: requireString(data.summary, `${field}.summary`),
+    datasets: requireStringArray(data.datasets ?? [], `${field}.datasets`),
+    models: requireStringArray(data.models ?? [], `${field}.models`),
+    comparisonIds: requireStringArray(data.comparison_ids ?? [], `${field}.comparison_ids`),
+    nextSteps: requireStringArray(data.next_steps ?? [], `${field}.next_steps`),
+  };
+}
+
+function requireArtifactPortfolioPlanExecutionCheckpoints(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioPlanExecutionCheckpoint[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      checkpointIndex: requireCount(
+        row.checkpoint_index,
+        `${field}[${index}].checkpoint_index`,
+      ),
+      familyId: requireString(row.family_id, `${field}[${index}].family_id`),
+      action: requireString(row.action, `${field}[${index}].action`),
+      status: requireString(row.status, `${field}[${index}].status`),
+      recordedAt: requireString(row.recorded_at, `${field}[${index}].recorded_at`),
+      summary: requireString(row.summary, `${field}[${index}].summary`),
+    };
+  });
+}
+
+function requireArtifactPortfolioPlanExecutionReceipts(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioPlanExecutionReceipt[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      checkpointIndex: requireCount(
+        row.checkpoint_index,
+        `${field}[${index}].checkpoint_index`,
+      ),
+      familyId: requireString(row.family_id, `${field}[${index}].family_id`),
+      action: requireString(row.action, `${field}[${index}].action`),
+      status: requireString(row.status, `${field}[${index}].status`),
+      recordedAt: requireString(row.recorded_at, `${field}[${index}].recorded_at`),
+      rationale: requireString(row.rationale, `${field}[${index}].rationale`),
+      lifecycleActionId: requireStringOrNull(
+        row.lifecycle_action_id,
+        `${field}[${index}].lifecycle_action_id`,
+      ),
+      outputPath: requireStringOrNull(row.output_path, `${field}[${index}].output_path`),
+      rollbackGuidance: requireString(
+        row.rollback_guidance,
+        `${field}[${index}].rollback_guidance`,
+      ),
+      beforeSnapshot: requireArtifactPortfolioExecutionSnapshot(
+        row.before_snapshot,
+        `${field}[${index}].before_snapshot`,
+      ),
+      afterSnapshot: requireArtifactPortfolioExecutionSnapshot(
+        row.after_snapshot,
+        `${field}[${index}].after_snapshot`,
+      ),
+      preflight: requireArtifactPortfolioPlanPreflightCheck(
+        row.preflight,
+        `${field}[${index}].preflight`,
+      ),
+      followUp: requireArtifactPortfolioExecutionFollowUp(
+        row.follow_up,
+        `${field}[${index}].follow_up`,
+      ),
+    };
+  });
+}
+
+function requireArtifactPortfolioPlanExecutions(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioPlanExecution[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      executionId: requireString(row.execution_id, `${field}[${index}].execution_id`),
+      planId: requireString(row.plan_id, `${field}[${index}].plan_id`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      completedAt: requireStringOrNull(row.completed_at, `${field}[${index}].completed_at`),
+      mode: requireString(row.mode, `${field}[${index}].mode`),
+      status: requireString(row.status, `${field}[${index}].status`),
+      rationale: requireString(row.rationale, `${field}[${index}].rationale`),
+      selectedFamilyIds: requireStringArray(
+        row.selected_family_ids ?? [],
+        `${field}[${index}].selected_family_ids`,
+      ),
+      remainingFamilyIds: requireStringArray(
+        row.remaining_family_ids ?? [],
+        `${field}[${index}].remaining_family_ids`,
+      ),
+      totalActionCount: requireCount(
+        row.total_action_count,
+        `${field}[${index}].total_action_count`,
+      ),
+      completedCheckpointCount: requireCount(
+        row.completed_checkpoint_count,
+        `${field}[${index}].completed_checkpoint_count`,
+      ),
+      preflight: requireArtifactPortfolioPlanPreflight(
+        row.preflight,
+        `${field}[${index}].preflight`,
+      ),
+      checkpoints: requireArtifactPortfolioPlanExecutionCheckpoints(
+        row.checkpoints ?? [],
+        `${field}[${index}].checkpoints`,
+      ),
+      receipts: requireArtifactPortfolioPlanExecutionReceipts(
+        row.receipts ?? [],
+        `${field}[${index}].receipts`,
+      ),
+    };
+  });
+}
+
 function requireArtifactMetricTrend(value: unknown, field: string): ArtifactMetricTrend {
   const data = requireObject(value, field);
   return {
@@ -1253,6 +1502,10 @@ function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatas
     portfolioPlans: requireArtifactSavedPortfolioPlans(
       data.portfolio_plans ?? [],
       "dataset_versions.portfolio_plans",
+    ),
+    planExecutions: requireArtifactPortfolioPlanExecutions(
+      data.plan_executions ?? [],
+      "dataset_versions.plan_executions",
     ),
   };
 }

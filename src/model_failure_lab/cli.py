@@ -44,6 +44,9 @@ from model_failure_lab.governance import (
     GovernancePolicy,
     GovernanceRecommendation,
     LifecycleApplyResult,
+    PortfolioPlanExecution,
+    PortfolioPlanExecutionResult,
+    PortfolioPlanPreflight,
     PortfolioFilters,
     PortfolioPlanApplyResult,
     PortfolioPlanSaveResult,
@@ -52,12 +55,16 @@ from model_failure_lab.governance import (
     apply_dataset_lifecycle_action,
     apply_dataset_actions,
     create_saved_portfolio_plan,
+    execute_saved_portfolio_plan,
     get_saved_portfolio_plan,
+    get_saved_portfolio_plan_execution,
     list_dataset_planning_units,
     list_dataset_portfolio,
+    list_saved_portfolio_plan_executions,
     review_dataset_lifecycle,
     list_dataset_family_health,
     list_saved_portfolio_plans,
+    preflight_saved_portfolio_plan,
     recommend_dataset_action,
     review_dataset_actions,
 )
@@ -479,6 +486,95 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dataset_plan_show_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_plan_show_parser.set_defaults(handler=_handle_dataset_plan_show)
+
+    dataset_plan_preflight_parser = dataset_subparsers.add_parser(
+        "plan-preflight",
+        help="Validate one saved portfolio draft before any lifecycle action is written.",
+    )
+    dataset_plan_preflight_parser.add_argument("plan_id")
+    dataset_plan_preflight_parser.add_argument(
+        "--family",
+        action="append",
+        dest="family_ids",
+        help="Limit preflight to one family action in the saved plan. Repeat as needed.",
+    )
+    dataset_plan_preflight_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_plan_preflight_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_plan_preflight_parser.set_defaults(handler=_handle_dataset_plan_preflight)
+
+    dataset_plan_execute_parser = dataset_subparsers.add_parser(
+        "plan-execute",
+        help="Execute one saved portfolio draft with explicit stepwise or bounded batch checkpoints.",
+    )
+    dataset_plan_execute_parser.add_argument("plan_id")
+    dataset_plan_execute_parser.add_argument(
+        "--family",
+        action="append",
+        dest="family_ids",
+        help="Limit execution to one family action in the saved plan. Repeat as needed.",
+    )
+    dataset_plan_execute_parser.add_argument(
+        "--mode",
+        choices=["batch", "stepwise"],
+        default="batch",
+        help="Use `stepwise` to execute one ready family action by default.",
+    )
+    dataset_plan_execute_parser.add_argument(
+        "--max-actions",
+        type=int,
+        help="Bound how many ready family actions are executed in this invocation.",
+    )
+    dataset_plan_execute_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_plan_execute_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_plan_execute_parser.set_defaults(handler=_handle_dataset_plan_execute)
+
+    dataset_executions_parser = dataset_subparsers.add_parser(
+        "executions",
+        help="List persisted saved-plan execution receipts.",
+    )
+    dataset_executions_parser.add_argument("--plan", dest="plan_id")
+    dataset_executions_parser.add_argument("--family", dest="family_id")
+    dataset_executions_parser.add_argument("--limit", type=int, default=20)
+    dataset_executions_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_executions_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_executions_parser.set_defaults(handler=_handle_dataset_executions)
+
+    dataset_execution_show_parser = dataset_subparsers.add_parser(
+        "execution-show",
+        help="Inspect one saved plan execution receipt and its before/after snapshots.",
+    )
+    dataset_execution_show_parser.add_argument("execution_id")
+    dataset_execution_show_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_execution_show_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_execution_show_parser.set_defaults(handler=_handle_dataset_execution_show)
 
     dataset_plan_promote_parser = dataset_subparsers.add_parser(
         "plan-promote",
@@ -1598,6 +1694,71 @@ def _handle_dataset_plan_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_dataset_plan_preflight(args: argparse.Namespace) -> int:
+    result = preflight_saved_portfolio_plan(
+        args.plan_id,
+        root=_normalized_root(args.root),
+        family_ids=tuple(args.family_ids) if args.family_ids else None,
+    )
+    if args.as_json:
+        print(_render_json_payload(result.to_payload()))
+        return 0
+    print(_render_portfolio_plan_preflight(result))
+    return 0
+
+
+def _handle_dataset_plan_execute(args: argparse.Namespace) -> int:
+    result = execute_saved_portfolio_plan(
+        args.plan_id,
+        root=_normalized_root(args.root),
+        family_ids=tuple(args.family_ids) if args.family_ids else None,
+        mode=args.mode,
+        max_actions=args.max_actions,
+    )
+    if args.as_json:
+        print(_render_json_payload(result.to_payload()))
+        return 0
+    print(_render_portfolio_plan_execution(result))
+    return 0
+
+
+def _handle_dataset_executions(args: argparse.Namespace) -> int:
+    rows = list_saved_portfolio_plan_executions(
+        root=_normalized_root(args.root),
+        plan_id=args.plan_id,
+        family_id=args.family_id,
+        limit=args.limit,
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "dataset_portfolio_plan_executions",
+                    "plan_id": args.plan_id,
+                    "family_id": args.family_id,
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_saved_portfolio_plan_executions(rows))
+    return 0
+
+
+def _handle_dataset_execution_show(args: argparse.Namespace) -> int:
+    execution = get_saved_portfolio_plan_execution(
+        args.execution_id,
+        root=_normalized_root(args.root),
+    )
+    if execution is None:
+        raise ValueError(f"portfolio plan execution not found: {args.execution_id}")
+    if args.as_json:
+        print(_render_json_payload(execution.to_payload()))
+        return 0
+    print(_render_saved_portfolio_plan_execution(execution))
+    return 0
+
+
 def _handle_dataset_plan_promote(args: argparse.Namespace) -> int:
     result = apply_saved_portfolio_plan_action(
         args.plan_id,
@@ -2592,6 +2753,170 @@ def _render_saved_portfolio_plan(plan: SavedPortfolioPlan) -> str:
         ),
     ]
     return "\n".join(lines)
+
+
+def _render_portfolio_plan_preflight(result: PortfolioPlanPreflight) -> str:
+    lines = [
+        "Failure Lab Portfolio Plan Preflight",
+        f"Plan: {result.plan_id}",
+        f"Status: {result.status}",
+        (
+            "Counts: "
+            f"ready={result.ready_actions} blocked={result.blocked_actions} "
+            f"already_applied={result.already_applied_actions}"
+        ),
+        _render_table(
+            [
+                (
+                    "family_id",
+                    "action",
+                    "status",
+                    "active",
+                    "current",
+                    "blockers",
+                ),
+                *[
+                    (
+                        check.family_id,
+                        check.action,
+                        check.status,
+                        check.active_lifecycle_action or "n/a",
+                        check.current_recommendation_action or "n/a",
+                        str(len(check.blockers)),
+                    )
+                    for check in result.checks
+                ],
+            ]
+        ),
+    ]
+    for check in result.checks:
+        if not check.blockers and not check.warnings:
+            continue
+        lines.append(f"{check.family_id}: {check.summary}")
+        if check.blockers:
+            lines.append(f"  blockers: {', '.join(check.blockers)}")
+        if check.warnings:
+            lines.append(f"  warnings: {', '.join(check.warnings)}")
+    return "\n".join(lines)
+
+
+def _render_portfolio_plan_execution(result: PortfolioPlanExecutionResult) -> str:
+    execution = result.execution
+    lines = [
+        "Failure Lab Portfolio Plan Execution",
+        f"Execution: {execution.execution_id}",
+        f"Plan: {execution.plan_id}",
+        f"Status: {result.status}",
+        f"Mode: {execution.mode}",
+        f"Checkpoints: {execution.completed_checkpoint_count}/{execution.total_action_count}",
+        f"Remaining: {', '.join(execution.remaining_family_ids) or 'none'}",
+        f"Output: {result.output_path}",
+        f"Rationale: {execution.rationale}",
+    ]
+    if execution.checkpoints:
+        lines.append(
+            _render_table(
+                [
+                    ("checkpoint", "family_id", "action", "status", "recorded_at"),
+                    *[
+                        (
+                            str(checkpoint.checkpoint_index),
+                            checkpoint.family_id,
+                            checkpoint.action,
+                            checkpoint.status,
+                            checkpoint.recorded_at,
+                        )
+                        for checkpoint in execution.checkpoints
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _render_saved_portfolio_plan_executions(rows: tuple[PortfolioPlanExecution, ...]) -> str:
+    if not rows:
+        return (
+            "Failure Lab Portfolio Plan Executions\n"
+            "No saved plan executions matched the current filters."
+        )
+    return "\n".join(
+        [
+            "Failure Lab Portfolio Plan Executions",
+            _render_table(
+                [
+                    (
+                        "execution_id",
+                        "plan_id",
+                        "created_at",
+                        "mode",
+                        "status",
+                        "remaining",
+                    ),
+                    *[
+                        (
+                            row.execution_id,
+                            row.plan_id,
+                            row.created_at,
+                            row.mode,
+                            row.status,
+                            str(len(row.remaining_family_ids)),
+                        )
+                        for row in rows
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
+def _render_saved_portfolio_plan_execution(execution: PortfolioPlanExecution) -> str:
+    lines = [
+        "Failure Lab Portfolio Plan Execution",
+        f"Execution: {execution.execution_id}",
+        f"Plan: {execution.plan_id}",
+        f"Created at: {execution.created_at}",
+        f"Completed at: {execution.completed_at or 'in_progress'}",
+        f"Status: {execution.status}",
+        f"Mode: {execution.mode}",
+        f"Rationale: {execution.rationale}",
+        f"Remaining families: {', '.join(execution.remaining_family_ids) or 'none'}",
+    ]
+    if execution.receipts:
+        lines.append(
+            _render_table(
+                [
+                    (
+                        "checkpoint",
+                        "family_id",
+                        "action",
+                        "status",
+                        "before",
+                        "after",
+                    ),
+                    *[
+                        (
+                            str(receipt.checkpoint_index),
+                            receipt.family_id,
+                            receipt.action,
+                            receipt.status,
+                            _render_execution_snapshot_label(receipt.before_snapshot),
+                            _render_execution_snapshot_label(receipt.after_snapshot),
+                        )
+                        for receipt in execution.receipts
+                    ],
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _render_execution_snapshot_label(snapshot) -> str:
+    if snapshot is None:
+        return "n/a"
+    lifecycle = snapshot.active_lifecycle_action or "none"
+    health = snapshot.health_label or "unknown"
+    return f"{lifecycle}:{health}"
 
 
 def _render_portfolio_plan_apply(result: PortfolioPlanApplyResult) -> str:

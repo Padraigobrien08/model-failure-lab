@@ -103,6 +103,19 @@ function formatPriorityBand(value: string): string {
   return value.replace(/_/g, " ");
 }
 
+function formatExecutionSnapshotValue(
+  action: string | null,
+  health: string | null,
+  priority: string | null,
+): string {
+  const segments = [
+    action ? formatLifecycleLabel(action) : null,
+    health ? formatLifecycleLabel(health) : null,
+    priority ? formatPriorityBand(priority) : null,
+  ].filter((entry): entry is string => entry != null && entry.trim().length > 0);
+  return segments.length > 0 ? segments.join(" · ") : "No saved family snapshot";
+}
+
 type SurfaceSectionProps = {
   eyebrow: string;
   title: string;
@@ -217,6 +230,12 @@ export function SignalDatasetAutomationPanel({
     versionsState.status === "ready" ? versionsState.value.portfolioItem : null;
   const portfolioPlans =
     versionsState.status === "ready" ? versionsState.value.portfolioPlans : [];
+  const planExecutions =
+    versionsState.status === "ready" ? versionsState.value.planExecutions : [];
+  const latestPlanExecution = planExecutions.length > 0 ? planExecutions[0] : null;
+  const latestExecutionReceipt =
+    latestPlanExecution?.receipts.find((receipt) => receipt.familyId === targetFamilyId) ??
+    (latestPlanExecution?.receipts.length ? latestPlanExecution.receipts[0] : null);
 
   return (
     <Card className="border-border/70 bg-card/70">
@@ -559,8 +578,95 @@ export function SignalDatasetAutomationPanel({
           </SurfaceSection>
         ) : null}
 
+        {planExecutions.length > 0 ? (
+          <SurfaceSection
+            eyebrow="4"
+            title="Execution context"
+            description="Keep the latest saved execution status, before/after family state, and prepared follow-up attached to the same comparison review."
+          >
+            <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="accent">Latest execution</Badge>
+                <Badge tone="muted">{latestPlanExecution?.executionId}</Badge>
+                <Badge tone="muted">{latestPlanExecution?.mode}</Badge>
+                <Badge tone="muted">{latestPlanExecution?.status}</Badge>
+                <Badge tone="muted">
+                  {latestPlanExecution?.completedCheckpointCount ?? 0}/
+                  {latestPlanExecution?.totalActionCount ?? 0} checkpoints
+                </Badge>
+                {latestPlanExecution?.remainingFamilyIds.length ? (
+                  <Badge tone="muted">
+                    {latestPlanExecution.remainingFamilyIds.length} remaining
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {latestPlanExecution?.rationale}
+              </p>
+              {latestExecutionReceipt ? (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <div className="rounded-[16px] border border-border/60 bg-card/70 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Before
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {formatExecutionSnapshotValue(
+                        latestExecutionReceipt.beforeSnapshot?.activeLifecycleAction ?? null,
+                        latestExecutionReceipt.beforeSnapshot?.healthLabel ?? null,
+                        latestExecutionReceipt.beforeSnapshot?.priorityBand ?? null,
+                      )}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Captured {latestExecutionReceipt.beforeSnapshot?.capturedAt ?? "n/a"}
+                    </p>
+                  </div>
+                  <div className="rounded-[16px] border border-border/60 bg-card/70 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      After
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {formatExecutionSnapshotValue(
+                        latestExecutionReceipt.afterSnapshot?.activeLifecycleAction ?? null,
+                        latestExecutionReceipt.afterSnapshot?.healthLabel ?? null,
+                        latestExecutionReceipt.afterSnapshot?.priorityBand ?? null,
+                      )}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Captured {latestExecutionReceipt.afterSnapshot?.capturedAt ?? "n/a"}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+              {latestExecutionReceipt ? (
+                <div className="space-y-2 rounded-[16px] border border-border/60 bg-card/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="muted">{formatLifecycleLabel(latestExecutionReceipt.action)}</Badge>
+                    <Badge tone="muted">{latestExecutionReceipt.status}</Badge>
+                    <Badge tone="muted">{latestExecutionReceipt.recordedAt}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {latestExecutionReceipt.rollbackGuidance}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {latestExecutionReceipt.followUp.summary}
+                  </p>
+                  {latestExecutionReceipt.followUp.nextSteps.length > 0 ? (
+                    <div className="space-y-2">
+                      {latestExecutionReceipt.followUp.nextSteps.map((step) => (
+                        <p key={step} className="text-xs text-muted-foreground">
+                          {step}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </SurfaceSection>
+        ) : null}
+
         <SurfaceSection
-          eyebrow="4"
+          eyebrow="5"
           title="Take action"
           description="Generate a draft pack, evolve the family, or refresh immutable history from the same comparison context."
         >
@@ -656,7 +762,7 @@ export function SignalDatasetAutomationPanel({
 
         {activePreview ? (
           <SurfaceSection
-            eyebrow="5"
+            eyebrow="6"
             title="Preview output"
             description="Stay anchored to the same evidence while checking the generated draft or evolved family output."
           >
@@ -693,7 +799,7 @@ export function SignalDatasetAutomationPanel({
 
         {versionsState.status === "ready" ? (
           <SurfaceSection
-            eyebrow="6"
+            eyebrow="7"
             title="Version history"
             description="Review immutable dataset lineage and lifecycle actions for the current family."
           >

@@ -615,6 +615,12 @@ export function ComparisonDetailPage() {
   const activePortfolioPlans = loadedDatasetVersions?.portfolioPlans ?? [];
   const matchedFamilyId =
     activeRecommendation?.matchedFamily.familyId ?? loadedDatasetVersions?.familyId ?? null;
+  const activePlanExecutions = loadedDatasetVersions?.planExecutions ?? [];
+  const latestPlanExecution =
+    activePlanExecutions.length > 0 ? activePlanExecutions[0] : null;
+  const latestExecutionReceipt =
+    latestPlanExecution?.receipts.find((receipt) => receipt.familyId === matchedFamilyId) ??
+    (latestPlanExecution?.receipts.length ? latestPlanExecution.receipts[0] : null);
   const detailReturnState = {
     returnTo: {
       pathname: location.pathname,
@@ -886,6 +892,24 @@ export function ComparisonDetailPage() {
                         </Badge>
                       ))}
                     </div>
+                  </div>
+
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Latest execution
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {latestPlanExecution
+                        ? `${formatLabel(latestPlanExecution.status)} · ${formatLabel(latestPlanExecution.mode)}`
+                        : "No plan execution recorded"}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {latestExecutionReceipt
+                        ? `${formatLabel(latestExecutionReceipt.action)} · ${latestExecutionReceipt.recordedAt}`
+                        : latestPlanExecution
+                          ? `${latestPlanExecution.completedCheckpointCount}/${latestPlanExecution.totalActionCount} checkpoints saved`
+                          : "Execution receipts will appear here after a saved plan is preflighted or executed."}
+                    </p>
                   </div>
 
                   <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
