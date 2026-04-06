@@ -1,5 +1,21 @@
 # Milestones
 
+## v5.3 Closed-Loop Outcome Attestation And Policy Feedback (Shipped: 2026-04-06)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Added explicit execution-follow-up attestation over saved receipts with linked run and
+  comparison evidence, operator notes, and persisted open or closed state.
+- Added deterministic measured verdicts with saved source signals, follow-up signals, delta
+  summaries, and rationale for `improved`, `regressed`, `inconclusive`, and `no_signal`.
+- Fed attested outcomes back into portfolio rationale and priority context while exposing latest
+  outcome state on the existing automation panel and comparison detail summary rail.
+- Closed the milestone with backend governance/history/CLI proof, frontend route regressions, and
+  a clean production build over the expanded outcome-feedback payload contract.
+
+---
+
 ## v5.2 Guided Plan Execution And Outcome Verification (Shipped: 2026-04-06)
 
 **Phases completed:** 4 phases, 4 plans
