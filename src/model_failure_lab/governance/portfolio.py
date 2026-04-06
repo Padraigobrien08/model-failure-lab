@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from model_failure_lab.index import QueryFilters, query_comparison_signals
 from model_failure_lab.schemas import JsonValue
@@ -21,6 +22,9 @@ from model_failure_lab.storage import (
 from .lifecycle import LifecycleApplyResult, apply_lifecycle_action, get_active_lifecycle_action
 from .policy import LifecycleRecommendation, describe_dataset_family_lifecycle, recommend_dataset_action
 from .workflow import DatasetFamilyHealth, list_dataset_family_health
+
+if TYPE_CHECKING:
+    from .outcomes import PortfolioOutcomeFeedbackSummary
 
 _DEFAULT_PORTFOLIO_SCAN_LIMIT = 200
 _MAX_COMPARISON_REFS = 5
@@ -121,6 +125,7 @@ class DatasetPortfolioItem:
     active_lifecycle_action: str | None = None
     active_lifecycle_condition: str | None = None
     active_lifecycle_applied_at: str | None = None
+    outcome_feedback: PortfolioOutcomeFeedbackSummary | None = None
 
     def to_payload(self) -> dict[str, JsonValue]:
         return {
@@ -160,6 +165,9 @@ class DatasetPortfolioItem:
             "active_lifecycle_action": self.active_lifecycle_action,
             "active_lifecycle_condition": self.active_lifecycle_condition,
             "active_lifecycle_applied_at": self.active_lifecycle_applied_at,
+            "outcome_feedback": (
+                self.outcome_feedback.to_payload() if self.outcome_feedback is not None else None
+            ),
         }
 
 
@@ -821,11 +829,15 @@ def _build_portfolio_item(
     evidence: _FamilyPortfolioEvidence | None,
     root: Path,
 ) -> DatasetPortfolioItem:
+    from .outcomes import summarize_portfolio_outcomes_for_family
+
     active_action = get_active_lifecycle_action(family.family_id, root=root)
+    outcome_feedback = summarize_portfolio_outcomes_for_family(family.family_id, root=root)
     priority_score = _priority_score(
         family=family,
         recommendation=recommendation,
         evidence=evidence,
+        outcome_feedback=outcome_feedback,
     )
     priority_band = _priority_band(priority_score)
     actionability = "actionable" if recommendation.action != "keep" else "neutral"
@@ -851,6 +863,12 @@ def _build_portfolio_item(
         rationale_parts.append(f"recent_regressions={recent_regression_count}")
     if recurring_cluster_count:
         rationale_parts.append(f"recurring_clusters={recurring_cluster_count}")
+    if outcome_feedback is not None:
+        rationale_parts.append(
+            f"outcomes={outcome_feedback.attested_count} attested/{outcome_feedback.open_count + outcome_feedback.evidence_linked_count} open"
+        )
+        if outcome_feedback.latest_verdict is not None:
+            rationale_parts.append(f"latest_outcome={outcome_feedback.latest_verdict}")
     return DatasetPortfolioItem(
         family_id=family.family_id,
         priority_rank=0,
@@ -884,6 +902,7 @@ def _build_portfolio_item(
         active_lifecycle_action=family.active_lifecycle_action,
         active_lifecycle_condition=family.active_lifecycle_condition,
         active_lifecycle_applied_at=family.active_lifecycle_applied_at,
+        outcome_feedback=outcome_feedback,
     )
 
 
@@ -892,6 +911,7 @@ def _priority_score(
     family: DatasetFamilyHealth,
     recommendation: LifecycleRecommendation,
     evidence: _FamilyPortfolioEvidence | None,
+    outcome_feedback: PortfolioOutcomeFeedbackSummary | None,
 ) -> float:
     score = _ACTION_WEIGHTS.get(recommendation.action, 0.0)
     score += _HEALTH_WEIGHTS.get(family.health_label, 0.0)
@@ -902,6 +922,12 @@ def _priority_score(
         score += (evidence.escalation_score or 0.0) * 100.0
         score += min(evidence.recent_regression_count, 5) * 4.0
         score += min(len(evidence.cluster_ids), 4) * 3.0
+    if outcome_feedback is not None:
+        score += min(outcome_feedback.regressed_count, 3) * 4.0
+        score -= min(outcome_feedback.improved_count, 3) * 2.5
+        score += min(outcome_feedback.evidence_linked_count, 2) * 1.0
+        if outcome_feedback.latest_state == "open":
+            score += 1.0
     if family.active_lifecycle_action is not None and family.active_lifecycle_action != recommendation.action:
         score += 2.0
     return round(score, 6)

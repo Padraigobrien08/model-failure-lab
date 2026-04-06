@@ -5,7 +5,11 @@ from pathlib import Path
 
 from model_failure_lab.cli import main
 from model_failure_lab.datasets import evolve_dataset_family, list_dataset_versions
-from model_failure_lab.governance import recommend_dataset_action
+from model_failure_lab.governance import (
+    create_saved_portfolio_plan,
+    execute_saved_portfolio_plan,
+    recommend_dataset_action,
+)
 from model_failure_lab.index import QueryFilters, query_comparison_signals
 from model_failure_lab.testing import materialize_insight_fixture
 
@@ -18,6 +22,25 @@ def _pick_regression_report_id(root: Path) -> str:
     )
     assert rows
     return str(rows[0]["report_id"])
+
+
+def _seed_execution_follow_up(root: Path) -> tuple[str, str, int]:
+    comparison_id = _pick_regression_report_id(root)
+    family_id = recommend_dataset_action(comparison_id, root=root).matched_family.family_id
+    evolve_dataset_family(
+        family_id,
+        comparison_id=comparison_id,
+        root=root,
+        top_n=1,
+    )
+    plan = create_saved_portfolio_plan(root=root, include_keep=True)
+    execution = execute_saved_portfolio_plan(plan.plan.plan_id, root=root, mode="stepwise")
+    assert execution.execution.receipts
+    return (
+        plan.plan.plan_id,
+        execution.execution.execution_id,
+        execution.execution.receipts[0].checkpoint_index,
+    )
 
 
 def test_cli_governance_recommend_review_apply_and_family_health(
@@ -506,3 +529,127 @@ def test_cli_dataset_plan_preflight_blocks_when_family_history_is_missing(
     assert preflight_payload["status"] == "blocked"
     assert preflight_payload["blocked_actions"] == 1
     assert "no longer" in preflight_payload["checks"][0]["summary"].lower()
+
+
+def test_cli_dataset_follow_up_link_and_attest_workflow(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    plan_id, execution_id, checkpoint_index = _seed_execution_follow_up(workspace.root)
+    follow_up_comparison_id = workspace.comparisons[0].report_id
+    follow_up_run_id = workspace.runs[-1].run_id
+
+    follow_ups_exit = main(
+        [
+            "dataset",
+            "follow-ups",
+            "--root",
+            str(workspace.root),
+            "--plan",
+            plan_id,
+            "--json",
+        ]
+    )
+    follow_ups_payload = json.loads(capsys.readouterr().out)
+
+    link_exit = main(
+        [
+            "dataset",
+            "follow-up-link",
+            execution_id,
+            "--checkpoint",
+            str(checkpoint_index),
+            "--run",
+            follow_up_run_id,
+            "--comparison",
+            follow_up_comparison_id,
+            "--note",
+            "Captured rerun evidence from the stable follow-up check.",
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    link_payload = json.loads(capsys.readouterr().out)
+
+    show_exit = main(
+        [
+            "dataset",
+            "follow-up-show",
+            execution_id,
+            "--checkpoint",
+            str(checkpoint_index),
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    show_payload = json.loads(capsys.readouterr().out)
+
+    attest_exit = main(
+        [
+            "dataset",
+            "follow-up-attest",
+            execution_id,
+            "--checkpoint",
+            str(checkpoint_index),
+            "--note",
+            "Stable rerun reduced the saved regression pressure.",
+            "--root",
+            str(workspace.root),
+            "--json",
+        ]
+    )
+    attest_payload = json.loads(capsys.readouterr().out)
+
+    assert follow_ups_exit == 0
+    assert follow_ups_payload["query_kind"] == "dataset_portfolio_outcomes"
+    assert len(follow_ups_payload["rows"]) == 1
+    assert follow_ups_payload["rows"][0]["attestation"]["state"] == "open"
+
+    assert link_exit == 0
+    assert link_payload["plan_id"] == plan_id
+    assert link_payload["attestation"]["state"] == "evidence_linked"
+    assert link_payload["attestation"]["linked_run_ids"] == [follow_up_run_id]
+    assert link_payload["attestation"]["linked_comparison_ids"] == [follow_up_comparison_id]
+    assert link_payload["attestation"]["notes"]
+
+    assert show_exit == 0
+    assert show_payload["execution_id"] == execution_id
+    assert show_payload["attestation"]["state"] == "evidence_linked"
+
+    assert attest_exit == 0
+    assert attest_payload["execution_id"] == execution_id
+    assert attest_payload["attestation"]["state"] == "attested"
+    assert attest_payload["attestation"]["verdict"]["status"] == "improved"
+    assert (
+        attest_payload["attestation"]["verdict"]["delta_summary"]["follow_up_comparison_count"]
+        == 1
+    )
+
+
+def test_cli_dataset_follow_up_link_rejects_missing_artifacts(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    _plan_id, execution_id, checkpoint_index = _seed_execution_follow_up(workspace.root)
+
+    link_exit = main(
+        [
+            "dataset",
+            "follow-up-link",
+            execution_id,
+            "--checkpoint",
+            str(checkpoint_index),
+            "--comparison",
+            "compare_missing",
+            "--root",
+            str(workspace.root),
+        ]
+    )
+    stderr = capsys.readouterr().err
+
+    assert link_exit == 1
+    assert "saved comparison report not found" in stderr

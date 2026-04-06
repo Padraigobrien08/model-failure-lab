@@ -92,6 +92,16 @@ function priorityTone(priorityBand: string | null): "accent" | "default" | "mute
   return "muted";
 }
 
+function outcomeTone(status: string | null): "accent" | "default" | "muted" {
+  if (status === "regressed") {
+    return "default";
+  }
+  if (status === "improved" || status === "attested") {
+    return "accent";
+  }
+  return "muted";
+}
+
 function formatPercent(value: number | null): string {
   return value == null ? "n/a" : `${(value * 100).toFixed(1)}%`;
 }
@@ -616,11 +626,14 @@ export function ComparisonDetailPage() {
   const matchedFamilyId =
     activeRecommendation?.matchedFamily.familyId ?? loadedDatasetVersions?.familyId ?? null;
   const activePlanExecutions = loadedDatasetVersions?.planExecutions ?? [];
+  const activeOutcomes = loadedDatasetVersions?.outcomes ?? [];
   const latestPlanExecution =
     activePlanExecutions.length > 0 ? activePlanExecutions[0] : null;
   const latestExecutionReceipt =
     latestPlanExecution?.receipts.find((receipt) => receipt.familyId === matchedFamilyId) ??
     (latestPlanExecution?.receipts.length ? latestPlanExecution.receipts[0] : null);
+  const familyOutcomes = activeOutcomes.filter((outcome) => outcome.familyId === matchedFamilyId);
+  const latestOutcome = familyOutcomes.length > 0 ? familyOutcomes[0] : activeOutcomes[0] ?? null;
   const detailReturnState = {
     returnTo: {
       pathname: location.pathname,
@@ -910,6 +923,42 @@ export function ComparisonDetailPage() {
                           ? `${latestPlanExecution.completedCheckpointCount}/${latestPlanExecution.totalActionCount} checkpoints saved`
                           : "Execution receipts will appear here after a saved plan is preflighted or executed."}
                     </p>
+                  </div>
+
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Latest outcome
+                    </p>
+                    {latestOutcome ? (
+                      <>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Badge tone={outcomeTone(latestOutcome.attestation.state)}>
+                            {formatLabel(latestOutcome.attestation.state)}
+                          </Badge>
+                          {latestOutcome.attestation.verdict ? (
+                            <Badge tone={outcomeTone(latestOutcome.attestation.verdict.status)}>
+                              {formatLabel(latestOutcome.attestation.verdict.status)}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {latestOutcome.attestation.verdict
+                            ? `${latestOutcome.attestation.linkedComparisonIds.length} linked follow-up comparisons · severity delta ${formatPercent(latestOutcome.attestation.verdict.deltaSummary.severityDelta)}`
+                            : `${latestOutcome.attestation.linkedComparisonIds.length} linked follow-up comparisons · ${latestOutcome.attestation.linkedRunIds.length} linked runs`}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="mt-2 text-sm font-semibold text-foreground">
+                          No outcome attestation recorded
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {activePortfolioItem?.outcomeFeedback
+                            ? `${activePortfolioItem.outcomeFeedback.openCount} open · ${activePortfolioItem.outcomeFeedback.evidenceLinkedCount} evidence linked · ${activePortfolioItem.outcomeFeedback.attestedCount} attested`
+                            : "Follow-up closure and measured outcome feedback will appear here after execution evidence is linked."}
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">

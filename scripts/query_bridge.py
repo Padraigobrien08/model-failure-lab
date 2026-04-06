@@ -38,6 +38,7 @@ from model_failure_lab.datasets import (  # noqa: E402
 from model_failure_lab.governance import (  # noqa: E402
     PortfolioFilters,
     get_dataset_portfolio_item,
+    list_portfolio_execution_outcomes,
     list_dataset_lifecycle_actions,
     list_saved_portfolio_plan_executions,
     list_saved_portfolio_plans,
@@ -278,6 +279,15 @@ def main(argv: list[str] | None = None) -> int:
                     root=root,
                     family_id=args.dataset_family,
                     limit=5,
+                )
+            ],
+            "outcomes": [
+                row.to_payload()
+                for row in list_portfolio_execution_outcomes(
+                    root=root,
+                    family_id=args.dataset_family,
+                    include_attested=True,
+                    limit=10,
                 )
             ],
         }

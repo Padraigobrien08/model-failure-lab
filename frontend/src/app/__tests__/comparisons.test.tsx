@@ -237,6 +237,7 @@ function buildInventoryPortfolioItem(
     activeLifecycleAction: "prune",
     activeLifecycleCondition: "overgrown",
     activeLifecycleAppliedAt: "2026-03-30T12:45:00Z",
+    outcomeFeedback: null,
     ...overrides,
   };
 }

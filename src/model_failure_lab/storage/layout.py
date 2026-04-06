@@ -69,6 +69,17 @@ def portfolio_plan_executions_root(
     )
 
 
+def portfolio_outcome_attestations_root(
+    *,
+    root: str | Path | None = None,
+    create: bool = False,
+) -> Path:
+    return _ensure_dir(
+        governance_root(root=root, create=create) / "portfolio_outcome_attestations",
+        create=create,
+    )
+
+
 def lifecycle_family_directory(
     family_id: str,
     *,
@@ -99,6 +110,18 @@ def portfolio_plan_execution_file(
     return (
         portfolio_plan_executions_root(root=root, create=create)
         / f"{_normalize_segment(execution_id)}.json"
+    )
+
+
+def portfolio_outcome_attestation_file(
+    attestation_id: str,
+    *,
+    root: str | Path | None = None,
+    create: bool = False,
+) -> Path:
+    return (
+        portfolio_outcome_attestations_root(root=root, create=create)
+        / f"{_normalize_segment(attestation_id)}.json"
     )
 
 

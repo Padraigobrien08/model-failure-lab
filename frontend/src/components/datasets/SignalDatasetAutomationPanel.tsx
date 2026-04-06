@@ -11,12 +11,14 @@ import {
 } from "@/lib/artifacts/detailRouteState";
 import type {
   ArtifactDatasetEvolutionResponse,
+  ArtifactPortfolioExecutionOutcome,
   ArtifactGovernanceRecommendation,
   ArtifactSignalHistoryContext,
   ArtifactDatasetVersionsResponse,
   ArtifactRegressionPackResponse,
   ComparisonSignal,
 } from "@/lib/artifacts/types";
+import { formatLabel, formatSignedMetric } from "@/lib/formatters";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -114,6 +116,16 @@ function formatExecutionSnapshotValue(
     priority ? formatPriorityBand(priority) : null,
   ].filter((entry): entry is string => entry != null && entry.trim().length > 0);
   return segments.length > 0 ? segments.join(" · ") : "No saved family snapshot";
+}
+
+function outcomeTone(value: string | null | undefined): "default" | "accent" | "muted" {
+  if (value === "regressed") {
+    return "default";
+  }
+  if (value === "improved" || value === "attested") {
+    return "accent";
+  }
+  return "muted";
 }
 
 type SurfaceSectionProps = {
@@ -232,10 +244,13 @@ export function SignalDatasetAutomationPanel({
     versionsState.status === "ready" ? versionsState.value.portfolioPlans : [];
   const planExecutions =
     versionsState.status === "ready" ? versionsState.value.planExecutions : [];
+  const outcomes = versionsState.status === "ready" ? versionsState.value.outcomes : [];
   const latestPlanExecution = planExecutions.length > 0 ? planExecutions[0] : null;
   const latestExecutionReceipt =
     latestPlanExecution?.receipts.find((receipt) => receipt.familyId === targetFamilyId) ??
     (latestPlanExecution?.receipts.length ? latestPlanExecution.receipts[0] : null);
+  const familyOutcomes = outcomes.filter((outcome) => outcome.familyId === targetFamilyId);
+  const latestOutcome = familyOutcomes.length > 0 ? familyOutcomes[0] : null;
 
   return (
     <Card className="border-border/70 bg-card/70">
@@ -507,6 +522,17 @@ export function SignalDatasetAutomationPanel({
                   {portfolioItem.recentRegressionCount} recent regressions ·{" "}
                   {portfolioItem.recurringClusterCount} recurring clusters
                 </p>
+                {portfolioItem.outcomeFeedback ? (
+                  <p className="text-xs text-muted-foreground">
+                    Outcomes {portfolioItem.outcomeFeedback.attestedCount} attested ·{" "}
+                    {portfolioItem.outcomeFeedback.openCount +
+                      portfolioItem.outcomeFeedback.evidenceLinkedCount}{" "}
+                    still open
+                    {portfolioItem.outcomeFeedback.latestVerdict
+                      ? ` · latest ${formatLabel(portfolioItem.outcomeFeedback.latestVerdict)}`
+                      : ""}
+                  </p>
+                ) : null}
                 {portfolioItem.comparisonRefs.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {portfolioItem.comparisonRefs.slice(0, 3).map((reference) =>
@@ -582,7 +608,7 @@ export function SignalDatasetAutomationPanel({
           <SurfaceSection
             eyebrow="4"
             title="Execution context"
-            description="Keep the latest saved execution status, before/after family state, and prepared follow-up attached to the same comparison review."
+            description="Keep the latest saved execution status, outcome attestation state, and action-effect timeline attached to the same comparison review."
           >
             <div className="space-y-3 rounded-[20px] border border-border/70 bg-background/70 p-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -659,6 +685,80 @@ export function SignalDatasetAutomationPanel({
                       ))}
                     </div>
                   ) : null}
+                </div>
+              ) : null}
+              {latestOutcome ? (
+                <div className="space-y-2 rounded-[16px] border border-border/60 bg-card/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={outcomeTone(latestOutcome.attestation.state)}>
+                      {formatLabel(latestOutcome.attestation.state)}
+                    </Badge>
+                    {latestOutcome.attestation.verdict ? (
+                      <Badge tone={outcomeTone(latestOutcome.attestation.verdict.status)}>
+                        {formatLabel(latestOutcome.attestation.verdict.status)}
+                      </Badge>
+                    ) : null}
+                    <Badge tone="muted">
+                      {latestOutcome.attestation.linkedComparisonIds.length} linked comparisons
+                    </Badge>
+                    <Badge tone="muted">
+                      {latestOutcome.attestation.linkedRunIds.length} linked runs
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {latestOutcome.attestation.verdict?.rationale ??
+                      "This execution follow-up is still open. Link rerun and comparison evidence before attesting the outcome."}
+                  </p>
+                  {latestOutcome.attestation.verdict ? (
+                    <p className="text-xs text-muted-foreground">
+                      Severity Δ{" "}
+                      {formatSignedMetric(
+                        latestOutcome.attestation.verdict.deltaSummary.severityDelta,
+                      )}{" "}
+                      · {latestOutcome.attestation.verdict.deltaSummary.followUpRegressionCount}{" "}
+                      follow-up regressions
+                    </p>
+                  ) : null}
+                  {latestOutcome.attestation.notes.length > 0 ? (
+                    <div className="space-y-1">
+                      {latestOutcome.attestation.notes.slice(-2).map((note) => (
+                        <p key={note} className="text-xs text-muted-foreground">
+                          {note}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                  {latestOutcome.attestation.linkedComparisonIds.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {latestOutcome.attestation.linkedComparisonIds.map((comparisonId) =>
+                        renderPreviewLink(comparisonId, null, comparisonId, returnState),
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {familyOutcomes.length > 0 ? (
+                <div className="space-y-2 rounded-[16px] border border-border/60 bg-card/70 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Action-effect timeline
+                  </p>
+                  {familyOutcomes.slice(0, 3).map((outcome: ArtifactPortfolioExecutionOutcome) => (
+                    <div
+                      key={`${outcome.executionId}:${outcome.checkpointIndex}`}
+                      className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <Badge tone="muted">{outcome.recordedAt}</Badge>
+                      <Badge tone="muted">{formatLifecycleLabel(outcome.action)}</Badge>
+                      <Badge tone={outcomeTone(outcome.attestation.state)}>
+                        {formatLabel(outcome.attestation.state)}
+                      </Badge>
+                      {outcome.attestation.verdict ? (
+                        <Badge tone={outcomeTone(outcome.attestation.verdict.status)}>
+                          {formatLabel(outcome.attestation.verdict.status)}
+                        </Badge>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               ) : null}
             </div>

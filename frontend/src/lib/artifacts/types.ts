@@ -454,6 +454,21 @@ export type ArtifactDatasetPortfolioItem = {
   activeLifecycleAction: string | null;
   activeLifecycleCondition: string | null;
   activeLifecycleAppliedAt: string | null;
+  outcomeFeedback: ArtifactPortfolioOutcomeFeedbackSummary | null;
+};
+
+export type ArtifactPortfolioOutcomeFeedbackSummary = {
+  familyId: string;
+  openCount: number;
+  evidenceLinkedCount: number;
+  attestedCount: number;
+  improvedCount: number;
+  regressedCount: number;
+  inconclusiveCount: number;
+  noSignalCount: number;
+  latestState: string | null;
+  latestVerdict: string | null;
+  latestUpdatedAt: string | null;
 };
 
 export type ArtifactPlanningUnitMember = {
@@ -584,6 +599,60 @@ export type ArtifactPortfolioExecutionFollowUp = {
   nextSteps: string[];
 };
 
+export type ArtifactPortfolioOutcomeSignalSummary = {
+  comparisonId: string;
+  createdAt: string;
+  dataset: string | null;
+  baselineModel: string | null;
+  candidateModel: string | null;
+  compatible: boolean;
+  signalVerdict: string;
+  regressionScore: number;
+  improvementScore: number;
+  severity: number;
+};
+
+export type ArtifactPortfolioOutcomeDeltaSummary = {
+  sourceComparisonCount: number;
+  followUpComparisonCount: number;
+  sourceAverageSeverity: number | null;
+  followUpAverageSeverity: number | null;
+  severityDelta: number | null;
+  sourceRegressionCount: number;
+  followUpRegressionCount: number;
+  sourceImprovementCount: number;
+  followUpImprovementCount: number;
+};
+
+export type ArtifactPortfolioOutcomeVerdict = {
+  status: string;
+  rationale: string;
+  sourceSignals: ArtifactPortfolioOutcomeSignalSummary[];
+  followUpSignals: ArtifactPortfolioOutcomeSignalSummary[];
+  deltaSummary: ArtifactPortfolioOutcomeDeltaSummary;
+};
+
+export type ArtifactPortfolioOutcomeAttestation = {
+  attestationId: string;
+  executionId: string;
+  planId: string;
+  checkpointIndex: number;
+  familyId: string;
+  action: string;
+  receiptRecordedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  state: string;
+  sourceComparisonIds: string[];
+  expectedDatasets: string[];
+  expectedModels: string[];
+  linkedRunIds: string[];
+  linkedComparisonIds: string[];
+  notes: string[];
+  closedAt: string | null;
+  verdict: ArtifactPortfolioOutcomeVerdict | null;
+};
+
 export type ArtifactPortfolioPlanExecutionCheckpoint = {
   checkpointIndex: number;
   familyId: string;
@@ -607,6 +676,26 @@ export type ArtifactPortfolioPlanExecutionReceipt = {
   afterSnapshot: ArtifactPortfolioExecutionSnapshot | null;
   preflight: ArtifactPortfolioPlanPreflightCheck;
   followUp: ArtifactPortfolioExecutionFollowUp;
+};
+
+export type ArtifactPortfolioExecutionOutcome = {
+  executionId: string;
+  planId: string;
+  executionStatus: string;
+  executionMode: string;
+  executionCreatedAt: string;
+  executionCompletedAt: string | null;
+  checkpointIndex: number;
+  familyId: string;
+  action: string;
+  receiptStatus: string;
+  recordedAt: string;
+  rationale: string;
+  rollbackGuidance: string;
+  beforeSnapshot: ArtifactPortfolioExecutionSnapshot | null;
+  afterSnapshot: ArtifactPortfolioExecutionSnapshot | null;
+  followUp: ArtifactPortfolioExecutionFollowUp;
+  attestation: ArtifactPortfolioOutcomeAttestation;
 };
 
 export type ArtifactPortfolioPlanExecution = {
@@ -806,6 +895,7 @@ export type ArtifactDatasetVersionsResponse = {
   portfolioItem: ArtifactDatasetPortfolioItem | null;
   portfolioPlans: ArtifactSavedPortfolioPlan[];
   planExecutions: ArtifactPortfolioPlanExecution[];
+  outcomes: ArtifactPortfolioExecutionOutcome[];
 };
 
 export type ArtifactDatasetEvolutionResponse = {

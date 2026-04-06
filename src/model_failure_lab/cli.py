@@ -44,29 +44,36 @@ from model_failure_lab.governance import (
     GovernancePolicy,
     GovernanceRecommendation,
     LifecycleApplyResult,
+    PortfolioExecutionOutcome,
     PortfolioPlanExecution,
     PortfolioPlanExecutionResult,
     PortfolioPlanPreflight,
     PortfolioFilters,
+    PortfolioOutcomeFeedbackSummary,
     PortfolioPlanApplyResult,
     PortfolioPlanSaveResult,
     SavedPortfolioPlan,
     apply_saved_portfolio_plan_action,
+    attest_portfolio_execution_outcome,
     apply_dataset_lifecycle_action,
     apply_dataset_actions,
     create_saved_portfolio_plan,
     execute_saved_portfolio_plan,
     get_saved_portfolio_plan,
     get_saved_portfolio_plan_execution,
+    get_portfolio_execution_outcome,
     list_dataset_planning_units,
     list_dataset_portfolio,
+    list_portfolio_execution_outcomes,
     list_saved_portfolio_plan_executions,
     review_dataset_lifecycle,
     list_dataset_family_health,
     list_saved_portfolio_plans,
+    link_portfolio_execution_outcome_evidence,
     preflight_saved_portfolio_plan,
     recommend_dataset_action,
     review_dataset_actions,
+    summarize_portfolio_outcomes_for_family,
 )
 from model_failure_lab.history import HistorySnapshot, query_history_snapshot
 from model_failure_lab.index import (
@@ -575,6 +582,115 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dataset_execution_show_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_execution_show_parser.set_defaults(handler=_handle_dataset_execution_show)
+
+    dataset_follow_ups_parser = dataset_subparsers.add_parser(
+        "follow-ups",
+        help="List open or attested outcome follow-ups linked to saved plan execution receipts.",
+    )
+    dataset_follow_ups_parser.add_argument("--plan", dest="plan_id")
+    dataset_follow_ups_parser.add_argument("--family", dest="family_id")
+    dataset_follow_ups_parser.add_argument("--execution", dest="execution_id")
+    dataset_follow_ups_parser.add_argument("--include-attested", action="store_true")
+    dataset_follow_ups_parser.add_argument("--limit", type=int, default=20)
+    dataset_follow_ups_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_follow_ups_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_follow_ups_parser.set_defaults(handler=_handle_dataset_follow_ups)
+
+    dataset_follow_up_show_parser = dataset_subparsers.add_parser(
+        "follow-up-show",
+        help="Inspect one execution follow-up, linked evidence, and attestation state.",
+    )
+    dataset_follow_up_show_parser.add_argument("execution_id")
+    dataset_follow_up_show_parser.add_argument(
+        "--checkpoint",
+        required=True,
+        type=int,
+        dest="checkpoint_index",
+        help="Execution checkpoint index to inspect.",
+    )
+    dataset_follow_up_show_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_follow_up_show_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_follow_up_show_parser.set_defaults(handler=_handle_dataset_follow_up_show)
+
+    dataset_follow_up_link_parser = dataset_subparsers.add_parser(
+        "follow-up-link",
+        help="Attach saved run or comparison artifacts to one execution follow-up.",
+    )
+    dataset_follow_up_link_parser.add_argument("execution_id")
+    dataset_follow_up_link_parser.add_argument(
+        "--checkpoint",
+        required=True,
+        type=int,
+        dest="checkpoint_index",
+        help="Execution checkpoint index to update.",
+    )
+    dataset_follow_up_link_parser.add_argument(
+        "--run",
+        action="append",
+        dest="run_ids",
+        help="Saved run id to link to this outcome follow-up. Repeat as needed.",
+    )
+    dataset_follow_up_link_parser.add_argument(
+        "--comparison",
+        action="append",
+        dest="comparison_ids",
+        help="Saved comparison id to link to this outcome follow-up. Repeat as needed.",
+    )
+    dataset_follow_up_link_parser.add_argument(
+        "--note",
+        help="Optional operator note recorded with this evidence-link update.",
+    )
+    dataset_follow_up_link_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_follow_up_link_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_follow_up_link_parser.set_defaults(handler=_handle_dataset_follow_up_link)
+
+    dataset_follow_up_attest_parser = dataset_subparsers.add_parser(
+        "follow-up-attest",
+        help="Finalize one execution follow-up into a measured outcome attestation.",
+    )
+    dataset_follow_up_attest_parser.add_argument("execution_id")
+    dataset_follow_up_attest_parser.add_argument(
+        "--checkpoint",
+        required=True,
+        type=int,
+        dest="checkpoint_index",
+        help="Execution checkpoint index to attest.",
+    )
+    dataset_follow_up_attest_parser.add_argument(
+        "--note",
+        help="Optional operator note recorded with the attestation.",
+    )
+    dataset_follow_up_attest_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    dataset_follow_up_attest_parser.add_argument("--json", action="store_true", dest="as_json")
+    dataset_follow_up_attest_parser.set_defaults(handler=_handle_dataset_follow_up_attest)
 
     dataset_plan_promote_parser = dataset_subparsers.add_parser(
         "plan-promote",
@@ -1759,6 +1875,76 @@ def _handle_dataset_execution_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_dataset_follow_ups(args: argparse.Namespace) -> int:
+    rows = list_portfolio_execution_outcomes(
+        root=_normalized_root(args.root),
+        plan_id=args.plan_id,
+        family_id=args.family_id,
+        execution_id=args.execution_id,
+        include_attested=args.include_attested,
+        limit=args.limit,
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "dataset_portfolio_outcomes",
+                    "plan_id": args.plan_id,
+                    "family_id": args.family_id,
+                    "execution_id": args.execution_id,
+                    "include_attested": args.include_attested,
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_portfolio_execution_outcomes(rows, include_attested=args.include_attested))
+    return 0
+
+
+def _handle_dataset_follow_up_show(args: argparse.Namespace) -> int:
+    outcome = get_portfolio_execution_outcome(
+        args.execution_id,
+        args.checkpoint_index,
+        root=_normalized_root(args.root),
+    )
+    if args.as_json:
+        print(_render_json_payload(outcome.to_payload()))
+        return 0
+    print(_render_portfolio_execution_outcome(outcome))
+    return 0
+
+
+def _handle_dataset_follow_up_link(args: argparse.Namespace) -> int:
+    outcome = link_portfolio_execution_outcome_evidence(
+        args.execution_id,
+        args.checkpoint_index,
+        root=_normalized_root(args.root),
+        run_ids=tuple(args.run_ids or ()),
+        comparison_ids=tuple(args.comparison_ids or ()),
+        note=args.note,
+    )
+    if args.as_json:
+        print(_render_json_payload(outcome.to_payload()))
+        return 0
+    print(_render_portfolio_execution_outcome(outcome))
+    return 0
+
+
+def _handle_dataset_follow_up_attest(args: argparse.Namespace) -> int:
+    outcome = attest_portfolio_execution_outcome(
+        args.execution_id,
+        args.checkpoint_index,
+        root=_normalized_root(args.root),
+        note=args.note,
+    )
+    if args.as_json:
+        print(_render_json_payload(outcome.to_payload()))
+        return 0
+    print(_render_portfolio_execution_outcome(outcome))
+    return 0
+
+
 def _handle_dataset_plan_promote(args: argparse.Namespace) -> int:
     result = apply_saved_portfolio_plan_action(
         args.plan_id,
@@ -2908,6 +3094,85 @@ def _render_saved_portfolio_plan_execution(execution: PortfolioPlanExecution) ->
                 ]
             )
         )
+    return "\n".join(lines)
+
+
+def _render_portfolio_execution_outcomes(
+    rows: tuple[PortfolioExecutionOutcome, ...],
+    *,
+    include_attested: bool,
+) -> str:
+    if not rows:
+        suffix = "open or linked" if not include_attested else "saved"
+        return (
+            "Failure Lab Portfolio Follow-Ups\n"
+            f"No {suffix} execution follow-ups matched the current filters."
+        )
+    return "\n".join(
+        [
+            "Failure Lab Portfolio Follow-Ups",
+            _render_table(
+                [
+                    (
+                        "execution_id",
+                        "checkpoint",
+                        "family_id",
+                        "action",
+                        "state",
+                        "verdict",
+                    ),
+                    *[
+                        (
+                            row.execution_id,
+                            str(row.checkpoint_index),
+                            row.family_id,
+                            row.action,
+                            row.attestation.state,
+                            (
+                                row.attestation.verdict.status
+                                if row.attestation.verdict is not None
+                                else "pending"
+                            ),
+                        )
+                        for row in rows
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
+def _render_portfolio_execution_outcome(outcome: PortfolioExecutionOutcome) -> str:
+    attestation = outcome.attestation
+    lines = [
+        "Failure Lab Portfolio Follow-Up",
+        f"Execution: {outcome.execution_id}",
+        f"Checkpoint: {outcome.checkpoint_index}",
+        f"Plan: {outcome.plan_id}",
+        f"Family: {outcome.family_id}",
+        f"Action: {outcome.action}",
+        f"Execution status: {outcome.execution_status}",
+        f"Outcome state: {attestation.state}",
+        f"Linked runs: {', '.join(attestation.linked_run_ids) or 'none'}",
+        f"Linked comparisons: {', '.join(attestation.linked_comparison_ids) or 'none'}",
+        f"Expected datasets: {', '.join(attestation.expected_datasets) or 'none'}",
+        f"Expected models: {', '.join(attestation.expected_models) or 'none'}",
+        f"Source comparisons: {', '.join(attestation.source_comparison_ids) or 'none'}",
+    ]
+    if attestation.notes:
+        lines.append(f"Notes: {' | '.join(attestation.notes)}")
+    if attestation.verdict is not None:
+        lines.extend(
+            [
+                f"Verdict: {attestation.verdict.status}",
+                f"Verdict rationale: {attestation.verdict.rationale}",
+            ]
+        )
+    else:
+        lines.append("Verdict: pending")
+    lines.append(f"Follow-up summary: {outcome.follow_up.summary}")
+    if outcome.follow_up.nextSteps:
+        lines.extend([f"Next step: {step}" for step in outcome.follow_up.nextSteps])
     return "\n".join(lines)
 
 

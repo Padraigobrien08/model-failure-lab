@@ -41,6 +41,12 @@ import {
   type ArtifactPlanningUnitMember,
   type ArtifactPortfolioComparisonReference,
   type ArtifactPortfolioExecutionFollowUp,
+  type ArtifactPortfolioExecutionOutcome,
+  type ArtifactPortfolioOutcomeAttestation,
+  type ArtifactPortfolioOutcomeDeltaSummary,
+  type ArtifactPortfolioOutcomeFeedbackSummary,
+  type ArtifactPortfolioOutcomeSignalSummary,
+  type ArtifactPortfolioOutcomeVerdict,
   type ArtifactPortfolioExecutionSnapshot,
   type ArtifactPortfolioPlanAction,
   type ArtifactPortfolioPlanExecution,
@@ -112,6 +118,13 @@ function requireObject(value: unknown, field: string): Record<string, unknown> {
 function requireNumber(value: unknown, field: string): number {
   if (typeof value !== "number" || Number.isNaN(value)) {
     throw new Error(`${field} must be a number`);
+  }
+  return value;
+}
+
+function requireBoolean(value: unknown, field: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new Error(`${field} must be a boolean`);
   }
   return value;
 }
@@ -619,6 +632,42 @@ function requireArtifactDatasetPortfolioItem(
       data.active_lifecycle_applied_at,
       `${field}.active_lifecycle_applied_at`,
     ),
+    outcomeFeedback:
+      data.outcome_feedback == null
+        ? null
+        : requireArtifactPortfolioOutcomeFeedbackSummary(
+            data.outcome_feedback,
+            `${field}.outcome_feedback`,
+          ),
+  };
+}
+
+function requireArtifactPortfolioOutcomeFeedbackSummary(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioOutcomeFeedbackSummary {
+  const data = requireObject(value, field);
+  return {
+    familyId: requireString(data.family_id, `${field}.family_id`),
+    openCount: requireCount(data.open_count, `${field}.open_count`),
+    evidenceLinkedCount: requireCount(
+      data.evidence_linked_count,
+      `${field}.evidence_linked_count`,
+    ),
+    attestedCount: requireCount(data.attested_count, `${field}.attested_count`),
+    improvedCount: requireCount(data.improved_count, `${field}.improved_count`),
+    regressedCount: requireCount(data.regressed_count, `${field}.regressed_count`),
+    inconclusiveCount: requireCount(
+      data.inconclusive_count,
+      `${field}.inconclusive_count`,
+    ),
+    noSignalCount: requireCount(data.no_signal_count, `${field}.no_signal_count`),
+    latestState: requireStringOrNull(data.latest_state, `${field}.latest_state`),
+    latestVerdict: requireStringOrNull(data.latest_verdict, `${field}.latest_verdict`),
+    latestUpdatedAt: requireStringOrNull(
+      data.latest_updated_at,
+      `${field}.latest_updated_at`,
+    ),
   };
 }
 
@@ -943,6 +992,155 @@ function requireArtifactPortfolioExecutionFollowUp(
   };
 }
 
+function requireArtifactPortfolioOutcomeSignalSummaries(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioOutcomeSignalSummary[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      comparisonId: requireString(row.comparison_id, `${field}[${index}].comparison_id`),
+      createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
+      dataset: requireStringOrNull(row.dataset, `${field}[${index}].dataset`),
+      baselineModel: requireStringOrNull(
+        row.baseline_model,
+        `${field}[${index}].baseline_model`,
+      ),
+      candidateModel: requireStringOrNull(
+        row.candidate_model,
+        `${field}[${index}].candidate_model`,
+      ),
+      compatible: requireBoolean(row.compatible, `${field}[${index}].compatible`),
+      signalVerdict: requireString(row.signal_verdict, `${field}[${index}].signal_verdict`),
+      regressionScore: requireNumber(
+        row.regression_score,
+        `${field}[${index}].regression_score`,
+      ),
+      improvementScore: requireNumber(
+        row.improvement_score,
+        `${field}[${index}].improvement_score`,
+      ),
+      severity: requireNumber(row.severity, `${field}[${index}].severity`),
+    };
+  });
+}
+
+function requireArtifactPortfolioOutcomeDeltaSummary(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioOutcomeDeltaSummary {
+  const data = requireObject(value, field);
+  return {
+    sourceComparisonCount: requireCount(
+      data.source_comparison_count,
+      `${field}.source_comparison_count`,
+    ),
+    followUpComparisonCount: requireCount(
+      data.follow_up_comparison_count,
+      `${field}.follow_up_comparison_count`,
+    ),
+    sourceAverageSeverity: requireNumberOrNull(
+      data.source_average_severity,
+      `${field}.source_average_severity`,
+    ),
+    followUpAverageSeverity: requireNumberOrNull(
+      data.follow_up_average_severity,
+      `${field}.follow_up_average_severity`,
+    ),
+    severityDelta: requireNumberOrNull(data.severity_delta, `${field}.severity_delta`),
+    sourceRegressionCount: requireCount(
+      data.source_regression_count,
+      `${field}.source_regression_count`,
+    ),
+    followUpRegressionCount: requireCount(
+      data.follow_up_regression_count,
+      `${field}.follow_up_regression_count`,
+    ),
+    sourceImprovementCount: requireCount(
+      data.source_improvement_count,
+      `${field}.source_improvement_count`,
+    ),
+    followUpImprovementCount: requireCount(
+      data.follow_up_improvement_count,
+      `${field}.follow_up_improvement_count`,
+    ),
+  };
+}
+
+function requireArtifactPortfolioOutcomeVerdict(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioOutcomeVerdict | null {
+  if (value == null) {
+    return null;
+  }
+  const data = requireObject(value, field);
+  return {
+    status: requireString(data.status, `${field}.status`),
+    rationale: requireString(data.rationale, `${field}.rationale`),
+    sourceSignals: requireArtifactPortfolioOutcomeSignalSummaries(
+      data.source_signals ?? [],
+      `${field}.source_signals`,
+    ),
+    followUpSignals: requireArtifactPortfolioOutcomeSignalSummaries(
+      data.follow_up_signals ?? [],
+      `${field}.follow_up_signals`,
+    ),
+    deltaSummary: requireArtifactPortfolioOutcomeDeltaSummary(
+      data.delta_summary,
+      `${field}.delta_summary`,
+    ),
+  };
+}
+
+function requireArtifactPortfolioOutcomeAttestation(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioOutcomeAttestation {
+  const data = requireObject(value, field);
+  return {
+    attestationId: requireString(data.attestation_id, `${field}.attestation_id`),
+    executionId: requireString(data.execution_id, `${field}.execution_id`),
+    planId: requireString(data.plan_id, `${field}.plan_id`),
+    checkpointIndex: requireCount(data.checkpoint_index, `${field}.checkpoint_index`),
+    familyId: requireString(data.family_id, `${field}.family_id`),
+    action: requireString(data.action, `${field}.action`),
+    receiptRecordedAt: requireString(
+      data.receipt_recorded_at,
+      `${field}.receipt_recorded_at`,
+    ),
+    createdAt: requireString(data.created_at, `${field}.created_at`),
+    updatedAt: requireString(data.updated_at, `${field}.updated_at`),
+    state: requireString(data.state, `${field}.state`),
+    sourceComparisonIds: requireStringArray(
+      data.source_comparison_ids ?? [],
+      `${field}.source_comparison_ids`,
+    ),
+    expectedDatasets: requireStringArray(
+      data.expected_datasets ?? [],
+      `${field}.expected_datasets`,
+    ),
+    expectedModels: requireStringArray(
+      data.expected_models ?? [],
+      `${field}.expected_models`,
+    ),
+    linkedRunIds: requireStringArray(
+      data.linked_run_ids ?? [],
+      `${field}.linked_run_ids`,
+    ),
+    linkedComparisonIds: requireStringArray(
+      data.linked_comparison_ids ?? [],
+      `${field}.linked_comparison_ids`,
+    ),
+    notes: requireStringArray(data.notes ?? [], `${field}.notes`),
+    closedAt: requireStringOrNull(data.closed_at, `${field}.closed_at`),
+    verdict: requireArtifactPortfolioOutcomeVerdict(data.verdict, `${field}.verdict`),
+  };
+}
+
 function requireArtifactPortfolioPlanExecutionCheckpoints(
   value: unknown,
   field: string,
@@ -1009,6 +1207,64 @@ function requireArtifactPortfolioPlanExecutionReceipts(
       followUp: requireArtifactPortfolioExecutionFollowUp(
         row.follow_up,
         `${field}[${index}].follow_up`,
+      ),
+    };
+  });
+}
+
+function requireArtifactPortfolioExecutionOutcomes(
+  value: unknown,
+  field: string,
+): ArtifactPortfolioExecutionOutcome[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
+  }
+  return value.map((entry, index) => {
+    const row = requireObject(entry, `${field}[${index}]`);
+    return {
+      executionId: requireString(row.execution_id, `${field}[${index}].execution_id`),
+      planId: requireString(row.plan_id, `${field}[${index}].plan_id`),
+      executionStatus: requireString(
+        row.execution_status,
+        `${field}[${index}].execution_status`,
+      ),
+      executionMode: requireString(row.execution_mode, `${field}[${index}].execution_mode`),
+      executionCreatedAt: requireString(
+        row.execution_created_at,
+        `${field}[${index}].execution_created_at`,
+      ),
+      executionCompletedAt: requireStringOrNull(
+        row.execution_completed_at,
+        `${field}[${index}].execution_completed_at`,
+      ),
+      checkpointIndex: requireCount(
+        row.checkpoint_index,
+        `${field}[${index}].checkpoint_index`,
+      ),
+      familyId: requireString(row.family_id, `${field}[${index}].family_id`),
+      action: requireString(row.action, `${field}[${index}].action`),
+      receiptStatus: requireString(row.receipt_status, `${field}[${index}].receipt_status`),
+      recordedAt: requireString(row.recorded_at, `${field}[${index}].recorded_at`),
+      rationale: requireString(row.rationale, `${field}[${index}].rationale`),
+      rollbackGuidance: requireString(
+        row.rollback_guidance,
+        `${field}[${index}].rollback_guidance`,
+      ),
+      beforeSnapshot: requireArtifactPortfolioExecutionSnapshot(
+        row.before_snapshot,
+        `${field}[${index}].before_snapshot`,
+      ),
+      afterSnapshot: requireArtifactPortfolioExecutionSnapshot(
+        row.after_snapshot,
+        `${field}[${index}].after_snapshot`,
+      ),
+      followUp: requireArtifactPortfolioExecutionFollowUp(
+        row.follow_up,
+        `${field}[${index}].follow_up`,
+      ),
+      attestation: requireArtifactPortfolioOutcomeAttestation(
+        row.attestation,
+        `${field}[${index}].attestation`,
       ),
     };
   });
@@ -1506,6 +1762,10 @@ function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatas
     planExecutions: requireArtifactPortfolioPlanExecutions(
       data.plan_executions ?? [],
       "dataset_versions.plan_executions",
+    ),
+    outcomes: requireArtifactPortfolioExecutionOutcomes(
+      data.outcomes ?? [],
+      "dataset_versions.outcomes",
     ),
   };
 }

@@ -1124,6 +1124,19 @@ function mockComparisonDetailWithVersionHistory(detail: ComparisonDetail) {
               active_lifecycle_action: null,
               active_lifecycle_condition: null,
               active_lifecycle_applied_at: null,
+              outcome_feedback: {
+                family_id: "regression-reasoning-failures-v1-reasoning",
+                open_count: 0,
+                evidence_linked_count: 0,
+                attested_count: 1,
+                improved_count: 1,
+                regressed_count: 0,
+                inconclusive_count: 0,
+                no_signal_count: 0,
+                latest_state: "attested",
+                latest_verdict: "improved",
+                latest_updated_at: "2026-04-05T14:42:00Z",
+              },
             },
             portfolio_plans: [
               {
@@ -1334,6 +1347,136 @@ function mockComparisonDetailWithVersionHistory(detail: ComparisonDetail) {
                     },
                   },
                 ],
+              },
+            ],
+            outcomes: [
+              {
+                execution_id: "execution-fixture",
+                plan_id: "portfolio-plan-fixture",
+                execution_status: "checkpointed",
+                execution_mode: "stepwise",
+                execution_created_at: "2026-04-05T14:30:00Z",
+                execution_completed_at: "2026-04-05T14:31:00Z",
+                checkpoint_index: 1,
+                family_id: "regression-reasoning-failures-v1-reasoning",
+                action: "prune",
+                receipt_status: "applied",
+                recorded_at: "2026-04-05T14:31:00Z",
+                rationale:
+                  "Family remains a standalone review unit in the current portfolio queue.",
+                rollback_guidance:
+                  "No prior lifecycle action was recorded. Review the family manually before applying an alternative action.",
+                before_snapshot: {
+                  family_id: "regression-reasoning-failures-v1-reasoning",
+                  captured_at: "2026-04-05T14:30:20Z",
+                  health_label: "stable",
+                  trend_label: "stable",
+                  version_count: versions.length,
+                  latest_dataset_id:
+                    versions[versions.length - 1]?.dataset_id ??
+                    "regression-reasoning-failures-v1-reasoning-v1",
+                  latest_version_tag: versions[versions.length - 1]?.version_tag ?? "v1",
+                  recent_fail_rate: 0.25,
+                  priority_rank: 1,
+                  priority_band: "high",
+                  priority_score: 48.5,
+                  active_lifecycle_action: null,
+                  active_lifecycle_condition: null,
+                  active_lifecycle_applied_at: null,
+                },
+                after_snapshot: {
+                  family_id: "regression-reasoning-failures-v1-reasoning",
+                  captured_at: "2026-04-05T14:31:00Z",
+                  health_label: "stable",
+                  trend_label: "stable",
+                  version_count: versions.length,
+                  latest_dataset_id:
+                    versions[versions.length - 1]?.dataset_id ??
+                    "regression-reasoning-failures-v1-reasoning-v1",
+                  latest_version_tag: versions[versions.length - 1]?.version_tag ?? "v1",
+                  recent_fail_rate: 0.18,
+                  priority_rank: 1,
+                  priority_band: "high",
+                  priority_score: 42.5,
+                  active_lifecycle_action: "prune",
+                  active_lifecycle_condition: "overgrown",
+                  active_lifecycle_applied_at: "2026-04-05T14:31:00Z",
+                },
+                follow_up: {
+                  status: "pending_validation",
+                  summary:
+                    "Run and compare the affected dataset family to verify that the latest lifecycle action reduced regression pressure.",
+                  datasets: ["reasoning-failures-v1"],
+                  models: ["model-alpha", "model-beta"],
+                  comparison_ids: ["compare_alpha_to_beta"],
+                  next_steps: [
+                    "Run the dataset family again after the lifecycle action.",
+                    "Compare the latest run against the previous baseline before closing the outcome.",
+                  ],
+                },
+                attestation: {
+                  attestation_id: "attestation-fixture",
+                  execution_id: "execution-fixture",
+                  plan_id: "portfolio-plan-fixture",
+                  checkpoint_index: 1,
+                  family_id: "regression-reasoning-failures-v1-reasoning",
+                  action: "prune",
+                  receipt_recorded_at: "2026-04-05T14:31:00Z",
+                  created_at: "2026-04-05T14:33:00Z",
+                  updated_at: "2026-04-05T14:42:00Z",
+                  state: "attested",
+                  source_comparison_ids: ["compare_alpha_to_beta"],
+                  expected_datasets: ["reasoning-failures-v1"],
+                  expected_models: ["model-alpha", "model-beta"],
+                  linked_run_ids: ["run_gamma"],
+                  linked_comparison_ids: ["compare_gamma_to_delta"],
+                  notes: ["Follow-up run reduced the regression severity after pruning."],
+                  closed_at: "2026-04-05T14:42:00Z",
+                  verdict: {
+                    status: "improved",
+                    rationale:
+                      "Follow-up comparison severity decreased and no new regression signal replaced the original issue.",
+                    source_signals: [
+                      {
+                        comparison_id: "compare_alpha_to_beta",
+                        created_at: "2026-04-03T11:10:00Z",
+                        dataset: "reasoning-failures-v1",
+                        baseline_model: "model-alpha",
+                        candidate_model: "model-beta",
+                        compatible: true,
+                        signal_verdict: "regression",
+                        regression_score: 0.25,
+                        improvement_score: 0,
+                        severity: 0.25,
+                      },
+                    ],
+                    follow_up_signals: [
+                      {
+                        comparison_id: "compare_gamma_to_delta",
+                        created_at: "2026-04-05T14:40:00Z",
+                        dataset: "reasoning-failures-v1",
+                        baseline_model: "model-alpha",
+                        candidate_model: "model-beta",
+                        compatible: true,
+                        signal_verdict: "improvement",
+                        regression_score: 0,
+                        improvement_score: 0.13,
+                        severity: 0.13,
+                      },
+                    ],
+                    delta_summary: {
+                      source_comparison_count: 1,
+                      follow_up_comparison_count: 1,
+                      source_average_severity: 0.25,
+                      follow_up_average_severity: 0.13,
+                      severity_delta: -0.12,
+                      source_regression_count: 1,
+                      follow_up_regression_count: 0,
+                      source_improvement_count: 0,
+                      follow_up_improvement_count: 1,
+                    },
+                  },
+                },
               },
             ],
             history: {
@@ -2005,7 +2148,8 @@ describe("comparison detail route", () => {
     expect(screen.getByText("Matched family")).toBeInTheDocument();
     expect(screen.getAllByText("Saved plans").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Latest execution").length).toBeGreaterThan(0);
-    expect(screen.getByText("Execution context")).toBeInTheDocument();
+    expect(screen.getAllByText("Latest outcome").length).toBeGreaterThan(0);
+    expect(await screen.findByText("Execution context")).toBeInTheDocument();
   });
 
   it("keeps incompatible comparisons openable with explicit coverage semantics", async () => {

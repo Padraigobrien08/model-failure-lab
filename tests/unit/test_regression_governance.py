@@ -8,13 +8,18 @@ from model_failure_lab.governance import (
     GovernancePolicy,
     apply_dataset_actions,
     apply_dataset_lifecycle_action,
+    attest_portfolio_execution_outcome,
+    create_saved_portfolio_plan,
     describe_dataset_family_lifecycle,
+    execute_saved_portfolio_plan,
+    link_portfolio_execution_outcome_evidence,
     list_dataset_planning_units,
     list_dataset_portfolio,
     list_dataset_family_health,
     list_dataset_lifecycle_actions,
     recommend_dataset_action,
     review_dataset_actions,
+    summarize_portfolio_outcomes_for_family,
 )
 from model_failure_lab.governance.policy import (
     GovernanceFamilyMatch,
@@ -446,6 +451,66 @@ def test_dataset_portfolio_ranks_existing_family_with_deterministic_evidence(
     assert first[0].escalation_status in {"watch", "elevated", "critical", "suppressed"}
     assert "lifecycle=" in first[0].rationale
     assert [row.to_payload() for row in first] == [row.to_payload() for row in second]
+
+
+def test_dataset_portfolio_includes_outcome_feedback_from_attested_follow_up(
+    tmp_path: Path,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    regression_comparison_id = _pick_regression_comparison(workspace.root, minimum_cases=2)
+    family_id = recommend_dataset_action(
+        regression_comparison_id,
+        root=workspace.root,
+    ).matched_family.family_id
+
+    evolve_dataset_family(
+        family_id,
+        comparison_id=regression_comparison_id,
+        root=workspace.root,
+        top_n=2,
+    )
+
+    plan = create_saved_portfolio_plan(root=workspace.root, include_keep=True)
+    execution = execute_saved_portfolio_plan(
+        plan.plan.plan_id,
+        root=workspace.root,
+        mode="stepwise",
+    )
+    receipt = execution.execution.receipts[0]
+    follow_up_comparison_id = _pick_improvement_comparison(workspace.root)
+
+    link_portfolio_execution_outcome_evidence(
+        execution.execution.execution_id,
+        receipt.checkpoint_index,
+        root=workspace.root,
+        comparison_ids=(follow_up_comparison_id,),
+        note="Linked deterministic follow-up comparison.",
+    )
+    attest_portfolio_execution_outcome(
+        execution.execution.execution_id,
+        receipt.checkpoint_index,
+        root=workspace.root,
+        note="Outcome attested from saved comparison evidence.",
+    )
+
+    summary = summarize_portfolio_outcomes_for_family(family_id, root=workspace.root)
+    portfolio_rows = list_dataset_portfolio(root=workspace.root)
+    portfolio_row = next(row for row in portfolio_rows if row.family_id == family_id)
+
+    assert summary is not None
+    assert summary.attested_count == 1
+    assert summary.latest_state == "attested"
+    assert summary.latest_verdict in {"improved", "regressed", "inconclusive", "no_signal"}
+    assert (
+        summary.improved_count
+        + summary.regressed_count
+        + summary.inconclusive_count
+        + summary.no_signal_count
+        == 1
+    )
+    assert portfolio_row.outcome_feedback is not None
+    assert portfolio_row.outcome_feedback.latest_verdict == summary.latest_verdict
+    assert f"latest_outcome={summary.latest_verdict}" in portfolio_row.rationale
 
 
 def test_dataset_planning_units_group_merge_candidates_together(tmp_path: Path) -> None:
