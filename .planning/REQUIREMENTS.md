@@ -1,62 +1,69 @@
-# Requirements: v5.2 Guided Plan Execution And Outcome Verification
+# Requirements: v5.3 Closed-Loop Outcome Attestation And Policy Feedback
 
 **Defined:** 2026-04-06  
-**Status:** Shipped
+**Status:** Active
 
-## v5.2 Requirements
+## v5.3 Requirements
 
-### Execution Contract
+### Outcome Attestation
 
-- [x] **EXEC-01**: Users can run a preflight validation against a saved plan or planned lifecycle
-  action and see blockers before any dataset family state changes.
-- [x] **EXEC-02**: Users can execute a saved plan in explicit stepwise or bounded batch mode with
-  persisted checkpoints between actions.
-- [x] **EXEC-03**: Every executed action produces a persisted execution receipt with outcome,
-  affected families, and compensating-action or rollback guidance when execution stops or fails.
+- [ ] **ATTEST-01**: Users can list open execution follow-ups and attach resulting run and
+  comparison artifacts to a specific execution receipt from the CLI.
+- [ ] **ATTEST-02**: Users can finalize an execution outcome attestation with a persisted closure
+  state, linked evidence, and operator notes without mutating family policy implicitly.
 
-### Outcome Verification
+### Measured Outcome Verdicts
 
-- [x] **VERIFY-01**: The system captures before/after snapshots for affected dataset families and
-  portfolio items so operators can inspect what changed.
-- [x] **VERIFY-02**: Users can launch or prepare rerun/compare follow-up directly from executed
-  plan context to measure whether the change improved behavior.
+- [ ] **VERDICT-01**: The system computes a deterministic outcome verdict (`improved`,
+  `regressed`, `inconclusive`, or `no_signal`) from linked follow-up comparison evidence.
+- [ ] **VERDICT-02**: Every attested outcome preserves the compared signals, delta summary, and
+  rationale used to reach the verdict.
 
-### Debugger Execution Context
+### Policy Feedback
 
-- [x] **UI-01**: Existing debugger routes surface execution status, receipts, and before/after
-  state context for affected family or comparison views without introducing a new control-center
-  dashboard.
-- [x] **UI-02**: Users can move from execution context into the originating plan, affected family
-  history, and post-execution rerun/compare evidence without losing route context.
+- [ ] **FEEDBACK-01**: Attested outcomes feed back into dataset-family history and portfolio
+  priority context so operators can see whether prior actions helped.
+- [ ] **FEEDBACK-02**: Future plan review and execution surfaces expose relevant prior attested
+  outcomes for the same family or action type before new changes are applied.
+
+### Debugger Outcome Closure
+
+- [ ] **UI-01**: Existing debugger routes surface open follow-ups, attested verdicts, and
+  action-effect timelines without introducing a separate outcome dashboard.
+- [ ] **UI-02**: Users can move from an execution receipt to its linked follow-up evidence,
+  measured verdict, and updated family or portfolio context without losing route locality.
 
 ### Workflow Verification
 
-- [x] **FLOW-01**: The full local workflow from triage to saved plan to explicit execution to
-  rerun/compare to updated family state is verified and reproducible.
+- [ ] **FLOW-01**: The full local workflow from triage to saved plan to explicit execution to
+  rerun/compare to attested outcome to updated policy context is verified and reproducible.
 
 ## Future Requirements
 
-- Automatic background execution of approved plans without user checkpoints.
-- Notifications or scheduled execution windows for saved plans.
-- Multi-user approval or sign-off workflows around plan execution.
+- Automatic closure when matching rerun/compare artifacts appear without explicit operator review.
+- Notifications or reminders for stale open follow-ups.
+- Multi-user approval or sign-off workflows around attestation overrides or manual verdict changes.
 
 ## Out of Scope
 
-- Hosted orchestration, remote workers, or queue infrastructure for plan execution.
-- Silent execution of lifecycle changes without explicit operator checkpoints.
-- Learned execution policies or opaque rollback logic that cannot be reproduced from local
-  artifacts.
-- A new standalone execution dashboard that duplicates existing route-local debugger surfaces.
+- Background or scheduled outcome attestation without explicit operator review.
+- Hosted orchestration, remote workers, or queue infrastructure for follow-up execution or
+  closure.
+- Learned policy tuning that rewrites deterministic governance behavior automatically from
+  attested outcomes.
+- A new standalone execution or outcomes dashboard that duplicates existing route-local debugger
+  surfaces.
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EXEC-01 | Phase 117 | Complete |
-| VERIFY-01 | Phase 117 | Complete |
-| EXEC-02 | Phase 118 | Complete |
-| EXEC-03 | Phase 118 | Complete |
-| VERIFY-02 | Phase 118 | Complete |
-| UI-01 | Phase 119 | Complete |
-| UI-02 | Phase 119 | Complete |
-| FLOW-01 | Phase 120 | Complete |
+| ATTEST-01 | Phase 121 | Planned |
+| ATTEST-02 | Phase 121 | Planned |
+| VERDICT-01 | Phase 122 | Planned |
+| VERDICT-02 | Phase 122 | Planned |
+| FEEDBACK-01 | Phase 123 | Planned |
+| FEEDBACK-02 | Phase 123 | Planned |
+| UI-01 | Phase 123 | Planned |
+| UI-02 | Phase 123 | Planned |
+| FLOW-01 | Phase 124 | Planned |

@@ -10,7 +10,7 @@ artifacts, a CLI-first workflow, and a React debugger that reads the same saved 
 ## Current State
 
 - Latest shipped milestone: `v5.2`
-- Active milestone: none
+- Active milestone: `v5.3`
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -60,10 +60,19 @@ actions improved behavior.
 - Route-local debugger execution context on the existing automation panel and sticky operator
   summary without creating a separate execution dashboard.
 
-## Current Milestone
+## Current Milestone: v5.3 Closed-Loop Outcome Attestation And Policy Feedback
 
-No active milestone is defined. `v5.2` is shipped and the next step is to choose the next
-milestone.
+**Goal:** Turn post-execution follow-up into explicit, persisted outcome closure, so operators can
+prove whether a lifecycle action helped and feed that result back into future policy decisions.
+
+**Target features:**
+- Execution-receipt attestation that links follow-up runs and comparison artifacts back to the
+  executed action.
+- Deterministic measured outcome verdicts with persisted deltas, rationale, and closure state.
+- Policy feedback that feeds attested outcomes into family history, portfolio priority, and future
+  plan review context.
+- Route-local CLI and debugger surfaces for open follow-ups, closed outcomes, and action-effect
+  timelines.
 
 ## Core Value
 
@@ -101,7 +110,12 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 
 ### Active
 
-- No active milestone is defined; use `$gsd-new-milestone` to formalize the next planning cycle.
+- Execution receipts need explicit outcome attestation and evidence linking rather than leaving
+  rerun/compare follow-up as an external manual step.
+- Operators need deterministic measured verdicts and persisted rationale so they can tell whether
+  a lifecycle action improved behavior.
+- Family history, portfolio priority, and future plan review should reflect prior attested outcomes
+  before new changes are proposed or applied.
 - Future behavior-management work should stay artifact-native unless a clear structural limit
   forces broader infrastructure.
 - Any future automation must preserve explicit reviewability; no silent mutation of published
@@ -134,8 +148,10 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
   workspace orientation clearer without replacing the route-local, artifact-native debugger shape.
 - `v5.2` closed the next bottleneck by turning saved plans into explicit execution workflows with
   preflight, checkpoints, receipts, and route-local outcome review.
-- The next milestone can now build on a full explicit operator loop instead of inventing plan
-  execution first.
+- `v5.2` prepared rerun/compare follow-up from execution receipts, but the system still stops short
+  of persisting whether that evidence proved an action helped.
+- `v5.3` should close that final manual gap by linking execution receipts to follow-up evidence,
+  persisting measured outcome verdicts, and feeding those results back into future policy context.
 
 ## Constraints
 
@@ -169,5 +185,6 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 | Keep proactive escalation and dataset lifecycle actions local, deterministic, and explicitly reviewable | Maintenance decisions matter only if users can audit why a family should be kept, pruned, merged, or retired | ✓ Validated in `v4.9` |
 | Improve the existing debugger with route-local triage, persistent operator context, and URL-backed analysis presets instead of adding a separate dashboard | The product had already outgrown its UI, but the artifact-native model still fit; workflow clarity mattered more than a brand new surface | ✓ Validated in `v5.1` |
 | Keep saved-plan execution checkpointed, explicit, and artifact-native instead of introducing background automation | Execution only matters if operators can inspect blockers, receipts, and outcome context before and after every mutation | ✓ Validated in `v5.2` |
+| Close the post-execution loop with explicit attestation and policy feedback before pursuing schedule-driven automation | The system should first prove whether an action measurably helped before it optimizes when or how often actions run | — Pending in `v5.3` |
 
-*Last updated: 2026-04-06 after v5.2 completion*
+*Last updated: 2026-04-06 for v5.3 initialization*

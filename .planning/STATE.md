@@ -1,24 +1,24 @@
 ---
 gsd_state_version: 1.0
-milestone: v5.2
-milestone_name: Guided Plan Execution And Outcome Verification
-current_phase: 120
-current_phase_name: Workflow Verification And Stability
+milestone: v5.3
+milestone_name: Closed-Loop Outcome Attestation And Policy Feedback
+current_phase: 121
+current_phase_name: Outcome Attestation Contract And Evidence Linking
 current_plan: null
-status: milestone_complete
-stopped_at: Milestone v5.2 completed
-resume_file: /Users/padraigobrien/model-failure-lab/.planning/PROJECT.md
-last_updated: "2026-04-06T18:48:31Z"
+status: ready_to_discuss
+stopped_at: Milestone v5.3 initialized
+resume_file: /Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md
+last_updated: "2026-04-06T20:11:51Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# State: v5.2 Complete
+# State: v5.3 Ready To Discuss
 
 ## Project Reference
 
@@ -27,37 +27,38 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** `v5.2` is shipped; the next step is defining the next milestone.
+**Current focus:** Define the outcome-attestation and policy-feedback loop for `v5.3`.
 
 ## Current Focus
 
-- next_action: start the next milestone
-- status: `v5.2` completed
+- next_action: discuss Phase 121
+- status: `v5.3` initialized
 
 ## Current Position
 
-Milestone: `v5.2`
-Phase: `120` — Workflow Verification And Stability
+Milestone: `v5.3`
+Phase: `121` — Outcome Attestation Contract And Evidence Linking
 
 ## Workflow State
 
-**Current Phase:** 120
-**Current Phase Name:** Workflow Verification And Stability
+**Current Phase:** 121
+**Current Phase Name:** Outcome Attestation Contract And Evidence Linking
 **Total Phases:** 4
 **Current Plan:** none
-**Total Plans in Phase:** 1
-**Status:** Milestone complete
-**Progress:** [██████████] 100%
+**Total Plans in Phase:** 0
+**Status:** Ready to discuss
+**Progress:** [░░░░░░░░░░] 0%
 **Last Activity:** 2026-04-06
-**Last Activity Description:** Completed milestone `v5.2`
+**Last Activity Description:** Initialized milestone `v5.3`
 
 ## Recent Decisions
 
-- Turn saved plans into explicit executable workflows rather than leaving them advisory-only.
-- Keep execution checkpointed, review-first, and local; no background automation or silent
-  mutation.
-- Make post-execution outcome verification part of the product contract rather than an ad hoc
-  manual follow-up.
+- Close the post-execution loop with explicit outcome attestation rather than leaving follow-up
+  evidence ad hoc.
+- Keep measured outcome verdicts deterministic, inspectable, and evidence-backed instead of
+  heuristic-only.
+- Feed attested outcomes back into family history and portfolio context before considering
+  schedule-driven automation or notifications.
 
 ## Accumulated Context
 
@@ -81,20 +82,22 @@ Phase: `120` — Workflow Verification And Stability
   plus build verification for the full `triage -> detail -> analysis` loop.
 - `v5.2` closed the saved-plan execution gap with explicit preflight, checkpointed execution,
   persisted receipts, and route-local before/after outcome context.
-- The next product choice now starts from an explicit execution loop rather than needing to invent
-  one.
+- `v5.2` now prepares rerun and compare follow-up from execution receipts, but it still does not
+  persist whether those follow-ups proved the action helped.
+- `v5.3` starts from that explicit execution loop and should close the final manual gap with
+  persisted outcome attestation and policy feedback.
 
 ## Session
 
-**Last Date:** 2026-04-06T18:48:31Z
-**Stopped At:** Milestone v5.2 completed
-**Resume File:** [PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PROJECT.md)
+**Last Date:** 2026-04-06T20:11:51Z
+**Stopped At:** Milestone v5.3 initialized
+**Resume File:** [ROADMAP.md](/Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 121
 ```
 
 ---
-*State updated: 2026-04-06 after v5.2 completion*
+*State updated: 2026-04-06 for v5.3 initialization*

@@ -49,16 +49,60 @@
   preflight, checkpointed execution receipts, rollback and rerun/compare guidance, and route-local
   debugger outcome context.
 
-## Current Milestone
+## Active Milestone: v5.3 Closed-Loop Outcome Attestation And Policy Feedback
 
-No active milestone is defined. `v5.2` is shipped and the next step is to define the next
-milestone.
+**Goal:** Turn post-execution follow-up into explicit, persisted outcome closure, so operators can
+prove whether a lifecycle action helped and feed that result back into future policy decisions.
+
+### Phase 121: Outcome Attestation Contract And Evidence Linking
+- Status: pending
+- Requirements: `ATTEST-01`, `ATTEST-02`
+- Goal: define the persisted attestation contract over execution receipts, open follow-ups, linked
+  rerun artifacts, and explicit closure state.
+- Success criteria:
+  - Operators can identify open follow-ups and attach resulting run and comparison evidence to a
+    specific executed action.
+  - Attestation records preserve linked evidence and closure status without silently changing
+    family policy.
+
+### Phase 122: Measured Verdicts And CLI Outcome Closure
+- Status: pending
+- Requirements: `VERDICT-01`, `VERDICT-02`
+- Goal: compute deterministic measured verdicts from linked evidence and expose explicit CLI
+  closure flows for outcome attestation.
+- Success criteria:
+  - The system can derive `improved`, `regressed`, `inconclusive`, or `no_signal` from follow-up
+    comparison evidence and persist the basis for that verdict.
+  - CLI users can finalize an outcome closure and inspect the exact deltas and rationale behind
+    it.
+
+### Phase 123: Policy Feedback And Debugger Outcome Timelines
+- Status: pending
+- Requirements: `FEEDBACK-01`, `FEEDBACK-02`, `UI-01`, `UI-02`
+- Goal: feed attested outcomes back into family and portfolio context while surfacing open and
+  closed outcomes on existing debugger routes.
+- Success criteria:
+  - Family history, portfolio views, and future plan or execution review surfaces reflect relevant
+    prior attested outcomes.
+  - Existing debugger routes show open follow-ups, outcome verdicts, and action-effect timelines
+    without becoming a separate dashboard.
+
+### Phase 124: Workflow Verification And Stability
+- Status: pending
+- Requirements: `FLOW-01`
+- Goal: verify the full local workflow from triage to plan to execute to attested outcome and
+  updated policy context.
+- Success criteria:
+  - Verification proves the full `triage -> plan -> execute -> rerun -> compare -> attest outcome
+    -> updated context` loop is stable and reproducible.
+  - Outcome linking, measured verdicts, and policy feedback remain deterministic and inspectable
+    across rebuilds.
 
 ## Next Action
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 121
 ```
 
 ---
-*Roadmap updated: 2026-04-06 after v5.2 completion*
+*Roadmap updated: 2026-04-06 for v5.3 initialization*
