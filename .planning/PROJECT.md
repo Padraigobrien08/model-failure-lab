@@ -10,7 +10,7 @@ artifacts, a CLI-first workflow, and a React debugger that reads the same saved 
 ## Current State
 
 - Latest shipped milestone: `v5.0`
-- Active milestone: none
+- Active milestone: `v5.1`
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -53,9 +53,20 @@ without background automation.
 - Saved dry-run lifecycle plans with projected impact and stepwise explicit apply handoff.
 - Lightweight debugger priority and saved-plan context on existing routes.
 
-## Current Milestone
+## Current Milestone: v5.1 Operator Workflow Clarity And Triage Surfaces
 
-No active milestone is defined. `v5.0` is shipped and the next step is to choose the next milestone.
+**Goal:** Make the React debugger triage-first and action-oriented, so operators can spot
+actionable regressions earlier, keep key family and lifecycle context visible while reviewing a
+comparison, and move through analysis and workspace setup with less route-by-route friction.
+
+**Target features:**
+- Comparison inventory triage with governance, escalation, lifecycle, family, and priority
+  signals visible before opening detail views.
+- Clear comparison-detail decision surfaces with a persistent operator summary and decomposed
+  recommendation, action, and history sections.
+- Intent-first `/analysis` entry points with shareable preset views for common workflows.
+- Stronger artifact-root and workspace orientation in the shell without adding a separate
+  dashboard.
 
 ## Core Value
 
@@ -89,7 +100,14 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 
 ### Active
 
-- No active milestone is defined; use `$gsd-new-milestone` to formalize the next planning cycle.
+- The React debugger should surface triage-critical governance, lifecycle, and priority context in
+  comparisons inventory instead of hiding it behind detail-route drillthrough.
+- Comparison detail should keep operator state visible while separating recommendation, action,
+  family history, and supporting evidence into clearer sub-surfaces.
+- `/analysis` should become an intent-first workflow surface with preset/shareable views rather
+  than a generic filter wall.
+- Artifact-root and workspace context should be more explicit and actionable in the shell so local
+  testing and route trust are easier to maintain.
 - Future behavior-management work should stay artifact-native unless a clear structural limit
   forces broader infrastructure.
 - Any future automation must preserve explicit reviewability; no silent mutation of published
@@ -118,8 +136,10 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
   management over local artifacts.
 - `v5.0` solved the operator-prioritization layer with deterministic ranking, explicit planning
   units, saved portfolio drafts, and route-local debugger context.
-- The next milestone can now build on saved plan artifacts rather than inventing portfolio
-  prioritization from scratch.
+- The next bottleneck is not missing backend governance logic; it is that the UI still behaves
+  like an artifact debugger even though the product now supports a richer operator workflow.
+- `v5.1` should make triage, decision-making, and workspace orientation clearer without replacing
+  the existing route-local, artifact-native product shape.
 
 ## Constraints
 
@@ -152,4 +172,4 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 | Add recurring cluster identity before proactive alerts or pruning | The system needs to know whether the same problem is returning before escalating or consolidating | ✓ Validated in `v4.8` |
 | Keep proactive escalation and dataset lifecycle actions local, deterministic, and explicitly reviewable | Maintenance decisions matter only if users can audit why a family should be kept, pruned, merged, or retired | ✓ Validated in `v4.9` |
 
-*Last updated: 2026-04-05 after v5.0 completion*
+*Last updated: 2026-04-06 for v5.1 initialization*

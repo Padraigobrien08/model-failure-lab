@@ -39,64 +39,60 @@
 - [x] `v4.9` Proactive Escalation And Dataset Lifecycle Management - shipped 2026-04-05;
   deterministic escalation statuses, lifecycle review/apply CLI, debugger lifecycle surfacing,
   and full `history -> cluster -> escalation -> lifecycle action -> family state` proof.
+- [x] `v5.0` Portfolio Prioritization And Guided Lifecycle Planning - shipped 2026-04-05;
+  deterministic portfolio ranking, saved guided lifecycle plans, explicit plan promotion, and
+  route-local debugger plan context.
 
-## Active Milestone: v5.0 Portfolio Prioritization And Guided Lifecycle Planning
+## Active Milestone: v5.1 Operator Workflow Clarity And Triage Surfaces
 
-**Goal:** Turn per-family lifecycle signals into a deterministic operator queue and saved
-lifecycle plans, so users can prioritize and execute family-management work across the portfolio
-without background automation.
+**Goal:** Make the debugger triage-first and action-oriented, so users can identify actionable
+items earlier, keep decision-critical context visible while reviewing a comparison, and move
+through analysis and workspace setup with less friction.
 
-- [x] Phase 109 complete
-### Phase 109: Portfolio Priority Contract And Planning Units
-- Status: complete
-- Requirements: `PORT-01`, `PORT-02`, `PLAN-01`
-- Goal: define deterministic portfolio ranking and grouping rules over escalation, recurrence,
-  lifecycle health, and related family context.
+### Phase 113: Comparison Inventory Triage And Priority Surfacing
+- Status: pending
+- Requirements: `TRIAGE-01`, `TRIAGE-02`
+- Goal: surface governance, lifecycle, family, and priority context directly in the comparisons
+  inventory with operator-first triage controls.
 - Success criteria:
-  - Dataset families can be ranked in a stable priority order with explicit artifact-derived
-    rationale.
-  - Related families or merge candidates can be grouped into inspectable planning units without
-    opaque clustering or manual spreadsheets.
+  - Users can identify urgent or actionable comparisons from inventory without opening each report.
+  - Comparison inventory preserves compatibility and report identity while adding meaningful
+    triage context.
 
-- [x] Phase 110 complete
-### Phase 110: CLI Queue And Plan Draft Surfaces
-- Status: complete
-- Requirements: `PLAN-02`, `PLAN-03`, `CLI-01`, `CLI-02`, `CLI-03`
-- Goal: expose the portfolio queue, saved plan drafts, and explicit plan-to-apply handoff through
-  the CLI.
+### Phase 114: Comparison Detail Decision Surfaces And Operator Summary
+- Status: pending
+- Requirements: `DETAIL-01`, `DETAIL-02`, `DETAIL-03`
+- Goal: restructure comparison detail so operator summary, recommendation, action, family state,
+  and supporting evidence are easier to parse and navigate.
 - Success criteria:
-  - Users can list and inspect priority items and saved plans directly from the CLI.
-  - Users can generate a dry-run plan and promote one planned action into the existing explicit
-    review/apply workflow without background execution.
+  - Key operator state remains visible while users scroll through comparison evidence.
+  - Recommendation and family-history surfaces are decomposed enough to reduce cognitive overload
+    on the detail route.
 
-- [x] Phase 111 complete
-### Phase 111: Debugger Priority And Plan Context Surfacing
-- Status: complete
-- Requirements: `UI-01`, `UI-02`
-- Goal: surface priority and plan context on existing debugger routes with drillthrough into the
-  relevant families, clusters, and evidence.
+### Phase 115: Analysis Intent Presets And Workspace Orientation
+- Status: pending
+- Requirements: `ANALYSIS-01`, `ANALYSIS-02`, `SHELL-01`
+- Goal: make `/analysis` and the shared shell intent-first, with preset entry points and clearer
+  artifact-root/workspace orientation.
 - Success criteria:
-  - Existing family and comparison routes show why an item is high priority or included in a plan
-    without becoming dashboard-like.
-  - Users can move from surfaced priority or plan context directly into the underlying family,
-    cluster, comparison, and lifecycle evidence.
+  - Users can launch common workflows from analysis without manually composing every filter.
+  - The active artifact root and workspace source are explicit, inspectable, and easy to trust.
 
-- [x] Phase 112 complete
-### Phase 112: Portfolio Workflow Verification And Stability
-- Status: complete
+### Phase 116: Operator Workflow Verification And UI Stability
+- Status: pending
 - Requirements: `FLOW-01`
-- Goal: verify the full local workflow from portfolio queue to saved plan to explicit apply and
-  updated family state.
+- Goal: verify the end-to-end local operator workflow across comparison inventory, detail review,
+  analysis presets, and workspace context.
 - Success criteria:
-  - Verification proves the full `queue -> plan -> review/apply -> family state` loop is stable
-    and reproducible.
-  - Saved plan artifacts remain deterministic, inspectable, and consistent across rebuilds.
+  - Verification proves the full `triage -> detail -> analysis` route loop is stable and
+    reproducible on real artifacts.
+  - New UI surfaces preserve shareability, route integrity, and artifact-grounded reasoning.
 
 ## Next Action
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 113
 ```
 
 ---
-*Roadmap updated: 2026-04-05 after v5.0 completion*
+*Roadmap updated: 2026-04-06 for v5.1 initialization*

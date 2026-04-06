@@ -1,72 +1,65 @@
-# Requirements: v5.0 Portfolio Prioritization And Guided Lifecycle Planning
+# Requirements: v5.1 Operator Workflow Clarity And Triage Surfaces
 
-**Defined:** 2026-04-05  
-**Status:** Shipped
+**Defined:** 2026-04-06  
+**Status:** Active
 
-## v5.0 Requirements
+## v5.1 Requirements
 
-### Portfolio Priority
+### Comparison Triage
 
-- [x] **PORT-01**: Users can list dataset families in a deterministic priority order derived from
-  escalation, recurrence, lifecycle health, and recent failure history.
-- [x] **PORT-02**: Portfolio priority items preserve explicit rationale and links back to the
-  families, comparisons, clusters, and lifecycle actions that drove their rank.
+- [ ] **TRIAGE-01**: Users can scan saved comparisons with governance recommendation, escalation,
+  lifecycle state, matched family, and portfolio-priority context visible in the inventory itself.
+- [ ] **TRIAGE-02**: Comparison inventory supports operator-first sorting, filtering, or grouping
+  by actionability and lifecycle context rather than only raw comparison identity fields.
 
-### Guided Planning
+### Comparison Detail Workflow
 
-- [x] **PLAN-01**: The system can group related families or merge candidates into explicit planning
-  units with deterministic rationale for why they should be reviewed together.
-- [x] **PLAN-02**: Users can generate a saved dry-run lifecycle plan that proposes a bounded set of
-  actions without mutating any dataset family automatically.
-- [x] **PLAN-03**: Saved lifecycle plans preserve projected impact, dependencies, and the exact
-  family-level actions they recommend so operators can step through them explicitly.
+- [ ] **DETAIL-01**: Comparison detail keeps the current operator state visible in a persistent
+  summary surface that includes severity, escalation, lifecycle action, matched family, priority,
+  and saved-plan linkage.
+- [ ] **DETAIL-02**: The current regression-enforcement surface is decomposed into clearer
+  recommendation, action, family-state, and history sections so users do not parse one overloaded
+  card.
+- [ ] **DETAIL-03**: Users can move from the operator summary into supporting family history,
+  lifecycle actions, saved plans, and comparison evidence without losing route context.
 
-### CLI Surfaces
+### Analysis And Workspace Intent
 
-- [x] **CLI-01**: Users can list and filter the portfolio queue and saved lifecycle plans from the
-  CLI by family, model, failure type, actionability, or priority band.
-- [x] **CLI-02**: Users can inspect one queue item or saved plan with rationale, contributing
-  evidence, and the proposed family-level actions.
-- [x] **CLI-03**: Users can promote one saved plan action into the existing explicit review/apply
-  workflow without introducing background execution.
-
-### Debugger Support
-
-- [x] **UI-01**: Existing debugger routes surface priority and plan context on affected family or
-  comparison views without introducing a new control-center dashboard.
-- [x] **UI-02**: Users can drill from surfaced priority or plan items into the relevant family
-  histories, clusters, comparisons, and lifecycle action evidence.
+- [ ] **ANALYSIS-01**: `/analysis` exposes intent-first presets for common workflows such as
+  actionable regressions, critical families, merge candidates, or plan-backed items.
+- [ ] **ANALYSIS-02**: Analysis presets remain URL-shareable and preserve the underlying filter
+  logic so operators can return to the same view predictably.
+- [ ] **SHELL-01**: The shared shell makes artifact-root and workspace status first-class context
+  with clearer controls, provenance, and orientation cues.
 
 ### Workflow Verification
 
-- [x] **FLOW-01**: The full local workflow from portfolio queue to saved plan to explicit
-  review/apply to updated family state is verified and reproducible.
+- [ ] **FLOW-01**: The full local operator workflow from comparison inventory to detail decision
+  support to analysis preset drillthrough is verified and reproducible.
 
 ## Future Requirements
 
-- Automatic execution of saved plans without an explicit user step.
-- Background scheduling, notifications, or hosted escalation delivery.
-- Multi-user coordination or approval workflows over shared lifecycle plans.
+- A new standalone control-center dashboard that replaces the existing route-local debugger model.
+- Full user-customizable workspace layouts or per-user preference storage.
+- Hosted collaboration, notifications, or background automation over triage decisions.
 
 ## Out of Scope
 
-- Hosted prioritization services, queues, or orchestration backends.
-- Learned ranking or opaque portfolio scoring that cannot be reproduced from local artifacts.
-- A separate browser-side planning workspace that duplicates existing debugger routes.
-- Silent mutation of dataset families from plan generation alone.
+- A visual redesign disconnected from the operator-workflow gaps identified in current routes.
+- Hosted workflow orchestration, notification services, or shared-user state.
+- Browser-only state that cannot be reproduced through local artifacts or shareable URLs.
+- Silent lifecycle execution or dataset mutation from UI-only actions.
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PORT-01 | Phase 109 | Complete |
-| PORT-02 | Phase 109 | Complete |
-| PLAN-01 | Phase 109 | Complete |
-| PLAN-02 | Phase 110 | Complete |
-| PLAN-03 | Phase 110 | Complete |
-| CLI-01 | Phase 110 | Complete |
-| CLI-02 | Phase 110 | Complete |
-| CLI-03 | Phase 110 | Complete |
-| UI-01 | Phase 111 | Complete |
-| UI-02 | Phase 111 | Complete |
-| FLOW-01 | Phase 112 | Complete |
+| TRIAGE-01 | Phase 113 | Planned |
+| TRIAGE-02 | Phase 113 | Planned |
+| DETAIL-01 | Phase 114 | Planned |
+| DETAIL-02 | Phase 114 | Planned |
+| DETAIL-03 | Phase 114 | Planned |
+| ANALYSIS-01 | Phase 115 | Planned |
+| ANALYSIS-02 | Phase 115 | Planned |
+| SHELL-01 | Phase 115 | Planned |
+| FLOW-01 | Phase 116 | Planned |
