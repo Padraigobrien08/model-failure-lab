@@ -6,9 +6,9 @@ current_phase: 116
 current_phase_name: Operator Workflow Verification And UI Stability
 current_plan: null
 status: milestone_complete
-stopped_at: Phase 116 completed
-resume_file: /Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md
-last_updated: "2026-04-06T18:11:00Z"
+stopped_at: Milestone v5.1 completed
+resume_file: /Users/padraigobrien/model-failure-lab/.planning/PROJECT.md
+last_updated: "2026-04-06T17:16:47Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
@@ -18,7 +18,7 @@ progress:
   percent: 100
 ---
 
-# State: v5.1 Milestone Complete
+# State: v5.1 Complete
 
 ## Project Reference
 
@@ -27,13 +27,12 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** `v5.1` implementation is complete; the next lifecycle step is milestone
-archive/closeout.
+**Current focus:** `v5.1` is shipped; the next step is defining the next milestone.
 
 ## Current Focus
 
-- next_action: complete milestone `v5.1`
-- status: `v5.1` in progress
+- next_action: start the next milestone
+- status: `v5.1` completed
 
 ## Current Position
 
@@ -46,33 +45,22 @@ Phase: `116` — Operator Workflow Verification And UI Stability
 **Current Phase Name:** Operator Workflow Verification And UI Stability
 **Total Phases:** 4
 **Current Plan:** none
-**Total Plans in Phase:** 4
+**Total Plans in Phase:** 1
 **Status:** Milestone complete
 **Progress:** [██████████] 100%
 **Last Activity:** 2026-04-06
-**Last Activity Description:** Completed Phase 116
+**Last Activity Description:** Completed milestone `v5.1`
 
 ## Recent Decisions
 
-- Use the next milestone to make the debugger triage-first instead of starting with a broad visual
-  redesign.
-- Keep operator context route-local and explicit rather than creating a separate control-center
+- Make the debugger triage-first rather than starting with a broad visual redesign.
+- Keep operator context route-local and explicit instead of creating a separate control-center
   dashboard.
-- Make analysis and shell surfaces opinionated enough to guide action while staying URL-shareable,
-  artifact-native, and locally inspectable.
-- Reuse the existing comparison inventory route as the triage queue instead of adding a new queue
-  screen.
-- Enrich comparison inventory rows with existing governance and portfolio context rather than
-  bolting on a second client-side fetch path.
-- Reuse the existing dataset-version payload on comparison detail so the sticky right rail can show
-  operator summary state without inventing a new endpoint.
-- Keep the right rail decision-first and decompose the automation panel into named sections rather
-  than expanding the detail route into a separate dashboard.
 - Keep analysis presets URL-backed and layered on top of the raw query contract rather than
   introducing hidden workflow state.
 - Treat the active artifact root as shared workspace context in the shell, not passive metadata.
 - Land the router future-flag opt-in and insight-panel duplicate-key fix as milestone stability
-  work rather than leaving them as manual browser-only fixes.
+  work instead of leaving them as browser-only drift.
 
 ## Accumulated Context
 
@@ -88,26 +76,24 @@ Phase: `116` — Operator Workflow Verification And UI Stability
 - `v5.0` added deterministic portfolio ranking, inspectable planning units, saved dry-run
   lifecycle plans, explicit CLI promotion, and route-local debugger context over the same local
   governance artifacts.
-- Phase 113 already moved recommendation, escalation, lifecycle, matched family, and priority rank
-  into the saved comparison inventory with route-local triage lenses.
-- Phase 114 now keeps operator state visible on comparison detail with a sticky summary rail and a
-  decomposed regression-enforcement surface.
-- Phase 115 now gives `/analysis` intent presets, URL-backed workflow views, and clearer shell
-  workspace orientation without leaving the artifact-native model.
-- Phase 116 closed the remaining work by landing the router/key fixes and verifying the full
-  `triage -> detail -> analysis` loop plus production build stability.
+- `v5.1` moved recommendation, escalation, lifecycle, family, and priority context into the saved
+  comparisons inventory with route-local triage lenses and priority-aware ordering.
+- `v5.1` now keeps operator state visible on comparison detail with a sticky summary rail and a
+  decomposed decision surface for recommendation, family state, actions, and history.
+- `v5.1` added `/analysis` intent presets, clearer shell workspace orientation, and final route
+  plus build verification for the full `triage -> detail -> analysis` loop.
 
 ## Session
 
-**Last Date:** 2026-04-06T18:11:00Z
-**Stopped At:** Phase 116 completed
-**Resume File:** [ROADMAP.md](/Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md)
+**Last Date:** 2026-04-06T17:16:47Z
+**Stopped At:** Milestone v5.1 completed
+**Resume File:** [PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PROJECT.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-complete-milestone v5.1
+$gsd-new-milestone
 ```
 
 ---
-*State updated: 2026-04-06 after Phase 116 completion*
+*State updated: 2026-04-06 after v5.1 completion*

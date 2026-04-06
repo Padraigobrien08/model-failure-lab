@@ -1,5 +1,21 @@
 # Milestones
 
+## v5.1 Operator Workflow Clarity And Triage Surfaces (Shipped: 2026-04-06)
+
+**Phases completed:** 4 phases, 4 plans
+
+**Key accomplishments:**
+- Moved governance, escalation, lifecycle, family, and portfolio-priority context into the saved
+  comparison inventory with operator-first triage lenses and ordering.
+- Added a sticky operator summary rail and decomposed decision surfaces on comparison detail so
+  recommendation, action, family state, and supporting evidence stay easier to parse.
+- Added URL-backed `/analysis` intent presets plus stronger shell workspace orientation, keeping
+  artifact-root trust and workflow entry points visible across routes.
+- Closed the milestone with route-suite and build verification, along with the router future-flag
+  opt-in and insight-panel duplicate-key stability fixes.
+
+---
+
 ## v5.0 Portfolio Prioritization And Guided Lifecycle Planning (Shipped: 2026-04-05)
 
 **Phases completed:** 4 phases, 4 plans
