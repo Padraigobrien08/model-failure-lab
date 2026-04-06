@@ -86,6 +86,8 @@ export type ComparisonInventoryItem = {
   netScore: number;
   severity: number;
   topDrivers: ComparisonSignalDriver[];
+  governanceRecommendation?: ArtifactGovernanceRecommendation | null;
+  portfolioItem?: ArtifactDatasetPortfolioItem | null;
 };
 
 export type ComparisonInventory = {

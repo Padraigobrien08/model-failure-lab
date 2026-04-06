@@ -50,7 +50,7 @@ items earlier, keep decision-critical context visible while reviewing a comparis
 through analysis and workspace setup with less friction.
 
 ### Phase 113: Comparison Inventory Triage And Priority Surfacing
-- Status: pending
+- Status: complete
 - Requirements: `TRIAGE-01`, `TRIAGE-02`
 - Goal: surface governance, lifecycle, family, and priority context directly in the comparisons
   inventory with operator-first triage controls.
@@ -91,8 +91,8 @@ through analysis and workspace setup with less friction.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 113
+$gsd-discuss-phase 114
 ```
 
 ---
-*Roadmap updated: 2026-04-06 for v5.1 initialization*
+*Roadmap updated: 2026-04-06 after Phase 113 completion*

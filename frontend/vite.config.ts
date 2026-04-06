@@ -53,6 +53,8 @@ type ComparisonInventoryRow = {
   net_score: number;
   severity: number;
   top_drivers: ComparisonSignalDriverRow[];
+  governance_recommendation?: Record<string, unknown> | null;
+  portfolio_item?: Record<string, unknown> | null;
 };
 
 type ComparisonSignalDriverRow = {

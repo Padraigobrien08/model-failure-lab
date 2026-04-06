@@ -7,9 +7,9 @@
 
 ### Comparison Triage
 
-- [ ] **TRIAGE-01**: Users can scan saved comparisons with governance recommendation, escalation,
+- [x] **TRIAGE-01**: Users can scan saved comparisons with governance recommendation, escalation,
   lifecycle state, matched family, and portfolio-priority context visible in the inventory itself.
-- [ ] **TRIAGE-02**: Comparison inventory supports operator-first sorting, filtering, or grouping
+- [x] **TRIAGE-02**: Comparison inventory supports operator-first sorting, filtering, or grouping
   by actionability and lifecycle context rather than only raw comparison identity fields.
 
 ### Comparison Detail Workflow
@@ -54,8 +54,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRIAGE-01 | Phase 113 | Planned |
-| TRIAGE-02 | Phase 113 | Planned |
+| TRIAGE-01 | Phase 113 | Complete |
+| TRIAGE-02 | Phase 113 | Complete |
 | DETAIL-01 | Phase 114 | Planned |
 | DETAIL-02 | Phase 114 | Planned |
 | DETAIL-03 | Phase 114 | Planned |

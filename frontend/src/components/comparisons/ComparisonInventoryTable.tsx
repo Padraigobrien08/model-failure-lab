@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ComparisonInventoryItem } from "@/lib/artifacts/types";
+import { formatLabel } from "@/lib/formatters";
 
 type ComparisonInventoryTableProps = {
   rows: ComparisonInventoryItem[];
@@ -62,6 +63,30 @@ function signalTone(verdict: string): "accent" | "default" | "muted" {
   return "muted";
 }
 
+function recommendationTone(action: string): "accent" | "default" | "muted" {
+  return action === "ignore" ? "default" : "accent";
+}
+
+function escalationTone(status: string): "accent" | "default" | "muted" {
+  if (status === "critical") {
+    return "default";
+  }
+  if (status === "elevated") {
+    return "accent";
+  }
+  return "muted";
+}
+
+function priorityTone(priorityBand: string): "accent" | "default" | "muted" {
+  if (priorityBand === "urgent") {
+    return "default";
+  }
+  if (priorityBand === "high") {
+    return "accent";
+  }
+  return "muted";
+}
+
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
@@ -95,7 +120,7 @@ export function ComparisonInventoryTable({
                 Saved at
               </th>
               <th className="px-4 py-3 font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Signal
+                Operator triage
               </th>
               <th className="px-4 py-3 font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Open
@@ -103,8 +128,16 @@ export function ComparisonInventoryTable({
             </tr>
           </thead>
           <tbody className="block md:table-row-group">
-            {rows.map((row) => (
-              <tr
+            {rows.map((row) => {
+              const recommendation = row.governanceRecommendation ?? null;
+              const lifecycleRecommendation = recommendation?.lifecycleRecommendation ?? null;
+              const escalation = recommendation?.escalation ?? null;
+              const portfolioItem = row.portfolioItem ?? null;
+              const matchedFamilyId = recommendation?.matchedFamily.familyId ?? null;
+              const actionability = portfolioItem?.actionability ?? null;
+
+              return (
+                <tr
                 key={row.reportId}
                 tabIndex={0}
                 role="link"
@@ -139,19 +172,54 @@ export function ComparisonInventoryTable({
                   <time dateTime={row.createdAt}>{formatTimestamp(row.createdAt)}</time>
                 </td>
                 <td className="block px-0 py-2 md:table-cell md:px-4 md:py-3">
-                  <MobileLabel>Signal</MobileLabel>
+                  <MobileLabel>Triage</MobileLabel>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={signalTone(row.signalVerdict)}>{row.signalVerdict}</Badge>
                     <Badge tone="muted">{formatPercent(row.severity)} severity</Badge>
                     <Badge tone={statusTone(row.compatible, row.status)}>{row.status}</Badge>
+                    {recommendation ? (
+                      <Badge tone={recommendationTone(recommendation.action)}>
+                        {formatLabel(recommendation.action)}
+                      </Badge>
+                    ) : null}
+                    {escalation ? (
+                      <Badge tone={escalationTone(escalation.status)}>
+                        {formatLabel(escalation.status)}
+                      </Badge>
+                    ) : null}
+                    {lifecycleRecommendation ? (
+                      <Badge tone="muted">
+                        {formatLabel(lifecycleRecommendation.action)}
+                      </Badge>
+                    ) : null}
+                    {portfolioItem ? (
+                      <Badge tone={priorityTone(portfolioItem.priorityBand)}>
+                        Rank {portfolioItem.priorityRank} {formatLabel(portfolioItem.priorityBand)}
+                      </Badge>
+                    ) : null}
                   </div>
-                  {row.topDrivers[0] ? (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Driver: {row.topDrivers[0].failureType}{" "}
-                      {row.topDrivers[0].delta > 0 ? "+" : ""}
-                      {(row.topDrivers[0].delta * 100).toFixed(1)}%
-                    </p>
-                  ) : null}
+                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    {matchedFamilyId ? (
+                      <p className="break-all">
+                        Family: {matchedFamilyId}
+                        {actionability ? ` · ${formatLabel(actionability)}` : ""}
+                      </p>
+                    ) : null}
+                    {portfolioItem ? (
+                      <p>
+                        Priority {portfolioItem.priorityScore.toFixed(3)} ·{" "}
+                        {portfolioItem.recentRegressionCount} recent regressions ·{" "}
+                        {portfolioItem.recurringClusterCount} recurring clusters
+                      </p>
+                    ) : null}
+                    {row.topDrivers[0] ? (
+                      <p>
+                        Driver: {row.topDrivers[0].failureType}{" "}
+                        {row.topDrivers[0].delta > 0 ? "+" : ""}
+                        {(row.topDrivers[0].delta * 100).toFixed(1)}%
+                      </p>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="block px-0 pt-3 md:table-cell md:px-4 md:py-3">
                   <MobileLabel>Open</MobileLabel>
@@ -168,8 +236,9 @@ export function ComparisonInventoryTable({
                     Open
                   </Button>
                 </td>
-              </tr>
-            ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

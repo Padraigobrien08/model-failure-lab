@@ -4,6 +4,8 @@ import { afterEach, vi } from "vitest";
 
 import { App } from "@/app/App";
 import type {
+  ArtifactDatasetPortfolioItem,
+  ArtifactGovernanceRecommendation,
   ArtifactShellState,
   ComparisonDetail,
   ComparisonInventoryItem,
@@ -111,6 +113,131 @@ function buildSignalInventoryFields(
     netScore: verdict === "improvement" ? -severity : severity,
     severity,
     topDrivers,
+  };
+}
+
+function buildInventoryGovernanceRecommendation(
+  overrides: Partial<ArtifactGovernanceRecommendation> = {},
+): ArtifactGovernanceRecommendation {
+  return {
+    comparisonId: "compare_alpha_to_beta",
+    action: "evolve",
+    policyRule: "existing_family_match",
+    rationale:
+      "Qualifying regression matches existing family `regression-reasoning-failures-v1-hallucination`.",
+    policy: {
+      minimumSeverity: 0.05,
+      topN: 10,
+      failureType: null,
+      familyId: null,
+      familyCaseCap: 200,
+      maxDuplicateRatio: 0.6,
+      recurrenceWindow: 5,
+      recurrenceThreshold: 2,
+      strategy: "exact_suggested_family_then_health_guards",
+    },
+    signal: {
+      verdict: "regression",
+      reason: null,
+      regressionScore: 0.27,
+      improvementScore: 0,
+      netScore: 0.27,
+      severity: 0.27,
+      topDrivers: [
+        {
+          driverRank: 0,
+          failureType: "hallucination",
+          delta: 0.18,
+          direction: "regression",
+          caseIds: ["case-regression"],
+        },
+      ],
+    },
+    matchedFamily: {
+      familyId: "regression-reasoning-failures-v1-hallucination",
+      matchKind: "existing_family",
+      exists: true,
+      versionCount: 2,
+      latestDatasetId: "regression-reasoning-failures-v1-hallucination-v2",
+      currentCaseCount: 12,
+      proposedAdditionCount: 2,
+      duplicateCaseCount: 0,
+      duplicateRatio: 0,
+      projectedCaseCount: 14,
+      familyCaseCap: 200,
+      capReached: false,
+      duplicateRatioExceeded: false,
+    },
+    selectedCaseCount: 2,
+    evidenceCaseIds: ["case-regression"],
+    previewCases: [],
+    historyContext: null,
+    clusterContext: [],
+    escalation: {
+      status: "critical",
+      score: 0.41,
+      severityBand: "high",
+      reason: "severity=0.270, recent_regressions=2, recurring_clusters=1",
+      recentRegressionCount: 2,
+      recurringClusterCount: 1,
+      familyHealthLabel: "degrading",
+    },
+    lifecycleRecommendation: {
+      familyId: "regression-reasoning-failures-v1-hallucination",
+      action: "prune",
+      healthCondition: "overgrown",
+      rationale: "Projected family growth crosses the deterministic overgrowth threshold.",
+      targetFamilyId: null,
+      relatedFamilyIds: [],
+      sourceDatasetId: "reasoning-failures-v1",
+      primaryFailureType: "hallucination",
+      latestDatasetId: "regression-reasoning-failures-v1-hallucination-v2",
+      versionCount: 2,
+      evaluationRunCount: 3,
+      recentFailRate: 0.25,
+      projectedCaseCount: 14,
+    },
+    ...overrides,
+  };
+}
+
+function buildInventoryPortfolioItem(
+  overrides: Partial<ArtifactDatasetPortfolioItem> = {},
+): ArtifactDatasetPortfolioItem {
+  return {
+    familyId: "regression-reasoning-failures-v1-hallucination",
+    priorityRank: 1,
+    priorityBand: "urgent",
+    priorityScore: 91.25,
+    actionability: "actionable_now",
+    rationale: "Critical escalation with recurring regressions keeps this family at the top.",
+    lifecycleAction: "prune",
+    healthCondition: "overgrown",
+    healthLabel: "degrading",
+    trendLabel: "degrading",
+    versionCount: 2,
+    latestDatasetId: "regression-reasoning-failures-v1-hallucination-v2",
+    latestVersionTag: "v2",
+    latestComparisonId: "compare_alpha_to_beta",
+    sourceDatasetId: "reasoning-failures-v1",
+    primaryFailureType: "hallucination",
+    recentFailRate: 0.25,
+    projectedCaseCount: 14,
+    escalationStatus: "critical",
+    escalationScore: 0.41,
+    recentRegressionCount: 2,
+    recurringClusterCount: 1,
+    targetFamilyId: null,
+    relatedFamilyIds: [],
+    comparisonRefs: [],
+    clusterIds: [],
+    datasets: ["reasoning-failures-v1"],
+    models: ["demo"],
+    activeLifecycleActionId: "life-001",
+    activeLifecycleAction: "prune",
+    activeLifecycleCondition: "overgrown",
+    activeLifecycleAppliedAt: "2026-03-30T12:45:00Z",
+    ...overrides,
   };
 }
 
@@ -456,6 +583,117 @@ describe("comparisons route", () => {
     expect(screen.getByText("Multiple datasets")).toBeInTheDocument();
     expect(screen.getByText("22.0% severity")).toBeInTheDocument();
     expect(screen.getByText("Driver: hallucination -22.0%")).toBeInTheDocument();
+  });
+
+  it("supports operator-first triage lenses and priority surfacing from the inventory", () => {
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/comparisons?triage=critical&order=priority"]}
+        initialArtifactState={buildReadyState([
+          "compare_alpha_to_beta",
+          "compare_beta_to_gamma",
+          "compare_gamma_to_delta",
+        ])}
+        initialRunInventoryState={buildReadyInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState([
+          {
+            reportId: "compare_alpha_to_beta",
+            baselineRunId: "run_alpha",
+            candidateRunId: "run_beta",
+            dataset: "reasoning-failures-v1",
+            createdAt: "2026-03-30T12:00:00Z",
+            status: "regressed",
+            compatible: true,
+            ...buildSignalInventoryFields("regression", 0.27, {
+              failureType: "hallucination",
+              delta: 0.18,
+              caseIds: ["case-regression"],
+            }),
+            governanceRecommendation: buildInventoryGovernanceRecommendation(),
+            portfolioItem: buildInventoryPortfolioItem(),
+          },
+          {
+            reportId: "compare_beta_to_gamma",
+            baselineRunId: "run_beta",
+            candidateRunId: "run_gamma",
+            dataset: "reasoning-failures-v1",
+            createdAt: "2026-03-30T12:30:00Z",
+            status: "regressed",
+            compatible: true,
+            ...buildSignalInventoryFields("regression", 0.14, {
+              failureType: "reasoning",
+              delta: 0.12,
+              caseIds: ["case-008"],
+            }),
+            governanceRecommendation: buildInventoryGovernanceRecommendation({
+              action: "ignore",
+              escalation: {
+                status: "watch",
+                score: 0.12,
+                severityBand: "medium",
+                reason: "severity=0.140",
+                recentRegressionCount: 1,
+                recurringClusterCount: 0,
+                familyHealthLabel: null,
+              },
+              lifecycleRecommendation: {
+                familyId: "regression-reasoning-failures-v1-reasoning",
+                action: "keep",
+                healthCondition: "stable",
+                rationale: "No lifecycle follow-up is required.",
+                targetFamilyId: null,
+                relatedFamilyIds: [],
+                sourceDatasetId: "reasoning-failures-v1",
+                primaryFailureType: "reasoning",
+                latestDatasetId: "regression-reasoning-failures-v1-reasoning-v1",
+                versionCount: 1,
+                evaluationRunCount: 2,
+                recentFailRate: 0.1,
+                projectedCaseCount: 8,
+              },
+            }),
+            portfolioItem: buildInventoryPortfolioItem({
+              familyId: "regression-reasoning-failures-v1-reasoning",
+              priorityRank: 4,
+              priorityBand: "medium",
+              priorityScore: 40.5,
+              actionability: "monitor",
+              lifecycleAction: "keep",
+              healthCondition: "stable",
+              escalationStatus: "watch",
+              escalationScore: 0.12,
+            }),
+          },
+          {
+            reportId: "compare_gamma_to_delta",
+            baselineRunId: "run_gamma",
+            candidateRunId: "run_delta",
+            dataset: "hallucination-failures-v1",
+            createdAt: "2026-03-30T13:00:00Z",
+            status: "improved",
+            compatible: true,
+            ...buildSignalInventoryFields("improvement", 0.18, {
+              failureType: "hallucination",
+              delta: -0.18,
+              caseIds: ["case-013"],
+            }),
+          },
+        ])}
+      />,
+    );
+
+    expect(screen.getByText("1 visible")).toBeInTheDocument();
+    expect(screen.getByText("1 critical")).toBeInTheDocument();
+    expect(screen.getByText("1 lifecycle follow-up")).toBeInTheDocument();
+    expect(screen.getByText("Rank 1 Urgent")).toBeInTheDocument();
+    expect(screen.getAllByText("Critical").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Prune").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Family: regression-reasoning-failures-v1-hallucination · Actionable Now"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("compare_beta_to_gamma")).not.toBeInTheDocument();
+    expect(screen.queryByText("compare_gamma_to_delta")).not.toBeInTheDocument();
   });
 
   it("shows a route-level empty state when no comparison reports exist yet", () => {

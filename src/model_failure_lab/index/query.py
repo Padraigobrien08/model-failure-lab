@@ -80,7 +80,7 @@ def list_comparison_inventory(*, root: str | Path | None = None) -> list[dict[st
             ORDER BY severity DESC, created_at DESC, report_id DESC
             """
         ).fetchall()
-    hydrated = [dict(row) for row in rows]
+    hydrated = [_normalize_comparison_row(dict(row)) for row in rows]
     _attach_signal_drivers(connection=None, rows=hydrated, root=root)
     return hydrated
 
@@ -147,9 +147,19 @@ def query_comparison_signals(
         query.append("ORDER BY severity DESC, created_at DESC, report_id DESC")
         query.append("LIMIT ?")
         params.append(max(filters.limit, 1))
-        rows = [dict(row) for row in connection.execute(" ".join(query), params).fetchall()]
+        rows = [
+            _normalize_comparison_row(dict(row))
+            for row in connection.execute(" ".join(query), params).fetchall()
+        ]
         _attach_signal_drivers(connection=connection, rows=rows, root=root)
     return rows
+
+
+def _normalize_comparison_row(row: dict[str, Any]) -> dict[str, Any]:
+    compatible = row.get("compatible")
+    if compatible is not None:
+        row["compatible"] = bool(compatible)
+    return row
 
 
 def list_query_facets(*, root: str | Path | None = None) -> dict[str, list[str]]:

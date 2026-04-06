@@ -188,6 +188,7 @@ def test_rebuild_query_index_creates_expected_rows(tmp_path: Path) -> None:
     ]
     comparison_inventory = list_comparison_inventory(root=tmp_path)
     assert [row["report_id"] for row in comparison_inventory] == [ids["comparison_report_id"]]
+    assert comparison_inventory[0]["compatible"] is True
     assert comparison_inventory[0]["signal_verdict"] == "neutral"
     assert comparison_inventory[0]["regression_score"] == 0.25
     assert comparison_inventory[0]["improvement_score"] == 0.25
@@ -336,6 +337,7 @@ def test_query_comparison_signals_orders_by_severity_and_supports_failure_type_f
         root=tmp_path,
     )
     assert [row["report_id"] for row in neutral_rows] == [ids["comparison_report_id"]]
+    assert neutral_rows[0]["compatible"] is True
     assert neutral_rows[0]["top_drivers"][0]["failure_type"] == "instruction_following"
 
     filtered_rows = query_comparison_signals(

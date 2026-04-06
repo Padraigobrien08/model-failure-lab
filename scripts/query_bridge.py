@@ -55,7 +55,23 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "runs":
         payload = list_run_inventory(root=root)
     elif args.command == "comparisons":
-        payload = list_comparison_inventory(root=root)
+        payload = []
+        for row in list_comparison_inventory(root=root):
+            comparison_id = str(row["report_id"])
+            recommendation = recommend_dataset_action(comparison_id, root=root)
+            portfolio_item = get_dataset_portfolio_item(
+                recommendation.matched_family.family_id,
+                root=root,
+            )
+            payload.append(
+                {
+                    **row,
+                    "governance_recommendation": recommendation.to_payload(),
+                    "portfolio_item": (
+                        portfolio_item.to_payload() if portfolio_item is not None else None
+                    ),
+                }
+            )
     elif args.command == "query":
         filters = QueryFilters(
             failure_type=args.failure_type,

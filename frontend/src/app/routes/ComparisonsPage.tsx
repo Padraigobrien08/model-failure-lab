@@ -9,6 +9,7 @@ import {
   createSearchString,
 } from "@/lib/artifacts/navigation";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -17,8 +18,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { ComparisonInventoryItem } from "@/lib/artifacts/types";
+import { formatLabel } from "@/lib/formatters";
 
-function compareComparisonsNewestFirst(
+type ComparisonTriageLens = "all" | "actionable" | "critical" | "lifecycle";
+type ComparisonOrder = "severity" | "priority" | "newest";
+
+function compareComparisonsSeverityFirst(
   left: ComparisonInventoryItem,
   right: ComparisonInventoryItem,
 ): number {
@@ -40,17 +45,139 @@ function compareComparisonsNewestFirst(
   return right.reportId.localeCompare(left.reportId);
 }
 
+function compareComparisonsNewestFirst(
+  left: ComparisonInventoryItem,
+  right: ComparisonInventoryItem,
+): number {
+  const leftTime = Date.parse(left.createdAt);
+  const rightTime = Date.parse(right.createdAt);
+
+  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
+    return rightTime - leftTime;
+  }
+
+  if (left.createdAt !== right.createdAt) {
+    return right.createdAt.localeCompare(left.createdAt);
+  }
+
+  return right.reportId.localeCompare(left.reportId);
+}
+
+function isActionableComparison(row: ComparisonInventoryItem): boolean {
+  return row.governanceRecommendation?.action != null
+    && row.governanceRecommendation.action !== "ignore";
+}
+
+function hasLifecycleFollowUp(row: ComparisonInventoryItem): boolean {
+  const lifecycleAction =
+    row.governanceRecommendation?.lifecycleRecommendation?.action
+    ?? row.portfolioItem?.lifecycleAction
+    ?? null;
+  return lifecycleAction != null && lifecycleAction !== "keep";
+}
+
+function isCriticalComparison(row: ComparisonInventoryItem): boolean {
+  return row.governanceRecommendation?.escalation?.status === "critical"
+    || row.portfolioItem?.priorityBand === "urgent";
+}
+
+function compareComparisonsPriorityFirst(
+  left: ComparisonInventoryItem,
+  right: ComparisonInventoryItem,
+): number {
+  const leftRank = left.portfolioItem?.priorityRank ?? Number.MAX_SAFE_INTEGER;
+  const rightRank = right.portfolioItem?.priorityRank ?? Number.MAX_SAFE_INTEGER;
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  const leftActionable = isActionableComparison(left) ? 1 : 0;
+  const rightActionable = isActionableComparison(right) ? 1 : 0;
+  if (leftActionable !== rightActionable) {
+    return rightActionable - leftActionable;
+  }
+
+  return compareComparisonsSeverityFirst(left, right);
+}
+
+function readTriageLens(searchParams: URLSearchParams): ComparisonTriageLens {
+  const value = searchParams.get("triage");
+  if (value === "actionable" || value === "critical" || value === "lifecycle") {
+    return value;
+  }
+  return "all";
+}
+
+function readComparisonOrder(searchParams: URLSearchParams): ComparisonOrder {
+  const value = searchParams.get("order");
+  if (value === "priority" || value === "newest") {
+    return value;
+  }
+  return "severity";
+}
+
+function buildComparisonsSearchParams(
+  current: URLSearchParams,
+  patch: Partial<Record<"triage" | "order", string>>,
+): URLSearchParams {
+  const next = new URLSearchParams(current);
+  for (const [key, value] of Object.entries(patch)) {
+    if (!value || value === "all" || value === "severity") {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+  }
+  return next;
+}
+
 export function ComparisonsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { artifactState, artifactOverview, comparisonInventoryState } = useAppRouteContext();
 
   const inventory =
     comparisonInventoryState.status === "ready" ? comparisonInventoryState.inventory : null;
   const comparisons = inventory?.comparisons ?? [];
-  const sortedComparisons = useMemo(
-    () => comparisons.slice().sort(compareComparisonsNewestFirst),
+  const triageLens = readTriageLens(searchParams);
+  const order = readComparisonOrder(searchParams);
+  const actionableCount = useMemo(
+    () => comparisons.filter(isActionableComparison).length,
     [comparisons],
+  );
+  const criticalCount = useMemo(
+    () => comparisons.filter(isCriticalComparison).length,
+    [comparisons],
+  );
+  const lifecycleCount = useMemo(
+    () => comparisons.filter(hasLifecycleFollowUp).length,
+    [comparisons],
+  );
+  const visibleComparisons = useMemo(
+    () => {
+      const filtered = comparisons.filter((row) => {
+        if (triageLens === "actionable") {
+          return isActionableComparison(row);
+        }
+        if (triageLens === "critical") {
+          return isCriticalComparison(row);
+        }
+        if (triageLens === "lifecycle") {
+          return hasLifecycleFollowUp(row);
+        }
+        return true;
+      });
+
+      const compare =
+        order === "priority"
+          ? compareComparisonsPriorityFirst
+          : order === "newest"
+            ? compareComparisonsNewestFirst
+            : compareComparisonsSeverityFirst;
+
+      return filtered.slice().sort(compare);
+    },
+    [comparisons, order, triageLens],
   );
 
   if (artifactState.status !== "ready" || artifactOverview === null) {
@@ -125,20 +252,85 @@ export function ComparisonsPage() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Comparisons</Badge>
-          <Badge tone="muted">{sortedComparisons.length} detected</Badge>
+          <Badge tone="muted">{visibleComparisons.length} visible</Badge>
+          <Badge tone="muted">{actionableCount} actionable</Badge>
+          <Badge tone="muted">{criticalCount} critical</Badge>
+          <Badge tone="muted">{lifecycleCount} lifecycle follow-up</Badge>
         </div>
         <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
           Saved comparisons inventory.
         </h1>
         <p className="max-w-3xl text-base leading-7 text-muted-foreground">
           The comparisons route reads saved baseline-to-candidate reports from the engine contract
-          and prioritizes the highest-signal behavior changes first, so you can open the sharpest
-          regressions or improvements without manual sorting.
+          and now surfaces the operator context needed to triage what deserves attention before you
+          open a report: recommendation, escalation, lifecycle posture, matched family, and
+          portfolio priority.
         </p>
       </div>
 
+      <Card className="border-border/70 bg-card/70">
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-xl">Triage focus</CardTitle>
+          <CardDescription>
+            Move between all comparisons, immediately actionable items, critical escalations, and
+            lifecycle follow-up without leaving the saved inventory.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: "all", label: "All comparisons" },
+              { value: "actionable", label: "Actionable" },
+              { value: "critical", label: "Critical" },
+              { value: "lifecycle", label: "Lifecycle follow-up" },
+            ].map((lens) => (
+              <Button
+                key={lens.value}
+                variant={triageLens === lens.value ? "default" : "ghost"}
+                size="sm"
+                onClick={() =>
+                  setSearchParams(
+                    buildComparisonsSearchParams(searchParams, { triage: lens.value }),
+                    { replace: true },
+                  )
+                }
+              >
+                {lens.label}
+              </Button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Order
+            </span>
+            {[
+              { value: "severity", label: "Severity first" },
+              { value: "priority", label: "Priority first" },
+              { value: "newest", label: "Newest first" },
+            ].map((option) => (
+              <Button
+                key={option.value}
+                variant={order === option.value ? "default" : "ghost"}
+                size="sm"
+                onClick={() =>
+                  setSearchParams(
+                    buildComparisonsSearchParams(searchParams, { order: option.value }),
+                    { replace: true },
+                  )
+                }
+              >
+                {option.label}
+              </Button>
+            ))}
+            <Badge tone="muted">
+              {formatLabel(triageLens === "all" ? "all" : triageLens)}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
       <ComparisonInventoryTable
-        rows={sortedComparisons}
+        rows={visibleComparisons}
         onOpenComparison={(selectedReportId) =>
           navigate(`/comparisons/${encodeURIComponent(selectedReportId)}`, {
             state: buildArtifactReturnState(

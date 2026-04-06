@@ -1027,6 +1027,20 @@ function requireArtifactHistoryComparisonRows(
         row.top_drivers,
         `${field}[${index}].top_drivers`,
       ),
+      governanceRecommendation:
+        row.governance_recommendation == null
+          ? null
+          : requireArtifactGovernanceRecommendation(
+              row.governance_recommendation,
+              `${field}[${index}].governance_recommendation`,
+            ),
+      portfolioItem:
+        row.portfolio_item == null
+          ? null
+          : requireArtifactDatasetPortfolioItem(
+              row.portfolio_item,
+              `${field}[${index}].portfolio_item`,
+            ),
     };
   });
 }
@@ -1427,13 +1441,22 @@ function requireComparisonSignalDrivers(
     const row = requireObject(entry, `${field}[${index}]`);
     return {
       driverRank:
-        row.driver_rank == null
+        row.driver_rank == null && row.driverRank == null
           ? index
-          : requireCount(row.driver_rank, `${field}[${index}].driver_rank`),
-      failureType: requireString(row.failure_type, `${field}[${index}].failure_type`),
+          : requireCount(
+              row.driver_rank ?? row.driverRank,
+              `${field}[${index}].driver_rank`,
+            ),
+      failureType: requireString(
+        row.failure_type ?? row.failureType,
+        `${field}[${index}].failure_type`,
+      ),
       delta: requireNumber(row.delta, `${field}[${index}].delta`),
       direction: requireString(row.direction, `${field}[${index}].direction`),
-      caseIds: requireStringArray(row.case_ids, `${field}[${index}].case_ids`),
+      caseIds: requireStringArray(
+        row.case_ids ?? row.caseIds,
+        `${field}[${index}].case_ids`,
+      ),
     };
   });
 }
@@ -1457,11 +1480,20 @@ function requireComparisonSignal(
   return {
     verdict: requireString(signal.verdict, `${field}.verdict`),
     reason: requireStringOrNull(signal.reason, `${field}.reason`),
-    regressionScore: requireNumber(signal.regression_score, `${field}.regression_score`),
-    improvementScore: requireNumber(signal.improvement_score, `${field}.improvement_score`),
-    netScore: requireNumber(signal.net_score, `${field}.net_score`),
+    regressionScore: requireNumber(
+      signal.regression_score ?? signal.regressionScore,
+      `${field}.regression_score`,
+    ),
+    improvementScore: requireNumber(
+      signal.improvement_score ?? signal.improvementScore,
+      `${field}.improvement_score`,
+    ),
+    netScore: requireNumber(signal.net_score ?? signal.netScore, `${field}.net_score`),
     severity: requireNumber(signal.severity, `${field}.severity`),
-    topDrivers: requireComparisonSignalDrivers(signal.top_drivers, `${field}.top_drivers`),
+    topDrivers: requireComparisonSignalDrivers(
+      signal.top_drivers ?? signal.topDrivers,
+      `${field}.top_drivers`,
+    ),
   };
 }
 
