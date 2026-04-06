@@ -31,11 +31,13 @@ import {
 import { createSearchString, resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
 import { createArtifactHarvestDraft, loadComparisonDetail } from "@/lib/artifacts/load";
 import type {
+  ArtifactDatasetVersionsResponse,
   ArtifactHarvestResponse,
   ArtifactInsightEvidenceRef,
   ComparisonCaseDeltaRecord,
   ComparisonDetailState,
 } from "@/lib/artifacts/types";
+import { formatLabel } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 type ExportState =
@@ -43,6 +45,56 @@ type ExportState =
   | { status: "loading"; response: null; message: null }
   | { status: "ready"; response: ArtifactHarvestResponse; message: string | null }
   | { status: "error"; response: null; message: string };
+
+type DatasetVersionsState =
+  | { status: "idle"; value: null; message: null }
+  | { status: "loading"; value: null; message: null }
+  | { status: "ready"; value: ArtifactDatasetVersionsResponse; message: null }
+  | { status: "error"; value: null; message: string };
+
+function signalTone(verdict: string): "accent" | "default" | "muted" {
+  if (verdict === "improvement") {
+    return "accent";
+  }
+  if (verdict === "regression") {
+    return "default";
+  }
+  return "muted";
+}
+
+function recommendationTone(action: string | null): "accent" | "default" | "muted" {
+  if (action === "create" || action === "evolve") {
+    return "accent";
+  }
+  if (action === "ignore") {
+    return "default";
+  }
+  return "muted";
+}
+
+function escalationTone(status: string | null): "accent" | "default" | "muted" {
+  if (status === "critical") {
+    return "default";
+  }
+  if (status) {
+    return "accent";
+  }
+  return "muted";
+}
+
+function priorityTone(priorityBand: string | null): "accent" | "default" | "muted" {
+  if (priorityBand === "urgent") {
+    return "default";
+  }
+  if (priorityBand === "high") {
+    return "accent";
+  }
+  return "muted";
+}
+
+function formatPercent(value: number | null): string {
+  return value == null ? "n/a" : `${(value * 100).toFixed(1)}%`;
+}
 
 function selectCasesByOrder(
   orderedCaseIds: string[],
@@ -104,6 +156,11 @@ export function ComparisonDetailPage() {
     response: null,
     message: null,
   });
+  const [datasetVersionsState, setDatasetVersionsState] = useState<DatasetVersionsState>({
+    status: "idle",
+    value: null,
+    message: null,
+  });
 
   const inventory =
     comparisonInventoryState.status === "ready" ? comparisonInventoryState.inventory : null;
@@ -119,6 +176,11 @@ export function ComparisonDetailPage() {
 
   useEffect(() => {
     if (!reportId || comparison === undefined) {
+      setDatasetVersionsState({
+        status: "idle",
+        value: null,
+        message: null,
+      });
       startTransition(() => {
         setDetailState({
           status: "idle",
@@ -135,6 +197,11 @@ export function ComparisonDetailPage() {
         detail: null,
         message: null,
       });
+    });
+    setDatasetVersionsState({
+      status: "idle",
+      value: null,
+      message: null,
     });
 
     void loadComparisonDetail(reportId)
@@ -531,6 +598,23 @@ export function ComparisonDetailPage() {
   }
 
   const detail = detailState.detail;
+  const activeRecommendation =
+    detail.governanceRecommendation ?? comparison.governanceRecommendation ?? null;
+  const loadedDatasetVersions =
+    datasetVersionsState.status === "ready" ? datasetVersionsState.value : null;
+  const activeHistoryContext = activeRecommendation?.historyContext ?? null;
+  const activeFamilyHealth =
+    loadedDatasetVersions?.history.datasetHealth ?? activeHistoryContext?.familyHealth ?? null;
+  const activeLifecycleActions = loadedDatasetVersions?.lifecycleActions ?? [];
+  const activeLifecycleAction =
+    activeLifecycleActions.length > 0
+      ? activeLifecycleActions[activeLifecycleActions.length - 1]
+      : null;
+  const activePortfolioItem =
+    loadedDatasetVersions?.portfolioItem ?? comparison.portfolioItem ?? null;
+  const activePortfolioPlans = loadedDatasetVersions?.portfolioPlans ?? [];
+  const matchedFamilyId =
+    activeRecommendation?.matchedFamily.familyId ?? loadedDatasetVersions?.familyId ?? null;
   const detailReturnState = {
     returnTo: {
       pathname: location.pathname,
@@ -612,7 +696,7 @@ export function ComparisonDetailPage() {
               <ComparisonDetailHeader
                 comparison={detail.comparison}
                 signal={detail.signal}
-                governanceRecommendation={detail.governanceRecommendation}
+                governanceRecommendation={activeRecommendation}
                 inventoryHref={returnHref}
                 baselineRunState={detailReturnState}
                 candidateRunState={detailReturnState}
@@ -643,11 +727,12 @@ export function ComparisonDetailPage() {
                 comparisonId={detail.comparison.reportId}
                 dataset={detail.comparison.dataset}
                 signal={detail.signal}
-                recommendation={detail.governanceRecommendation}
-                historyContext={detail.governanceRecommendation?.historyContext ?? null}
+                recommendation={activeRecommendation}
+                historyContext={activeRecommendation?.historyContext ?? null}
                 returnState={detailReturnState}
                 autoLoadVersions
                 title="Regression enforcement surface"
+                onVersionsStateChange={(state) => setDatasetVersionsState(state)}
               />
 
               <InsightPanel
@@ -679,6 +764,162 @@ export function ComparisonDetailPage() {
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-28">
+          <Card className="rounded-[24px] border border-border/70 bg-card/75">
+            <CardHeader className="space-y-1 pb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Operator summary
+              </p>
+              <CardTitle className="text-lg">Keep the decision state visible</CardTitle>
+              <CardDescription>
+                Recommendation, family pressure, and saved plan context stay anchored here while
+                you inspect the evidence below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={signalTone(detail.signal.verdict)}>
+                  {formatLabel(detail.signal.verdict)}
+                </Badge>
+                <Badge tone="muted">{(detail.signal.severity * 100).toFixed(1)}% severity</Badge>
+                {activeRecommendation ? (
+                  <Badge tone={recommendationTone(activeRecommendation.action)}>
+                    {formatLabel(activeRecommendation.action)}
+                  </Badge>
+                ) : null}
+                {activeRecommendation?.escalation ? (
+                  <Badge tone={escalationTone(activeRecommendation.escalation.status)}>
+                    {formatLabel(activeRecommendation.escalation.status)}
+                  </Badge>
+                ) : null}
+                {activeRecommendation?.lifecycleRecommendation ? (
+                  <Badge tone="muted">
+                    {formatLabel(activeRecommendation.lifecycleRecommendation.action)}
+                  </Badge>
+                ) : null}
+                {activePortfolioItem ? (
+                  <Badge tone={priorityTone(activePortfolioItem.priorityBand)}>
+                    {formatLabel(activePortfolioItem.priorityBand)}
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="space-y-3">
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Recommended next move
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-foreground">
+                    {activeRecommendation
+                      ? formatLabel(activeRecommendation.action)
+                      : "No governance recommendation"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {activeRecommendation?.rationale ??
+                      "This comparison exposes evidence and metrics only; no dataset action recommendation is attached."}
+                  </p>
+                </div>
+
+                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Matched family
+                  </p>
+                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                    {matchedFamilyId ?? "New family not resolved yet"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {activeRecommendation
+                      ? `${formatLabel(activeRecommendation.matchedFamily.matchKind)} · ${activeRecommendation.matchedFamily.versionCount} versions · ${activeRecommendation.matchedFamily.projectedCaseCount} projected cases`
+                      : "Load family history to inspect immutable versions, lifecycle actions, and portfolio context."}
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Active family state
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {activeLifecycleAction
+                        ? `${formatLabel(activeLifecycleAction.action)} · ${formatLabel(activeLifecycleAction.healthCondition)}`
+                        : activeRecommendation?.lifecycleRecommendation
+                          ? `${formatLabel(activeRecommendation.lifecycleRecommendation.action)} · ${formatLabel(activeRecommendation.lifecycleRecommendation.healthCondition)}`
+                          : activeFamilyHealth?.healthLabel ?? "No lifecycle action recorded"}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {activeLifecycleAction
+                        ? `Applied ${activeLifecycleAction.appliedAt}`
+                        : activeFamilyHealth
+                          ? `${formatLabel(activeFamilyHealth.trend.label)} trend · ${activeFamilyHealth.evaluationRunCount} runs evaluated`
+                          : "Family history is still loading for this comparison."}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Portfolio priority
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {activePortfolioItem
+                        ? `Rank ${activePortfolioItem.priorityRank} · ${formatLabel(activePortfolioItem.priorityBand)}`
+                        : "Priority not loaded yet"}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {activePortfolioItem
+                        ? `Score ${activePortfolioItem.priorityScore.toFixed(3)} · ${activePortfolioItem.recentRegressionCount} recent regressions · ${activePortfolioItem.recurringClusterCount} recurring clusters`
+                        : "Load linked family context to inspect queue placement and plan relevance."}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Saved plans
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {activePortfolioPlans.length > 0
+                        ? `${activePortfolioPlans.length} linked`
+                        : "No saved plans linked"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {activePortfolioPlans.slice(0, 3).map((plan) => (
+                        <Badge key={plan.planId} tone="muted">
+                          {plan.planId}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Recent pressure
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {activeRecommendation?.escalation
+                        ? `${formatLabel(activeRecommendation.escalation.status)} escalation`
+                        : "No escalation attached"}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {activeRecommendation?.escalation
+                        ? `${activeRecommendation.escalation.recentRegressionCount} recent regressions · ${activeRecommendation.escalation.recurringClusterCount} recurring clusters · fail rate ${formatPercent(activeFamilyHealth?.recentFailRate ?? null)}`
+                        : activeHistoryContext
+                          ? `${activeHistoryContext.recentRegressionCount}/${activeHistoryContext.recentComparisonCount} recent regressions · ${activeHistoryContext.recurringClusters.length} recurring clusters`
+                          : "Escalation and recent-history context are unavailable for this comparison."}
+                    </p>
+                  </div>
+                </div>
+
+                {datasetVersionsState.status === "loading" ? (
+                  <p className="text-sm text-muted-foreground">
+                    Loading immutable family history and saved plan context for{" "}
+                    {matchedFamilyId ?? detail.comparison.reportId}.
+                  </p>
+                ) : null}
+                {datasetVersionsState.status === "error" ? (
+                  <p className="text-sm text-destructive">{datasetVersionsState.message}</p>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="rounded-[24px] border border-border/70 bg-card/75">
             <CardHeader className="space-y-1 pb-3">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">

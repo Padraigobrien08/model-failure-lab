@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v5.1
 milestone_name: Operator Workflow Clarity And Triage Surfaces
-current_phase: 114
-current_phase_name: Comparison Detail Decision Surfaces And Operator Summary
+current_phase: 115
+current_phase_name: Analysis Intent Presets And Workspace Orientation
 current_plan: null
 status: ready_to_discuss
-stopped_at: Phase 113 completed
+stopped_at: Phase 114 completed
 resume_file: /Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md
-last_updated: "2026-04-06T16:41:50Z"
+last_updated: "2026-04-06T16:58:00Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
-  percent: 25
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
+  percent: 50
 ---
 
 # State: v5.1 Ready To Discuss
@@ -27,30 +27,30 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** Define the persistent operator-summary and decomposed decision-surface contract
-for `v5.1`.
+**Current focus:** Make `/analysis` and the shared shell intent-first enough that operators can
+launch common workflows without reconstructing filters or doubting the active workspace.
 
 ## Current Focus
 
-- next_action: discuss Phase 114
+- next_action: discuss Phase 115
 - status: `v5.1` in progress
 
 ## Current Position
 
 Milestone: `v5.1`
-Phase: `114` — Comparison Detail Decision Surfaces And Operator Summary
+Phase: `115` — Analysis Intent Presets And Workspace Orientation
 
 ## Workflow State
 
-**Current Phase:** 114
-**Current Phase Name:** Comparison Detail Decision Surfaces And Operator Summary
+**Current Phase:** 115
+**Current Phase Name:** Analysis Intent Presets And Workspace Orientation
 **Total Phases:** 4
 **Current Plan:** none
-**Total Plans in Phase:** 1
+**Total Plans in Phase:** 2
 **Status:** Ready to discuss
-**Progress:** [██░░░░░░░░] 25%
+**Progress:** [█████░░░░░] 50%
 **Last Activity:** 2026-04-06
-**Last Activity Description:** Completed Phase 113
+**Last Activity Description:** Completed Phase 114
 
 ## Recent Decisions
 
@@ -64,6 +64,10 @@ Phase: `114` — Comparison Detail Decision Surfaces And Operator Summary
   screen.
 - Enrich comparison inventory rows with existing governance and portfolio context rather than
   bolting on a second client-side fetch path.
+- Reuse the existing dataset-version payload on comparison detail so the sticky right rail can show
+  operator summary state without inventing a new endpoint.
+- Keep the right rail decision-first and decompose the automation panel into named sections rather
+  than expanding the detail route into a separate dashboard.
 
 ## Accumulated Context
 
@@ -81,22 +85,24 @@ Phase: `114` — Comparison Detail Decision Surfaces And Operator Summary
   governance artifacts.
 - Phase 113 already moved recommendation, escalation, lifecycle, matched family, and priority rank
   into the saved comparison inventory with route-local triage lenses.
-- The next bottleneck is comparison detail density: the route still buries operator state in one
-  overloaded automation panel and a mostly navigational right rail.
-- `v5.1` continues by restructuring comparison detail, then analysis and shell orientation, while
-  preserving the artifact contract.
+- Phase 114 now keeps operator state visible on comparison detail with a sticky summary rail and a
+  decomposed regression-enforcement surface.
+- The next bottleneck is `/analysis` and shell orientation: the system has workflow power, but the
+  UI still makes operators reconstruct intent and workspace trust manually.
+- `v5.1` continues by making analysis intent-first and the shell more trustworthy while preserving
+  the artifact contract.
 
 ## Session
 
-**Last Date:** 2026-04-06T16:41:50Z
-**Stopped At:** Phase 113 completed
+**Last Date:** 2026-04-06T16:58:00Z
+**Stopped At:** Phase 114 completed
 **Resume File:** [ROADMAP.md](/Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-discuss-phase 114
+$gsd-discuss-phase 115
 ```
 
 ---
-*State updated: 2026-04-06 after Phase 113 completion*
+*State updated: 2026-04-06 after Phase 114 completion*

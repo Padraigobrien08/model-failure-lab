@@ -14,13 +14,13 @@
 
 ### Comparison Detail Workflow
 
-- [ ] **DETAIL-01**: Comparison detail keeps the current operator state visible in a persistent
+- [x] **DETAIL-01**: Comparison detail keeps the current operator state visible in a persistent
   summary surface that includes severity, escalation, lifecycle action, matched family, priority,
   and saved-plan linkage.
-- [ ] **DETAIL-02**: The current regression-enforcement surface is decomposed into clearer
+- [x] **DETAIL-02**: The current regression-enforcement surface is decomposed into clearer
   recommendation, action, family-state, and history sections so users do not parse one overloaded
   card.
-- [ ] **DETAIL-03**: Users can move from the operator summary into supporting family history,
+- [x] **DETAIL-03**: Users can move from the operator summary into supporting family history,
   lifecycle actions, saved plans, and comparison evidence without losing route context.
 
 ### Analysis And Workspace Intent
@@ -56,9 +56,9 @@
 |-------------|-------|--------|
 | TRIAGE-01 | Phase 113 | Complete |
 | TRIAGE-02 | Phase 113 | Complete |
-| DETAIL-01 | Phase 114 | Planned |
-| DETAIL-02 | Phase 114 | Planned |
-| DETAIL-03 | Phase 114 | Planned |
+| DETAIL-01 | Phase 114 | Complete |
+| DETAIL-02 | Phase 114 | Complete |
+| DETAIL-03 | Phase 114 | Complete |
 | ANALYSIS-01 | Phase 115 | Planned |
 | ANALYSIS-02 | Phase 115 | Planned |
 | SHELL-01 | Phase 115 | Planned |

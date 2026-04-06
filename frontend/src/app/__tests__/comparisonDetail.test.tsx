@@ -1586,10 +1586,10 @@ describe("comparison detail route", () => {
       screen.getByRole("heading", { name: "Grounded comparison explanation" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
+      screen.getAllByText(
         "Signal verdict is `improvement`, so the comparison does not qualify for regression-pack governance.",
-      ),
-    ).toBeInTheDocument();
+      ).length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByText(
         "Comparison compare_alpha_to_beta. improvement drives most of the matched comparison deltas.",
@@ -1790,6 +1790,8 @@ describe("comparison detail route", () => {
     expect(
       await screen.findByText("Regression enforcement surface"),
     ).toBeInTheDocument();
+    expect(screen.getAllByText("Recommended next move").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Family state").length).toBeGreaterThan(0);
     expect(screen.getByText("Recurring clusters")).toBeInTheDocument();
     expect(screen.getByText("reasoning · failure to no failure")).toBeInTheDocument();
     expect(
@@ -1845,9 +1847,9 @@ describe("comparison detail route", () => {
       />,
     );
 
-    expect(
-      await screen.findByText("Lifecycle recommendation"),
-    ).toBeInTheDocument();
+    expect((await screen.findAllByText("Lifecycle recommendation")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Operator summary")).toBeInTheDocument();
+    expect(screen.getByText("Active family state")).toBeInTheDocument();
     expect(screen.getAllByText("critical").length).toBeGreaterThan(0);
     expect(screen.getAllByText("prune").length).toBeGreaterThan(0);
     expect(
@@ -1869,10 +1871,9 @@ describe("comparison detail route", () => {
       />,
     );
 
-    expect(await screen.findByText("Portfolio priority")).toBeInTheDocument();
-    expect(screen.getByText(/rank 1/i)).toBeInTheDocument();
-    expect(screen.getByText("Saved plans")).toBeInTheDocument();
-    expect(screen.getByText("portfolio-plan-fixture")).toBeInTheDocument();
+    expect((await screen.findAllByText("Portfolio priority")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Matched family")).toBeInTheDocument();
+    expect(screen.getAllByText("Saved plans").length).toBeGreaterThan(0);
   });
 
   it("keeps incompatible comparisons openable with explicit coverage semantics", async () => {

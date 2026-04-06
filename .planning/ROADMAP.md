@@ -49,6 +49,8 @@
 items earlier, keep decision-critical context visible while reviewing a comparison, and move
 through analysis and workspace setup with less friction.
 
+- [x] Phase 113 complete
+- [x] Phase 114 complete
 ### Phase 113: Comparison Inventory Triage And Priority Surfacing
 - Status: complete
 - Requirements: `TRIAGE-01`, `TRIAGE-02`
@@ -60,7 +62,7 @@ through analysis and workspace setup with less friction.
     triage context.
 
 ### Phase 114: Comparison Detail Decision Surfaces And Operator Summary
-- Status: pending
+- Status: complete
 - Requirements: `DETAIL-01`, `DETAIL-02`, `DETAIL-03`
 - Goal: restructure comparison detail so operator summary, recommendation, action, family state,
   and supporting evidence are easier to parse and navigate.
@@ -91,8 +93,8 @@ through analysis and workspace setup with less friction.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 114
+$gsd-discuss-phase 115
 ```
 
 ---
-*Roadmap updated: 2026-04-06 after Phase 113 completion*
+*Roadmap updated: 2026-04-06 after Phase 114 completion*
