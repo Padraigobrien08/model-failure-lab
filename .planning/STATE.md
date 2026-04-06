@@ -5,20 +5,20 @@ milestone_name: Operator Workflow Clarity And Triage Surfaces
 current_phase: 116
 current_phase_name: Operator Workflow Verification And UI Stability
 current_plan: null
-status: ready_to_discuss
-stopped_at: Phase 115 completed
+status: milestone_complete
+stopped_at: Phase 116 completed
 resume_file: /Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md
-last_updated: "2026-04-06T18:08:00Z"
+last_updated: "2026-04-06T18:11:00Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 75
+  completed_phases: 4
+  total_plans: 4
+  completed_plans: 4
+  percent: 100
 ---
 
-# State: v5.1 Ready To Discuss
+# State: v5.1 Milestone Complete
 
 ## Project Reference
 
@@ -27,12 +27,12 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** Prove the full operator workflow is stable end-to-end and absorb the remaining
-local UI cleanup into a single verification/stability phase.
+**Current focus:** `v5.1` implementation is complete; the next lifecycle step is milestone
+archive/closeout.
 
 ## Current Focus
 
-- next_action: discuss Phase 116
+- next_action: complete milestone `v5.1`
 - status: `v5.1` in progress
 
 ## Current Position
@@ -46,11 +46,11 @@ Phase: `116` — Operator Workflow Verification And UI Stability
 **Current Phase Name:** Operator Workflow Verification And UI Stability
 **Total Phases:** 4
 **Current Plan:** none
-**Total Plans in Phase:** 3
-**Status:** Ready to discuss
-**Progress:** [███████░░░] 75%
+**Total Plans in Phase:** 4
+**Status:** Milestone complete
+**Progress:** [██████████] 100%
 **Last Activity:** 2026-04-06
-**Last Activity Description:** Completed Phase 115
+**Last Activity Description:** Completed Phase 116
 
 ## Recent Decisions
 
@@ -71,6 +71,8 @@ Phase: `116` — Operator Workflow Verification And UI Stability
 - Keep analysis presets URL-backed and layered on top of the raw query contract rather than
   introducing hidden workflow state.
 - Treat the active artifact root as shared workspace context in the shell, not passive metadata.
+- Land the router future-flag opt-in and insight-panel duplicate-key fix as milestone stability
+  work rather than leaving them as manual browser-only fixes.
 
 ## Accumulated Context
 
@@ -92,20 +94,20 @@ Phase: `116` — Operator Workflow Verification And UI Stability
   decomposed regression-enforcement surface.
 - Phase 115 now gives `/analysis` intent presets, URL-backed workflow views, and clearer shell
   workspace orientation without leaving the artifact-native model.
-- The remaining `v5.1` work is verification and cleanup: prove the `triage -> detail -> analysis`
-  loop on real artifacts and absorb the pending router/key cleanup already sitting in the worktree.
+- Phase 116 closed the remaining work by landing the router/key fixes and verifying the full
+  `triage -> detail -> analysis` loop plus production build stability.
 
 ## Session
 
-**Last Date:** 2026-04-06T18:08:00Z
-**Stopped At:** Phase 115 completed
+**Last Date:** 2026-04-06T18:11:00Z
+**Stopped At:** Phase 116 completed
 **Resume File:** [ROADMAP.md](/Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-discuss-phase 116
+$gsd-complete-milestone v5.1
 ```
 
 ---
-*State updated: 2026-04-06 after Phase 115 completion*
+*State updated: 2026-04-06 after Phase 116 completion*

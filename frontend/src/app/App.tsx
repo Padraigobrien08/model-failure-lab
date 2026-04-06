@@ -34,6 +34,11 @@ type AppProps = {
   initialEntries?: string[];
 };
 
+const ROUTER_FUTURE_FLAGS = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+} as const;
+
 const DEFAULT_SELECTION: WorkbenchSelection = {
   scope: "official",
   verdict: null,
@@ -323,8 +328,12 @@ export function App({
   );
 
   if (useMemoryRouter) {
-    return <MemoryRouter initialEntries={initialEntries}>{appFrame}</MemoryRouter>;
+    return (
+      <MemoryRouter future={ROUTER_FUTURE_FLAGS} initialEntries={initialEntries}>
+        {appFrame}
+      </MemoryRouter>
+    );
   }
 
-  return <BrowserRouter>{appFrame}</BrowserRouter>;
+  return <BrowserRouter future={ROUTER_FUTURE_FLAGS}>{appFrame}</BrowserRouter>;
 }

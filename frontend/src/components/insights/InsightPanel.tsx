@@ -12,6 +12,15 @@ type InsightPanelProps = {
   renderEvidenceLink: (reference: ArtifactInsightEvidenceRef) => ReactNode;
 };
 
+function buildInsightItemKey(
+  kind: string,
+  groupKey: string | null,
+  label: string,
+  index: number,
+): string {
+  return `${kind}:${groupKey ?? label}:${index}`;
+}
+
 function formatShare(share: number | null): string {
   if (share == null) {
     return "n/a";
@@ -51,9 +60,9 @@ export function InsightPanel({
               Key patterns
             </p>
             <div className="grid gap-4 lg:grid-cols-2">
-              {report.patterns.map((pattern) => (
+              {report.patterns.map((pattern, index) => (
                 <div
-                  key={`${pattern.kind}:${pattern.groupKey ?? pattern.label}`}
+                  key={buildInsightItemKey(pattern.kind, pattern.groupKey, pattern.label, index)}
                   className="rounded-[20px] border border-border/70 bg-background/75 p-4"
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -81,9 +90,9 @@ export function InsightPanel({
               Notable outliers
             </p>
             <div className="grid gap-4 lg:grid-cols-2">
-              {report.anomalies.map((anomaly) => (
+              {report.anomalies.map((anomaly, index) => (
                 <div
-                  key={`${anomaly.kind}:${anomaly.groupKey ?? anomaly.label}`}
+                  key={buildInsightItemKey(anomaly.kind, anomaly.groupKey, anomaly.label, index)}
                   className="rounded-[20px] border border-border/70 bg-background/75 p-4"
                 >
                   <div className="flex flex-wrap items-center gap-2">

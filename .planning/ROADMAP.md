@@ -52,6 +52,7 @@ through analysis and workspace setup with less friction.
 - [x] Phase 113 complete
 - [x] Phase 114 complete
 - [x] Phase 115 complete
+- [x] Phase 116 complete
 ### Phase 113: Comparison Inventory Triage And Priority Surfacing
 - Status: complete
 - Requirements: `TRIAGE-01`, `TRIAGE-02`
@@ -82,7 +83,7 @@ through analysis and workspace setup with less friction.
   - The active artifact root and workspace source are explicit, inspectable, and easy to trust.
 
 ### Phase 116: Operator Workflow Verification And UI Stability
-- Status: pending
+- Status: complete
 - Requirements: `FLOW-01`
 - Goal: verify the end-to-end local operator workflow across comparison inventory, detail review,
   analysis presets, and workspace context.
@@ -94,8 +95,8 @@ through analysis and workspace setup with less friction.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 116
+$gsd-complete-milestone v5.1
 ```
 
 ---
-*Roadmap updated: 2026-04-06 after Phase 115 completion*
+*Roadmap updated: 2026-04-06 after Phase 116 completion*

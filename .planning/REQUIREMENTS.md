@@ -34,7 +34,7 @@
 
 ### Workflow Verification
 
-- [ ] **FLOW-01**: The full local operator workflow from comparison inventory to detail decision
+- [x] **FLOW-01**: The full local operator workflow from comparison inventory to detail decision
   support to analysis preset drillthrough is verified and reproducible.
 
 ## Future Requirements
@@ -62,4 +62,4 @@
 | ANALYSIS-01 | Phase 115 | Complete |
 | ANALYSIS-02 | Phase 115 | Complete |
 | SHELL-01 | Phase 115 | Complete |
-| FLOW-01 | Phase 116 | Planned |
+| FLOW-01 | Phase 116 | Complete |
