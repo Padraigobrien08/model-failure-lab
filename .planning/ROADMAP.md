@@ -51,6 +51,7 @@ through analysis and workspace setup with less friction.
 
 - [x] Phase 113 complete
 - [x] Phase 114 complete
+- [x] Phase 115 complete
 ### Phase 113: Comparison Inventory Triage And Priority Surfacing
 - Status: complete
 - Requirements: `TRIAGE-01`, `TRIAGE-02`
@@ -72,7 +73,7 @@ through analysis and workspace setup with less friction.
     on the detail route.
 
 ### Phase 115: Analysis Intent Presets And Workspace Orientation
-- Status: pending
+- Status: complete
 - Requirements: `ANALYSIS-01`, `ANALYSIS-02`, `SHELL-01`
 - Goal: make `/analysis` and the shared shell intent-first, with preset entry points and clearer
   artifact-root/workspace orientation.
@@ -93,8 +94,8 @@ through analysis and workspace setup with less friction.
 ## Next Action
 
 ```bash
-$gsd-discuss-phase 115
+$gsd-discuss-phase 116
 ```
 
 ---
-*Roadmap updated: 2026-04-06 after Phase 114 completion*
+*Roadmap updated: 2026-04-06 after Phase 115 completion*

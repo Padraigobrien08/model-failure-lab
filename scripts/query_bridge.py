@@ -98,21 +98,32 @@ def main(argv: list[str] | None = None) -> int:
                 root=root,
             )]
         elif args.mode == "signals":
-            rows = query_comparison_signals(
+            signal_rows = query_comparison_signals(
                 filters,
                 verdict=None if args.signal_direction == "all" else args.signal_direction,
                 root=root,
             )
-            rows = [
-                {
-                    **row,
-                    "governance_recommendation": recommend_dataset_action(
-                        str(row["report_id"]),
-                        root=root,
-                    ).to_payload(),
-                }
-                for row in rows
-            ]
+            rows = []
+            for row in signal_rows:
+                recommendation = recommend_dataset_action(str(row["report_id"]), root=root)
+                family_id = recommendation.matched_family.family_id
+                portfolio_item = get_dataset_portfolio_item(family_id, root=root)
+                portfolio_plans = list_saved_portfolio_plans(
+                    root=root,
+                    filters=PortfolioFilters(family_id=family_id, limit=5),
+                )
+                rows.append(
+                    {
+                        **row,
+                        "governance_recommendation": recommendation.to_payload(),
+                        "portfolio_item": (
+                            portfolio_item.to_payload() if portfolio_item is not None else None
+                        ),
+                        "portfolio_plans": [
+                            plan.to_payload() for plan in portfolio_plans
+                        ],
+                    }
+                )
         elif args.mode == "deltas":
             rows = query_case_deltas(filters, root=root)
         else:

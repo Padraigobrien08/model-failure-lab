@@ -1648,6 +1648,17 @@ function requireArtifactQuerySignalRows(value: unknown, field: string): Artifact
               row.governance_recommendation,
               `${field}[${index}].governance_recommendation`,
             ),
+      portfolioItem:
+        row.portfolio_item == null
+          ? null
+          : requireArtifactDatasetPortfolioItem(
+              row.portfolio_item,
+              `${field}[${index}].portfolio_item`,
+            ),
+      portfolioPlans: requireArtifactSavedPortfolioPlans(
+        row.portfolio_plans ?? [],
+        `${field}[${index}].portfolio_plans`,
+      ),
     };
   });
 }

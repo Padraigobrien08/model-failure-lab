@@ -118,11 +118,48 @@ function resolveRouteMeta(pathname: string): RouteMeta {
   };
 }
 
+function resolveWorkspaceStatusLabel(status: string, issueCount: number): string {
+  if (status === "ready") {
+    return issueCount === 0 ? "Artifact contract clean" : `${issueCount} workspace issues`;
+  }
+  if (status === "empty") {
+    return "No artifacts detected";
+  }
+  if (status === "incompatible") {
+    return "Artifact contract unavailable";
+  }
+  return "Loading workspace";
+}
+
+function resolveWorkspaceStatusDescription(status: string, issueCount: number): string {
+  if (status === "ready") {
+    return issueCount === 0
+      ? "Saved runs and comparisons are readable from the active artifact root."
+      : "The current root loaded, but one or more artifact issues still need attention.";
+  }
+  if (status === "empty") {
+    return "No saved runs or comparison artifacts were found in the active workspace.";
+  }
+  if (status === "incompatible") {
+    return "The current root does not match the supported artifact contract.";
+  }
+  return "The shell is still resolving the active artifact workspace.";
+}
+
 export function TraceShell({ routeContext }: TraceShellProps) {
   const location = useLocation();
   const artifactOverview = routeContext.artifactOverview;
   const sourceLabel = artifactOverview?.source.label ?? "Local artifact root";
   const sourcePath = artifactOverview?.source.path ?? "Scanning repo-root runs/ and reports/…";
+  const issueCount = artifactOverview?.issues.length ?? 0;
+  const workspaceStatusLabel = resolveWorkspaceStatusLabel(
+    routeContext.artifactState.status,
+    issueCount,
+  );
+  const workspaceStatusDescription = resolveWorkspaceStatusDescription(
+    routeContext.artifactState.status,
+    issueCount,
+  );
   const routeMeta = resolveRouteMeta(location.pathname);
   const isDetailRoute =
     location.pathname.startsWith("/runs/") || location.pathname.startsWith("/comparisons/");
@@ -188,6 +225,12 @@ export function TraceShell({ routeContext }: TraceShellProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <a
+        href="#app-content"
+        className="sr-only absolute left-4 top-4 z-50 rounded-full border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground no-underline focus:not-sr-only"
+      >
+        Skip to content
+      </a>
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/92 backdrop-blur">
         <div className="mx-auto flex w-full max-w-[92rem] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -205,6 +248,7 @@ export function TraceShell({ routeContext }: TraceShellProps) {
               <Badge tone="muted">
                 Comparisons {artifactOverview?.comparisons.count ?? 0}
               </Badge>
+              <Badge tone="muted">{sourceLabel}</Badge>
             </div>
 
             <nav
@@ -322,13 +366,23 @@ export function TraceShell({ routeContext }: TraceShellProps) {
                 <div className="space-y-1">
                   <div className="space-y-1">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Artifact source
+                      Workspace source
                     </p>
                     <p className="text-sm font-medium text-foreground">{sourceLabel}</p>
                     <p className="break-all font-mono text-xs text-muted-foreground">
                       {sourcePath}
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge tone={issueCount === 0 ? "accent" : "default"}>
+                    {workspaceStatusLabel}
+                  </Badge>
+                  <Badge tone="muted">{artifactOverview?.runs.count ?? 0} runs</Badge>
+                  <Badge tone="muted">
+                    {artifactOverview?.comparisons.count ?? 0} comparisons
+                  </Badge>
                 </div>
 
                 <div className="mt-4 rounded-[22px] border border-border/60 bg-background/70 px-4 py-4">
@@ -348,7 +402,7 @@ export function TraceShell({ routeContext }: TraceShellProps) {
         </section>
       )}
 
-      <main className="mx-auto w-full max-w-[92rem] px-4 py-6 sm:px-6 lg:px-8">
+      <main id="app-content" className="mx-auto w-full max-w-[92rem] px-4 py-6 sm:px-6 lg:px-8">
         <div
           className={cn(
             "gap-6",
@@ -363,6 +417,30 @@ export function TraceShell({ routeContext }: TraceShellProps) {
           {!isDetailRoute ? (
             <aside className="hidden xl:block">
               <div className="sticky top-24 space-y-4">
+                <div className="rounded-[24px] border border-border/60 bg-card/75 px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Workspace context
+                  </p>
+                  <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                    <div className="rounded-[18px] border border-border/60 bg-background/70 px-3 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Source
+                      </p>
+                      <p className="mt-2 font-semibold text-foreground">{sourceLabel}</p>
+                      <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
+                        {sourcePath}
+                      </p>
+                    </div>
+                    <div className="rounded-[18px] border border-border/60 bg-background/70 px-3 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Status
+                      </p>
+                      <p className="mt-2 font-semibold text-foreground">{workspaceStatusLabel}</p>
+                      <p className="mt-2 leading-6">{workspaceStatusDescription}</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-[24px] border border-border/60 bg-card/75 px-4 py-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     Pathway checkpoints

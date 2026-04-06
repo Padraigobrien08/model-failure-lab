@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v5.1
 milestone_name: Operator Workflow Clarity And Triage Surfaces
-current_phase: 115
-current_phase_name: Analysis Intent Presets And Workspace Orientation
+current_phase: 116
+current_phase_name: Operator Workflow Verification And UI Stability
 current_plan: null
 status: ready_to_discuss
-stopped_at: Phase 114 completed
+stopped_at: Phase 115 completed
 resume_file: /Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md
-last_updated: "2026-04-06T16:58:00Z"
+last_updated: "2026-04-06T18:08:00Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
+  percent: 75
 ---
 
 # State: v5.1 Ready To Discuss
@@ -27,30 +27,30 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** Make `/analysis` and the shared shell intent-first enough that operators can
-launch common workflows without reconstructing filters or doubting the active workspace.
+**Current focus:** Prove the full operator workflow is stable end-to-end and absorb the remaining
+local UI cleanup into a single verification/stability phase.
 
 ## Current Focus
 
-- next_action: discuss Phase 115
+- next_action: discuss Phase 116
 - status: `v5.1` in progress
 
 ## Current Position
 
 Milestone: `v5.1`
-Phase: `115` — Analysis Intent Presets And Workspace Orientation
+Phase: `116` — Operator Workflow Verification And UI Stability
 
 ## Workflow State
 
-**Current Phase:** 115
-**Current Phase Name:** Analysis Intent Presets And Workspace Orientation
+**Current Phase:** 116
+**Current Phase Name:** Operator Workflow Verification And UI Stability
 **Total Phases:** 4
 **Current Plan:** none
-**Total Plans in Phase:** 2
+**Total Plans in Phase:** 3
 **Status:** Ready to discuss
-**Progress:** [█████░░░░░] 50%
+**Progress:** [███████░░░] 75%
 **Last Activity:** 2026-04-06
-**Last Activity Description:** Completed Phase 114
+**Last Activity Description:** Completed Phase 115
 
 ## Recent Decisions
 
@@ -68,6 +68,9 @@ Phase: `115` — Analysis Intent Presets And Workspace Orientation
   operator summary state without inventing a new endpoint.
 - Keep the right rail decision-first and decompose the automation panel into named sections rather
   than expanding the detail route into a separate dashboard.
+- Keep analysis presets URL-backed and layered on top of the raw query contract rather than
+  introducing hidden workflow state.
+- Treat the active artifact root as shared workspace context in the shell, not passive metadata.
 
 ## Accumulated Context
 
@@ -87,22 +90,22 @@ Phase: `115` — Analysis Intent Presets And Workspace Orientation
   into the saved comparison inventory with route-local triage lenses.
 - Phase 114 now keeps operator state visible on comparison detail with a sticky summary rail and a
   decomposed regression-enforcement surface.
-- The next bottleneck is `/analysis` and shell orientation: the system has workflow power, but the
-  UI still makes operators reconstruct intent and workspace trust manually.
-- `v5.1` continues by making analysis intent-first and the shell more trustworthy while preserving
-  the artifact contract.
+- Phase 115 now gives `/analysis` intent presets, URL-backed workflow views, and clearer shell
+  workspace orientation without leaving the artifact-native model.
+- The remaining `v5.1` work is verification and cleanup: prove the `triage -> detail -> analysis`
+  loop on real artifacts and absorb the pending router/key cleanup already sitting in the worktree.
 
 ## Session
 
-**Last Date:** 2026-04-06T16:58:00Z
-**Stopped At:** Phase 114 completed
+**Last Date:** 2026-04-06T18:08:00Z
+**Stopped At:** Phase 115 completed
 **Resume File:** [ROADMAP.md](/Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-discuss-phase 115
+$gsd-discuss-phase 116
 ```
 
 ---
-*State updated: 2026-04-06 after Phase 114 completion*
+*State updated: 2026-04-06 after Phase 115 completion*

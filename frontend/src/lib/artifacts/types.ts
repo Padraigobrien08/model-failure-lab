@@ -821,6 +821,8 @@ export type ArtifactQuerySignalRow = {
   severity: number;
   topDrivers: ComparisonSignalDriver[];
   governanceRecommendation: ArtifactGovernanceRecommendation | null;
+  portfolioItem: ArtifactDatasetPortfolioItem | null;
+  portfolioPlans: ArtifactSavedPortfolioPlan[];
 };
 
 export type ArtifactQueryClusterRow = ArtifactFailureClusterSummary;

@@ -20,6 +20,7 @@ import type {
   ArtifactHarvestResponse,
   ArtifactInsightEvidenceRef,
   ArtifactQueryMode,
+  ArtifactQuerySignalRow,
   ArtifactQueryState,
 } from "@/lib/artifacts/types";
 
@@ -33,6 +34,45 @@ type FilterSelectProps = {
 
 const AGGREGATE_OPTIONS = ["failure_type", "model", "dataset", "prompt_id"];
 const LAST_N_OPTIONS = ["1", "5", "10"];
+
+type AnalysisPresetId =
+  | "actionable"
+  | "critical"
+  | "merge_candidate"
+  | "plan_backed";
+
+type AnalysisPreset = {
+  id: AnalysisPresetId;
+  label: string;
+  description: string;
+};
+
+const ANALYSIS_PRESETS: AnalysisPreset[] = [
+  {
+    id: "actionable",
+    label: "Actionable regressions",
+    description:
+      "Show signal rows where governance already recommends creating or evolving a family.",
+  },
+  {
+    id: "critical",
+    label: "Critical queue",
+    description:
+      "Focus the signal view on comparisons already carrying critical escalation pressure.",
+  },
+  {
+    id: "merge_candidate",
+    label: "Merge candidates",
+    description:
+      "Check only the signals whose lifecycle recommendation points toward merge-candidate handling.",
+  },
+  {
+    id: "plan_backed",
+    label: "Plan-backed items",
+    description:
+      "Jump to signal rows that already belong to one or more saved portfolio plans.",
+  },
+];
 
 type ExportState =
   | { status: "idle"; response: null; message: null }
@@ -61,6 +101,19 @@ function readSignalDirection(searchParams: URLSearchParams): string {
   return searchParams.get("signalDirection") ?? "regression";
 }
 
+function readAnalysisPreset(searchParams: URLSearchParams): AnalysisPresetId | null {
+  const preset = searchParams.get("preset");
+  if (
+    preset === "actionable" ||
+    preset === "critical" ||
+    preset === "merge_candidate" ||
+    preset === "plan_backed"
+  ) {
+    return preset;
+  }
+  return null;
+}
+
 function buildAnalysisSearchParams(
   current: URLSearchParams,
   patch: Partial<Record<string, string>>,
@@ -74,6 +127,45 @@ function buildAnalysisSearchParams(
     }
   }
   return next;
+}
+
+function buildAnalysisPresetSearchParams(
+  current: URLSearchParams,
+  preset: AnalysisPresetId,
+): URLSearchParams {
+  return buildAnalysisSearchParams(current, {
+    mode: "signals",
+    signalDirection: "regression",
+    preset,
+    aggregateBy: "",
+    delta: "",
+    lastN: current.get("lastN") ?? "10",
+  });
+}
+
+function filterSignalRowsByPreset(
+  rows: ArtifactQuerySignalRow[],
+  preset: AnalysisPresetId | null,
+): ArtifactQuerySignalRow[] {
+  if (preset === null) {
+    return rows;
+  }
+
+  return rows.filter((row) => {
+    if (preset === "actionable") {
+      return (
+        row.governanceRecommendation?.action === "create" ||
+        row.governanceRecommendation?.action === "evolve"
+      );
+    }
+    if (preset === "critical") {
+      return row.governanceRecommendation?.escalation?.status === "critical";
+    }
+    if (preset === "merge_candidate") {
+      return row.governanceRecommendation?.lifecycleRecommendation?.action === "merge_candidate";
+    }
+    return row.portfolioPlans.length > 0;
+  });
 }
 
 function buildAnalysisExportStem(
@@ -132,6 +224,9 @@ export function AnalysisPage() {
   });
 
   const mode = readMode(searchParams);
+  const activePresetId = readAnalysisPreset(searchParams);
+  const activePreset =
+    ANALYSIS_PRESETS.find((preset) => preset.id === activePresetId) ?? null;
   const deferredSearch = useDeferredValue(searchParams.toString());
 
   useEffect(() => {
@@ -221,11 +316,17 @@ export function AnalysisPage() {
   const signalDirection = readSignalDirection(searchParams);
   const since = readSearchValue(searchParams, "since");
   const lastN = readSearchValue(searchParams, "lastN");
+  const visibleSignalRows =
+    response.mode === "signals"
+      ? filterSignalRowsByPreset(response.rows, activePresetId)
+      : [];
+  const visibleResultCount =
+    response.mode === "signals" ? visibleSignalRows.length : resultCount;
   const canExportDraft =
     response.mode !== "aggregates" &&
     response.mode !== "signals" &&
     response.mode !== "clusters" &&
-    resultCount > 0;
+    visibleResultCount > 0;
 
   const renderEvidenceLink = (reference: ArtifactInsightEvidenceRef) => {
     if (reference.kind === "run_case" && reference.runId && reference.caseId) {
@@ -278,7 +379,12 @@ export function AnalysisPage() {
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone="accent">Analysis</Badge>
           <Badge tone="muted">{mode}</Badge>
-          <Badge tone="muted">{resultCount} rows</Badge>
+          <Badge tone="muted">
+            {response.mode === "signals" && activePreset
+              ? `${visibleResultCount}/${resultCount} rows`
+              : `${visibleResultCount} rows`}
+          </Badge>
+          {activePreset ? <Badge tone="accent">{activePreset.label}</Badge> : null}
         </div>
         <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
           Cross-run artifact analysis.
@@ -288,6 +394,86 @@ export function AnalysisPage() {
           evidence. This view is backed by the derived local query index instead of raw directory
           scans.
         </p>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+        <Card className="border-border/70 bg-card/70">
+          <CardHeader>
+            <CardTitle>Start from intent</CardTitle>
+            <CardDescription>
+              Launch the common operator workflows first, then narrow them with the underlying
+              dataset, model, and time filters below.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {ANALYSIS_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                aria-pressed={activePresetId === preset.id}
+                className={
+                  activePresetId === preset.id
+                    ? "rounded-[22px] border border-primary/30 bg-primary/12 px-4 py-4 text-left transition-colors"
+                    : "rounded-[22px] border border-border/70 bg-background/70 px-4 py-4 text-left transition-colors hover:bg-background"
+                }
+                onClick={() =>
+                  setSearchParams(buildAnalysisPresetSearchParams(searchParams, preset.id), {
+                    replace: true,
+                  })
+                }
+              >
+                <p className="text-sm font-semibold text-foreground">{preset.label}</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {preset.description}
+                </p>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70 bg-card/70">
+          <CardHeader>
+            <CardTitle>Preset focus</CardTitle>
+            <CardDescription>
+              The active preset stays in the URL and composes with the raw analysis filters instead
+              of hiding them behind a separate dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge tone="muted">{mode}</Badge>
+              <Badge tone="muted">{artifactOverview.source.label}</Badge>
+              {activePreset ? <Badge tone="accent">{activePreset.label}</Badge> : null}
+            </div>
+            <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Current focus
+              </p>
+              <p className="mt-2 text-sm font-semibold text-foreground">
+                {activePreset?.label ?? "Manual query"}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {activePreset?.description ??
+                  "Combine the raw analysis filters directly when you need a custom query shape."}
+              </p>
+            </div>
+            <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Visible rows
+              </p>
+              <p className="mt-2 text-sm font-semibold text-foreground">
+                {response.mode === "signals" && activePreset
+                  ? `${visibleResultCount} of ${resultCount}`
+                  : visibleResultCount}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {response.mode === "signals" && activePreset
+                  ? "Signal rows are being filtered locally against the active operator preset."
+                  : "The visible result count currently matches the raw query response."}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="rounded-[24px] border border-border/70 bg-card/70 p-4">
@@ -306,6 +492,8 @@ export function AnalysisPage() {
                 }
                 if (nextMode === "signals") {
                   patch.signalDirection = "regression";
+                } else {
+                  patch.preset = "";
                 }
                 setSearchParams(buildAnalysisSearchParams(searchParams, patch), {
                   replace: true,
@@ -535,7 +723,7 @@ export function AnalysisPage() {
 
       {response.mode === "signals" ? (
         <div className="grid gap-4">
-          {response.rows.map((row) => {
+          {visibleSignalRows.map((row) => {
             const primaryDriver = row.topDrivers[0] ?? null;
             const primaryCaseId = primaryDriver?.caseIds[0] ?? null;
             const historyContext = row.governanceRecommendation?.historyContext ?? null;
@@ -592,6 +780,14 @@ export function AnalysisPage() {
                       <Badge tone="muted">
                         {clusterContext.length} recurring clusters
                       </Badge>
+                    ) : null}
+                    {row.portfolioItem ? (
+                      <Badge tone="muted">
+                        rank {row.portfolioItem.priorityRank} {row.portfolioItem.priorityBand}
+                      </Badge>
+                    ) : null}
+                    {row.portfolioPlans.length > 0 ? (
+                      <Badge tone="muted">{row.portfolioPlans.length} saved plans</Badge>
                     ) : null}
                   </div>
                   <CardTitle className="text-xl">{row.reportId}</CardTitle>
@@ -819,12 +1015,18 @@ export function AnalysisPage() {
         </div>
       ) : null}
 
-      {resultCount === 0 ? (
+      {visibleResultCount === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No query rows match the current filters.</CardTitle>
+            <CardTitle>
+              {activePreset
+                ? "No query rows match the current intent preset."
+                : "No query rows match the current filters."}
+            </CardTitle>
             <CardDescription>
-              Adjust one or more analysis filters to broaden the cross-run result set.
+              {activePreset
+                ? "Broaden the preset scope or relax one of the raw analysis filters to widen the result set."
+                : "Adjust one or more analysis filters to broaden the cross-run result set."}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">

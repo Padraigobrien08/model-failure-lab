@@ -25,11 +25,11 @@
 
 ### Analysis And Workspace Intent
 
-- [ ] **ANALYSIS-01**: `/analysis` exposes intent-first presets for common workflows such as
+- [x] **ANALYSIS-01**: `/analysis` exposes intent-first presets for common workflows such as
   actionable regressions, critical families, merge candidates, or plan-backed items.
-- [ ] **ANALYSIS-02**: Analysis presets remain URL-shareable and preserve the underlying filter
+- [x] **ANALYSIS-02**: Analysis presets remain URL-shareable and preserve the underlying filter
   logic so operators can return to the same view predictably.
-- [ ] **SHELL-01**: The shared shell makes artifact-root and workspace status first-class context
+- [x] **SHELL-01**: The shared shell makes artifact-root and workspace status first-class context
   with clearer controls, provenance, and orientation cues.
 
 ### Workflow Verification
@@ -59,7 +59,7 @@
 | DETAIL-01 | Phase 114 | Complete |
 | DETAIL-02 | Phase 114 | Complete |
 | DETAIL-03 | Phase 114 | Complete |
-| ANALYSIS-01 | Phase 115 | Planned |
-| ANALYSIS-02 | Phase 115 | Planned |
-| SHELL-01 | Phase 115 | Planned |
+| ANALYSIS-01 | Phase 115 | Complete |
+| ANALYSIS-02 | Phase 115 | Complete |
+| SHELL-01 | Phase 115 | Complete |
 | FLOW-01 | Phase 116 | Planned |

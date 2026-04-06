@@ -758,11 +758,42 @@ describe("analysis route", () => {
     expect(
       await screen.findByRole("heading", { name: "Cross-run artifact analysis." }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Workspace context")).toBeInTheDocument();
+    expect(screen.getAllByText("Artifact contract clean").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(DEFAULT_SOURCE.path).length).toBeGreaterThan(0);
     expect(screen.getByText("Grounded cross-run readout")).toBeInTheDocument();
     expect(screen.getByText("Regression case")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(
         "/__failure_lab__/artifacts/query.json?mode=cases&failureType=hallucination&lastN=5&limit=20&summarize=1",
+      ),
+    );
+  });
+
+  it("supports URL-backed intent presets for signal analysis", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockSignalAnalysisQuery();
+
+    render(
+      <App
+        useMemoryRouter
+        initialEntries={["/analysis?mode=cases"]}
+        initialArtifactState={buildReadyArtifactState()}
+        initialRunInventoryState={buildReadyRunInventoryState()}
+        initialComparisonInventoryState={buildReadyComparisonInventoryState()}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Critical queue/i }));
+
+    expect(
+      await screen.findByRole("button", { name: /Critical queue/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Preset focus")).toBeInTheDocument();
+    expect(screen.getByText("compare_alpha_to_beta")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/__failure_lab__/artifacts/query.json?mode=signals&signalDirection=regression&preset=critical&lastN=10&limit=20&summarize=1",
       ),
     );
   });
