@@ -1,65 +1,62 @@
-# Requirements: v5.1 Operator Workflow Clarity And Triage Surfaces
+# Requirements: v5.2 Guided Plan Execution And Outcome Verification
 
 **Defined:** 2026-04-06  
-**Status:** Shipped
+**Status:** Active
 
-## v5.1 Requirements
+## v5.2 Requirements
 
-### Comparison Triage
+### Execution Contract
 
-- [x] **TRIAGE-01**: Users can scan saved comparisons with governance recommendation, escalation,
-  lifecycle state, matched family, and portfolio-priority context visible in the inventory itself.
-- [x] **TRIAGE-02**: Comparison inventory supports operator-first sorting, filtering, or grouping
-  by actionability and lifecycle context rather than only raw comparison identity fields.
+- [ ] **EXEC-01**: Users can run a preflight validation against a saved plan or planned lifecycle
+  action and see blockers before any dataset family state changes.
+- [ ] **EXEC-02**: Users can execute a saved plan in explicit stepwise or bounded batch mode with
+  persisted checkpoints between actions.
+- [ ] **EXEC-03**: Every executed action produces a persisted execution receipt with outcome,
+  affected families, and compensating-action or rollback guidance when execution stops or fails.
 
-### Comparison Detail Workflow
+### Outcome Verification
 
-- [x] **DETAIL-01**: Comparison detail keeps the current operator state visible in a persistent
-  summary surface that includes severity, escalation, lifecycle action, matched family, priority,
-  and saved-plan linkage.
-- [x] **DETAIL-02**: The current regression-enforcement surface is decomposed into clearer
-  recommendation, action, family-state, and history sections so users do not parse one overloaded
-  card.
-- [x] **DETAIL-03**: Users can move from the operator summary into supporting family history,
-  lifecycle actions, saved plans, and comparison evidence without losing route context.
+- [ ] **VERIFY-01**: The system captures before/after snapshots for affected dataset families and
+  portfolio items so operators can inspect what changed.
+- [ ] **VERIFY-02**: Users can launch or prepare rerun/compare follow-up directly from executed
+  plan context to measure whether the change improved behavior.
 
-### Analysis And Workspace Intent
+### Debugger Execution Context
 
-- [x] **ANALYSIS-01**: `/analysis` exposes intent-first presets for common workflows such as
-  actionable regressions, critical families, merge candidates, or plan-backed items.
-- [x] **ANALYSIS-02**: Analysis presets remain URL-shareable and preserve the underlying filter
-  logic so operators can return to the same view predictably.
-- [x] **SHELL-01**: The shared shell makes artifact-root and workspace status first-class context
-  with clearer controls, provenance, and orientation cues.
+- [ ] **UI-01**: Existing debugger routes surface execution status, receipts, and before/after
+  state context for affected family or comparison views without introducing a new control-center
+  dashboard.
+- [ ] **UI-02**: Users can move from execution context into the originating plan, affected family
+  history, and post-execution rerun/compare evidence without losing route context.
 
 ### Workflow Verification
 
-- [x] **FLOW-01**: The full local operator workflow from comparison inventory to detail decision
-  support to analysis preset drillthrough is verified and reproducible.
+- [ ] **FLOW-01**: The full local workflow from triage to saved plan to explicit execution to
+  rerun/compare to updated family state is verified and reproducible.
 
 ## Future Requirements
 
-- A new standalone control-center dashboard that replaces the existing route-local debugger model.
-- Full user-customizable workspace layouts or per-user preference storage.
-- Hosted collaboration, notifications, or background automation over triage decisions.
+- Automatic background execution of approved plans without user checkpoints.
+- Notifications or scheduled execution windows for saved plans.
+- Multi-user approval or sign-off workflows around plan execution.
 
 ## Out of Scope
 
-- A visual redesign disconnected from the operator-workflow gaps identified in current routes.
-- Hosted workflow orchestration, notification services, or shared-user state.
-- Browser-only state that cannot be reproduced through local artifacts or shareable URLs.
-- Silent lifecycle execution or dataset mutation from UI-only actions.
+- Hosted orchestration, remote workers, or queue infrastructure for plan execution.
+- Silent execution of lifecycle changes without explicit operator checkpoints.
+- Learned execution policies or opaque rollback logic that cannot be reproduced from local
+  artifacts.
+- A new standalone execution dashboard that duplicates existing route-local debugger surfaces.
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRIAGE-01 | Phase 113 | Complete |
-| TRIAGE-02 | Phase 113 | Complete |
-| DETAIL-01 | Phase 114 | Complete |
-| DETAIL-02 | Phase 114 | Complete |
-| DETAIL-03 | Phase 114 | Complete |
-| ANALYSIS-01 | Phase 115 | Complete |
-| ANALYSIS-02 | Phase 115 | Complete |
-| SHELL-01 | Phase 115 | Complete |
-| FLOW-01 | Phase 116 | Complete |
+| EXEC-01 | Phase 117 | Planned |
+| VERIFY-01 | Phase 117 | Planned |
+| EXEC-02 | Phase 118 | Planned |
+| EXEC-03 | Phase 118 | Planned |
+| VERIFY-02 | Phase 118 | Planned |
+| UI-01 | Phase 119 | Planned |
+| UI-02 | Phase 119 | Planned |
+| FLOW-01 | Phase 120 | Planned |

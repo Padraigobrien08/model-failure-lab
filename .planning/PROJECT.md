@@ -10,7 +10,7 @@ artifacts, a CLI-first workflow, and a React debugger that reads the same saved 
 ## Current State
 
 - Latest shipped milestone: `v5.1`
-- Active milestone: none
+- Active milestone: `v5.2`
 - Primary public surface:
   - [failure-lab CLI](/Users/padraigobrien/model-failure-lab/src/model_failure_lab/cli.py)
 - Secondary surfaces:
@@ -59,10 +59,17 @@ comparison, and move through analysis and workspace setup with less route-by-rou
 - Stronger shell workspace orientation and verified `triage -> detail -> analysis` route stability
   without adding a separate dashboard.
 
-## Current Milestone
+## Current Milestone: v5.2 Guided Plan Execution And Outcome Verification
 
-No active milestone is defined. `v5.1` is shipped and the next step is to choose the next
-milestone.
+**Goal:** Turn saved lifecycle plans into an explicit, checkpointed execution workflow with
+outcome verification, so operators can safely act on portfolio decisions and measure whether those
+actions improved behavior.
+
+**Target features:**
+- Preflight validation and a persisted execution contract for saved plans and lifecycle actions.
+- Explicit CLI plan execution with checkpoints, receipts, and compensating-action guidance.
+- Before/after family-state snapshots plus rerun/compare handoff for outcome verification.
+- Route-local debugger execution status and outcome context on existing views.
 
 ## Core Value
 
@@ -98,7 +105,12 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 
 ### Active
 
-- No active milestone is defined; use `$gsd-new-milestone` to formalize the next planning cycle.
+- Saved plans need explicit preflight, checkpointed execution, and persisted receipts instead of
+  remaining advisory artifacts.
+- Operators need before/after family-state inspection and rerun/compare handoff so execution
+  outcomes can be measured rather than inferred.
+- Execution context should stay compact and route-local on existing CLI and debugger surfaces
+  rather than becoming a separate execution dashboard.
 - Future behavior-management work should stay artifact-native unless a clear structural limit
   forces broader infrastructure.
 - Any future automation must preserve explicit reviewability; no silent mutation of published
@@ -129,8 +141,10 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
   units, saved portfolio drafts, and route-local debugger context.
 - `v5.1` resolved the most obvious workflow bottleneck by making triage, decision-making, and
   workspace orientation clearer without replacing the route-local, artifact-native debugger shape.
-- The next milestone can now build on a clearer operator workflow instead of first untangling UI
-  friction around triage and route context.
+- The next bottleneck is explicit execution: saved plans still stop before checkpointed apply,
+  execution receipts, and measured rerun/compare follow-up.
+- `v5.2` should close that gap while preserving the same local, artifact-native, review-first
+  contract.
 
 ## Constraints
 
@@ -164,4 +178,4 @@ actionable, time-aware, pattern-aware, and lifecycle-manageable from local artif
 | Keep proactive escalation and dataset lifecycle actions local, deterministic, and explicitly reviewable | Maintenance decisions matter only if users can audit why a family should be kept, pruned, merged, or retired | ✓ Validated in `v4.9` |
 | Improve the existing debugger with route-local triage, persistent operator context, and URL-backed analysis presets instead of adding a separate dashboard | The product had already outgrown its UI, but the artifact-native model still fit; workflow clarity mattered more than a brand new surface | ✓ Validated in `v5.1` |
 
-*Last updated: 2026-04-06 after v5.1 completion*
+*Last updated: 2026-04-06 for v5.2 initialization*

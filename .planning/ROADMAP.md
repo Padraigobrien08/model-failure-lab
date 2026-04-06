@@ -46,16 +46,59 @@
   comparison inventory context, sticky operator summary, URL-backed analysis presets, stronger
   workspace orientation, and verified `triage -> detail -> analysis` route stability.
 
-## Current Milestone
+## Active Milestone: v5.2 Guided Plan Execution And Outcome Verification
 
-No active milestone is defined. `v5.1` is shipped and the next step is to define the next
-milestone.
+**Goal:** Turn saved lifecycle plans into an explicit, checkpointed execution workflow with
+outcome verification, so operators can safely act on portfolio decisions and measure whether those
+actions improved behavior.
+
+### Phase 117: Execution Contract And Preflight Checks
+- Status: pending
+- Requirements: `EXEC-01`, `VERIFY-01`
+- Goal: define the persisted execution and preflight contract over saved plans, planned lifecycle
+  actions, and before/after state capture.
+- Success criteria:
+  - Operators can validate a plan before execution and see blockers without mutating any dataset
+    family.
+  - Execution records preserve enough state to inspect what changed before and after each action.
+
+### Phase 118: CLI Plan Execution, Checkpoints, And Rollback Receipts
+- Status: pending
+- Requirements: `EXEC-02`, `EXEC-03`, `VERIFY-02`
+- Goal: expose explicit saved-plan execution, checkpoint progression, compensating-action
+  receipts, and rerun/compare handoff through the CLI.
+- Success criteria:
+  - Operators can execute or resume a saved plan in bounded steps or batches with persisted
+    checkpoint state.
+  - Failed or interrupted execution produces inspectable receipts and clear follow-up options,
+    including rerun/compare preparation.
+
+### Phase 119: Debugger Execution Context And Before/After Outcome Views
+- Status: pending
+- Requirements: `UI-01`, `UI-02`
+- Goal: surface execution status, receipts, and outcome deltas on existing debugger routes.
+- Success criteria:
+  - Existing comparison and family surfaces show execution status and before/after state without
+    becoming a separate dashboard.
+  - Users can drill from execution context into the originating plan, affected family state, and
+    post-execution evidence.
+
+### Phase 120: Workflow Verification And Stability
+- Status: pending
+- Requirements: `FLOW-01`
+- Goal: verify the full local workflow from triage to saved plan to explicit execution to
+  rerun/compare and updated family state.
+- Success criteria:
+  - Verification proves the full `triage -> plan -> execute -> rerun -> compare -> updated state`
+    loop is stable and reproducible.
+  - Execution receipts, checkpoints, and outcome snapshots remain deterministic and inspectable
+    across rebuilds.
 
 ## Next Action
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 117
 ```
 
 ---
-*Roadmap updated: 2026-04-06 after v5.1 completion*
+*Roadmap updated: 2026-04-06 for v5.2 initialization*

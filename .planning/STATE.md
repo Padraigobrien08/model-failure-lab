@@ -1,24 +1,24 @@
 ---
 gsd_state_version: 1.0
-milestone: v5.1
-milestone_name: Operator Workflow Clarity And Triage Surfaces
-current_phase: 116
-current_phase_name: Operator Workflow Verification And UI Stability
+milestone: v5.2
+milestone_name: Guided Plan Execution And Outcome Verification
+current_phase: 117
+current_phase_name: Execution Contract And Preflight Checks
 current_plan: null
-status: milestone_complete
-stopped_at: Milestone v5.1 completed
-resume_file: /Users/padraigobrien/model-failure-lab/.planning/PROJECT.md
-last_updated: "2026-04-06T17:16:47Z"
+status: ready_to_discuss
+stopped_at: Milestone v5.2 initialized
+resume_file: /Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md
+last_updated: "2026-04-06T18:20:50Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# State: v5.1 Complete
+# State: v5.2 Ready To Discuss
 
 ## Project Reference
 
@@ -27,40 +27,37 @@ See: [.planning/PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PRO
 **Core value:** Make structured LLM failure analysis simple, reproducible, queryable,
 interpretable, reusable, actionable, time-aware, pattern-aware, and now lifecycle-manageable from
 local artifacts.
-**Current focus:** `v5.1` is shipped; the next step is defining the next milestone.
+**Current focus:** Define the execution contract and outcome-verification loop for `v5.2`.
 
 ## Current Focus
 
-- next_action: start the next milestone
-- status: `v5.1` completed
+- next_action: discuss Phase 117
+- status: `v5.2` initialized
 
 ## Current Position
 
-Milestone: `v5.1`
-Phase: `116` — Operator Workflow Verification And UI Stability
+Milestone: `v5.2`
+Phase: `117` — Execution Contract And Preflight Checks
 
 ## Workflow State
 
-**Current Phase:** 116
-**Current Phase Name:** Operator Workflow Verification And UI Stability
+**Current Phase:** 117
+**Current Phase Name:** Execution Contract And Preflight Checks
 **Total Phases:** 4
 **Current Plan:** none
-**Total Plans in Phase:** 1
-**Status:** Milestone complete
-**Progress:** [██████████] 100%
+**Total Plans in Phase:** 0
+**Status:** Ready to discuss
+**Progress:** [░░░░░░░░░░] 0%
 **Last Activity:** 2026-04-06
-**Last Activity Description:** Completed milestone `v5.1`
+**Last Activity Description:** Initialized milestone `v5.2`
 
 ## Recent Decisions
 
-- Make the debugger triage-first rather than starting with a broad visual redesign.
-- Keep operator context route-local and explicit instead of creating a separate control-center
-  dashboard.
-- Keep analysis presets URL-backed and layered on top of the raw query contract rather than
-  introducing hidden workflow state.
-- Treat the active artifact root as shared workspace context in the shell, not passive metadata.
-- Land the router future-flag opt-in and insight-panel duplicate-key fix as milestone stability
-  work instead of leaving them as browser-only drift.
+- Turn saved plans into explicit executable workflows rather than leaving them advisory-only.
+- Keep execution checkpointed, review-first, and local; no background automation or silent
+  mutation.
+- Make post-execution outcome verification part of the product contract rather than an ad hoc
+  manual follow-up.
 
 ## Accumulated Context
 
@@ -82,18 +79,22 @@ Phase: `116` — Operator Workflow Verification And UI Stability
   decomposed decision surface for recommendation, family state, actions, and history.
 - `v5.1` added `/analysis` intent presets, clearer shell workspace orientation, and final route
   plus build verification for the full `triage -> detail -> analysis` loop.
+- The next bottleneck is explicit execution: saved plans still stop before checkpointed apply,
+  execution receipts, and measured rerun/compare follow-up.
+- `v5.2` will close that gap while preserving the same local, artifact-native, review-first
+  contract.
 
 ## Session
 
-**Last Date:** 2026-04-06T17:16:47Z
-**Stopped At:** Milestone v5.1 completed
-**Resume File:** [PROJECT.md](/Users/padraigobrien/model-failure-lab/.planning/PROJECT.md)
+**Last Date:** 2026-04-06T18:20:50Z
+**Stopped At:** Milestone v5.2 initialized
+**Resume File:** [ROADMAP.md](/Users/padraigobrien/model-failure-lab/.planning/ROADMAP.md)
 
 ## Next Suggested Commands
 
 ```bash
-$gsd-new-milestone
+$gsd-discuss-phase 117
 ```
 
 ---
-*State updated: 2026-04-06 after v5.1 completion*
+*State updated: 2026-04-06 for v5.2 initialization*
