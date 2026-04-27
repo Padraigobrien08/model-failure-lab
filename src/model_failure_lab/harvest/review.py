@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from model_failure_lab.datasets import FailureDataset, load_dataset
-from model_failure_lab.schemas import JsonValue, PromptCase
+from model_failure_lab.schemas import PromptCase
 from model_failure_lab.storage import write_json
 from model_failure_lab.storage.layout import dataset_file, project_root
 

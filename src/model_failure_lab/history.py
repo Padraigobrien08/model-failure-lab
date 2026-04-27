@@ -8,9 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from model_failure_lab.clusters import FailureClusterSummary, list_clusters_for_comparison, list_failure_clusters
-from model_failure_lab.index.query import QueryFilters
+from model_failure_lab.clusters import (
+    FailureClusterSummary,
+    list_clusters_for_comparison,
+    list_failure_clusters,
+)
 from model_failure_lab.index.builder import ensure_query_index, query_index_path
+from model_failure_lab.index.query import QueryFilters
 from model_failure_lab.schemas import JsonValue
 
 DEFAULT_HISTORY_LIMIT = 10

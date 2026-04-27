@@ -11,7 +11,6 @@ from model_failure_lab.reporting.load import load_saved_run_artifacts
 from model_failure_lab.schemas import JsonValue
 from model_failure_lab.storage import (
     portfolio_outcome_attestation_file,
-    portfolio_outcome_attestations_root,
     project_root,
     read_json,
     report_details_file,

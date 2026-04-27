@@ -6,12 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from model_failure_lab.datasets import DatasetEvolutionSummary, evolve_dataset_family
+from model_failure_lab.datasets.contracts import FailureDataset
+from model_failure_lab.datasets.load import load_dataset
 from model_failure_lab.history import (
     DatasetHealthSummary,
     query_history_snapshot,
 )
-from model_failure_lab.datasets.contracts import FailureDataset
-from model_failure_lab.datasets.load import load_dataset
 from model_failure_lab.index import QueryFilters, query_comparison_signals
 from model_failure_lab.schemas import JsonValue
 from model_failure_lab.storage import datasets_root

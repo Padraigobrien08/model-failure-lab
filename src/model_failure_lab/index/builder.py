@@ -10,10 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import time
+from typing import TypeAlias
 
 from model_failure_lab.datasets.load import load_dataset
-from model_failure_lab.reporting.signals import build_comparison_signal, build_incompatible_signal
 from model_failure_lab.reporting.load import load_saved_run_artifacts
+from model_failure_lab.reporting.signals import build_comparison_signal, build_incompatible_signal
 from model_failure_lab.storage.layout import (
     REPORT_DETAILS_FILENAME,
     REPORT_FILENAME,
@@ -29,6 +30,7 @@ QUERY_INDEX_SCHEMA_VERSION = "query_index_v4"
 QUERY_INDEX_DIRNAME = ".failure_lab"
 QUERY_INDEX_FILENAME = "query_index.sqlite3"
 _PROMPT_NORMALIZE_PATTERN = re.compile(r"[^a-z0-9]+")
+JsonValue: TypeAlias = str | int | float | bool | None | dict[str, object] | list[object]
 
 DELTA_KIND_BY_TRANSITION = {
     "failure_to_no_failure": "improvement",

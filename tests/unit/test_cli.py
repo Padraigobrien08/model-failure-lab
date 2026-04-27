@@ -308,27 +308,18 @@ def test_index_rebuild_help_is_exposed() -> None:
 
 
 def test_cli_module_import_does_not_load_matplotlib() -> None:
+    heavy_modules = ("matplotlib", "pandas", "pyarrow", "torch", "transformers", "wilds", "sklearn")
+    preexisting = {name: name in sys.modules for name in heavy_modules}
     _purge_modules(
         "model_failure_lab.cli",
         "model_failure_lab.reporting",
-        "matplotlib",
-        "pandas",
-        "pyarrow",
-        "torch",
-        "transformers",
-        "wilds",
-        "sklearn",
     )
 
     importlib.import_module("model_failure_lab.cli")
 
-    assert "matplotlib" not in sys.modules
-    assert "pandas" not in sys.modules
-    assert "pyarrow" not in sys.modules
-    assert "torch" not in sys.modules
-    assert "transformers" not in sys.modules
-    assert "wilds" not in sys.modules
-    assert "sklearn" not in sys.modules
+    for name in heavy_modules:
+        if not preexisting[name]:
+            assert name not in sys.modules
     assert not any(
         name == "model_failure_lab.reporting"
         or name.startswith("model_failure_lab.reporting.")

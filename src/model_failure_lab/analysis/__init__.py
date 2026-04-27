@@ -1,7 +1,7 @@
 """Structured grounded analysis over query-backed failure artifacts."""
 
-from .contracts import InsightEvidenceRef, InsightPattern, InsightReport, InsightSampling
 from .comparison_explainer import build_query_insight_report, explain_comparison_report
+from .contracts import InsightEvidenceRef, InsightPattern, InsightReport, InsightSampling
 from .prompt_builder import DEFAULT_ANALYSIS_SYSTEM_PROMPT, build_insight_enrichment_prompt
 from .summarizer import (
     DEFAULT_INSIGHT_SAMPLE_LIMIT,

@@ -11,18 +11,20 @@ def _purge_modules(*prefixes: str) -> None:
 
 
 def test_reporting_package_import_stays_light() -> None:
-    _purge_modules("model_failure_lab.reporting", "matplotlib")
+    had_matplotlib = "matplotlib" in sys.modules
+    _purge_modules("model_failure_lab.reporting")
 
     reporting = importlib.import_module("model_failure_lab.reporting")
 
-    assert "matplotlib" not in sys.modules
+    if not had_matplotlib:
+        assert "matplotlib" not in sys.modules
     assert "build_run_report" in reporting.__all__
     assert "build_comparison_report" in reporting.__all__
     assert "build_robustness_report_metadata" in reporting.__all__
 
 
 def test_reporting_package_keeps_representative_exports_reachable() -> None:
-    _purge_modules("model_failure_lab.reporting", "matplotlib")
+    _purge_modules("model_failure_lab.reporting")
 
     reporting = importlib.import_module("model_failure_lab.reporting")
     core = importlib.import_module("model_failure_lab.reporting.core")

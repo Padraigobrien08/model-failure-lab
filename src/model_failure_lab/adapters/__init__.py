@@ -1,5 +1,6 @@
 """Model adapter contracts, registries, and built-in adapters."""
 
+from .anthropic_adapter import AnthropicAdapter
 from .contracts import (
     ModelAdapter,
     ModelFactory,
@@ -8,7 +9,6 @@ from .contracts import (
     ModelResult,
     ModelUsage,
 )
-from .anthropic_adapter import AnthropicAdapter
 from .demo import DemoAdapter
 from .ollama_adapter import OllamaAdapter
 from .openai_adapter import OpenAIAdapter

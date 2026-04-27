@@ -39,8 +39,8 @@ from scripts.check_environment import run_command as run_check_environment_comma
 from scripts.download_data import run_command as run_download_data_command
 from scripts.run_baseline import run_command as run_baseline_command
 from scripts.run_mitigation import run_command as run_mitigation_command
-from scripts.run_react_ui import run_command as run_react_ui_command
 from scripts.run_perturbation_eval import run_command as run_perturbation_eval_command
+from scripts.run_react_ui import run_command as run_react_ui_command
 from scripts.run_results_ui import run_command as run_results_ui_command
 from scripts.run_shift_eval import run_command as run_shift_eval_command
 from scripts.validate_artifact_index import run_command as run_validate_artifact_index_command

@@ -33,6 +33,16 @@ from .outcomes import (
     list_portfolio_execution_outcomes,
     summarize_portfolio_outcomes_for_family,
 )
+from .policy import (
+    DEFAULT_GOVERNANCE_POLICY,
+    GovernanceEscalation,
+    GovernanceFamilyMatch,
+    GovernancePolicy,
+    GovernanceRecommendation,
+    LifecycleRecommendation,
+    describe_dataset_family_lifecycle,
+    recommend_dataset_action,
+)
 from .portfolio import (
     DatasetPlanningUnit,
     DatasetPortfolioItem,
@@ -52,19 +62,9 @@ from .portfolio import (
     list_dataset_portfolio,
     list_saved_portfolio_plans,
 )
-from .policy import (
-    DEFAULT_GOVERNANCE_POLICY,
-    GovernanceEscalation,
-    GovernanceFamilyMatch,
-    GovernancePolicy,
-    GovernanceRecommendation,
-    LifecycleRecommendation,
-    describe_dataset_family_lifecycle,
-    recommend_dataset_action,
-)
 from .workflow import (
-    DatasetLifecycleAlert,
     DatasetFamilyHealth,
+    DatasetLifecycleAlert,
     GovernanceApplyResult,
     apply_comparison_lifecycle_action,
     apply_dataset_actions,
@@ -72,8 +72,8 @@ from .workflow import (
     get_dataset_family_health,
     list_dataset_family_health,
     list_dataset_lifecycle_actions,
-    review_dataset_lifecycle,
     review_dataset_actions,
+    review_dataset_lifecycle,
 )
 
 __all__ = [
