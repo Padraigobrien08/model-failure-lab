@@ -1,5 +1,9 @@
 # Model Failure Lab
 
+![CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 Model Failure Lab is a local-first evaluation and failure-analysis toolkit for LLM and RAG systems.
 It helps teams run prompt datasets, classify failures, compare model versions, and turn regressions
 into reusable test cases.
@@ -43,6 +47,25 @@ If your shell does not expose the console script on `PATH`, use:
 ```bash
 python3 -m model_failure_lab demo
 ```
+
+## Example Output
+
+Prompt case:
+
+```text
+"What is 37 * 48?"
+```
+
+Run result:
+
+- model output: incorrect
+- failure type: reasoning_error
+- classification confidence: high
+
+Comparison summary:
+
+- regression rate: +12%
+- new failure clusters: arithmetic carry errors
 
 ## Core Workflow
 
@@ -92,15 +115,6 @@ export FAILURE_LAB_ARTIFACT_ROOT=/path/to/failure-lab-workspace
 npm --prefix frontend run dev
 ```
 
-## Product Screens
-
-- Run summary
-- Failure inventory
-- Comparison view
-- Harvest/replay workflow
-
-Image placeholders and naming conventions live in `docs/product-screens.md`.
-
 ## Development
 
 ```bash
@@ -119,8 +133,8 @@ This project follows semantic versioning before `v1.0` in the practical sense:
 
 ## Legacy Surfaces
 
-Legacy benchmark and UI surfaces are retained for reference and are not part of the supported
-production path.
+Legacy surfaces are retained for reference only and are not part of the supported production
+workflow.
 
 See:
 
