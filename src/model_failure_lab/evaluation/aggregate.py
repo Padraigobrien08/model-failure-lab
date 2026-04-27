@@ -31,9 +31,10 @@ def _validate_prediction_frame(frame: pd.DataFrame) -> pd.DataFrame:
 
 def _safe_auroc(true_labels: pd.Series, probability_positive: pd.Series) -> float | None:
     try:
-        return float(roc_auc_score(true_labels, probability_positive))
+        score = float(roc_auc_score(true_labels, probability_positive))
     except ValueError:
         return None
+    return score if np.isfinite(score) else None
 
 
 def compute_aggregate_metrics(frame: pd.DataFrame) -> dict[str, Any]:
