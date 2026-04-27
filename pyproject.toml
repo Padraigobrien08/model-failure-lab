@@ -5,12 +5,30 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "model-failure-lab"
 version = "0.1.0"
-description = "Reproducible experiment scaffold for distribution-shift failure analysis."
+description = "Local-first evaluation and failure-analysis toolkit for LLM and RAG systems."
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+authors = [
+  { name = "Model Failure Lab contributors" },
+]
+keywords = ["llm", "rag", "evaluation", "regression-testing", "prompt-testing"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
   "PyYAML",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Padraigobrien08/model-failure-lab"
+Repository = "https://github.com/Padraigobrien08/model-failure-lab"
+Issues = "https://github.com/Padraigobrien08/model-failure-lab/issues"
 
 [project.optional-dependencies]
 anthropic = [

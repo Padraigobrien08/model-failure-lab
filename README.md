@@ -1,267 +1,143 @@
 # Model Failure Lab
 
-Model Failure Lab is a CLI-first system for structured LLM failure analysis.
+Model Failure Lab is a local-first evaluation and failure-analysis toolkit for LLM and RAG systems.
+It helps teams run prompt datasets, classify failures, compare model versions, and turn regressions
+into reusable test cases.
 
-It lets you run prompt datasets against a model, classify failures with simple heuristic logic,
-save deterministic local artifacts, and compare runs without needing a database or extra
-infrastructure.
+## What It Is
+
+Model Failure Lab focuses on one production loop:
+
+`failure -> report -> compare -> harvest -> promote -> rerun`
+
+The primary value is not only executing evals, but preserving deterministic artifact history so teams
+can turn regressions into durable datasets and governance decisions.
 
 ## Quickstart
 
 Use Python 3.11 or newer.
 
+From a local clone:
+
 ```bash
+git clone <repo-url>
+cd model-failure-lab
 python3 -m pip install .
 failure-lab demo
-failure-lab run --dataset reasoning-failures-v1 --model demo
-failure-lab report --run <run-id>
-failure-lab compare <baseline-run-id> <candidate-run-id>
 ```
 
-Use the Run ID from `failure-lab demo` as `<baseline-run-id>` and the Run ID from the bundled
-`run` command as `<candidate-run-id>` in the later commands.
+Then run the canonical workflow:
 
-That standard install path exercises the real `failure-lab` console script: the demo writes a
-bundled dataset snapshot plus one run and report, the bundled `run` command gives you a second run
-to inspect, `report` rebuilds summaries from saved artifacts, and `compare` writes a saved
-comparison artifact for those two run IDs. Because the demo dataset and the reasoning dataset are
-different, that final quickstart comparison is expected to report `incompatible_dataset` while
-still writing the comparison files; rerun `failure-lab run` against the same dataset twice when
-you want a fully compatible comparison.
+```bash
+failure-lab run --dataset reasoning-failures-v1 --model demo
+failure-lab report --run <run-id>
+failure-lab run --dataset reasoning-failures-v1 --model ollama:llama3.2
+failure-lab compare <baseline-run-id> <candidate-run-id>
+failure-lab harvest --comparison <comparison-id> --delta regression --out datasets/harvested/regression-pack.json
+failure-lab dataset promote datasets/harvested/regression-pack.json --dataset-id reasoning-regressions-v1
+failure-lab run --dataset reasoning-regressions-v1 --model demo
+```
 
-By default, `failure-lab` writes `datasets/`, `runs/`, and `reports/` under your current working
-directory. Pass `--root /path/to/workspace` when you want the artifacts somewhere else.
-
-If your shell does not expose the console script on `PATH`, use the module entrypoint instead:
+If your shell does not expose the console script on `PATH`, use:
 
 ```bash
 python3 -m model_failure_lab demo
 ```
 
-## What You Can Do
+## Core Workflow
 
-List bundled datasets shipped with the installed package:
+`failure-lab` writes artifact folders under the active root (default: current working directory):
 
-```bash
-failure-lab datasets list
-```
+- `datasets/`
+- `runs/`
+- `reports/`
 
-All commands accept explicit paths and `--root` as well, so you can keep datasets, runs, and
-reports in an isolated workspace instead of the current directory.
+Comparison outputs are persisted as report artifacts under `reports/`.
 
-## Optional Extras
+Use `--root` on commands to target a specific workspace.
 
-The base install above is enough for the shipped artifact-backed engine loop:
+For detailed artifact contracts and examples, see `docs/artifact-model.md`.
 
-- bundled datasets
-- `failure-lab demo`
-- `failure-lab run`
-- `failure-lab report`
-- `failure-lab compare`
-- local Ollama routing such as `--model ollama:llama3.2`
+## Model Adapters
 
-Install extras only when you need those optional surfaces from a repo checkout:
+`failure-lab run --model` supports:
 
-| Need | Install |
-|------|---------|
-| Anthropic adapter support | `python3 -m pip install '.[anthropic]'` |
-| OpenAI adapter support | `python3 -m pip install '.[openai]'` |
-| Legacy benchmark, training, and old reporting surfaces | `python3 -m pip install '.[legacy]'` |
-| Legacy Streamlit results explorer | `python3 -m pip install '.[ui]'` |
-| Test and lint tools | `python3 -m pip install '.[dev]'` |
+- `demo` for deterministic local execution
+- `ollama:<model>`
+- `anthropic:<model>` (after installing optional dependencies)
+- OpenAI model names (after installing optional dependencies)
 
-If you are installing from a built wheel or published distribution instead of a local checkout, the
-equivalent package form is `model-failure-lab[anthropic]`, `model-failure-lab[openai]`,
-`model-failure-lab[legacy]`, or `model-failure-lab[ui]`.
+Optional extras:
 
-## Bundled Datasets
+- `python3 -m pip install '.[anthropic]'`
+- `python3 -m pip install '.[openai]'`
+- `python3 -m pip install '.[dev]'`
+- `python3 -m pip install '.[legacy]'` (legacy-only surfaces)
+- `python3 -m pip install '.[ui]'` (legacy Streamlit UI)
 
-The repo currently ships bundled packs for:
+If installing from a published distribution in the future, the equivalent form is
+`model-failure-lab[anthropic]`, `model-failure-lab[openai]`, `model-failure-lab[legacy]`,
+and `model-failure-lab[ui]`.
 
-- `reasoning-failures-v1`
-- `hallucination-failures-v1`
-- `rag-failures-v1`
+## React Debugger
 
-Bundled datasets default to the `core` slice for fast local runs. Use `--full` to include the
-extended tail:
+The React debugger reads existing artifact workspaces via:
 
-```bash
-failure-lab run --dataset rag-failures-v1 --model demo --full
-```
+- `FAILURE_LAB_ARTIFACT_ROOT`
 
-## Artifact Model
-
-The engine writes simple filesystem artifacts:
-
-```text
-datasets/
-runs/<run-id>/
-  run.json
-  results.json
-reports/<report-id>/
-  report.json
-  report_details.json
-```
-
-The main contracts are:
-
-- `PromptCase`
-- `Run`
-- `Result`
-- `Report`
-
-Everything stays inspectable by hand. There is no database layer.
-
-## React Debugger Handoff
-
-The React debugger reads an existing artifact workspace through one supported seam:
-`FAILURE_LAB_ARTIFACT_ROOT`.
-
-Point it at the directory that contains `runs/`, `reports/`, and optional `datasets/`:
+Example:
 
 ```bash
 export FAILURE_LAB_ARTIFACT_ROOT=/path/to/failure-lab-workspace
 npm --prefix frontend run dev
 ```
 
-That contract is the same whether the artifacts were written from this repo checkout, from a normal
-installed-package workflow, or from an Ollama-backed run. The debugger does not have an in-app
-artifact-root picker; the server-side environment variable is the supported handoff.
+## Product Screens
 
-## Model Surface
+- Run summary
+- Failure inventory
+- Comparison view
+- Harvest/replay workflow
 
-`failure-lab run` supports:
+Image placeholders and naming conventions live in `docs/product-screens.md`.
 
-- `demo` for deterministic local execution
-- Anthropic models through explicit routing such as `anthropic:claude-sonnet-4-0` after installing `.[anthropic]`
-- OpenAI model names such as `gpt-4.1-mini` after installing `.[openai]`
-- Ollama models through explicit routing such as `ollama:llama3.2`
-- explicit adapter routing with `<adapter>:<model>`
-
-One explicit Anthropic example:
-
-```bash
-failure-lab run \
-  --dataset reasoning-failures-v1 \
-  --model anthropic:claude-sonnet-4-0 \
-  --anthropic-base-url http://127.0.0.1:8000 \
-  --system-prompt "Be concise." \
-  --model-option max_tokens=256
-```
-
-One explicit local Ollama example:
-
-```bash
-failure-lab run \
-  --dataset reasoning-failures-v1 \
-  --model ollama:llama3.2 \
-  --ollama-host http://localhost:11434 \
-  --system-prompt "Be concise." \
-  --model-option temperature=0
-```
-
-That same surface supports the normal saved-artifact loop:
-
-```bash
-failure-lab run --dataset reasoning-failures-v1 --model ollama:baseline-model --ollama-host http://localhost:11434 --system-prompt "Be concise." --model-option temperature=0
-failure-lab run --dataset reasoning-failures-v1 --model ollama:candidate-model --ollama-host http://localhost:11434 --system-prompt "Be concise." --model-option temperature=0
-failure-lab report --run <baseline-run-id>
-failure-lab compare <baseline-run-id> <candidate-run-id>
-```
-
-The package also exposes simple registration seams for future extension:
-
-- `register_model(...)`
-- `register_classifier(...)`
-
-## Deterministic Insight Test Data
-
-If you want a reusable local workspace for `/analysis`, comparison explanation, and insight
-drillthrough without depending on external models, generate the checked-in fixture workspace:
-
-```bash
-python3 scripts/generate_insight_fixture.py
-```
-
-By default that writes a deterministic artifact root at
-`artifacts/insight-fixture-workspace` with:
-
-- 1 dataset snapshot
-- 4 compatible runs
-- 4 run reports
-- 3 comparison reports
-- a rebuilt local query index
-
-Then point the debugger at it:
-
-```bash
-export FAILURE_LAB_ARTIFACT_ROOT="$(pwd)/artifacts/insight-fixture-workspace"
-npm --prefix frontend run dev
-```
-
-Useful smoke commands against that workspace:
-
-```bash
-failure-lab query --root artifacts/insight-fixture-workspace --failure-type hallucination --last-n 4 --summarize
-failure-lab compare <baseline-run-id> <candidate-run-id> --root artifacts/insight-fixture-workspace --explain
-```
-
-Closed-loop harvest replay over the same workspace:
-
-```bash
-failure-lab harvest --root artifacts/insight-fixture-workspace --comparison <comparison-report-id> --delta regression --out artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json
-failure-lab dataset review artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json
-failure-lab dataset promote artifacts/insight-fixture-workspace/datasets/harvested/regression-pack.json --dataset-id fixture-regression-pack-v1 --root artifacts/insight-fixture-workspace
-failure-lab run --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --model insight_fixture_v1:candidate-model --classifier insight_fixture_classifier_v1
-failure-lab run --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --model insight_fixture_v1:stable-model --classifier insight_fixture_classifier_v1
-failure-lab report --root artifacts/insight-fixture-workspace --run <candidate-rerun-id>
-failure-lab report --root artifacts/insight-fixture-workspace --run <stable-rerun-id>
-failure-lab compare <candidate-rerun-id> <stable-rerun-id> --root artifacts/insight-fixture-workspace --explain
-failure-lab query --root artifacts/insight-fixture-workspace --dataset fixture-regression-pack-v1 --summarize
-```
-
-## Development Setup
-
-Editable install:
+## Development
 
 ```bash
 python3 -m pip install -e '.[dev]'
-```
-
-Add extras as needed from a checkout:
-
-```bash
-python3 -m pip install -e '.[anthropic]'
-python3 -m pip install -e '.[openai]'
-python3 -m pip install -e '.[ui]'
-python3 -m pip install -e '.[legacy]'
-```
-
-If you need the old benchmark and research surfaces while developing, install both dev tooling and
-the legacy runtime stack together:
-
-```bash
-python3 -m pip install -e '.[dev,legacy]'
-```
-
-Focused checks:
-
-```bash
 python3 -m pytest -q
 python3 -m ruff check src tests
 ```
 
-## Legacy Benchmark And UI Surfaces
+## Versioning
 
-This repo still contains the earlier benchmark and UI work that focused on CivilComments,
-distribution shift, and the React failure debugger. That material remains useful as legacy
-reference, but the current product direction is the engine-first `failure-lab` workflow above.
+This project follows semantic versioning before `v1.0` in the practical sense:
 
-Useful legacy references:
+- patch: bug fixes and docs
+- minor: CLI-compatible feature additions
+- breaking: CLI or artifact schema changes
 
-- [v1.4 closeout](docs/v1_4_closeout.md)
-- [UI parity guide](docs/ui_parity.md)
-- [Runtime setup reference](docs/runtime-setup.md)
-- [Cloud GPU run guide](docs/cloud-gpu-run.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Configuration layout](configs/README.md)
+## Legacy Surfaces
+
+Legacy benchmark and UI surfaces are retained for reference and are not part of the supported
+production path.
+
+See:
+
+- `docs/legacy.md`
+- `docs/ui_parity.md`
+- `docs/v1_4_closeout.md`
+
+## Documentation
+
+Detailed docs moved out of this README:
+
+- Harvest replay: `docs/harvest-replay.md`
+- Legacy surfaces: `docs/legacy.md`
+- Fixture workspace: `docs/fixture-workspace.md`
+- Artifact schema/model: `docs/artifact-model.md`
+- Adapter extension guide: `docs/adapter-extension-guide.md`
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE`.
