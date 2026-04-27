@@ -1,6 +1,6 @@
 # Model Failure Lab
 
-![CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/ci.yml?query=branch%3Amain)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -26,11 +26,25 @@ From a local clone:
 ```bash
 git clone <repo-url>
 cd model-failure-lab
-python3 -m pip install .
-failure-lab demo
+make install
+make demo
 ```
 
-Then run the canonical workflow:
+Useful command shortcuts:
+
+```bash
+make help
+make check
+make smoke
+```
+
+Equivalent direct install command:
+
+```bash
+python3 -m pip install .
+```
+
+Then run the canonical workflow manually:
 
 ```bash
 failure-lab run --dataset reasoning-failures-v1 --model demo
@@ -66,6 +80,43 @@ Comparison summary:
 
 - regression rate: +12%
 - new failure clusters: arithmetic carry errors
+
+CLI transcript (abbreviated):
+
+```text
+$ failure-lab run --dataset reasoning-failures-v1 --model demo
+Failure Lab Run
+Dataset: reasoning-failures-v1
+Model: demo
+Status: completed
+Cases: attempted=8 classified=8 errors=0
+Failure rate: 62.5%
+Run ID: 20260427_192110_266368_reasoning_failures_v1_demo_...
+
+$ failure-lab report --run 20260427_192110_266368_reasoning_failures_v1_demo_...
+Failure Lab Report
+Status: completed
+Failure types: reasoning=62.5% (5)
+
+$ failure-lab compare <baseline-run-id> <candidate-run-id>
+Failure Lab Compare
+Status: improved
+Compatible: True
+Case changes: improvements=1
+```
+
+## Screenshots
+
+Screenshots are supported and strongly recommended for product clarity.
+
+Place assets under `docs/screens/`:
+
+- `run-summary.png`
+- `failure-inventory.png`
+- `comparison-view.png`
+- `harvest-replay-workflow.gif`
+
+Reference wiring and naming live in `docs/product-screens.md` and `docs/screens/README.md`.
 
 ## Core Workflow
 
@@ -118,9 +169,8 @@ npm --prefix frontend run dev
 ## Development
 
 ```bash
-python3 -m pip install -e '.[dev]'
-python3 -m pytest -q
-python3 -m ruff check src tests
+make install-dev
+make check
 ```
 
 ## Versioning
