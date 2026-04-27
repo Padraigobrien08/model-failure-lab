@@ -653,3 +653,115 @@ def test_cli_dataset_follow_up_link_rejects_missing_artifacts(
 
     assert link_exit == 1
     assert "saved comparison report not found" in stderr
+
+
+def test_cli_index_validate_regression_gate_patterns_and_baselines(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    workspace = materialize_insight_fixture(tmp_path / "fixture")
+    comparison_id = _pick_regression_report_id(workspace.root)
+    comparison_rows = query_comparison_signals(
+        QueryFilters(limit=1),
+        verdict=None,
+        root=workspace.root,
+    )
+    assert comparison_rows
+    baseline_run_id = str(comparison_rows[0]["baseline_run_id"])
+    candidate_run_id = str(comparison_rows[0]["candidate_run_id"])
+
+    validate_exit = main(["index", "validate", "--root", str(workspace.root), "--json"])
+    validate_payload = json.loads(capsys.readouterr().out)
+
+    waiver_path = workspace.root / "waivers.json"
+    waiver_path.write_text(
+        json.dumps(
+            {
+                "waivers": [
+                    {
+                        "comparison_id": comparison_id,
+                        "reason": "temporary waiver for fixture test",
+                        "owner": "ci",
+                        "expires_at": "2999-01-01T00:00:00Z",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    gate_exit = main(
+        [
+            "regressions",
+            "gate",
+            "--root",
+            str(workspace.root),
+            "--waivers",
+            str(waiver_path),
+            "--strict-exit",
+            "--json",
+        ]
+    )
+    gate_payload = json.loads(capsys.readouterr().out)
+
+    patterns_exit = main(["regressions", "patterns", "--root", str(workspace.root), "--json"])
+    patterns_payload = json.loads(capsys.readouterr().out)
+
+    baseline_set_exit = main(
+        [
+            "baselines",
+            "--root",
+            str(workspace.root),
+            "set",
+            "--name",
+            "prod-main",
+            "--run",
+            baseline_run_id,
+            "--model",
+            "stable-model",
+            "--dataset",
+            workspace.dataset_id,
+            "--json",
+        ]
+    )
+    baseline_set_payload = json.loads(capsys.readouterr().out)
+
+    baseline_list_exit = main(["baselines", "--root", str(workspace.root), "list", "--json"])
+    baseline_list_payload = json.loads(capsys.readouterr().out)
+
+    pr_comment_exit = main(
+        [
+            "regressions",
+            "pr-comment",
+            "--root",
+            str(workspace.root),
+            "--baseline-run",
+            baseline_run_id,
+            "--candidate-run",
+            candidate_run_id,
+        ]
+    )
+    pr_comment_output = capsys.readouterr().out
+
+    assert validate_exit == 0
+    assert validate_payload["ok"] is True
+    assert validate_payload["required_tables_present"] is True
+
+    assert gate_exit == 0
+    assert "blocked" in gate_payload
+    assert gate_payload["rows"]
+    assert any(row["waived"] is True for row in gate_payload["rows"])
+
+    assert patterns_exit == 0
+    assert patterns_payload["query_kind"] == "root_cause_patterns"
+    assert isinstance(patterns_payload["rows"], list)
+
+    assert baseline_set_exit == 0
+    assert baseline_set_payload["name"] == "prod-main"
+    assert baseline_set_payload["run_id"] == baseline_run_id
+
+    assert baseline_list_exit == 0
+    assert baseline_list_payload["query_kind"] == "baseline_registry"
+    assert any(row["name"] == "prod-main" for row in baseline_list_payload["rows"])
+
+    assert pr_comment_exit == 0
+    assert "## Reliability Diff" in pr_comment_output

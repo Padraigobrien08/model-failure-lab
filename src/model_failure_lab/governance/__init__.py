@@ -1,5 +1,11 @@
 """Deterministic governance recommendations over saved comparison signals."""
 
+from .baselines import (
+    BaselineEntry,
+    build_pr_reliability_comment,
+    list_baselines,
+    upsert_baseline,
+)
 from .execution import (
     PortfolioExecutionFollowUp,
     PortfolioExecutionSnapshot,
@@ -14,6 +20,14 @@ from .execution import (
     list_saved_portfolio_plan_executions,
     preflight_saved_portfolio_plan,
 )
+from .gates import (
+    GateDecision,
+    GateWaiver,
+    RegressionGateResult,
+    evaluate_regression_gate,
+    load_governance_policy_from_file,
+)
+from .intelligence import RootCauseSummary, summarize_recurring_root_causes
 from .lifecycle import (
     LifecycleActionRecord,
     LifecycleApplyResult,
@@ -81,6 +95,9 @@ __all__ = [
     "DatasetLifecycleAlert",
     "DatasetPlanningUnit",
     "DatasetPortfolioItem",
+    "BaselineEntry",
+    "GateDecision",
+    "GateWaiver",
     "DatasetFamilyHealth",
     "GovernanceEscalation",
     "GovernanceFamilyMatch",
@@ -111,12 +128,16 @@ __all__ = [
     "PortfolioPlanPreflight",
     "PortfolioPlanPreflightCheck",
     "PortfolioPlanSaveResult",
+    "RegressionGateResult",
+    "RootCauseSummary",
     "SavedPortfolioPlan",
     "apply_saved_portfolio_plan_action",
     "apply_comparison_lifecycle_action",
     "apply_dataset_actions",
     "apply_dataset_lifecycle_action",
     "create_saved_portfolio_plan",
+    "build_pr_reliability_comment",
+    "evaluate_regression_gate",
     "describe_dataset_family_lifecycle",
     "execute_saved_portfolio_plan",
     "get_active_lifecycle_action",
@@ -127,6 +148,7 @@ __all__ = [
     "get_saved_portfolio_plan_execution",
     "link_portfolio_execution_outcome_evidence",
     "list_dataset_family_health",
+    "list_baselines",
     "list_dataset_lifecycle_actions",
     "list_dataset_planning_units",
     "list_dataset_portfolio",
@@ -135,9 +157,12 @@ __all__ = [
     "list_saved_portfolio_plan_executions",
     "list_saved_portfolio_plans",
     "preflight_saved_portfolio_plan",
+    "load_governance_policy_from_file",
     "recommend_dataset_action",
     "review_dataset_lifecycle",
     "review_dataset_actions",
+    "summarize_recurring_root_causes",
     "summarize_portfolio_outcomes_for_family",
+    "upsert_baseline",
     "attest_portfolio_execution_outcome",
 ]

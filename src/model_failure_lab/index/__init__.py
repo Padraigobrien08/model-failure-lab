@@ -20,6 +20,7 @@ from .builder import (
     query_index_path,
     rebuild_query_index,
 )
+from .contracts import ArtifactContractValidation, validate_artifact_contracts
 from .query import (
     QueryFilters,
     aggregate_case_query,
@@ -44,6 +45,7 @@ __all__ = [
     "FailureClusterOccurrence",
     "FailureClusterSummary",
     "QueryFilters",
+    "ArtifactContractValidation",
     "QueryIndexSummary",
     "aggregate_case_query",
     "aggregate_delta_query",
@@ -63,6 +65,7 @@ __all__ = [
     "query_index_dir",
     "query_index_path",
     "rebuild_query_index",
+    "validate_artifact_contracts",
 ]
 
 

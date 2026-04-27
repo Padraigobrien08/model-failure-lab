@@ -31,10 +31,12 @@ from model_failure_lab.datasets import (
     load_demo_dataset,
 )
 from model_failure_lab.governance import (
+    BaselineEntry,
     DatasetFamilyHealth,
     DatasetLifecycleAlert,
     DatasetPlanningUnit,
     DatasetPortfolioItem,
+    GateDecision,
     GovernanceApplyResult,
     GovernancePolicy,
     GovernanceRecommendation,
@@ -46,27 +48,34 @@ from model_failure_lab.governance import (
     PortfolioPlanExecutionResult,
     PortfolioPlanPreflight,
     PortfolioPlanSaveResult,
+    RootCauseSummary,
     SavedPortfolioPlan,
     apply_dataset_actions,
     apply_dataset_lifecycle_action,
     apply_saved_portfolio_plan_action,
     attest_portfolio_execution_outcome,
+    build_pr_reliability_comment,
     create_saved_portfolio_plan,
+    evaluate_regression_gate,
     execute_saved_portfolio_plan,
     get_portfolio_execution_outcome,
     get_saved_portfolio_plan,
     get_saved_portfolio_plan_execution,
     link_portfolio_execution_outcome_evidence,
+    list_baselines,
     list_dataset_family_health,
     list_dataset_planning_units,
     list_dataset_portfolio,
     list_portfolio_execution_outcomes,
     list_saved_portfolio_plan_executions,
     list_saved_portfolio_plans,
+    load_governance_policy_from_file,
     preflight_saved_portfolio_plan,
     recommend_dataset_action,
     review_dataset_actions,
     review_dataset_lifecycle,
+    summarize_recurring_root_causes,
+    upsert_baseline,
 )
 from model_failure_lab.harvest import (
     harvest_artifact_cases,
@@ -75,12 +84,14 @@ from model_failure_lab.harvest import (
 )
 from model_failure_lab.history import HistorySnapshot, query_history_snapshot
 from model_failure_lab.index import (
+    ArtifactContractValidation,
     QueryFilters,
     aggregate_case_query,
     query_case_deltas,
     query_cases,
     query_comparison_signals,
     rebuild_query_index,
+    validate_artifact_contracts,
 )
 from model_failure_lab.runner.artifacts import write_run_artifacts
 from model_failure_lab.runner.execute import DatasetRunExecution, execute_dataset_run
@@ -751,6 +762,21 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     index_rebuild_parser.set_defaults(handler=_handle_index_rebuild)
+    index_validate_parser = index_subparsers.add_parser(
+        "validate",
+        help="Validate query-index artifact contracts and required tables.",
+        description="Validate query-index artifact contracts and required tables.",
+    )
+    index_validate_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    index_validate_parser.add_argument("--json", action="store_true", dest="as_json")
+    index_validate_parser.set_defaults(handler=_handle_index_validate)
 
     query_parser = subparsers.add_parser(
         "query",
@@ -995,6 +1021,87 @@ def build_parser() -> argparse.ArgumentParser:
     )
     regressions_apply_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_apply_parser.set_defaults(handler=_handle_regressions_apply)
+    regressions_gate_parser = regressions_subparsers.add_parser(
+        "gate",
+        help="Evaluate policy-as-code regression gate and optional waivers.",
+    )
+    regressions_gate_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_signal_filter_arguments(regressions_gate_parser)
+    _add_governance_policy_arguments(regressions_gate_parser)
+    regressions_gate_parser.add_argument("--policy-file", type=Path)
+    regressions_gate_parser.add_argument("--waivers", type=Path)
+    regressions_gate_parser.add_argument("--strict-exit", action="store_true")
+    regressions_gate_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_gate_parser.set_defaults(handler=_handle_regressions_gate)
+    regressions_patterns_parser = regressions_subparsers.add_parser(
+        "patterns",
+        help="Summarize recurring root-cause patterns from saved clusters.",
+    )
+    regressions_patterns_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    _add_signal_filter_arguments(regressions_patterns_parser)
+    regressions_patterns_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_patterns_parser.set_defaults(handler=_handle_regressions_patterns)
+    regressions_pr_comment_parser = regressions_subparsers.add_parser(
+        "pr-comment",
+        help="Render markdown reliability diff suitable for PR comments.",
+    )
+    regressions_pr_comment_parser.add_argument("--baseline-run", required=True)
+    regressions_pr_comment_parser.add_argument("--candidate-run", required=True)
+    regressions_pr_comment_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    regressions_pr_comment_parser.set_defaults(handler=_handle_regressions_pr_comment)
+
+    baselines_parser = subparsers.add_parser(
+        "baselines",
+        help="Manage shared baseline registry entries.",
+    )
+    baselines_subparsers = baselines_parser.add_subparsers(dest="baselines_command")
+    baselines_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    baselines_list_parser = baselines_subparsers.add_parser(
+        "list",
+        help="List shared baseline registry entries.",
+    )
+    baselines_list_parser.add_argument("--json", action="store_true", dest="as_json")
+    baselines_list_parser.set_defaults(handler=_handle_baselines_list)
+    baselines_set_parser = baselines_subparsers.add_parser(
+        "set",
+        help="Create or update a shared baseline registry entry.",
+    )
+    baselines_set_parser.add_argument("--name", required=True)
+    baselines_set_parser.add_argument("--run", required=True, dest="run_id")
+    baselines_set_parser.add_argument("--model")
+    baselines_set_parser.add_argument("--dataset")
+    baselines_set_parser.add_argument("--owner")
+    baselines_set_parser.add_argument("--notes")
+    baselines_set_parser.add_argument("--json", action="store_true", dest="as_json")
+    baselines_set_parser.set_defaults(handler=_handle_baselines_set)
 
     harvest_parser = subparsers.add_parser(
         "harvest",
@@ -1387,6 +1494,15 @@ def _handle_index_rebuild(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_index_validate(args: argparse.Namespace) -> int:
+    validation = validate_artifact_contracts(root=_normalized_root(args.root))
+    if args.as_json:
+        print(_render_json_payload(validation.to_payload()))
+    else:
+        print(_render_contract_validation(validation))
+    return 0 if validation.ok else 2
+
+
 def _handle_query(args: argparse.Namespace) -> int:
     if args.delta and args.aggregate_by:
         raise ValueError("`--delta` and `--aggregate-by` cannot be combined in one query")
@@ -1624,6 +1740,58 @@ def _handle_regressions_apply(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_regressions_gate(args: argparse.Namespace) -> int:
+    policy = (
+        load_governance_policy_from_file(args.policy_file)
+        if args.policy_file is not None
+        else _build_governance_policy(args)
+    )
+    result = evaluate_regression_gate(
+        root=_normalized_root(args.root),
+        filters=_build_signal_filters(args),
+        policy=policy,
+        waiver_path=args.waivers,
+    )
+    if args.as_json:
+        print(_render_json_payload(result.to_payload()))
+    else:
+        print(_render_gate_decisions(result.rows))
+    if result.blocked and args.strict_exit:
+        return 2
+    return 0
+
+
+def _handle_regressions_patterns(args: argparse.Namespace) -> int:
+    rows = summarize_recurring_root_causes(
+        root=_normalized_root(args.root),
+        filters=_build_signal_filters(args),
+        limit=args.limit,
+    )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "root_cause_patterns",
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_root_cause_patterns(rows))
+    return 0
+
+
+def _handle_regressions_pr_comment(args: argparse.Namespace) -> int:
+    print(
+        build_pr_reliability_comment(
+            baseline_run_id=args.baseline_run,
+            candidate_run_id=args.candidate_run,
+            root=_normalized_root(args.root),
+        )
+    )
+    return 0
+
+
 def _handle_regressions_generate(args: argparse.Namespace) -> int:
     summary = generate_regression_pack(
         comparison_id=args.comparison_id,
@@ -1665,6 +1833,39 @@ def _handle_harvest(args: argparse.Namespace) -> int:
         comparison_id=args.comparison_id,
     )
     print(_render_harvest_summary(summary))
+    return 0
+
+
+def _handle_baselines_list(args: argparse.Namespace) -> int:
+    rows = list_baselines(root=_normalized_root(args.root))
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "query_kind": "baseline_registry",
+                    "rows": [row.to_payload() for row in rows],
+                }
+            )
+        )
+        return 0
+    print(_render_baselines(rows))
+    return 0
+
+
+def _handle_baselines_set(args: argparse.Namespace) -> int:
+    row = upsert_baseline(
+        args.name,
+        run_id=args.run_id,
+        model=args.model,
+        dataset=args.dataset,
+        owner=args.owner,
+        notes=args.notes,
+        root=_normalized_root(args.root),
+    )
+    if args.as_json:
+        print(_render_json_payload(row.to_payload()))
+        return 0
+    print(_render_baseline_entry(row))
     return 0
 
 
@@ -2172,6 +2373,115 @@ def _render_index_rebuild_summary(summary) -> str:
             f"Cases: {summary.case_count}",
             f"Comparisons: {summary.comparison_count}",
             f"Case deltas: {summary.case_delta_count}",
+        ]
+    )
+
+
+def _render_contract_validation(validation: ArtifactContractValidation) -> str:
+    lines = [
+        "Failure Lab Contract Validation",
+        f"Status: {'ok' if validation.ok else 'failed'}",
+        f"Schema version: {validation.schema_version}",
+        f"Required tables present: {validation.required_tables_present}",
+        f"Runs: {validation.run_count}",
+        f"Comparisons: {validation.comparison_count}",
+        f"Cases: {validation.case_count}",
+    ]
+    if validation.missing_tables:
+        lines.append(f"Missing tables: {', '.join(validation.missing_tables)}")
+    if validation.errors:
+        lines.append("Errors:")
+        lines.extend(f"- {error}" for error in validation.errors)
+    return "\n".join(lines)
+
+
+def _render_gate_decisions(rows: tuple[GateDecision, ...]) -> str:
+    if not rows:
+        return "Failure Lab Regression Gate\nNo comparisons matched the current filters."
+    return "\n".join(
+        [
+            "Failure Lab Regression Gate",
+            _render_table(
+                [
+                    ("comparison", "blocked", "waived", "action", "severity", "rule"),
+                    *[
+                        (
+                            row.comparison_id,
+                            "yes" if row.blocked else "no",
+                            "yes" if row.waived else "no",
+                            row.action,
+                            _format_rate(row.severity),
+                            row.policy_rule,
+                        )
+                        for row in rows
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
+def _render_root_cause_patterns(rows: tuple[RootCauseSummary, ...]) -> str:
+    if not rows:
+        return "Failure Lab Root-Cause Patterns\nNo recurring root-cause patterns found."
+    return "\n".join(
+        [
+            "Failure Lab Root-Cause Patterns",
+            _render_table(
+                [
+                    ("failure_type", "clusters", "occurrences", "max_scope", "representative_clusters"),
+                    *[
+                        (
+                            row.failure_type,
+                            str(row.cluster_count),
+                            str(row.total_occurrences),
+                            str(row.max_scope),
+                            ",".join(row.representative_cluster_ids),
+                        )
+                        for row in rows
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
+def _render_baselines(rows: tuple[BaselineEntry, ...]) -> str:
+    if not rows:
+        return "Failure Lab Baselines\nNo shared baselines have been registered."
+    return "\n".join(
+        [
+            "Failure Lab Baselines",
+            _render_table(
+                [
+                    ("name", "run_id", "model", "dataset", "owner", "updated_at"),
+                    *[
+                        (
+                            row.name,
+                            row.run_id,
+                            row.model or "n/a",
+                            row.dataset or "n/a",
+                            row.owner or "n/a",
+                            row.updated_at,
+                        )
+                        for row in rows
+                    ],
+                ]
+            ),
+        ]
+    )
+
+
+def _render_baseline_entry(row: BaselineEntry) -> str:
+    return "\n".join(
+        [
+            "Failure Lab Baseline Updated",
+            f"Name: {row.name}",
+            f"Run ID: {row.run_id}",
+            f"Model: {row.model or 'n/a'}",
+            f"Dataset: {row.dataset or 'n/a'}",
+            f"Owner: {row.owner or 'n/a'}",
+            f"Updated at: {row.updated_at}",
         ]
     )
 
