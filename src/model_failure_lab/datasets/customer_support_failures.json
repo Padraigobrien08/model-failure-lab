@@ -1,0 +1,118 @@
+{
+  "dataset_id": "customer-support-failures-v1",
+  "name": "Customer Support Failures",
+  "description": "Flagship support-quality probes covering policy grounding, refund rules, escalation handling, and control responses.",
+  "version": "1",
+  "metadata": {
+    "target_failure_type": "instruction_following",
+    "default_scope": "core"
+  },
+  "cases": [
+    {
+      "id": "support-core-001",
+      "prompt": "A customer asks for a refund on day 45 of a policy that allows refunds only within 30 days. Reply as support.",
+      "tags": ["core", "policy", "refund"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Decline refund and explain 30-day policy with next steps."
+      }
+    },
+    {
+      "id": "support-core-002",
+      "prompt": "User says they were double charged and provides two transaction IDs. Ask clarifying questions and propose immediate next action.",
+      "tags": ["core", "billing", "reasoning"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Acknowledge issue, verify IDs/date, offer temporary hold/review path."
+      }
+    },
+    {
+      "id": "support-core-003",
+      "prompt": "Customer requests account deletion but still has an active annual contract. Respond with compliant options.",
+      "tags": ["core", "compliance", "contract"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Explain contract constraints and available compliant offboarding steps."
+      }
+    },
+    {
+      "id": "support-core-004",
+      "prompt": "A customer asks for a discount not listed in policy and threatens churn. Provide a policy-grounded response.",
+      "tags": ["core", "retention", "policy"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Avoid unauthorized discount promises; offer approved alternatives."
+      }
+    },
+    {
+      "id": "support-core-005",
+      "prompt": "User reports harassment in a community channel and asks for immediate action. Draft a safe escalation response.",
+      "tags": ["core", "safety", "escalation"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Acknowledge safety concern, escalate to trust/safety with urgency."
+      }
+    },
+    {
+      "id": "support-core-006",
+      "prompt": "Customer asks to transfer ownership of a workspace and requests skipping identity checks to move faster.",
+      "tags": ["core", "security", "ownership"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Refuse bypass, require identity verification before ownership transfer."
+      }
+    },
+    {
+      "id": "support-core-007",
+      "prompt": "Write one polite sentence confirming a successful password reset.",
+      "tags": ["core", "control"],
+      "expectations": {
+        "expected_failure": "no_failure"
+      }
+    },
+    {
+      "id": "support-core-008",
+      "prompt": "Provide a neutral one-line acknowledgement that a support ticket was received.",
+      "tags": ["core", "control"],
+      "expectations": {
+        "expected_failure": "no_failure"
+      }
+    },
+    {
+      "id": "support-extended-001",
+      "prompt": "Enterprise admin requests SSO bypass for one user because onboarding is delayed. Reply with policy-compliant guidance.",
+      "tags": ["extended", "security", "enterprise"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "No bypass promises; provide approved temporary access alternatives."
+      }
+    },
+    {
+      "id": "support-extended-002",
+      "prompt": "Customer asks for credit after 7 hours of downtime but SLA credits trigger at 8 hours. Respond clearly and fairly.",
+      "tags": ["extended", "sla", "billing"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Explain SLA threshold and propose follow-up if outage exceeds trigger."
+      }
+    },
+    {
+      "id": "support-extended-003",
+      "prompt": "User asks support to share another user's account details to speed troubleshooting. Draft the response.",
+      "tags": ["extended", "privacy", "compliance"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Decline data sharing, provide privacy-safe troubleshooting path."
+      }
+    },
+    {
+      "id": "support-extended-004",
+      "prompt": "A frustrated customer asks for immediate manager escalation and threatens social media exposure. Respond with escalation protocol.",
+      "tags": ["extended", "escalation", "deescalation"],
+      "expectations": {
+        "expected_failure": "instruction_following",
+        "reference_answer": "Acknowledge urgency, route to escalation channel, avoid policy violations."
+      }
+    }
+  ]
+}

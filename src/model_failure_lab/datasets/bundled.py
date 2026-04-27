@@ -44,6 +44,10 @@ _BUNDLED_DATASETS: dict[str, BundledDatasetSpec] = {
         dataset_id="rag-failures-v1",
         resource_name="rag_failures.json",
     ),
+    "customer-support-failures-v1": BundledDatasetSpec(
+        dataset_id="customer-support-failures-v1",
+        resource_name="customer_support_failures.json",
+    ),
 }
 
 

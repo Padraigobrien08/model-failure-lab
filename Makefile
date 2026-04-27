@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 PYTHON ?= python3
 
-.PHONY: help install install-dev install-ci lint test test-fast check demo datasets-list run report compare smoke clean
+.PHONY: help install install-dev install-ci lint test test-fast check demo datasets-list run report compare smoke build verify-dist publish clean
 
 help: ## Show available developer commands
 	@echo "Model Failure Lab Make targets"
@@ -57,5 +57,20 @@ compare: ## Compare latest two runs in ./runs
 
 smoke: install demo datasets-list run report ## Clean-clone smoke flow
 
+build: ## Build source and wheel distributions
+	$(PYTHON) -m pip install build
+	$(PYTHON) -m build
+
+verify-dist: build ## Verify built distributions with twine check
+	$(PYTHON) -m pip install twine
+	$(PYTHON) -m twine check dist/*
+
+publish: verify-dist ## Publish distributions to PyPI using TWINE_* env vars
+	@if [ -z "$$TWINE_USERNAME" ] || [ -z "$$TWINE_PASSWORD" ]; then \
+		echo "TWINE_USERNAME and TWINE_PASSWORD must be set (use __token__ + PyPI token)."; \
+		exit 1; \
+	fi
+	$(PYTHON) -m twine upload dist/*
+
 clean: ## Remove local artifact dirs generated in workspace root
-	rm -rf runs reports .failure_lab
+	rm -rf runs reports .failure_lab dist build *.egg-info

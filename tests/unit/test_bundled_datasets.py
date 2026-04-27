@@ -52,6 +52,15 @@ def test_rag_pack_is_registered_and_loads_by_canonical_id() -> None:
     assert len(dataset.cases) == 12
 
 
+def test_customer_support_pack_is_registered_and_loads_by_canonical_id() -> None:
+    assert "customer-support-failures-v1" in available_bundled_dataset_ids()
+
+    dataset = load_bundled_dataset("customer-support-failures-v1", include_extended=True)
+
+    assert dataset.dataset_id == "customer-support-failures-v1"
+    assert len(dataset.cases) == 12
+
+
 def test_bundled_packs_share_structural_tags_and_control_posture() -> None:
     reasoning = load_bundled_dataset("reasoning-failures-v1", include_extended=True)
     hallucination = load_bundled_dataset("hallucination-failures-v1", include_extended=True)
@@ -91,6 +100,20 @@ def test_rag_pack_authors_grounding_expectations_and_registry_summaries() -> Non
     assert summaries["rag-failures-v1"].target_failure_type == "retrieval"
     assert summaries["rag-failures-v1"].core_case_count == 8
     assert summaries["rag-failures-v1"].full_case_count == 12
+
+
+def test_customer_support_pack_exposes_policy_target_and_core_scope() -> None:
+    summaries = {summary.dataset_id: summary for summary in available_bundled_datasets()}
+    support = load_bundled_dataset("customer-support-failures-v1", include_extended=True)
+
+    assert summaries["customer-support-failures-v1"].target_failure_type == "instruction_following"
+    assert summaries["customer-support-failures-v1"].core_case_count == 8
+    assert summaries["customer-support-failures-v1"].full_case_count == 12
+    assert sum(
+        1
+        for case in support.cases
+        if case.expectations and case.expectations.expected_failure == "no_failure"
+    ) == 2
 
 
 def test_missing_bundled_asset_surfaces_packaged_install_error(monkeypatch) -> None:

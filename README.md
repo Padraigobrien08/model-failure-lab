@@ -1,6 +1,5 @@
 # Model Failure Lab
 
-[![CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/ci.yml?query=branch%3Amain)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -116,6 +115,15 @@ Place assets under `docs/screens/`:
 - `comparison-view.png`
 - `harvest-replay-workflow.gif`
 
+When those files exist, embed them with:
+
+```markdown
+![Run summary](docs/screens/run-summary.png)
+![Failure inventory](docs/screens/failure-inventory.png)
+![Comparison view](docs/screens/comparison-view.png)
+![Harvest replay](docs/screens/harvest-replay-workflow.gif)
+```
+
 Reference wiring and naming live in `docs/product-screens.md` and `docs/screens/README.md`.
 
 ## Core Workflow
@@ -137,6 +145,7 @@ For detailed artifact contracts and examples, see `docs/artifact-model.md`.
 `failure-lab run --model` supports:
 
 - `demo` for deterministic local execution
+- `customer-support-failures-v1` bundled flagship support-policy pack
 - `ollama:<model>`
 - `anthropic:<model>` (after installing optional dependencies)
 - OpenAI model names (after installing optional dependencies)
@@ -201,6 +210,12 @@ Detailed docs moved out of this README:
 - Fixture workspace: `docs/fixture-workspace.md`
 - Artifact schema/model: `docs/artifact-model.md`
 - Adapter extension guide: `docs/adapter-extension-guide.md`
+- Architecture overview: `docs/architecture.md`
+- CI governance and waivers: `docs/ci-governance.md`
+- Contributor code map: `docs/code-map.md`
+- 5-minute operator quickstart: `docs/getting-started-operator.md`
+- Release and PyPI guide: `docs/release-and-pypi.md`
+- Future ideas and backlog: `docs/future-ideas.md`
 
 ## License
 
