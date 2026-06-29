@@ -1,0 +1,41 @@
+name: Production (OSS)
+
+# Production OSS path: installs only the supported runtime + dev tools (no [legacy]
+# ML stack). This is the workflow intended to gate the run -> report -> compare
+# package. The legacy/full benchmark suite lives in `ci.yml` and is not required
+# for the production path.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  production:
+    name: production (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install production package (dev extra only, no legacy)
+        run: python -m pip install -e .[dev]
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest -q
+
+      - name: Import smoke
+        # The importable package is `model_failure_lab` (the `failure-lab` console
+        # script maps to it). There is no top-level `failure_lab` module.
+        run: python -c "import model_failure_lab"

@@ -11,25 +11,10 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from model_failure_lab.index import (  # noqa: E402
-    get_failure_cluster_detail,
-    QueryFilters,
-    aggregate_case_query,
-    artifact_overview_summary,
-    list_failure_clusters,
-    list_comparison_inventory,
-    list_query_facets,
-    list_clusters_for_comparison,
-    list_run_inventory,
-    query_case_deltas,
-    query_cases,
-    query_comparison_signals,
-)
 from model_failure_lab.analysis import (  # noqa: E402
     build_query_insight_report,
     explain_comparison_report,
 )
-from model_failure_lab.harvest import harvest_artifact_cases  # noqa: E402
 from model_failure_lab.datasets import (  # noqa: E402
     evolve_dataset_family,
     generate_regression_pack,
@@ -38,13 +23,28 @@ from model_failure_lab.datasets import (  # noqa: E402
 from model_failure_lab.governance import (  # noqa: E402
     PortfolioFilters,
     get_dataset_portfolio_item,
-    list_portfolio_execution_outcomes,
     list_dataset_lifecycle_actions,
+    list_portfolio_execution_outcomes,
     list_saved_portfolio_plan_executions,
     list_saved_portfolio_plans,
     recommend_dataset_action,
 )
+from model_failure_lab.harvest import harvest_artifact_cases  # noqa: E402
 from model_failure_lab.history import query_history_snapshot  # noqa: E402
+from model_failure_lab.index import (  # noqa: E402
+    QueryFilters,
+    aggregate_case_query,
+    artifact_overview_summary,
+    get_failure_cluster_detail,
+    list_clusters_for_comparison,
+    list_comparison_inventory,
+    list_failure_clusters,
+    list_query_facets,
+    list_run_inventory,
+    query_case_deltas,
+    query_cases,
+    query_comparison_signals,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
