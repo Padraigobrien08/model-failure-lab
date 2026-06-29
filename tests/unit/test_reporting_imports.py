@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 import sys
 
+import pytest
+
 
 def _purge_modules(*prefixes: str) -> None:
     for name in list(sys.modules):
@@ -23,7 +25,10 @@ def test_reporting_package_import_stays_light() -> None:
     assert "build_robustness_report_metadata" in reporting.__all__
 
 
+@pytest.mark.legacy
 def test_reporting_package_keeps_representative_exports_reachable() -> None:
+    # ``reporting.bundle`` pulls in the legacy ML stack (pandas); this assertion
+    # only applies when that optional stack is installed and cleanly importable.
     _purge_modules("model_failure_lab.reporting")
 
     reporting = importlib.import_module("model_failure_lab.reporting")

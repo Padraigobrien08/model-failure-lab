@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -11,6 +12,106 @@ SRC_ROOT = PROJECT_ROOT / "src"
 
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
+
+
+# ---------------------------------------------------------------------------
+# OSS hardening: isolate the production test suite from the optional legacy ML
+# stack (the ``[legacy]`` extra: torch / pandas / numpy / scikit-learn / ...).
+#
+# The production CLI (run -> report -> compare -> harvest) has no legacy
+# dependencies. The legacy DistilBERT/CivilComments benchmark surfaces do, and
+# their tests import those packages at module load time. We auto-skip the legacy
+# tests whenever the legacy stack is not *cleanly importable* so that a default
+# ``pytest`` run is green with only the production install (``pip install
+# .[dev]``). When the legacy extra is installed with compatible versions (as in
+# CI: ``pip install -e .[dev,legacy]``) every legacy test still runs.
+# ---------------------------------------------------------------------------
+
+# Probe the heavy/legacy import roots. A dependency counts as unavailable when it
+# is missing OR present-but-broken (e.g. a numpy/pandas ABI mismatch that raises
+# ValueError at import) -- hence the broad ``except Exception``.
+_LEGACY_DEPENDENCY_ROOTS = ("numpy", "pandas", "torch", "sklearn")
+
+
+def _legacy_stack_importable() -> bool:
+    for name in _LEGACY_DEPENDENCY_ROOTS:
+        try:
+            importlib.import_module(name)
+        except Exception:  # noqa: BLE001 - any import failure means "not usable"
+            return False
+    return True
+
+
+LEGACY_DEPENDENCIES_AVAILABLE = _legacy_stack_importable()
+
+# Test modules whose imports require the legacy ML stack. These fail at
+# *collection* time without it, so they must be ignored before import is
+# attempted. Tests that only touch the legacy stack inside a test body should use
+# the ``@pytest.mark.legacy`` marker instead (handled in modifyitems below).
+LEGACY_TEST_MODULES = frozenset(
+    {
+        "test_data_materialization_contract",
+        "test_distilbert_baseline_pipeline",
+        "test_evaluation_aggregate_metrics",
+        "test_evaluation_calibration",
+        "test_logistic_baseline_pipeline",
+        "test_mitigation_group_balanced_sampling",
+        "test_mitigation_group_dro",
+        "test_mitigation_reporting",
+        "test_mitigation_reweighting",
+        "test_mitigation_temperature_scaling",
+        "test_perturbation_evaluation",
+        "test_perturbation_generation",
+        "test_perturbation_reporting",
+        "test_prediction_export_contract",
+        "test_react_manifest_bridge",
+        "test_report_bundle",
+        "test_reporting_figures",
+        "test_reporting_selection",
+        "test_results_ui_views",
+        "test_robustness_reporting",
+        "test_runtime_environment",
+        "test_script_entrypoints",
+        "test_shift_eval_pipeline",
+        "test_stability_reporting",
+    }
+)
+
+_LEGACY_SKIP_REASON = (
+    "requires the optional [legacy] ML stack (torch/pandas/numpy/scikit-learn) "
+    "to be installed and cleanly importable"
+)
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "legacy: test depends on the optional [legacy] ML stack; "
+        "auto-skipped when it is unavailable.",
+    )
+
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
+    """Skip legacy test modules before importing them when the stack is absent."""
+
+    if LEGACY_DEPENDENCIES_AVAILABLE:
+        return None
+    if collection_path.suffix == ".py" and collection_path.stem in LEGACY_TEST_MODULES:
+        return True
+    return None
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Skip ``@pytest.mark.legacy`` items when the legacy stack is unavailable."""
+
+    if LEGACY_DEPENDENCIES_AVAILABLE:
+        return
+    skip_legacy = pytest.mark.skip(reason=_LEGACY_SKIP_REASON)
+    for item in items:
+        if item.get_closest_marker("legacy") is not None:
+            item.add_marker(skip_legacy)
 
 
 @pytest.fixture()

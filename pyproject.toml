@@ -70,6 +70,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "legacy: test depends on the optional [legacy] ML stack (torch/pandas/numpy/scikit-learn); auto-skipped when it is unavailable.",
+]
 
 [tool.ruff]
 line-length = 100

@@ -1,86 +1,98 @@
 # Model Failure Lab
 
-![Python](https://img.shields.io/badge/python-3.11-blue)
+![Python](https://img.shields.io/badge/python-3.11+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-Model Failure Lab is a local-first evaluation and failure-analysis toolkit for LLM and RAG systems.
-It helps teams run prompt datasets, classify failures, compare model versions, and turn regressions
-into reusable test cases.
+**Local-first evaluation and failure analysis for LLM and RAG systems.** Run prompt datasets through
+a model, classify the failures, compare two model versions, and turn regressions into reusable test
+cases — all from the command line, with deterministic artifacts you can commit and diff.
 
-## What It Is
+The whole product is one loop:
 
-Model Failure Lab focuses on one production loop:
+```
+run  ->  report  ->  compare  ->  harvest  ->  promote  ->  rerun
+```
 
-`failure -> report -> compare -> harvest -> promote -> rerun`
+No server, no account, no cloud. Everything runs on your machine and writes plain JSON.
 
-The primary value is not only executing evals, but preserving deterministic artifact history so teams
-can turn regressions into durable datasets and governance decisions.
+## Why
+
+When a model changes, you want to know **what got worse, where, and why** — and you want that answer
+to be reproducible. Model Failure Lab keeps a deterministic history of every run and comparison so a
+regression becomes a durable dataset and a reviewable decision, not a screenshot in a chat thread.
+
+The supported core (`run` / `report` / `compare` and the dataset/harvest workflow) depends only on
+Python 3.11+ and `PyYAML`. Model providers and the heavier research surfaces are **optional extras**
+you opt into.
+
+## Install
+
+From a published distribution:
+
+```bash
+pip install model-failure-lab
+```
+
+From a clone:
+
+```bash
+git clone https://github.com/Padraigobrien08/model-failure-lab
+cd model-failure-lab
+make install            # equivalent to: python3 -m pip install .
+```
+
+This installs the `failure-lab` command (also available as `model-failure-lab`, or
+`python3 -m model_failure_lab`).
+
+### Optional extras
+
+| Extra | From a clone | From the published package | Adds |
+|---|---|---|---|
+| Anthropic | `python3 -m pip install '.[anthropic]'` | `model-failure-lab[anthropic]` | `--model anthropic:<model>` |
+| OpenAI | `python3 -m pip install '.[openai]'` | `model-failure-lab[openai]` | OpenAI model names |
+| Legacy (research) | `python3 -m pip install '.[legacy]'` | `model-failure-lab[legacy]` | DistilBERT/CivilComments benchmark stack (reference only) |
+| Legacy UI | `python3 -m pip install '.[ui]'` | `model-failure-lab[ui]` | Streamlit results explorer (reference only) |
+
+For development, install the dev extra: `python3 -m pip install -e '.[dev]'` (adds `pytest` + `ruff`).
 
 ## Quickstart
 
-Use Python 3.11 or newer.
-
-From a local clone:
-
 ```bash
-git clone <repo-url>
-cd model-failure-lab
-make install
-make demo
-```
-
-Useful command shortcuts:
-
-```bash
-make help
-make check
-make smoke
-```
-
-Equivalent direct install command:
-
-```bash
-python3 -m pip install .
-```
-
-Then run the canonical workflow manually:
-
-```bash
+# 1. Run a bundled dataset through the deterministic demo model
 failure-lab run --dataset reasoning-failures-v1 --model demo
+
+# 2. Summarize the run (use the Run ID printed above)
 failure-lab report --run <run-id>
+
+# 3. Run a second version, then compare baseline -> candidate
 failure-lab run --dataset reasoning-failures-v1 --model ollama:llama3.2
 failure-lab compare <baseline-run-id> <candidate-run-id>
-failure-lab harvest --comparison <comparison-id> --delta regression --out datasets/harvested/regression-pack.json
-failure-lab dataset promote datasets/harvested/regression-pack.json --dataset-id reasoning-regressions-v1
+```
+
+Artifacts are written under the current directory (override with `--root`):
+
+```
+datasets/   runs/   reports/
+```
+
+Closing the loop — promote regressions into a durable dataset and rerun:
+
+```bash
+failure-lab harvest --comparison <comparison-id> --delta regression \
+  --out datasets/harvested/regression-pack.json
+failure-lab dataset promote datasets/harvested/regression-pack.json \
+  --dataset-id reasoning-regressions-v1
 failure-lab run --dataset reasoning-regressions-v1 --model demo
 ```
 
-If your shell does not expose the console script on `PATH`, use:
+### Try it with zero setup
 
 ```bash
-python3 -m model_failure_lab demo
+failure-lab demo            # runs the full demo flow and writes real artifacts
+failure-lab datasets list   # show bundled datasets
 ```
 
-## Example Output
-
-Prompt case:
-
-```text
-"What is 37 * 48?"
-```
-
-Run result:
-
-- model output: incorrect
-- failure type: reasoning_error
-- classification confidence: high
-
-Comparison summary:
-
-- regression rate: +12%
-- new failure clusters: arithmetic carry errors
-
-CLI transcript (abbreviated):
+## Example output
 
 ```text
 $ failure-lab run --dataset reasoning-failures-v1 --model demo
@@ -89,134 +101,76 @@ Dataset: reasoning-failures-v1
 Model: demo
 Status: completed
 Cases: attempted=8 classified=8 errors=0
-Failure rate: 62.5%
-Run ID: 20260427_192110_266368_reasoning_failures_v1_demo_...
-
-$ failure-lab report --run 20260427_192110_266368_reasoning_failures_v1_demo_...
-Failure Lab Report
-Status: completed
-Failure types: reasoning=62.5% (5)
 
 $ failure-lab compare <baseline-run-id> <candidate-run-id>
 Failure Lab Compare
-Status: improved
+Status: unchanged
 Compatible: True
-Case changes: improvements=1
+Shared coverage: shared=8 baseline_only=0 candidate_only=0
+Signal verdict: neutral
 ```
 
-## Screenshots
+## Models
 
-Screenshots are supported and strongly recommended for product clarity.
+`--model` accepts:
 
-Place assets under `docs/screens/`:
+| Value | Notes |
+|---|---|
+| `demo` | Deterministic, offline — great for trying the workflow and for tests |
+| `ollama:<model>` | Local [Ollama](https://ollama.com) runtime |
+| `anthropic:<model>` | Requires `[anthropic]` extra + `ANTHROPIC_API_KEY` |
+| OpenAI model name | Requires `[openai]` extra + `OPENAI_API_KEY` |
 
-- `run-summary.png`
-- `failure-inventory.png`
-- `comparison-view.png`
-- `harvest-replay-workflow.gif`
+Adding a backend is a small contract — see `docs/adapter-extension-guide.md`.
 
-When those files exist, embed them with:
+## How it fits together
 
-```markdown
-![Run summary](docs/screens/run-summary.png)
-![Failure inventory](docs/screens/failure-inventory.png)
-![Comparison view](docs/screens/comparison-view.png)
-![Harvest replay](docs/screens/harvest-replay-workflow.gif)
+```mermaid
+flowchart LR
+    DATA[(datasets/*.json)] --> RUN[run]
+    ADP[model adapter] --> RUN
+    RUN --> RUNS[(runs/)]
+    RUNS --> REP[report] --> REPORTS[(reports/)]
+    RUNS --> CMP[compare] --> REPORTS
+    CMP --> HARV[harvest] --> PROM[dataset promote] --> DATA
 ```
 
-Reference wiring and naming live in `docs/product-screens.md` and `docs/screens/README.md`.
-
-## Core Workflow
-
-`failure-lab` writes artifact folders under the active root (default: current working directory):
-
-- `datasets/`
-- `runs/`
-- `reports/`
-
-Comparison outputs are persisted as report artifacts under `reports/`.
-
-Use `--root` on commands to target a specific workspace.
-
-For detailed artifact contracts and examples, see `docs/artifact-model.md`.
-
-## Model Adapters
-
-`failure-lab run --model` supports:
-
-- `demo` for deterministic local execution
-- `customer-support-failures-v1` bundled flagship support-policy pack
-- `ollama:<model>`
-- `anthropic:<model>` (after installing optional dependencies)
-- OpenAI model names (after installing optional dependencies)
-
-Optional extras:
-
-- `python3 -m pip install '.[anthropic]'`
-- `python3 -m pip install '.[openai]'`
-- `python3 -m pip install '.[dev]'`
-- `python3 -m pip install '.[legacy]'` (legacy-only surfaces)
-- `python3 -m pip install '.[ui]'` (legacy Streamlit UI)
-
-If installing from a published distribution in the future, the equivalent form is
-`model-failure-lab[anthropic]`, `model-failure-lab[openai]`, `model-failure-lab[legacy]`,
-and `model-failure-lab[ui]`.
-
-## React Debugger
-
-The React debugger reads existing artifact workspaces via:
-
-- `FAILURE_LAB_ARTIFACT_ROOT`
-
-Example:
-
-```bash
-export FAILURE_LAB_ARTIFACT_ROOT=/path/to/failure-lab-workspace
-npm --prefix frontend run dev
-```
+Beyond the core loop, the CLI can build a derived SQLite index over your artifacts
+(`failure-lab index rebuild`) to power cross-run `query`, recurring failure `clusters`, `history`,
+and `regressions` governance gates. See `docs/architecture.md`.
 
 ## Development
 
 ```bash
-make install-dev
-make check
+make install-dev      # editable install with dev extras
+make check            # ruff + production test suite
+make test             # production test suite (legacy ML tests auto-skip without the [legacy] extra)
+make test-legacy      # legacy research tests (needs '.[legacy]' installed)
 ```
 
-## Versioning
-
-This project follows semantic versioning before `v1.0` in the practical sense:
-
-- patch: bug fixes and docs
-- minor: CLI-compatible feature additions
-- breaking: CLI or artifact schema changes
-
-## Legacy Surfaces
-
-Legacy surfaces are retained for reference only and are not part of the supported production
-workflow.
-
-See:
-
-- `docs/legacy.md`
-- `docs/ui_parity.md`
-- `docs/v1_4_closeout.md`
+The production CLI is dependency-isolated from the optional research/ML stack: importing the CLI or
+running `run`/`report`/`compare` never pulls in `torch`, `pandas`, `numpy`, etc. This is enforced by
+`tests/unit/test_production_cli_isolation.py`, so `make test` stays green with only the production
+install.
 
 ## Documentation
 
-Detailed docs moved out of this README:
+| Doc | Topic |
+|---|---|
+| `docs/overview.md` | Project overview, capabilities, limitations |
+| `docs/architecture.md` | Modules, control flow, design patterns |
+| `docs/setup.md` | Setup, environment variables, common issues |
+| `docs/api.md` | CLI surface and internal interfaces |
+| `docs/artifact-model.md` | Artifact schemas and examples |
+| `docs/adapter-extension-guide.md` | Add a model adapter |
+| `docs/legacy.md` | Legacy research surfaces (reference only) |
 
-- Harvest replay: `docs/harvest-replay.md`
-- Legacy surfaces: `docs/legacy.md`
-- Fixture workspace: `docs/fixture-workspace.md`
-- Artifact schema/model: `docs/artifact-model.md`
-- Adapter extension guide: `docs/adapter-extension-guide.md`
-- Architecture overview: `docs/architecture.md`
-- CI governance and waivers: `docs/ci-governance.md`
-- Contributor code map: `docs/code-map.md`
-- 5-minute operator quickstart: `docs/getting-started-operator.md`
-- Release and PyPI guide: `docs/release-and-pypi.md`
-- Future ideas and backlog: `docs/future-ideas.md`
+## Project status
+
+Pre-1.0 (`0.1.0`). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
+= CLI or artifact-schema changes. The DistilBERT/CivilComments benchmark stack under `[legacy]` is
+retained for reference and is not part of the supported workflow (`docs/legacy.md`).
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE`.
+MIT — see `LICENSE`.
