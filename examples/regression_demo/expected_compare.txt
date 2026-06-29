@@ -1,0 +1,20 @@
+Failure Lab Compare
+Baseline: baseline
+Candidate: candidate
+Report ID: compare_8ba8496a_to_dda18a0e_66320e7c
+Status: regressed
+Compatible: True
+Shared coverage: shared=8 baseline_only=0 candidate_only=0
+Signal verdict: regression
+Signal scores: regression=50.0% improvement=0.0% severity=50.0%
+Failure rate delta: +50.0%
+Coverage delta: 0.0%
+Case changes: regressions=4
+Failure Lab Signal Summary
+Report ID: compare_8ba8496a_to_dda18a0e_66320e7c
+Verdict: regression
+Scores: regression=50.0% improvement=0.0% severity=50.0% net=-50.0%
+Top drivers:
+- instruction_following +25.0% (regression) evidence=citation-latency, format-json
+- hallucination +12.5% (regression) evidence=grounding-warranty
+- reasoning +12.5% (regression) evidence=factual-apollo
