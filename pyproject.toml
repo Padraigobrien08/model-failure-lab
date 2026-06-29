@@ -8,9 +8,17 @@ version = "0.1.0"
 description = "Local-first evaluation and failure-analysis toolkit for LLM and RAG systems."
 readme = "README.md"
 requires-python = ">=3.11"
+# MIT is published as a PEP 639 SPDX expression -> METADATA "License-Expression: MIT",
+# which PyPI displays. A "License :: OSI Approved :: MIT License" classifier is
+# intentionally NOT added: setuptools >= 77 rejects a license classifier alongside a
+# license expression (PEP 639), which breaks `python -m build`.
 license = "MIT"
 authors = [
   { name = "Model Failure Lab contributors" },
+]
+maintainers = [
+  # TODO(release): replace with a real maintainer name/email before the public release.
+  { name = "Model Failure Lab maintainers", email = "maintainer@example.com" },
 ]
 keywords = ["llm", "rag", "evaluation", "regression-testing", "prompt-testing"]
 classifiers = [
@@ -18,6 +26,7 @@ classifiers = [
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Software Development :: Testing",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
