@@ -5,19 +5,27 @@ Thanks for contributing to Model Failure Lab.
 ## Development setup
 
 ```bash
-python3 -m pip install -e '.[dev]'
+python -m pip install -e .[dev]
 ```
 
 ## Before opening a PR
 
-Run:
+Run exactly what CI runs (`.github/workflows/production.yml`, Python 3.11 and 3.12):
 
 ```bash
-python3 -m pytest -q
-python3 -m ruff check src tests
-python3 -m pip install .
+ruff check .
+pytest -q
+python -c "import model_failure_lab"
+```
+
+Optional sanity check of the offline workflow:
+
+```bash
 failure-lab demo
 ```
+
+The optional `[legacy]` ML tests are not part of the production suite; they auto-skip unless that
+stack is installed. To run them: `python -m pip install -e .[dev,legacy]` then `make test-legacy`.
 
 ## Contribution expectations
 
@@ -25,3 +33,4 @@ failure-lab demo
 - Add or update tests for behavior changes.
 - Update docs when CLI flows or artifact contracts change.
 - Avoid breaking CLI flags and artifact schemas without documenting migration notes.
+- New features should fit the scope in `docs/roadmap.md`; prefer plugins/extension points over core.
