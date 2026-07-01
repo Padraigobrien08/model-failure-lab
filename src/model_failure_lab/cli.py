@@ -110,6 +110,21 @@ if TYPE_CHECKING:
 
 CANONICAL_COMMAND = "failure-lab"
 COMPATIBILITY_COMMAND = "model-failure-lab"
+DISTRIBUTION_NAME = "model-failure-lab"
+
+
+def _package_version() -> str:
+    """Return the installed package version, falling back to the in-tree version."""
+
+    from importlib import metadata
+
+    try:
+        return metadata.version(DISTRIBUTION_NAME)
+    except metadata.PackageNotFoundError:
+        from model_failure_lab import __version__
+
+        return __version__
+
 DEFAULT_CLASSIFIER_ID = "heuristic_v1"
 DEFAULT_RUN_SEED = 13
 DEFAULT_SIGNAL_ALERT_THRESHOLD = 0.05
@@ -147,6 +162,12 @@ def build_parser() -> argparse.ArgumentParser:
             "Run structured failure analysis on local prompt datasets and inspect the resulting "
             "run, report, and comparison artifacts."
         ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {_package_version()}",
+        help="Print the installed package version and exit.",
     )
     subparsers = parser.add_subparsers(dest="command")
 

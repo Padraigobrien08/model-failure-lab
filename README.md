@@ -46,6 +46,10 @@ diffable, reviewable, reproducible.
 The repo ships a deterministic demo: two versions of a customer-support assistant where **v2 quietly
 breaks 4 of 8 cases**. No model, key, or network needed.
 
+> The `examples/regression_demo/` walkthrough ships in the **source tree** (clone, or an unpacked
+> sdist) — run these commands from a checkout. If you only `pip install`ed, the offline single-run
+> demo is always available as `failure-lab demo`.
+
 ```bash
 failure-lab compare examples/regression_demo/runs/baseline examples/regression_demo/runs/candidate
 ```
@@ -205,7 +209,7 @@ The production CLI is dependency-isolated from the optional research/ML stack: r
 
 ## Project status
 
-Pre-1.0 (`0.1.0`). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
+Pre-1.0 (`0.9.0`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
 = CLI or artifact-schema changes. The DistilBERT/CivilComments benchmark stack under `[legacy]` is
 retained for reference and is not part of the supported workflow (`docs/legacy.md`).
 

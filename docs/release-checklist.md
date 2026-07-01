@@ -6,11 +6,20 @@
 
 ## 1. Pre-flight (repo state)
 - [ ] All release work merged to `main`; working tree clean. **(manual: git)**
-- [ ] Version bumped to `0.9.0` in `pyproject.toml` **and** `src/model_failure_lab/__init__.py`.
-- [ ] `CHANGELOG.md` `0.9.0` section finalized (move from *Unreleased* to dated, set the release date).
+- [x] Version set to `0.9.0` in `pyproject.toml` **and** `src/model_failure_lab/__init__.py` (guarded by `tests/unit/test_version.py`).
+- [x] `failure-lab --version` prints the installed package version.
+- [x] Offline regression demo (`examples/regression_demo/`) included in the **sdist** via `MANIFEST.in`.
+- [ ] `CHANGELOG.md` `0.9.0` section finalized (move from *Unreleased* to dated, set the release date). **(manual)**
 - [ ] `ruff check .` clean.
 - [ ] `pytest -q` green.
 - [ ] `python -m build` succeeds; `python -m twine check dist/*` passes.
+
+> **Demo packaging note (decision):** the `failure-lab demo` command is **package-install compatible**
+> (it uses bundled datasets). The `examples/regression_demo/` walkthrough ships in the **source tree
+> and sdist**, but is **not installed into the wheel** — top-level `examples/` cannot be placed in a
+> wheel without relocating it under the package, which would break the documented `examples/...` paths.
+> If wheel inclusion is later required, relocate the assets under `src/model_failure_lab/` and add a
+> CLI command to materialize them; tracked in `docs/roadmap.md`.
 
 ## 2. Maintainer contact replacement
 - [ ] Replace `security@example.com` in `SECURITY.md` with a real, monitored address (or enable GitHub Security Advisories and reference it). **(manual)**

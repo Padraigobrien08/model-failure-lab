@@ -2,7 +2,7 @@
 
 > ⚠️ **PLACEHOLDER — must be replaced before the public release.** The contact address below
 > (`security@example.com`) is not monitored. Replace it with a real, monitored channel (a dedicated
-> mailbox or GitHub Security Advisories) before announcing v0.1.0.
+> mailbox or GitHub Security Advisories) before announcing v0.9.0.
 
 ## Reporting a vulnerability
 

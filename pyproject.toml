@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "model-failure-lab"
-version = "0.1.0"
+version = "0.9.0"
 description = "Local-first evaluation and failure-analysis toolkit for LLM and RAG systems."
 readme = "README.md"
 requires-python = ">=3.11"

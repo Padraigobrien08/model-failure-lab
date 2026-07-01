@@ -27,7 +27,7 @@ python3 -m pip install .
 The package installs the console scripts `failure-lab` and `model-failure-lab`
 (`pyproject.toml [project.scripts]`). It can also be run as `python3 -m model_failure_lab`.
 
-> ✓ Verified: `model-failure-lab` 0.1.0 is importable and the `demo` command works (see below).
+> ✓ Verified: `model-failure-lab` (0.9.0) is importable and the `demo` command works (see below).
 
 ### Development environment
 

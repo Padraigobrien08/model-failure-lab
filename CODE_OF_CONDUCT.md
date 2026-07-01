@@ -2,7 +2,7 @@
 
 > ⚠️ **PLACEHOLDER — must be replaced before the public release.** The enforcement contact below
 > (`conduct@example.com`) is not monitored. Replace it with a real, monitored address before
-> announcing v0.1.0.
+> announcing v0.9.0.
 
 ## Our standards
 

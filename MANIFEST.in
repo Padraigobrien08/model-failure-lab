@@ -1,0 +1,12 @@
+# Source-distribution contents beyond the importable package.
+# The offline regression demo ships in the sdist so it can be run from an unpacked
+# source distribution (it is not installed into the wheel — see docs/release-checklist.md).
+recursive-include examples/regression_demo *
+include CHANGELOG.md
+include CONTRIBUTING.md
+include CODE_OF_CONDUCT.md
+include SECURITY.md
+include .env.example
+recursive-include docs *.md
+global-exclude .DS_Store
+global-exclude __pycache__/*

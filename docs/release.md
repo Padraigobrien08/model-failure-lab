@@ -1,4 +1,4 @@
-# Release Runbook (v0.1.0)
+# Release Runbook (v0.9.0)
 
 This is the runbook for the **first public OSS release**. It covers versioning/tag strategy and a
 **TestPyPI dry run** before any real publish. For the production publish mechanics (token handling,
@@ -10,7 +10,7 @@ This is the runbook for the **first public OSS release**. It covers versioning/t
 
 ## Public versioning policy
 
-**Public OSS releases start at `v0.1.0`.** The package version in `pyproject.toml` is `0.1.0`.
+**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.9.0`.
 
 Pre-1.0 semantics (also in the README): patch = fixes/docs, minor = CLI-compatible additions,
 breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
@@ -19,10 +19,10 @@ breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
 
 The repository currently carries **25 internal milestone tags**, `v1.0` → `v5.3` (created
 2026-03-20 → 2026-04-06). These are internal development phase markers, **not** public releases. They
-conflict with a `v0.1.0` public release in two ways:
+conflict with a `v0.9.0` public release in two ways:
 
 1. GitHub shows the highest semver tag (`v5.3`) as the "latest release," which directly contradicts a
-   `0.1.0` package on PyPI and a v0.1 announcement.
+   `0.9.0` package on PyPI and a v0.1 announcement.
 2. A new visitor cannot tell which tags (if any) are real releases.
 
 See `docs/oss-readiness.md` (P0) for the impact assessment.
@@ -44,7 +44,7 @@ git push origin internal/v5.3   # push the namespaced tag
 git push origin :refs/tags/v5.3 # delete the bare tag on the remote
 ```
 
-GitHub does not surface `internal/*` tags as releases, so `v0.1.0` becomes the only release.
+GitHub does not surface `internal/*` tags as releases, so `v0.9.0` becomes the only release.
 
 **Option B — Delete the internal tags outright** (simplest; loses the milestone markers):
 
@@ -56,8 +56,8 @@ git push origin --delete v1.0 v1.1 ... v5.3
 **Then, in either case, cut the public release:**
 
 ```bash
-git tag -a v0.1.0 -m "First public release"
-git push origin v0.1.0
+git tag -a v0.9.0 -m "First public release"
+git push origin v0.9.0
 ```
 
 > Until a maintainer performs the cleanup, **do not** create a GitHub Release from any `vX.Y` tag.
