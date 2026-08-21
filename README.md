@@ -41,6 +41,8 @@ flowchart TD
 Everything is plain JSON written to disk, so your evaluation history lives in git next to your code —
 diffable, reviewable, reproducible.
 
+![Comparison report in the React debugger](docs/screens/comparison-detail.png)
+
 ---
 
 ## See it catch a regression (offline, ~30s)
@@ -158,6 +160,19 @@ Runs and reports are written under the current directory (`runs/`, `reports/`; o
 | OpenAI model name | Requires `[openai]` extra + `OPENAI_API_KEY` |
 
 Adding a backend is a small contract — see `docs/adapter-extension-guide.md`.
+
+## Visual debugger
+
+The repo ships a React UI (in [`frontend/`](frontend/)) that opens your workspace's saved runs and
+comparison reports for point-and-click investigation:
+
+![Run detail in the React debugger](docs/screens/run-detail.png)
+
+```bash
+FAILURE_LAB_ARTIFACT_ROOT=/path/to/your/workspace npm --prefix frontend run dev
+```
+
+More screenshots in [`docs/screens/`](docs/screens/).
 
 ## How it compares
 
