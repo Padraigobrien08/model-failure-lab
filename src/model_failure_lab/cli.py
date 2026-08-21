@@ -110,6 +110,21 @@ if TYPE_CHECKING:
 
 CANONICAL_COMMAND = "failure-lab"
 COMPATIBILITY_COMMAND = "model-failure-lab"
+DISTRIBUTION_NAME = "model-failure-lab"
+
+
+def _package_version() -> str:
+    """Return the installed package version, falling back to the in-tree version."""
+
+    from importlib import metadata
+
+    try:
+        return metadata.version(DISTRIBUTION_NAME)
+    except metadata.PackageNotFoundError:
+        from model_failure_lab import __version__
+
+        return __version__
+
 DEFAULT_CLASSIFIER_ID = "heuristic_v1"
 DEFAULT_RUN_SEED = 13
 DEFAULT_SIGNAL_ALERT_THRESHOLD = 0.05
@@ -147,6 +162,12 @@ def build_parser() -> argparse.ArgumentParser:
             "Run structured failure analysis on local prompt datasets and inspect the resulting "
             "run, report, and comparison artifacts."
         ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {_package_version()}",
+        help="Print the installed package version and exit.",
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -228,6 +249,12 @@ def build_parser() -> argparse.ArgumentParser:
             "directory."
         ),
     )
+    report_parser.add_argument(
+        "--html",
+        type=Path,
+        dest="html_path",
+        help="Additionally write a self-contained HTML report to this path.",
+    )
     report_parser.set_defaults(handler=_handle_report)
 
     compare_parser = subparsers.add_parser(
@@ -271,6 +298,30 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SIGNAL_ALERT_THRESHOLD,
         help="Minimum severity score needed before `--alert` emits output (default: 0.05).",
     )
+    compare_parser.add_argument(
+        "--gate",
+        action="store_true",
+        help=(
+            "CI gate mode: exit 1 when the comparison signal verdict is a regression "
+            "(or the runs are incompatible), exit 0 otherwise."
+        ),
+    )
+    compare_parser.add_argument(
+        "--format",
+        choices=["text", "markdown"],
+        default="text",
+        dest="output_format",
+        help=(
+            "Output format. `markdown` emits a PR-comment-ready summary table "
+            "(combine with `--gate` in CI)."
+        ),
+    )
+    compare_parser.add_argument(
+        "--html",
+        type=Path,
+        dest="html_path",
+        help="Additionally write a self-contained HTML comparison report to this path.",
+    )
     _add_analysis_arguments(compare_parser, verb="explain")
     compare_parser.set_defaults(handler=_handle_compare)
 
@@ -287,6 +338,44 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     demo_parser.set_defaults(handler=_handle_demo)
+
+    init_parser = subparsers.add_parser(
+        "init",
+        help="Scaffold a starter prompt dataset in the active workspace.",
+    )
+    init_parser.add_argument(
+        "--id",
+        default="my-prompts-v1",
+        dest="dataset_id",
+        help="Dataset ID for the scaffolded pack (default: my-prompts-v1).",
+    )
+    init_parser.add_argument(
+        "--name",
+        help="Human-readable dataset name (defaults to the dataset ID).",
+    )
+    init_parser.add_argument(
+        "--from-jsonl",
+        type=Path,
+        dest="from_jsonl",
+        help=(
+            "Build the dataset from a JSONL file instead of the starter template. Each line is "
+            'an object with a required "prompt" and optional "id", "tags", "reference_answer".'
+        ),
+    )
+    init_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite the dataset file if it already exists.",
+    )
+    init_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    init_parser.set_defaults(handler=_handle_init)
 
     datasets_parser = subparsers.add_parser(
         "datasets",
@@ -1303,15 +1392,42 @@ def _handle_report(args: argparse.Namespace) -> int:
         built.details,
         root=root,
     )
-    print(
-        _render_report_summary(
-            saved_run,
-            built.report,
-            built.details,
-            report_path,
-            details_path,
-        )
+    summary = _render_report_summary(
+        saved_run,
+        built.report,
+        built.details,
+        report_path,
+        details_path,
     )
+    if args.html_path is not None:
+        from model_failure_lab.reporting.html import render_run_report_html
+        from model_failure_lab.runner.contracts import NO_FAILURE_TYPE
+
+        cases = []
+        for case in saved_run.case_results:
+            if case.error is not None:
+                status = "error"
+                failure_type = "n/a"
+            elif case.classification is None:
+                status = "unclassified"
+                failure_type = "n/a"
+            elif case.classification.failure_type == NO_FAILURE_TYPE:
+                status = "pass"
+                failure_type = case.classification.failure_type
+            else:
+                status = "fail"
+                failure_type = case.classification.failure_type
+            cases.append(
+                {"case_id": case.case_id, "failure_type": failure_type, "status": status}
+            )
+        html_path = args.html_path.expanduser()
+        html_path.parent.mkdir(parents=True, exist_ok=True)
+        html_path.write_text(
+            render_run_report_html(report=built.report, details=built.details, cases=cases),
+            encoding="utf-8",
+        )
+        summary = f"{summary}\nHTML report: {html_path}"
+    print(summary)
     return 0
 
 
@@ -1320,6 +1436,10 @@ def _handle_compare(args: argparse.Namespace) -> int:
         raise ValueError("`--score` cannot be combined with `--summary`, `--alert`, or `--explain`")
     if args.alert and (args.summary or args.explain):
         raise ValueError("`--alert` cannot be combined with `--summary` or `--explain`")
+    if args.output_format == "markdown" and (args.score or args.alert or args.explain):
+        raise ValueError(
+            "`--format markdown` cannot be combined with `--score`, `--alert`, or `--explain`"
+        )
 
     root = _normalized_root(args.root)
     baseline = _load_saved_run_reference(args.baseline, root=root)
@@ -1331,6 +1451,19 @@ def _handle_compare(args: argparse.Namespace) -> int:
         root=root,
     )
     compare_summary = _render_compare_summary(built.report, built.details, report_path, details_path)
+
+    html_line: str | None = None
+    if args.html_path is not None:
+        from model_failure_lab.reporting.html import render_comparison_html
+
+        html_path = args.html_path.expanduser()
+        html_path.parent.mkdir(parents=True, exist_ok=True)
+        html_path.write_text(
+            render_comparison_html(report=built.report, details=built.details),
+            encoding="utf-8",
+        )
+        html_line = f"HTML report: {html_path}"
+
     if args.score:
         print(
             _render_json_payload(
@@ -1344,6 +1477,8 @@ def _handle_compare(args: argparse.Namespace) -> int:
                 }
             )
         )
+        if html_line is not None:
+            print(html_line)
         return 0
 
     if args.alert:
@@ -1354,14 +1489,32 @@ def _handle_compare(args: argparse.Namespace) -> int:
         )
         if alert_output is not None:
             print(alert_output)
+        if html_line is not None:
+            print(html_line)
         return 0
 
+    gate_exit_code = 0
+    gate_line: str | None = None
+    if args.gate:
+        gate_exit_code, gate_line = _evaluate_compare_gate(built.report, built.details)
+
+    if args.output_format == "markdown":
+        markdown = _render_compare_markdown(built.report, built.details, gate_line=gate_line)
+        print(markdown)
+        if html_line is not None:
+            print(html_line)
+        return gate_exit_code
+
     output_sections = [compare_summary]
+    if html_line is not None:
+        output_sections[0] = f"{compare_summary}\n{html_line}"
     if args.summary:
         output_sections.append(_render_signal_summary(built.report, built.details))
+    if gate_line is not None:
+        output_sections.append(gate_line)
     if not args.explain:
         print("\n\n".join(output_sections))
-        return 0
+        return gate_exit_code
 
     rebuild_query_index(root=root)
     analysis_adapter_id, analysis_model_name, analysis_options = _resolve_analysis_request(args)
@@ -1376,7 +1529,7 @@ def _handle_compare(args: argparse.Namespace) -> int:
     )
     output_sections.append(_render_insight_report(insight_report))
     print("\n\n".join(output_sections))
-    return 0
+    return gate_exit_code
 
 
 def _handle_demo(args: argparse.Namespace) -> int:
@@ -1409,6 +1562,118 @@ def _handle_demo(args: argparse.Namespace) -> int:
             report_id=built.report.report_id,
         )
     )
+    return 0
+
+
+_INIT_TEMPLATE_CASES: list[dict[str, object]] = [
+    {
+        "id": "example-factual",
+        "prompt": "What year did the first human land on the Moon?",
+        "tags": ["core", "factual"],
+        "expectations": {
+            "expected_failure": "no_failure",
+            "reference_answer": "1969",
+        },
+    },
+    {
+        "id": "example-grounding",
+        "prompt": "Using the provided policy snippet, how long is the standard warranty?",
+        "tags": ["core", "rag"],
+        "expectations": {
+            "expected_failure": "no_failure",
+            "context": {"evidence_items": ["the standard warranty lasts 24 months"]},
+        },
+    },
+    {
+        "id": "example-format",
+        "prompt": "List three primary colors as a JSON array of strings.",
+        "tags": ["core", "format"],
+        "expectations": {
+            "expected_failure": "no_failure",
+            "constraints": ["respond with valid JSON"],
+        },
+    },
+]
+
+
+def _init_cases_from_jsonl(path: Path) -> list[dict[str, object]]:
+    if not path.exists():
+        raise FileNotFoundError(f"JSONL file not found: {path}")
+    cases: list[dict[str, object]] = []
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path}:{line_number} is not valid JSON: {exc}") from exc
+        if not isinstance(entry, dict):
+            raise ValueError(f"{path}:{line_number} must be a JSON object")
+        prompt = entry.get("prompt")
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError(f'{path}:{line_number} requires a non-empty "prompt" string')
+        case: dict[str, object] = {
+            "id": entry.get("id") or f"case-{len(cases) + 1:04d}",
+            "prompt": prompt,
+            "tags": entry.get("tags") or ["core"],
+        }
+        reference_answer = entry.get("reference_answer")
+        if isinstance(reference_answer, str) and reference_answer.strip():
+            case["expectations"] = {
+                "expected_failure": "no_failure",
+                "reference_answer": reference_answer,
+            }
+        cases.append(case)
+    if not cases:
+        raise ValueError(f"{path} contains no prompt cases")
+    return cases
+
+
+def _handle_init(args: argparse.Namespace) -> int:
+    from model_failure_lab.datasets import FailureDataset
+
+    root = _normalized_root(args.root)
+    if args.from_jsonl is not None:
+        cases = _init_cases_from_jsonl(args.from_jsonl)
+        description = f"Prompt pack imported from {args.from_jsonl.name}."
+    else:
+        cases = _INIT_TEMPLATE_CASES
+        description = (
+            "Starter prompt pack scaffolded by `failure-lab init`. Replace the example cases "
+            "with your own prompts."
+        )
+    payload: dict[str, object] = {
+        "dataset_id": args.dataset_id,
+        "name": args.name or args.dataset_id,
+        "description": description,
+        "version": "1",
+        "metadata": {"default_scope": "core"},
+        "cases": cases,
+    }
+    dataset = FailureDataset.from_payload(payload)
+    dataset_path = dataset_file(dataset.dataset_id, root=root, create=True)
+    if dataset_path.exists() and not args.force:
+        raise FileExistsError(
+            f"dataset already exists: {dataset_path}. Re-run with --force to overwrite."
+        )
+    write_json(dataset_path, dataset.to_payload())
+    lines = [
+        "Failure Lab Init",
+        f"Dataset ID: {dataset.dataset_id}",
+        f"Cases: {len(dataset.cases)}",
+        f"Dataset written to: {dataset_path}",
+        "",
+        "Next steps:",
+        f"1. Edit the prompts in {dataset_path}",
+        f"2. failure-lab run --dataset {dataset.dataset_id} --model demo",
+        "3. failure-lab report --run <run-id>",
+        f"4. failure-lab run --dataset {dataset.dataset_id} --model <your-model>",
+        "5. failure-lab compare <baseline-run-id> <candidate-run-id> --gate",
+    ]
+    print("\n".join(lines))
     return 0
 
 
@@ -3995,6 +4260,71 @@ def _render_compare_summary(
     )
     if comparison.get("compatible") is False:
         lines.append("Warning: comparison is incompatible, but artifacts were still written.")
+    return "\n".join(lines)
+
+
+def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str]:
+    """Deterministic CI gate contract: exit 1 on regression or incompatible runs."""
+    signal = _comparison_signal_payload(report, details)
+    verdict = signal.get("verdict", "unknown")
+    if report.comparison.get("compatible") is False:
+        return 1, "Gate: FAIL (runs are not comparable)"
+    if verdict == "regression":
+        return 1, f"Gate: FAIL (signal verdict: {verdict})"
+    return 0, f"Gate: PASS (signal verdict: {verdict})"
+
+
+def _render_compare_markdown(report, details: dict[str, object], *, gate_line: str | None) -> str:
+    comparison = report.comparison
+    signal = _comparison_signal_payload(report, details)
+    delta = report.metrics.get("delta", {})
+    verdict = signal.get("verdict", "unknown")
+    icon = {"regression": "🔴", "improvement": "🟢", "stable": "⚪"}.get(str(verdict), "⚪")
+    lines = [
+        "## Failure Lab Compare",
+        "",
+        f"**Verdict: {icon} {verdict}** — `{comparison.get('baseline_run_id', 'unknown')}` → "
+        f"`{comparison.get('candidate_run_id', 'unknown')}`",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| Status | {report.status.get('overall', 'unknown')} |",
+        f"| Failure rate delta | {_format_signed_rate(delta.get('failure_rate'))} |",
+        f"| Regression score | {_format_rate(signal.get('regression_score'))} |",
+        f"| Improvement score | {_format_rate(signal.get('improvement_score'))} |",
+        f"| Severity | {_format_rate(signal.get('severity'))} |",
+        f"| Report ID | `{report.report_id}` |",
+    ]
+    drivers = signal.get("top_drivers")
+    if isinstance(drivers, list) and drivers:
+        lines.extend(
+            [
+                "",
+                "### Top drivers",
+                "",
+                "| Failure type | Delta | Direction | Evidence |",
+                "|---|---|---|---|",
+            ]
+        )
+        for driver in drivers:
+            if not isinstance(driver, dict):
+                continue
+            evidence = driver.get("case_ids")
+            evidence_text = (
+                ", ".join(f"`{case_id}`" for case_id in evidence[:3])
+                if isinstance(evidence, list) and evidence
+                else "—"
+            )
+            lines.append(
+                f"| {driver.get('failure_type', 'unknown')} "
+                f"| {_format_signed_rate(driver.get('delta'))} "
+                f"| {driver.get('direction', 'unknown')} "
+                f"| {evidence_text} |"
+            )
+    if comparison.get("compatible") is False:
+        lines.extend(["", "> ⚠️ The two runs are not comparable (different datasets or contracts)."])
+    if gate_line is not None:
+        lines.extend(["", f"**{gate_line}**"])
     return "\n".join(lines)
 
 

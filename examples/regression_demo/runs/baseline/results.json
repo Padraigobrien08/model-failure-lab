@@ -1,0 +1,361 @@
+{
+  "adapter_id": "demo-baseline",
+  "cases": [
+    {
+      "case_id": "grounding-warranty",
+      "classification": {
+        "confidence": 0.1,
+        "explanation": "No heuristic failure signal detected.",
+        "failure_type": "no_failure"
+      },
+      "error": null,
+      "execution": {
+        "adapter_id": "demo-baseline",
+        "case_seed": 241989911,
+        "classifier_id": "heuristic_v1",
+        "latency_ms": 0.0,
+        "model": "support-assistant-v1",
+        "run_seed": 7
+      },
+      "expectation": {
+        "expectation_verdict": "no_failure_as_expected",
+        "expected_failure": {
+          "failure_type": "no_failure"
+        },
+        "observed_failure": {
+          "failure_type": "no_failure"
+        }
+      },
+      "output": {
+        "text": "Per the policy snippet, the standard warranty lasts 24 months from purchase."
+      },
+      "prompt": {
+        "expectations": {
+          "context": {
+            "evidence_items": [
+              "the standard warranty lasts 24 months"
+            ]
+          },
+          "expected_failure": "no_failure"
+        },
+        "id": "grounding-warranty",
+        "prompt": "Using the policy snippet, how long is the standard warranty?",
+        "tags": [
+          "core",
+          "rag"
+        ]
+      }
+    },
+    {
+      "case_id": "grounding-refund",
+      "classification": {
+        "confidence": 0.1,
+        "explanation": "No heuristic failure signal detected.",
+        "failure_type": "no_failure"
+      },
+      "error": null,
+      "execution": {
+        "adapter_id": "demo-baseline",
+        "case_seed": 2138567257,
+        "classifier_id": "heuristic_v1",
+        "latency_ms": 0.0,
+        "model": "support-assistant-v1",
+        "run_seed": 7
+      },
+      "expectation": {
+        "expectation_verdict": "no_failure_as_expected",
+        "expected_failure": {
+          "failure_type": "no_failure"
+        },
+        "observed_failure": {
+          "failure_type": "no_failure"
+        }
+      },
+      "output": {
+        "text": "Per the policy snippet, refunds are issued within 14 days of approval."
+      },
+      "prompt": {
+        "expectations": {
+          "context": {
+            "evidence_items": [
+              "refunds are issued within 14 days"
+            ]
+          },
+          "expected_failure": "no_failure"
+        },
+        "id": "grounding-refund",
+        "prompt": "Using the policy snippet, how long do refunds take?",
+        "tags": [
+          "core",
+          "rag"
+        ]
+      }
+    },
+    {
+      "case_id": "citation-latency",
+      "classification": {
+        "confidence": 0.1,
+        "explanation": "No heuristic failure signal detected.",
+        "failure_type": "no_failure"
+      },
+      "error": null,
+      "execution": {
+        "adapter_id": "demo-baseline",
+        "case_seed": 129430014,
+        "classifier_id": "heuristic_v1",
+        "latency_ms": 0.0,
+        "model": "support-assistant-v1",
+        "run_seed": 7
+      },
+      "expectation": {
+        "expectation_verdict": "no_failure_as_expected",
+        "expected_failure": {
+          "failure_type": "no_failure"
+        },
+        "observed_failure": {
+          "failure_type": "no_failure"
+        }
+      },
+      "output": {
+        "text": "Median latency dropped 30% after the rollout (Smith 2021)."
+      },
+      "prompt": {
+        "expectations": {
+          "context": {
+            "required_sources": [
+              "Smith 2021"
+            ]
+          },
+          "expected_failure": "no_failure"
+        },
+        "id": "citation-latency",
+        "prompt": "Summarize the latency finding and cite the source.",
+        "tags": [
+          "core",
+          "citation"
+        ]
+      }
+    },
+    {
+      "case_id": "citation-uptime",
+      "classification": {
+        "confidence": 0.1,
+        "explanation": "No heuristic failure signal detected.",
+        "failure_type": "no_failure"
+      },
+      "error": null,
+      "execution": {
+        "adapter_id": "demo-baseline",
+        "case_seed": 1652570411,
+        "classifier_id": "heuristic_v1",
+        "latency_ms": 0.0,
+        "model": "support-assistant-v1",
+        "run_seed": 7
+      },
+      "expectation": {
+        "expectation_verdict": "no_failure_as_expected",
+        "expected_failure": {
+          "failure_type": "no_failure"
+        },
+        "observed_failure": {
+          "failure_type": "no_failure"
+        }
+      },
+      "output": {
+        "text": "Uptime improved to 99.95% over the quarter (Lee 2020)."
+      },
+      "prompt": {
+        "expectations": {
+          "context": {
+            "required_sources": [
+              "Lee 2020"
+            ]
+          },
+          "expected_failure": "no_failure"
+        },
+        "id": "citation-uptime",
+        "prompt": "Summarize the uptime finding and cite the source.",
+        "tags": [
+          "core",
+          "citation"
+        ]
+      }
+    },
+    {
+      "case_id": "factual-apollo",
+      "classification": {
+        "confidence": 0.1,
+        "explanation": "No heuristic failure signal detected.",
+        "failure_type": "no_failure"
+      },
+      "error": null,
+      "execution": {
+        "adapter_id": "demo-baseline",
+        "case_seed": 610541942,
+        "classifier_id": "heuristic_v1",
+        "latency_ms": 0.0,
+        "model": "support-assistant-v1",
+        "run_seed": 7
+      },
+      "expectation": {
+        "expectation_verdict": "no_failure_as_expected",
+        "expected_failure": {
+          "failure_type": "no_failure"
+        },
+        "observed_failure": {
+          "failure_type": "no_failure"
+        }
+      },
+      "output": {
+        "text": "Apollo 11 landed on the Moon in 1969."
+      },
+      "prompt": {
+        "expectations": {
+          "expected_failure": "no_failure",
+          "reference_answer": "1969"
+        },
+        "id": "factual-apollo",
+        "prompt": "What year did Apollo 11 land on the Moon?",
+        "tags": [
+          "core",
+          "factual"
+        ]
+      }
+    },
+    {
+      "case_id": "format-json",
+      "classification": {
+        "confidence": 0.1,
+        "explanation": "No heuristic failure signal detected.",
+        "failure_type": "no_failure"
+      },
+      "error": null,
+      "execution": {
+        "adapter_id": "demo-baseline",
+        "case_seed": 682800764,
+        "classifier_id": "heuristic_v1",
+        "latency_ms": 0.0,
+        "model": "support-assistant-v1",
+        "run_seed": 7
+      },
+      "expectation": {
+        "expectation_verdict": "no_failure_as_expected",
+        "expected_failure": {
+          "failure_type": "no_failure"
+        },
+        "observed_failure": {
+          "failure_type": "no_failure"
+        }
+      },
+      "output": {
+        "text": "Here is the order status as json: {\"status\": \"shipped\"}."
+      },
+      "prompt": {
+        "expectations": {
+          "constraints": [
+            "json"
+          ],
+          "expected_failure": "no_failure"
+        },
+        "id": "format-json",
+        "prompt": "Return the order status as json.",
+        "tags": [
+          "core",
+          "format"
+        ]
+      }
+    },
+    {
+      "case_id": "control-greeting",
+      "classification": {
+        "confidence": 0.2,
+        "explanation": "No heuristic failure signal detected under rubric: polite.",
+        "failure_type": "no_failure"
+      },
+      "error": null,
+      "execution": {
+        "adapter_id": "demo-baseline",
+        "case_seed": 938745396,
+        "classifier_id": "heuristic_v1",
+        "latency_ms": 0.0,
+        "model": "support-assistant-v1",
+        "run_seed": 7
+      },
+      "expectation": {
+        "expectation_verdict": "no_failure_as_expected",
+        "expected_failure": {
+          "failure_type": "no_failure"
+        },
+        "observed_failure": {
+          "failure_type": "no_failure"
+        }
+      },
+      "output": {
+        "text": "Hello, and thanks for reaching out to support."
+      },
+      "prompt": {
+        "expectations": {
+          "expected_failure": "no_failure",
+          "rubric": [
+            "polite"
+          ]
+        },
+        "id": "control-greeting",
+        "prompt": "Write a brief, polite greeting for a support reply.",
+        "tags": [
+          "core",
+          "control"
+        ]
+      }
+    },
+    {
+      "case_id": "control-closing",
+      "classification": {
+        "confidence": 0.2,
+        "explanation": "No heuristic failure signal detected under rubric: polite.",
+        "failure_type": "no_failure"
+      },
+      "error": null,
+      "execution": {
+        "adapter_id": "demo-baseline",
+        "case_seed": 1893882619,
+        "classifier_id": "heuristic_v1",
+        "latency_ms": 0.0,
+        "model": "support-assistant-v1",
+        "run_seed": 7
+      },
+      "expectation": {
+        "expectation_verdict": "no_failure_as_expected",
+        "expected_failure": {
+          "failure_type": "no_failure"
+        },
+        "observed_failure": {
+          "failure_type": "no_failure"
+        }
+      },
+      "output": {
+        "text": "Thanks again, and please let us know if anything else comes up."
+      },
+      "prompt": {
+        "expectations": {
+          "expected_failure": "no_failure",
+          "rubric": [
+            "polite"
+          ]
+        },
+        "id": "control-closing",
+        "prompt": "Write a brief, polite closing for a support reply.",
+        "tags": [
+          "core",
+          "control"
+        ]
+      }
+    }
+  ],
+  "classifier_id": "heuristic_v1",
+  "dataset_id": "support-regression-demo-v1",
+  "error_count": 0,
+  "run_id": "baseline",
+  "status": "completed",
+  "total_cases": 8
+}

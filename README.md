@@ -1,222 +1,259 @@
 # Model Failure Lab
 
-![Python](https://img.shields.io/badge/python-3.11-blue)
+### Catch LLM regressions before your users do.
+
+You change a prompt, swap a model, or bump a version — and quietly break answers that used to work.
+Model Failure Lab is a command-line tool that **compares two versions of your LLM/RAG system, tells
+you exactly what got worse, and turns those failures into a permanent test** so the same regression
+can't slip through again.
+
+It runs entirely on your machine — no account, no cloud, no API keys to get started — and you can see
+the whole thing work in **under two minutes, fully offline**:
+
+```bash
+pip install model-failure-lab
+bash examples/regression_demo/run.sh      # from a clone — see a real regression caught
+```
+
+[![Production CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml/badge.svg)](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml)
+[![PyPI](https://img.shields.io/pypi/v/model-failure-lab)](https://pypi.org/project/model-failure-lab/)
+![Python](https://img.shields.io/badge/python-3.11%20|%203.12-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-Model Failure Lab is a local-first evaluation and failure-analysis toolkit for LLM and RAG systems.
-It helps teams run prompt datasets, classify failures, compare model versions, and turn regressions
-into reusable test cases.
+---
 
-## What It Is
+## The workflow
 
-Model Failure Lab focuses on one production loop:
+**Run** your prompts → **Compare** two versions → if there's a **regression**, **Harvest** the broken
+cases → keep them as a **permanent regression dataset** → every future run checks against them.
 
-`failure -> report -> compare -> harvest -> promote -> rerun`
-
-The primary value is not only executing evals, but preserving deterministic artifact history so teams
-can turn regressions into durable datasets and governance decisions.
-
-## Quickstart
-
-Use Python 3.11 or newer.
-
-From a local clone:
-
-```bash
-git clone <repo-url>
-cd model-failure-lab
-make install
-make demo
+```mermaid
+flowchart TD
+    RUN[Run your prompts through a model] --> COMPARE[Compare baseline vs candidate]
+    COMPARE --> Q{Regression?}
+    Q -- no --> SHIP[Ship with confidence]
+    Q -- yes --> HARVEST[Harvest the failing cases]
+    HARVEST --> DATASET[(Permanent regression dataset)]
+    DATASET --> FUTURE[Future runs are checked against it]
+    FUTURE --> RUN
 ```
 
-Useful command shortcuts:
+Everything is plain JSON written to disk, so your evaluation history lives in git next to your code —
+diffable, reviewable, reproducible.
+
+![Comparison report in the React debugger](docs/screens/comparison-detail.png)
+
+---
+
+## See it catch a regression (offline, ~30s)
+
+The repo ships a deterministic demo: two versions of a customer-support assistant where **v2 quietly
+breaks 4 of 8 cases**. No model, key, or network needed.
+
+> The `examples/regression_demo/` walkthrough ships in the **source tree** (clone, or an unpacked
+> sdist) — run these commands from a checkout. If you only `pip install`ed, the offline single-run
+> demo is always available as `failure-lab demo`.
 
 ```bash
-make help
-make check
-make smoke
+failure-lab compare examples/regression_demo/runs/baseline examples/regression_demo/runs/candidate
 ```
 
-Equivalent direct install command:
-
-```bash
-python3 -m pip install .
-```
-
-Then run the canonical workflow manually:
-
-```bash
-failure-lab run --dataset reasoning-failures-v1 --model demo
-failure-lab report --run <run-id>
-failure-lab run --dataset reasoning-failures-v1 --model ollama:llama3.2
-failure-lab compare <baseline-run-id> <candidate-run-id>
-failure-lab harvest --comparison <comparison-id> --delta regression --out datasets/harvested/regression-pack.json
-failure-lab dataset promote datasets/harvested/regression-pack.json --dataset-id reasoning-regressions-v1
-failure-lab run --dataset reasoning-regressions-v1 --model demo
-```
-
-If your shell does not expose the console script on `PATH`, use:
-
-```bash
-python3 -m model_failure_lab demo
-```
-
-## Example Output
-
-Prompt case:
+Real output:
 
 ```text
-"What is 37 * 48?"
-```
-
-Run result:
-
-- model output: incorrect
-- failure type: reasoning_error
-- classification confidence: high
-
-Comparison summary:
-
-- regression rate: +12%
-- new failure clusters: arithmetic carry errors
-
-CLI transcript (abbreviated):
-
-```text
-$ failure-lab run --dataset reasoning-failures-v1 --model demo
-Failure Lab Run
-Dataset: reasoning-failures-v1
-Model: demo
-Status: completed
-Cases: attempted=8 classified=8 errors=0
-Failure rate: 62.5%
-Run ID: 20260427_192110_266368_reasoning_failures_v1_demo_...
-
-$ failure-lab report --run 20260427_192110_266368_reasoning_failures_v1_demo_...
-Failure Lab Report
-Status: completed
-Failure types: reasoning=62.5% (5)
-
-$ failure-lab compare <baseline-run-id> <candidate-run-id>
 Failure Lab Compare
-Status: improved
-Compatible: True
-Case changes: improvements=1
+Status: regressed
+Failure rate delta: +50.0%
+Case changes: regressions=4
+Signal verdict: regression
+Top drivers:
+- instruction_following +25.0% (regression) evidence=citation-latency, format-json
+- hallucination         +12.5% (regression) evidence=grounding-warranty
+- reasoning             +12.5% (regression) evidence=factual-apollo
 ```
 
-## Screenshots
-
-Screenshots are supported and strongly recommended for product clarity.
-
-Place assets under `docs/screens/`:
-
-- `run-summary.png`
-- `failure-inventory.png`
-- `comparison-view.png`
-- `harvest-replay-workflow.gif`
-
-When those files exist, embed them with:
-
-```markdown
-![Run summary](docs/screens/run-summary.png)
-![Failure inventory](docs/screens/failure-inventory.png)
-![Comparison view](docs/screens/comparison-view.png)
-![Harvest replay](docs/screens/harvest-replay-workflow.gif)
-```
-
-Reference wiring and naming live in `docs/product-screens.md` and `docs/screens/README.md`.
-
-## Core Workflow
-
-`failure-lab` writes artifact folders under the active root (default: current working directory):
-
-- `datasets/`
-- `runs/`
-- `reports/`
-
-Comparison outputs are persisted as report artifacts under `reports/`.
-
-Use `--root` on commands to target a specific workspace.
-
-For detailed artifact contracts and examples, see `docs/artifact-model.md`.
-
-## Model Adapters
-
-`failure-lab run --model` supports:
-
-- `demo` for deterministic local execution
-- `customer-support-failures-v1` bundled flagship support-policy pack
-- `ollama:<model>`
-- `anthropic:<model>` (after installing optional dependencies)
-- OpenAI model names (after installing optional dependencies)
-
-Optional extras:
-
-- `python3 -m pip install '.[anthropic]'`
-- `python3 -m pip install '.[openai]'`
-- `python3 -m pip install '.[dev]'`
-- `python3 -m pip install '.[legacy]'` (legacy-only surfaces)
-- `python3 -m pip install '.[ui]'` (legacy Streamlit UI)
-
-If installing from a published distribution in the future, the equivalent form is
-`model-failure-lab[anthropic]`, `model-failure-lab[openai]`, `model-failure-lab[legacy]`,
-and `model-failure-lab[ui]`.
-
-## React Debugger
-
-The React debugger reads existing artifact workspaces via:
-
-- `FAILURE_LAB_ARTIFACT_ROOT`
-
-Example:
+It pinpoints the regressions: a **hallucinated** warranty, a **dropped citation**, a **wrong fact**
+(1969 → 1971), and a **format** break (ignored the JSON instruction). Then turn those failures into a
+reusable test in one step:
 
 ```bash
-export FAILURE_LAB_ARTIFACT_ROOT=/path/to/failure-lab-workspace
-npm --prefix frontend run dev
+bash examples/regression_demo/run.sh    # compare -> harvest the 4 failing cases into a dataset
 ```
+
+Full walkthrough: [`examples/regression_demo/`](examples/regression_demo/).
+
+---
+
+## The workflow in plain English
+
+Four commands, four plain ideas:
+
+| Command | In plain English |
+|---|---|
+| **run** | Send a set of prompts through a model and record what came back, labelling each answer as a pass or a kind of failure (hallucination, wrong fact, missing citation, bad format…). |
+| **compare** | Diff two runs (e.g. old model vs new model) and report what got **worse** and what got **better**. |
+| **harvest** | Collect the cases that regressed into a small dataset file — the bugs, captured as test cases. |
+| **promote** | Save that harvested dataset as a permanent, versioned test you can re-run forever. |
+
+Beyond these four, there are **advanced** commands for teams — `index`/`query` (search across all your
+runs), `clusters` (recurring failure themes), and `regressions`/governance (turn comparisons into
+pass/fail CI gates). You can ignore them until you need them; the four above are the whole core loop.
+
+---
+
+## Install
+
+```bash
+pip install model-failure-lab
+```
+
+From a clone:
+
+```bash
+git clone https://github.com/Padraigobrien08/model-failure-lab
+cd model-failure-lab
+make install            # equivalent to: python3 -m pip install .
+```
+
+This installs the `failure-lab` command (also available as `model-failure-lab`, or
+`python3 -m model_failure_lab`). The import name in Python is `model_failure_lab`.
+
+### Optional extras
+
+| Extra | From a clone | From the published package | Adds |
+|---|---|---|---|
+| Anthropic | `python3 -m pip install '.[anthropic]'` | `model-failure-lab[anthropic]` | `--model anthropic:<model>` |
+| OpenAI | `python3 -m pip install '.[openai]'` | `model-failure-lab[openai]` | OpenAI model names |
+| Legacy (research) | `python3 -m pip install '.[legacy]'` | `model-failure-lab[legacy]` | DistilBERT/CivilComments benchmark stack (reference only) |
+| Legacy UI | `python3 -m pip install '.[ui]'` | `model-failure-lab[ui]` | Streamlit results explorer (reference only) |
+
+For development, install the dev extra: `python3 -m pip install -e '.[dev]'` (adds `pytest` + `ruff`).
+
+## Use it on your own prompts
+
+```bash
+# 0. Scaffold a starter dataset (or import prompts: --from-jsonl prompts.jsonl)
+failure-lab init --id my-prompts-v1
+
+# 1. Run it through the offline demo model
+failure-lab run --dataset my-prompts-v1 --model demo
+
+# 2. Summarize the run (add --html report.html for a shareable single-file report)
+failure-lab report --run <run-id>
+
+# 3. Run another version (a real model), then compare baseline -> candidate
+failure-lab run --dataset my-prompts-v1 --model ollama:llama3.2
+failure-lab compare <baseline-run-id> <candidate-run-id>
+```
+
+Runs and reports are written under the current directory (`runs/`, `reports/`; override with
+`--root`). Bring your own prompts as a JSON dataset — see
+[`examples/regression_demo/dataset.json`](examples/regression_demo/dataset.json) for the format and
+[`docs/artifact-model.md`](docs/artifact-model.md) for the full schema.
+
+## Models
+
+`--model` accepts:
+
+| Value | Notes |
+|---|---|
+| `demo` | Deterministic, offline — great for trying the workflow and for tests |
+| `ollama:<model>` | Local [Ollama](https://ollama.com) runtime |
+| `anthropic:<model>` | Requires `[anthropic]` extra + `ANTHROPIC_API_KEY` |
+| OpenAI model name | Requires `[openai]` extra + `OPENAI_API_KEY` |
+| `openai-compat:<model>` | Any OpenAI-compatible server (vLLM, llama.cpp, LM Studio, Together, Groq, OpenRouter…) via `--option base_url='"http://localhost:8000/v1"'`; no extra needed |
+
+Adding a backend is a small contract — see `docs/adapter-extension-guide.md`.
+
+## Gate your CI on regressions
+
+`compare --gate` exits non-zero when the candidate regresses, and `--format markdown` renders a
+PR-ready verdict table. The repo ships a composite GitHub Action that wraps both:
+
+```yaml
+- uses: Padraigobrien08/model-failure-lab@main
+  with:
+    baseline: eval/runs/baseline
+    candidate: eval/runs/candidate
+```
+
+The job fails on a regression and writes the verdict (top drivers, evidence case ids) to the job
+summary. This same gate runs in this repo's own CI against the bundled regression demo.
+
+You can also export any report or comparison as a self-contained HTML file to attach or share:
+
+```bash
+failure-lab compare <baseline> <candidate> --html regression-report.html
+```
+
+## Visual debugger
+
+The repo ships a React UI (in [`frontend/`](frontend/)) that opens your workspace's saved runs and
+comparison reports for point-and-click investigation:
+
+![Run detail in the React debugger](docs/screens/run-detail.png)
+
+```bash
+FAILURE_LAB_ARTIFACT_ROOT=/path/to/your/workspace npm --prefix frontend run dev
+```
+
+More screenshots in [`docs/screens/`](docs/screens/).
+
+## How it compares
+
+There are excellent tools in this space; they solve overlapping but different problems. This table is
+meant to be factual, not a claim of superiority — pick what fits your workflow.
+
+| Tool | Primary strength | Hosted? | Local? | Main focus |
+|---|---|---|---|---|
+| **LangSmith** | Polished UI for tracing, datasets, and evals | Yes (SaaS) | No | Observability + evaluation platform |
+| **promptfoo** | Great DX for config-driven prompt evals & red-teaming | Optional | Yes | Prompt/LLM testing & security |
+| **DeepEval** | Pytest-style assertions with many model-graded metrics | Optional | Yes | LLM unit-testing & metrics |
+| **Ragas** | Research-backed RAG metrics (faithfulness, context recall…) | No | Yes | RAG evaluation metrics |
+| **Model Failure Lab** | Git-native baseline-vs-candidate regression tracking; turns regressions into permanent datasets | No | Yes | Regression detection & failure-to-test workflow |
+
+Honest limitations: Model Failure Lab is pre-1.0, ships fewer built-in metrics than DeepEval/Ragas,
+has no hosted UI, and is Python/CLI-only. If you want a managed dashboard (LangSmith), a large metric
+library (DeepEval), deep RAG metrics (Ragas), or red-teaming (promptfoo), reach for those. Reach for
+Model Failure Lab when you want **local, git-tracked, version-to-version regression history** and a
+loop that converts failures into durable tests.
+
+## Advanced
+
+Beyond the core loop, the CLI can build a derived SQLite index over your artifacts
+(`failure-lab index rebuild`) to power cross-run `query`, recurring failure `clusters`, `history`, and
+`regressions` governance gates for CI. See `docs/architecture.md`.
 
 ## Development
 
 ```bash
-make install-dev
-make check
+make install-dev      # editable install with dev extras
+make check            # ruff + production test suite
+make test             # production test suite (legacy ML tests auto-skip without the [legacy] extra)
+make test-legacy      # legacy research tests (needs '.[legacy]' installed)
 ```
 
-## Versioning
-
-This project follows semantic versioning before `v1.0` in the practical sense:
-
-- patch: bug fixes and docs
-- minor: CLI-compatible feature additions
-- breaking: CLI or artifact schema changes
-
-## Legacy Surfaces
-
-Legacy surfaces are retained for reference only and are not part of the supported production
-workflow.
-
-See:
-
-- `docs/legacy.md`
-- `docs/ui_parity.md`
-- `docs/v1_4_closeout.md`
+The production CLI is dependency-isolated from the optional research/ML stack: running
+`run`/`report`/`compare` never imports `torch`, `pandas`, `numpy`, etc. (enforced by
+`tests/unit/test_production_cli_isolation.py`).
 
 ## Documentation
 
-Detailed docs moved out of this README:
+| Doc | Topic |
+|---|---|
+| `examples/regression_demo/` | The offline regression walkthrough |
+| `docs/architecture.md` | Modules, control flow, design patterns |
+| `docs/setup.md` | Setup, environment variables, common issues |
+| `docs/api.md` | CLI surface and internal interfaces |
+| `docs/artifact-model.md` | Artifact schemas and examples |
+| `docs/adapter-extension-guide.md` | Add a model adapter |
 
-- Harvest replay: `docs/harvest-replay.md`
-- Legacy surfaces: `docs/legacy.md`
-- Fixture workspace: `docs/fixture-workspace.md`
-- Artifact schema/model: `docs/artifact-model.md`
-- Adapter extension guide: `docs/adapter-extension-guide.md`
-- Architecture overview: `docs/architecture.md`
-- CI governance and waivers: `docs/ci-governance.md`
-- Contributor code map: `docs/code-map.md`
-- 5-minute operator quickstart: `docs/getting-started-operator.md`
-- Release and PyPI guide: `docs/release-and-pypi.md`
-- Future ideas and backlog: `docs/future-ideas.md`
+## Project status
+
+Pre-1.0 (`0.9.0`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
+= CLI or artifact-schema changes. The DistilBERT/CivilComments benchmark stack under `[legacy]` is
+retained for reference and is not part of the supported workflow (`docs/legacy.md`).
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE`.
+MIT — see `LICENSE`.

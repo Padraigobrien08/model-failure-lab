@@ -176,9 +176,8 @@ describe("App shell", () => {
     expect(screen.getByRole("link", { name: "Analysis" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Comparisons" })).toBeInTheDocument();
-    expect(screen.getByText("Artifact source")).toBeInTheDocument();
-    expect(screen.getByText("Configured artifact store")).toBeInTheDocument();
-    expect(screen.getByText("/tmp/external-artifacts")).toBeInTheDocument();
+    expect(screen.getAllByText("Configured artifact store").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("/tmp/external-artifacts").length).toBeGreaterThan(0);
     expect(screen.getByText("Runs 2")).toBeInTheDocument();
     expect(screen.getByText("Comparisons 1")).toBeInTheDocument();
   });

@@ -1,0 +1,97 @@
+name: Production (OSS)
+
+# Production OSS path: installs only the supported runtime + dev tools (no [legacy]
+# ML stack). This is the workflow intended to gate the run -> report -> compare
+# package. The legacy/full benchmark suite lives in `ci.yml` and is not required
+# for the production path.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  production:
+    name: production (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install production package (dev extra only, no legacy)
+        run: python -m pip install -e .[dev]
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest -q
+
+      - name: Import smoke
+        # The importable package is `model_failure_lab` (the `failure-lab` console
+        # script maps to it). There is no top-level `failure_lab` module.
+        run: python -c "import model_failure_lab"
+
+  regression-gate-action:
+    name: regression gate action (dogfood)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gate passes on a non-regressing candidate
+        uses: ./
+        with:
+          package: "."
+          baseline: examples/regression_demo/runs/baseline
+          candidate: examples/regression_demo/runs/baseline
+          root: ${{ runner.temp }}/gate-pass
+
+      - name: Gate detects the demo regression (report-only)
+        id: regression
+        uses: ./
+        with:
+          package: "."
+          baseline: examples/regression_demo/runs/baseline
+          candidate: examples/regression_demo/runs/candidate
+          root: ${{ runner.temp }}/gate-fail
+          gate: "false"
+
+      - name: Assert the regression was detected
+        run: test "${{ steps.regression.outputs.verdict }}" = "regression"
+
+  frontend:
+    name: frontend (typecheck + vitest + build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefix frontend
+
+      - name: Test
+        run: npm run --prefix frontend test:run
+
+      - name: Typecheck + build
+        run: npm run --prefix frontend build

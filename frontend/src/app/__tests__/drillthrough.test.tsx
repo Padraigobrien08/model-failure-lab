@@ -1,32 +1,14 @@
-import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
 
 import { App } from "@/app/App";
-import {
-  buildFinalRobustnessBundleFixture,
-  buildManifestFixture,
-} from "@/test/fixtures";
 
 describe("run drillthrough handoff", () => {
-  it("opens the drawer from failure explorer and hands the selected run into the Runs route", async () => {
-    const user = userEvent.setup();
+  it("redirects the removed failure-explorer drillthrough entry to the runs workspace", () => {
+    render(<App useMemoryRouter initialEntries={["/failure-explorer"]} />);
 
-    render(
-      <App
-        useMemoryRouter
-        initialEntries={["/failure-explorer"]}
-        initialIndex={buildManifestFixture()}
-        initialFinalRobustnessBundle={buildFinalRobustnessBundleFixture()}
-      />,
-    );
-
-    await user.click(screen.getAllByRole("button", { name: /Inspect Reweighting evidence/i })[0]);
-    await user.click(screen.getByRole("link", { name: /Open Run Lineage/i }));
-
+    expect(screen.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
     expect(
-      screen.getByRole("heading", { name: /Grouped runs by method lane, then by seed/i }),
+      screen.getByRole("heading", { name: "Start from saved runs, not abstract reports." }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Focused run: reweighting_seed_13/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Pin in inspector/i })).toBeInTheDocument();
   });
 });

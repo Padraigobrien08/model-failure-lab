@@ -18,4 +18,7 @@ Unacceptable behavior:
 
 ## Enforcement
 
+Report unacceptable behavior to the maintainer at **padraigobrien00@gmail.com**.
+Reports will be reviewed and handled confidentially.
+
 Maintainers may remove content, issue warnings, or ban participants for violations.

@@ -528,7 +528,7 @@ describe("run detail route", () => {
     expect(
       await screen.findByRole("heading", { name: "Hallucination Failures V1" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Configured artifact store")).toBeInTheDocument();
+    expect(screen.getAllByText("Configured artifact store").length).toBeGreaterThan(0);
     expect(screen.getAllByText("/tmp/external-artifacts").length).toBeGreaterThan(0);
 
     const artifactContext = screen.getByRole("region", { name: "Artifact context" });

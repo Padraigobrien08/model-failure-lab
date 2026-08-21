@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 PYTHON ?= python3
 
-.PHONY: help install install-dev install-ci lint test test-fast check demo datasets-list run report compare smoke build verify-dist publish clean
+.PHONY: help install install-dev install-ci lint test test-fast test-legacy check demo datasets-list run report compare smoke build verify-dist publish clean
 
 help: ## Show available developer commands
 	@echo "Model Failure Lab Make targets"
@@ -21,11 +21,15 @@ install-ci: ## Install dependencies used in CI
 lint: ## Run Ruff lint checks
 	$(PYTHON) -m ruff check src tests
 
-test: ## Run full test suite
+test: ## Run the production test suite (legacy ML tests auto-skip if their deps are absent)
 	$(PYTHON) -m pytest -q
 
 test-fast: ## Run smoke + governance-focused tests
 	$(PYTHON) -m pytest -q tests/unit/test_cli_production_smoke.py tests/unit/test_cli_governance.py
+
+test-legacy: ## Run the legacy ML tests (requires the [legacy] extra installed)
+	$(PYTHON) -m pytest -q -m legacy tests
+	@echo "Note: legacy *module-level* tests require torch/pandas/numpy/scikit-learn; install with 'pip install -e .[dev,legacy]'."
 
 check: lint test ## Run lint + tests
 

@@ -1,0 +1,64 @@
+name: "Model Failure Lab regression gate"
+description: >-
+  Compare a baseline and candidate Failure Lab run and fail the job when the
+  candidate regresses. Writes a markdown verdict to the job summary.
+branding:
+  icon: "alert-triangle"
+  color: "red"
+
+inputs:
+  baseline:
+    description: "Baseline run directory (or canonical run ID under `root`)."
+    required: true
+  candidate:
+    description: "Candidate run directory (or canonical run ID under `root`)."
+    required: true
+  root:
+    description: "Artifact root the comparison artifacts are written under."
+    required: false
+    default: "."
+  package:
+    description: >-
+      pip requirement to install, e.g. `model-failure-lab==0.9.0`. Use `.` to
+      install from the checked-out repository instead of PyPI.
+    required: false
+    default: "model-failure-lab"
+  gate:
+    description: "Fail the job on regression (set to `false` to only report)."
+    required: false
+    default: "true"
+
+outputs:
+  verdict:
+    description: "Signal verdict: regression, improvement, or stable."
+    value: ${{ steps.compare.outputs.verdict }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Model Failure Lab
+      shell: bash
+      run: python -m pip install --quiet "${{ inputs.package }}"
+
+    - name: Compare baseline vs candidate
+      id: compare
+      shell: bash
+      run: |
+        set +e
+        GATE_FLAG=""
+        if [ "${{ inputs.gate }}" = "true" ]; then
+          GATE_FLAG="--gate"
+        fi
+        failure-lab compare "${{ inputs.baseline }}" "${{ inputs.candidate }}" \
+          $GATE_FLAG --format markdown --root "${{ inputs.root }}" > compare.md
+        STATUS=$?
+        cat compare.md
+        cat compare.md >> "$GITHUB_STEP_SUMMARY"
+        if grep -q "regression" compare.md; then
+          echo "verdict=regression" >> "$GITHUB_OUTPUT"
+        elif grep -q "improvement" compare.md; then
+          echo "verdict=improvement" >> "$GITHUB_OUTPUT"
+        else
+          echo "verdict=stable" >> "$GITHUB_OUTPUT"
+        fi
+        exit $STATUS

@@ -1,0 +1,81 @@
+{
+  "dataset_id": "support-regression-demo-v1",
+  "name": "Support Assistant Regression Demo",
+  "description": "Tiny offline dataset that demonstrates a model regression between two versions of a customer-support assistant. Used by examples/regression_demo.",
+  "version": "1",
+  "metadata": { "default_scope": "core" },
+  "cases": [
+    {
+      "id": "grounding-warranty",
+      "prompt": "Using the policy snippet, how long is the standard warranty?",
+      "tags": ["core", "rag"],
+      "expectations": {
+        "expected_failure": "no_failure",
+        "context": { "evidence_items": ["the standard warranty lasts 24 months"] }
+      }
+    },
+    {
+      "id": "grounding-refund",
+      "prompt": "Using the policy snippet, how long do refunds take?",
+      "tags": ["core", "rag"],
+      "expectations": {
+        "expected_failure": "no_failure",
+        "context": { "evidence_items": ["refunds are issued within 14 days"] }
+      }
+    },
+    {
+      "id": "citation-latency",
+      "prompt": "Summarize the latency finding and cite the source.",
+      "tags": ["core", "citation"],
+      "expectations": {
+        "expected_failure": "no_failure",
+        "context": { "required_sources": ["Smith 2021"] }
+      }
+    },
+    {
+      "id": "citation-uptime",
+      "prompt": "Summarize the uptime finding and cite the source.",
+      "tags": ["core", "citation"],
+      "expectations": {
+        "expected_failure": "no_failure",
+        "context": { "required_sources": ["Lee 2020"] }
+      }
+    },
+    {
+      "id": "factual-apollo",
+      "prompt": "What year did Apollo 11 land on the Moon?",
+      "tags": ["core", "factual"],
+      "expectations": {
+        "expected_failure": "no_failure",
+        "reference_answer": "1969"
+      }
+    },
+    {
+      "id": "format-json",
+      "prompt": "Return the order status as json.",
+      "tags": ["core", "format"],
+      "expectations": {
+        "expected_failure": "no_failure",
+        "constraints": ["json"]
+      }
+    },
+    {
+      "id": "control-greeting",
+      "prompt": "Write a brief, polite greeting for a support reply.",
+      "tags": ["core", "control"],
+      "expectations": {
+        "expected_failure": "no_failure",
+        "rubric": ["polite"]
+      }
+    },
+    {
+      "id": "control-closing",
+      "prompt": "Write a brief, polite closing for a support reply.",
+      "tags": ["core", "control"],
+      "expectations": {
+        "expected_failure": "no_failure",
+        "rubric": ["polite"]
+      }
+    }
+  ]
+}

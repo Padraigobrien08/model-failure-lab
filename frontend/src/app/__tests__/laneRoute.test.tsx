@@ -36,23 +36,12 @@ describe("Lane route model", () => {
     ]);
   });
 
-  it("renders a real table-first lane route for robustness", () => {
+  it("redirects the removed lane routes to the runs workspace", () => {
     render(<App useMemoryRouter initialEntries={["/lane/robustness"]} />);
 
-    expect(screen.getByRole("heading", { name: "Robustness" })).toBeInTheDocument();
-    expect(screen.getByText("What is happening in this lane?")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Worst-group" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "OOD" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
-    expect(screen.queryByText("Why is this lane in focus?")).not.toBeInTheDocument();
-  });
-
-  it("switches the visible columns for the calibration lane", () => {
-    render(<App useMemoryRouter initialEntries={["/lane/calibration"]} />);
-
-    expect(screen.getByRole("heading", { name: "Calibration" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "ECE" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Brier" })).toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Worst-group" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.getByRole("heading", { name: "Start from saved runs, not abstract reports." }),
+    ).toBeInTheDocument();
   });
 });

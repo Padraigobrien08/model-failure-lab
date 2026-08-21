@@ -1,10 +1,16 @@
-# Screens Asset Placeholders
+# Screens
 
-Expected files:
+Screenshots of the React debugger (`frontend/`), captured against a real
+`failure-lab` workspace (the bundled regression demo plus a `demo` model run).
 
-- `run-summary.png`
-- `failure-inventory.png`
-- `comparison-view.png`
-- `harvest-replay-workflow.gif`
+- `comparison-detail.png` — baseline-vs-candidate comparison report: verdict,
+  failure-rate delta, governance recommendation, and matched dataset family.
+- `run-detail.png` — a saved run opened in the run debugger: failure rate,
+  coverage, and the staged investigation flow.
+- `runs-inventory.png` — the saved-runs inventory the UI opens on.
 
-Capture these from the React debugger and commit them to make the product surface tangible.
+To recapture: point the UI at a workspace and take 1440px-wide screenshots.
+
+```bash
+FAILURE_LAB_ARTIFACT_ROOT=/path/to/workspace npm --prefix frontend run dev
+```

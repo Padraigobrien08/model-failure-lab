@@ -1,4 +1,10 @@
-name: CI
+name: Legacy / Full Suite
+
+# Full benchmark suite: installs the optional [legacy] ML stack
+# (torch/pandas/numpy/scikit-learn/...) and runs every test plus the CLI smoke
+# flow. This covers the legacy DistilBERT/CivilComments research surfaces and is
+# NOT required for the production OSS path. The production gate lives in
+# `production.yml` (Python 3.11/3.12, dev-only install, no legacy deps).
 
 on:
   push:

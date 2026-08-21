@@ -4,20 +4,28 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "model-failure-lab"
-version = "0.1.0"
+version = "0.9.0"
 description = "Local-first evaluation and failure-analysis toolkit for LLM and RAG systems."
 readme = "README.md"
 requires-python = ">=3.11"
+# MIT is published as a PEP 639 SPDX expression -> METADATA "License-Expression: MIT",
+# which PyPI displays. A "License :: OSI Approved :: MIT License" classifier is
+# intentionally NOT added: setuptools >= 77 rejects a license classifier alongside a
+# license expression (PEP 639), which breaks `python -m build`.
 license = "MIT"
 authors = [
-  { name = "Model Failure Lab contributors" },
+  { name = "Padraig O'Brien" },
+]
+maintainers = [
+  { name = "Padraig O'Brien", email = "padraigobrien00@gmail.com" },
 ]
 keywords = ["llm", "rag", "evaluation", "regression-testing", "prompt-testing"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Software Development :: Testing",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -66,10 +74,32 @@ model_failure_lab = ["datasets/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+# The legacy research surfaces (see docs/legacy.md) are kept in the source tree for
+# reference but excluded from wheels: `pip install model-failure-lab` ships only the
+# supported run -> report -> compare -> harvest workflow.
+exclude = [
+  "model_failure_lab.models",
+  "model_failure_lab.models.*",
+  "model_failure_lab.results_ui",
+  "model_failure_lab.results_ui.*",
+  "model_failure_lab.mitigations",
+  "model_failure_lab.mitigations.*",
+  "model_failure_lab.perturbations",
+  "model_failure_lab.perturbations.*",
+  "model_failure_lab.evaluation",
+  "model_failure_lab.evaluation.*",
+  "model_failure_lab.data",
+  "model_failure_lab.data.*",
+  "model_failure_lab.runners",
+  "model_failure_lab.runners.*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "legacy: test depends on the optional [legacy] ML stack (torch/pandas/numpy/scikit-learn); auto-skipped when it is unavailable.",
+]
 
 [tool.ruff]
 line-length = 100

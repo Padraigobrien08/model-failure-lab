@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import argparse
 import filecmp
-import shutil
 import json
+import shutil
 from pathlib import Path
 from typing import Sequence
 

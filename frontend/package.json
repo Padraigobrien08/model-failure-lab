@@ -8,7 +8,8 @@
     "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build --config vite.config.ts",
     "preview": "vite preview --config vite.config.ts",
     "test": "vitest",
-    "smoke:real-artifacts": "node scripts/smoke-real-artifacts.mjs"
+    "smoke:real-artifacts": "node scripts/smoke-real-artifacts.mjs",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
