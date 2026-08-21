@@ -132,14 +132,17 @@ For development, install the dev extra: `python3 -m pip install -e '.[dev]'` (ad
 ## Use it on your own prompts
 
 ```bash
-# 1. Run a bundled dataset through the offline demo model
-failure-lab run --dataset reasoning-failures-v1 --model demo
+# 0. Scaffold a starter dataset (or import prompts: --from-jsonl prompts.jsonl)
+failure-lab init --id my-prompts-v1
 
-# 2. Summarize the run
+# 1. Run it through the offline demo model
+failure-lab run --dataset my-prompts-v1 --model demo
+
+# 2. Summarize the run (add --html report.html for a shareable single-file report)
 failure-lab report --run <run-id>
 
 # 3. Run another version (a real model), then compare baseline -> candidate
-failure-lab run --dataset reasoning-failures-v1 --model ollama:llama3.2
+failure-lab run --dataset my-prompts-v1 --model ollama:llama3.2
 failure-lab compare <baseline-run-id> <candidate-run-id>
 ```
 
@@ -158,8 +161,30 @@ Runs and reports are written under the current directory (`runs/`, `reports/`; o
 | `ollama:<model>` | Local [Ollama](https://ollama.com) runtime |
 | `anthropic:<model>` | Requires `[anthropic]` extra + `ANTHROPIC_API_KEY` |
 | OpenAI model name | Requires `[openai]` extra + `OPENAI_API_KEY` |
+| `openai-compat:<model>` | Any OpenAI-compatible server (vLLM, llama.cpp, LM Studio, Together, Groq, OpenRouter…) via `--option base_url='"http://localhost:8000/v1"'`; no extra needed |
 
 Adding a backend is a small contract — see `docs/adapter-extension-guide.md`.
+
+## Gate your CI on regressions
+
+`compare --gate` exits non-zero when the candidate regresses, and `--format markdown` renders a
+PR-ready verdict table. The repo ships a composite GitHub Action that wraps both:
+
+```yaml
+- uses: Padraigobrien08/model-failure-lab@main
+  with:
+    baseline: eval/runs/baseline
+    candidate: eval/runs/candidate
+```
+
+The job fails on a regression and writes the verdict (top drivers, evidence case ids) to the job
+summary. This same gate runs in this repo's own CI against the bundled regression demo.
+
+You can also export any report or comparison as a self-contained HTML file to attach or share:
+
+```bash
+failure-lab compare <baseline> <candidate> --html regression-report.html
+```
 
 ## Visual debugger
 
