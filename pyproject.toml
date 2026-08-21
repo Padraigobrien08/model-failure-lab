@@ -78,13 +78,20 @@ where = ["src"]
 # reference but excluded from wheels: `pip install model-failure-lab` ships only the
 # supported run -> report -> compare -> harvest workflow.
 exclude = [
-  "model_failure_lab.models*",
-  "model_failure_lab.results_ui*",
-  "model_failure_lab.mitigations*",
-  "model_failure_lab.perturbations*",
-  "model_failure_lab.evaluation*",
-  "model_failure_lab.data*",
-  "model_failure_lab.runners*",
+  "model_failure_lab.models",
+  "model_failure_lab.models.*",
+  "model_failure_lab.results_ui",
+  "model_failure_lab.results_ui.*",
+  "model_failure_lab.mitigations",
+  "model_failure_lab.mitigations.*",
+  "model_failure_lab.perturbations",
+  "model_failure_lab.perturbations.*",
+  "model_failure_lab.evaluation",
+  "model_failure_lab.evaluation.*",
+  "model_failure_lab.data",
+  "model_failure_lab.data.*",
+  "model_failure_lab.runners",
+  "model_failure_lab.runners.*",
 ]
 
 [tool.pytest.ini_options]
