@@ -249,6 +249,12 @@ def build_parser() -> argparse.ArgumentParser:
             "directory."
         ),
     )
+    report_parser.add_argument(
+        "--html",
+        type=Path,
+        dest="html_path",
+        help="Additionally write a self-contained HTML report to this path.",
+    )
     report_parser.set_defaults(handler=_handle_report)
 
     compare_parser = subparsers.add_parser(
@@ -309,6 +315,12 @@ def build_parser() -> argparse.ArgumentParser:
             "Output format. `markdown` emits a PR-comment-ready summary table "
             "(combine with `--gate` in CI)."
         ),
+    )
+    compare_parser.add_argument(
+        "--html",
+        type=Path,
+        dest="html_path",
+        help="Additionally write a self-contained HTML comparison report to this path.",
     )
     _add_analysis_arguments(compare_parser, verb="explain")
     compare_parser.set_defaults(handler=_handle_compare)
@@ -1342,15 +1354,42 @@ def _handle_report(args: argparse.Namespace) -> int:
         built.details,
         root=root,
     )
-    print(
-        _render_report_summary(
-            saved_run,
-            built.report,
-            built.details,
-            report_path,
-            details_path,
-        )
+    summary = _render_report_summary(
+        saved_run,
+        built.report,
+        built.details,
+        report_path,
+        details_path,
     )
+    if args.html_path is not None:
+        from model_failure_lab.reporting.html import render_run_report_html
+        from model_failure_lab.runner.contracts import NO_FAILURE_TYPE
+
+        cases = []
+        for case in saved_run.case_results:
+            if case.error is not None:
+                status = "error"
+                failure_type = "n/a"
+            elif case.classification is None:
+                status = "unclassified"
+                failure_type = "n/a"
+            elif case.classification.failure_type == NO_FAILURE_TYPE:
+                status = "pass"
+                failure_type = case.classification.failure_type
+            else:
+                status = "fail"
+                failure_type = case.classification.failure_type
+            cases.append(
+                {"case_id": case.case_id, "failure_type": failure_type, "status": status}
+            )
+        html_path = args.html_path.expanduser()
+        html_path.parent.mkdir(parents=True, exist_ok=True)
+        html_path.write_text(
+            render_run_report_html(report=built.report, details=built.details, cases=cases),
+            encoding="utf-8",
+        )
+        summary = f"{summary}\nHTML report: {html_path}"
+    print(summary)
     return 0
 
 
@@ -1374,6 +1413,19 @@ def _handle_compare(args: argparse.Namespace) -> int:
         root=root,
     )
     compare_summary = _render_compare_summary(built.report, built.details, report_path, details_path)
+
+    html_line: str | None = None
+    if args.html_path is not None:
+        from model_failure_lab.reporting.html import render_comparison_html
+
+        html_path = args.html_path.expanduser()
+        html_path.parent.mkdir(parents=True, exist_ok=True)
+        html_path.write_text(
+            render_comparison_html(report=built.report, details=built.details),
+            encoding="utf-8",
+        )
+        html_line = f"HTML report: {html_path}"
+
     if args.score:
         print(
             _render_json_payload(
@@ -1387,6 +1439,8 @@ def _handle_compare(args: argparse.Namespace) -> int:
                 }
             )
         )
+        if html_line is not None:
+            print(html_line)
         return 0
 
     if args.alert:
@@ -1397,6 +1451,8 @@ def _handle_compare(args: argparse.Namespace) -> int:
         )
         if alert_output is not None:
             print(alert_output)
+        if html_line is not None:
+            print(html_line)
         return 0
 
     gate_exit_code = 0
@@ -1407,9 +1463,13 @@ def _handle_compare(args: argparse.Namespace) -> int:
     if args.output_format == "markdown":
         markdown = _render_compare_markdown(built.report, built.details, gate_line=gate_line)
         print(markdown)
+        if html_line is not None:
+            print(html_line)
         return gate_exit_code
 
     output_sections = [compare_summary]
+    if html_line is not None:
+        output_sections[0] = f"{compare_summary}\n{html_line}"
     if args.summary:
         output_sections.append(_render_signal_summary(built.report, built.details))
     if gate_line is not None:
