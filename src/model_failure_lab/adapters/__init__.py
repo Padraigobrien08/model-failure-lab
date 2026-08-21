@@ -12,6 +12,7 @@ from .contracts import (
 from .demo import DemoAdapter
 from .ollama_adapter import OllamaAdapter
 from .openai_adapter import OpenAIAdapter
+from .openai_compat_adapter import OpenAICompatAdapter
 from .registry import (
     UnknownModelAdapterError,
     available_models,
@@ -30,6 +31,7 @@ __all__ = [
     "DemoAdapter",
     "OllamaAdapter",
     "OpenAIAdapter",
+    "OpenAICompatAdapter",
     "UnknownModelAdapterError",
     "available_models",
     "register_model",
