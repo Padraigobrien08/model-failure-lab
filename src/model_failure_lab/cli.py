@@ -292,6 +292,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SIGNAL_ALERT_THRESHOLD,
         help="Minimum severity score needed before `--alert` emits output (default: 0.05).",
     )
+    compare_parser.add_argument(
+        "--gate",
+        action="store_true",
+        help=(
+            "CI gate mode: exit 1 when the comparison signal verdict is a regression "
+            "(or the runs are incompatible), exit 0 otherwise."
+        ),
+    )
+    compare_parser.add_argument(
+        "--format",
+        choices=["text", "markdown"],
+        default="text",
+        dest="output_format",
+        help=(
+            "Output format. `markdown` emits a PR-comment-ready summary table "
+            "(combine with `--gate` in CI)."
+        ),
+    )
     _add_analysis_arguments(compare_parser, verb="explain")
     compare_parser.set_defaults(handler=_handle_compare)
 
@@ -1341,6 +1359,10 @@ def _handle_compare(args: argparse.Namespace) -> int:
         raise ValueError("`--score` cannot be combined with `--summary`, `--alert`, or `--explain`")
     if args.alert and (args.summary or args.explain):
         raise ValueError("`--alert` cannot be combined with `--summary` or `--explain`")
+    if args.output_format == "markdown" and (args.score or args.alert or args.explain):
+        raise ValueError(
+            "`--format markdown` cannot be combined with `--score`, `--alert`, or `--explain`"
+        )
 
     root = _normalized_root(args.root)
     baseline = _load_saved_run_reference(args.baseline, root=root)
@@ -1377,12 +1399,24 @@ def _handle_compare(args: argparse.Namespace) -> int:
             print(alert_output)
         return 0
 
+    gate_exit_code = 0
+    gate_line: str | None = None
+    if args.gate:
+        gate_exit_code, gate_line = _evaluate_compare_gate(built.report, built.details)
+
+    if args.output_format == "markdown":
+        markdown = _render_compare_markdown(built.report, built.details, gate_line=gate_line)
+        print(markdown)
+        return gate_exit_code
+
     output_sections = [compare_summary]
     if args.summary:
         output_sections.append(_render_signal_summary(built.report, built.details))
+    if gate_line is not None:
+        output_sections.append(gate_line)
     if not args.explain:
         print("\n\n".join(output_sections))
-        return 0
+        return gate_exit_code
 
     rebuild_query_index(root=root)
     analysis_adapter_id, analysis_model_name, analysis_options = _resolve_analysis_request(args)
@@ -1397,7 +1431,7 @@ def _handle_compare(args: argparse.Namespace) -> int:
     )
     output_sections.append(_render_insight_report(insight_report))
     print("\n\n".join(output_sections))
-    return 0
+    return gate_exit_code
 
 
 def _handle_demo(args: argparse.Namespace) -> int:
@@ -4016,6 +4050,71 @@ def _render_compare_summary(
     )
     if comparison.get("compatible") is False:
         lines.append("Warning: comparison is incompatible, but artifacts were still written.")
+    return "\n".join(lines)
+
+
+def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str]:
+    """Deterministic CI gate contract: exit 1 on regression or incompatible runs."""
+    signal = _comparison_signal_payload(report, details)
+    verdict = signal.get("verdict", "unknown")
+    if report.comparison.get("compatible") is False:
+        return 1, "Gate: FAIL (runs are not comparable)"
+    if verdict == "regression":
+        return 1, f"Gate: FAIL (signal verdict: {verdict})"
+    return 0, f"Gate: PASS (signal verdict: {verdict})"
+
+
+def _render_compare_markdown(report, details: dict[str, object], *, gate_line: str | None) -> str:
+    comparison = report.comparison
+    signal = _comparison_signal_payload(report, details)
+    delta = report.metrics.get("delta", {})
+    verdict = signal.get("verdict", "unknown")
+    icon = {"regression": "🔴", "improvement": "🟢", "stable": "⚪"}.get(str(verdict), "⚪")
+    lines = [
+        "## Failure Lab Compare",
+        "",
+        f"**Verdict: {icon} {verdict}** — `{comparison.get('baseline_run_id', 'unknown')}` → "
+        f"`{comparison.get('candidate_run_id', 'unknown')}`",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| Status | {report.status.get('overall', 'unknown')} |",
+        f"| Failure rate delta | {_format_signed_rate(delta.get('failure_rate'))} |",
+        f"| Regression score | {_format_rate(signal.get('regression_score'))} |",
+        f"| Improvement score | {_format_rate(signal.get('improvement_score'))} |",
+        f"| Severity | {_format_rate(signal.get('severity'))} |",
+        f"| Report ID | `{report.report_id}` |",
+    ]
+    drivers = signal.get("top_drivers")
+    if isinstance(drivers, list) and drivers:
+        lines.extend(
+            [
+                "",
+                "### Top drivers",
+                "",
+                "| Failure type | Delta | Direction | Evidence |",
+                "|---|---|---|---|",
+            ]
+        )
+        for driver in drivers:
+            if not isinstance(driver, dict):
+                continue
+            evidence = driver.get("case_ids")
+            evidence_text = (
+                ", ".join(f"`{case_id}`" for case_id in evidence[:3])
+                if isinstance(evidence, list) and evidence
+                else "—"
+            )
+            lines.append(
+                f"| {driver.get('failure_type', 'unknown')} "
+                f"| {_format_signed_rate(driver.get('delta'))} "
+                f"| {driver.get('direction', 'unknown')} "
+                f"| {evidence_text} |"
+            )
+    if comparison.get("compatible") is False:
+        lines.extend(["", "> ⚠️ The two runs are not comparable (different datasets or contracts)."])
+    if gate_line is not None:
+        lines.extend(["", f"**{gate_line}**"])
     return "\n".join(lines)
 
 

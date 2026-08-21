@@ -40,6 +40,39 @@ jobs:
         # script maps to it). There is no top-level `failure_lab` module.
         run: python -c "import model_failure_lab"
 
+  regression-gate-action:
+    name: regression gate action (dogfood)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gate passes on a non-regressing candidate
+        uses: ./
+        with:
+          package: "."
+          baseline: examples/regression_demo/runs/baseline
+          candidate: examples/regression_demo/runs/baseline
+          root: ${{ runner.temp }}/gate-pass
+
+      - name: Gate detects the demo regression (report-only)
+        id: regression
+        uses: ./
+        with:
+          package: "."
+          baseline: examples/regression_demo/runs/baseline
+          candidate: examples/regression_demo/runs/candidate
+          root: ${{ runner.temp }}/gate-fail
+          gate: "false"
+
+      - name: Assert the regression was detected
+        run: test "${{ steps.regression.outputs.verdict }}" = "regression"
+
   frontend:
     name: frontend (typecheck + vitest + build)
     runs-on: ubuntu-latest
