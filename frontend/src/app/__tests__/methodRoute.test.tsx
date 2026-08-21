@@ -37,13 +37,12 @@ describe("Method route model", () => {
     expect(model.defaultRunEntityId).toBe("run_distilbert_temperature_scaling_seed_13");
   });
 
-  it("renders a real method route instead of placeholder content", () => {
+  it("redirects the removed method route to the runs workspace", () => {
     render(<App useMemoryRouter initialEntries={["/lane/robustness/reweighting"]} />);
 
-    expect(screen.getByRole("heading", { name: "Reweighting" })).toBeInTheDocument();
-    expect(screen.getByText("Why is this method judged this way?")).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "Reweighting runs" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Run ID" })).toBeInTheDocument();
-    expect(screen.queryByText("Current params")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.getByRole("heading", { name: "Start from saved runs, not abstract reports." }),
+    ).toBeInTheDocument();
   });
 });

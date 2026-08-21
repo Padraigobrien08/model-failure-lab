@@ -34,3 +34,4 @@ screenshots/
 # local agent instructions
 CLAUDE.md
 .codex/
+.claude/
