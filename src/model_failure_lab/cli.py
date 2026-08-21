@@ -339,6 +339,44 @@ def build_parser() -> argparse.ArgumentParser:
     )
     demo_parser.set_defaults(handler=_handle_demo)
 
+    init_parser = subparsers.add_parser(
+        "init",
+        help="Scaffold a starter prompt dataset in the active workspace.",
+    )
+    init_parser.add_argument(
+        "--id",
+        default="my-prompts-v1",
+        dest="dataset_id",
+        help="Dataset ID for the scaffolded pack (default: my-prompts-v1).",
+    )
+    init_parser.add_argument(
+        "--name",
+        help="Human-readable dataset name (defaults to the dataset ID).",
+    )
+    init_parser.add_argument(
+        "--from-jsonl",
+        type=Path,
+        dest="from_jsonl",
+        help=(
+            "Build the dataset from a JSONL file instead of the starter template. Each line is "
+            'an object with a required "prompt" and optional "id", "tags", "reference_answer".'
+        ),
+    )
+    init_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite the dataset file if it already exists.",
+    )
+    init_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    init_parser.set_defaults(handler=_handle_init)
+
     datasets_parser = subparsers.add_parser(
         "datasets",
         help="Inspect bundled datasets available by canonical ID.",
@@ -1524,6 +1562,118 @@ def _handle_demo(args: argparse.Namespace) -> int:
             report_id=built.report.report_id,
         )
     )
+    return 0
+
+
+_INIT_TEMPLATE_CASES: list[dict[str, object]] = [
+    {
+        "id": "example-factual",
+        "prompt": "What year did the first human land on the Moon?",
+        "tags": ["core", "factual"],
+        "expectations": {
+            "expected_failure": "no_failure",
+            "reference_answer": "1969",
+        },
+    },
+    {
+        "id": "example-grounding",
+        "prompt": "Using the provided policy snippet, how long is the standard warranty?",
+        "tags": ["core", "rag"],
+        "expectations": {
+            "expected_failure": "no_failure",
+            "context": {"evidence_items": ["the standard warranty lasts 24 months"]},
+        },
+    },
+    {
+        "id": "example-format",
+        "prompt": "List three primary colors as a JSON array of strings.",
+        "tags": ["core", "format"],
+        "expectations": {
+            "expected_failure": "no_failure",
+            "constraints": ["respond with valid JSON"],
+        },
+    },
+]
+
+
+def _init_cases_from_jsonl(path: Path) -> list[dict[str, object]]:
+    if not path.exists():
+        raise FileNotFoundError(f"JSONL file not found: {path}")
+    cases: list[dict[str, object]] = []
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path}:{line_number} is not valid JSON: {exc}") from exc
+        if not isinstance(entry, dict):
+            raise ValueError(f"{path}:{line_number} must be a JSON object")
+        prompt = entry.get("prompt")
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError(f'{path}:{line_number} requires a non-empty "prompt" string')
+        case: dict[str, object] = {
+            "id": entry.get("id") or f"case-{len(cases) + 1:04d}",
+            "prompt": prompt,
+            "tags": entry.get("tags") or ["core"],
+        }
+        reference_answer = entry.get("reference_answer")
+        if isinstance(reference_answer, str) and reference_answer.strip():
+            case["expectations"] = {
+                "expected_failure": "no_failure",
+                "reference_answer": reference_answer,
+            }
+        cases.append(case)
+    if not cases:
+        raise ValueError(f"{path} contains no prompt cases")
+    return cases
+
+
+def _handle_init(args: argparse.Namespace) -> int:
+    from model_failure_lab.datasets import FailureDataset
+
+    root = _normalized_root(args.root)
+    if args.from_jsonl is not None:
+        cases = _init_cases_from_jsonl(args.from_jsonl)
+        description = f"Prompt pack imported from {args.from_jsonl.name}."
+    else:
+        cases = _INIT_TEMPLATE_CASES
+        description = (
+            "Starter prompt pack scaffolded by `failure-lab init`. Replace the example cases "
+            "with your own prompts."
+        )
+    payload: dict[str, object] = {
+        "dataset_id": args.dataset_id,
+        "name": args.name or args.dataset_id,
+        "description": description,
+        "version": "1",
+        "metadata": {"default_scope": "core"},
+        "cases": cases,
+    }
+    dataset = FailureDataset.from_payload(payload)
+    dataset_path = dataset_file(dataset.dataset_id, root=root, create=True)
+    if dataset_path.exists() and not args.force:
+        raise FileExistsError(
+            f"dataset already exists: {dataset_path}. Re-run with --force to overwrite."
+        )
+    write_json(dataset_path, dataset.to_payload())
+    lines = [
+        "Failure Lab Init",
+        f"Dataset ID: {dataset.dataset_id}",
+        f"Cases: {len(dataset.cases)}",
+        f"Dataset written to: {dataset_path}",
+        "",
+        "Next steps:",
+        f"1. Edit the prompts in {dataset_path}",
+        f"2. failure-lab run --dataset {dataset.dataset_id} --model demo",
+        "3. failure-lab report --run <run-id>",
+        f"4. failure-lab run --dataset {dataset.dataset_id} --model <your-model>",
+        "5. failure-lab compare <baseline-run-id> <candidate-run-id> --gate",
+    ]
+    print("\n".join(lines))
     return 0
 
 
