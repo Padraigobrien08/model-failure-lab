@@ -27,3 +27,10 @@ frontend/*.config.d.ts
 frontend/*.config.js
 frontend/*.tsbuildinfo
 screenshots/
+
+# OS cruft
+.DS_Store
+
+# local agent instructions
+CLAUDE.md
+.codex/
