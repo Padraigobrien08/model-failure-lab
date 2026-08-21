@@ -7,7 +7,4 @@ Use these only for historical context or migration support.
 
 Related references:
 
-- `docs/v1_4_closeout.md`
-- `docs/ui_parity.md`
-- `docs/runtime-setup.md`
-- `docs/cloud-gpu-run.md`
+- historical milestone reports and setup guides live in git history (pre-v0.9.0)

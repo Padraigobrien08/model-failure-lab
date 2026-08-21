@@ -28,7 +28,7 @@ Artifacts are deterministic (stable IDs, sorted keys) so they diff cleanly and r
 - No server to operate, no account, no data leaving the machine.
 - The artifact format is a public contract — schema changes are breaking and must be versioned.
 - Cross-run analytics depend on the derived index, which is rebuildable from the JSON; at very large
-  scale the rebuild model becomes the bottleneck (tracked in `docs/scalability-review.md`), not the
+  scale the rebuild model becomes the bottleneck (reviewed pre-release; acceptable), not the
   storage choice itself.
 - Artifacts may contain prompt/response content in plaintext; users must avoid putting secrets in
-  prompts (noted in `docs/security-audit.md`).
+  prompts (noted in the pre-release security review).

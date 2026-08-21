@@ -34,7 +34,7 @@ the product, with the optional research/ML stack quarantined behind extras.
 
 ### Notes
 - Pre-1.0: CLI flags and artifact schemas may still change before `1.0.0`.
-- Before tagging this release, complete `docs/release-checklist.md` — including replacing the
+- Before tagging this release, complete `docs/release.md` — including replacing the
   placeholder maintainer/security/conduct contacts and reconciling the internal git tags.
 
 [0.9.0]: https://github.com/Padraigobrien08/model-failure-lab/releases/tag/v0.9.0

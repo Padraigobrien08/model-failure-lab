@@ -29,7 +29,7 @@ Keep a hard **dependency boundary** between the two surfaces:
 - `pip install model-failure-lab` stays small, fast, and low-risk; the large attack/maintenance
   surface is isolated.
 - Contributors can develop and test the production path without installing the ML stack.
-- The legacy stack is reference-only and a candidate for spin-out/removal (`docs/roadmap.md` →
+- The legacy stack is reference-only and a candidate for spin-out/removal (→
   Later / Explicitly Not Planned).
 - Any new production code that needs a heavy dependency is a boundary violation and must instead live
   behind an extra or a plugin.

@@ -52,7 +52,7 @@
 | `ruff` | 0.13.3 | |
 
 > The numpy/pandas pair is the single most consequential dependency problem in the audited
-> environment: it blocks the full test suite. See `docs/technical-debt.md`.
+> environment: it blocks the full test suite. This only affects the optional legacy stack (see `docs/legacy.md`).
 
 ## Frontend — declared (`frontend/package.json`)
 

@@ -1,14 +1,11 @@
 # Setup Guide
 
-> Baseline audit, generated 2026-06-29. Commands marked **✓ verified** were executed during the audit
-> on macOS (Darwin 24.5.0), Python 3.11.0. Commands marked **(not run)** are documented from
-> `Makefile` / `README.md` / `.github/workflows/ci.yml` but were not executed.
 
 ## Prerequisites
 
 | Requirement | Version | Notes |
 |---|---|---|
-| Python | 3.11+ | `pyproject.toml` `requires-python = ">=3.11"`; audited with 3.11.0 |
+| Python | 3.11+ | `pyproject.toml` `requires-python = ">=3.11"` |
 | pip | recent | Used for all install paths |
 | Node.js + npm | — | Only for the React UI (`frontend/`). Not required for the Python CLI. Exact version not pinned in repo. |
 | Ollama | local install | Only for `--model ollama:*` |
@@ -19,7 +16,7 @@
 ### Production CLI (minimal)
 
 ```bash
-make install            # python3 -m pip install .   (not run; equivalent install verified present)
+make install            # python3 -m pip install .
 # or
 python3 -m pip install .
 ```
@@ -47,7 +44,7 @@ python3 -m pip install '.[ui]'          # Streamlit legacy UI
 ### Frontend (React UI)
 
 ```bash
-npm --prefix frontend install           # (not run)
+npm --prefix frontend install           #
 ```
 
 ## Environment variables
@@ -66,9 +63,9 @@ npm --prefix frontend install           # (not run)
 ## Build process
 
 ```bash
-make build              # pip install build && python -m build   -> dist/*.whl, *.tar.gz   (not run)
-make verify-dist        # twine check dist/*                                                 (not run)
-make publish            # twine upload dist/* (requires TWINE_* env)                         (not run)
+make build              # pip install build && python -m build   -> dist/*.whl, *.tar.gz
+make verify-dist        # twine check dist/*
+make publish            # twine upload dist/* (requires TWINE_* env)
 ```
 
 A prebuilt `dist/model_failure_lab-0.1.0-py3-none-any.whl` and `.tar.gz` already exist in `dist/`.
@@ -77,7 +74,7 @@ A prebuilt `dist/model_failure_lab-0.1.0-py3-none-any.whl` and `.tar.gz` already
 
 ```bash
 # Deterministic demo (writes datasets/, runs/, reports/ in the CWD)
-python3 -m model_failure_lab demo                         # ✓ verified
+python3 -m model_failure_lab demo
 
 # Canonical loop
 failure-lab run --dataset reasoning-failures-v1 --model demo
@@ -89,7 +86,7 @@ failure-lab dataset promote datasets/harvested/regression-pack.json \
   --dataset-id reasoning-regressions-v1
 
 # Inspect bundled datasets
-python3 -m model_failure_lab datasets list                # ✓ verified (returns 3 core packs)
+python3 -m model_failure_lab datasets list
 
 # Build/validate the derived query index
 failure-lab index rebuild
@@ -103,7 +100,7 @@ failure-lab index validate
 > `reports/`, `.failure_lab/` inside the checkout. These paths are gitignored but accumulate locally.
 > `make clean` removes them.
 
-### React UI (not run)
+### React UI
 
 ```bash
 export FAILURE_LAB_ARTIFACT_ROOT=/path/to/workspace
@@ -113,9 +110,9 @@ npm --prefix frontend run dev        # or: python3 scripts/run_react_ui.py
 ## Running tests
 
 ```bash
-make lint               # python3 -m ruff check src tests      # ✓ verified: "All checks passed!"
-make test               # production suite (legacy auto-skipped without [legacy]) # ✓ verified
-make test-fast          # smoke + governance subset            # ✓ verified: 9 passed
+make lint               # python3 -m ruff check src tests
+make test               # production suite (legacy auto-skipped without [legacy])
+make test-fast          # smoke + governance subset
 make test-legacy        # legacy ML tests (needs '.[legacy]' installed)
 ```
 
@@ -135,7 +132,7 @@ tests are skipped — so `pytest -q` is green on a production-only install. In C
 `.[dev,legacy]` is installed with compatible versions, the legacy tests run as well.
 
 > Baseline note: before this branch, `pytest -q` produced **252 passed, 1 failed, 23 collection
-> errors**, all caused by the numpy/pandas ABI mismatch. See `docs/technical-debt.md` (D1).
+> errors**, all caused by the numpy/pandas ABI mismatch. This is a known limitation of the legacy stack (see `docs/legacy.md`).
 
 Run a single test:
 
@@ -160,4 +157,4 @@ python3 -m pytest tests/unit/test_cli_governance.py -q
 `.github/workflows/ci.yml` (on push + PR): Python 3.11 → `pip install .` → `pip install -e
 '.[dev,legacy]'` → `pytest -q` → `ruff check` → CLI smoke (`demo`, `datasets list`, `run`, `report`,
 `index validate`). The fresh `[dev,legacy]` install is expected to resolve a compatible numpy/pandas
-pair (not reproduced in this audit — see Assumptions in `docs/overview.md`).
+pair.

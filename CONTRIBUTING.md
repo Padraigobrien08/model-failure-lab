@@ -33,4 +33,4 @@ stack is installed. To run them: `python -m pip install -e .[dev,legacy]` then `
 - Add or update tests for behavior changes.
 - Update docs when CLI flows or artifact contracts change.
 - Avoid breaking CLI flags and artifact schemas without documenting migration notes.
-- New features should fit the scope in `docs/roadmap.md`; prefer plugins/extension points over core.
+- New features should fit the supported `run -> report -> compare -> harvest` workflow; prefer plugins/extension points over core.
