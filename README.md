@@ -15,6 +15,8 @@ pip install model-failure-lab
 bash examples/regression_demo/run.sh      # from a clone — see a real regression caught
 ```
 
+[![Production CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml/badge.svg)](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml)
+[![PyPI](https://img.shields.io/pypi/v/model-failure-lab)](https://pypi.org/project/model-failure-lab/)
 ![Python](https://img.shields.io/badge/python-3.11%20|%203.12-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -200,7 +202,6 @@ The production CLI is dependency-isolated from the optional research/ML stack: r
 | Doc | Topic |
 |---|---|
 | `examples/regression_demo/` | The offline regression walkthrough |
-| `docs/overview.md` | Project overview, capabilities, limitations |
 | `docs/architecture.md` | Modules, control flow, design patterns |
 | `docs/setup.md` | Setup, environment variables, common issues |
 | `docs/api.md` | CLI surface and internal interfaces |

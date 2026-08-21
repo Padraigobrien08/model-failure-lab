@@ -12,8 +12,15 @@ is unaffected by whatever the rest of the test session has already imported.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from pathlib import Path
+
+# Make the subprocess work on a plain checkout too: pytest resolves the package via
+# ``pythonpath = ["src"]``, but a fresh interpreter only sees installed packages, so
+# put the repo's ``src`` on PYTHONPATH explicitly.
+_SRC_DIR = Path(__file__).resolve().parents[2] / "src"
 
 # Heavy/optional roots that the production import path must never trigger.
 FORBIDDEN_LEGACY_MODULES = (
@@ -55,11 +62,16 @@ def _modules_loaded_after_production_import() -> list[str]:
         + "\n"
         + "print(','.join(m for m in forbidden if m in sys.modules))\n"
     )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(_SRC_DIR), env.get("PYTHONPATH")) if part
+    )
     result = subprocess.run(
         [sys.executable, "-c", program],
         capture_output=True,
         text=True,
         check=True,
+        env=env,
     )
     loaded = result.stdout.strip()
     return [name for name in loaded.split(",") if name]
