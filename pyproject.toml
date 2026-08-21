@@ -14,15 +14,14 @@ requires-python = ">=3.11"
 # license expression (PEP 639), which breaks `python -m build`.
 license = "MIT"
 authors = [
-  { name = "Model Failure Lab contributors" },
+  { name = "Padraig O'Brien" },
 ]
 maintainers = [
-  # TODO(release): replace with a real maintainer name/email before the public release.
-  { name = "Model Failure Lab maintainers", email = "maintainer@example.com" },
+  { name = "Padraig O'Brien", email = "padraigobrien00@gmail.com" },
 ]
 keywords = ["llm", "rag", "evaluation", "regression-testing", "prompt-testing"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
@@ -75,6 +74,18 @@ model_failure_lab = ["datasets/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+# The legacy research surfaces (see docs/legacy.md) are kept in the source tree for
+# reference but excluded from wheels: `pip install model-failure-lab` ships only the
+# supported run -> report -> compare -> harvest workflow.
+exclude = [
+  "model_failure_lab.models*",
+  "model_failure_lab.results_ui*",
+  "model_failure_lab.mitigations*",
+  "model_failure_lab.perturbations*",
+  "model_failure_lab.evaluation*",
+  "model_failure_lab.data*",
+  "model_failure_lab.runners*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

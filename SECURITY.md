@@ -1,16 +1,11 @@
 # Security Policy
 
-> ⚠️ **PLACEHOLDER — must be replaced before the public release.** The contact address below
-> (`security@example.com`) is not monitored. Replace it with a real, monitored channel (a dedicated
-> mailbox or GitHub Security Advisories) before announcing v0.9.0.
-
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities **privately** — do not open a public issue.
 
-- Email: **security@example.com** *(placeholder — replace before public release)*
-- Preferred: use GitHub's **"Report a vulnerability"** (Security Advisories) once enabled for the
-  repository.
+- Preferred: use GitHub's **"Report a vulnerability"** (Security Advisories) on this repository.
+- Or email the maintainer: **padraigobrien00@gmail.com**.
 
 Include:
 
