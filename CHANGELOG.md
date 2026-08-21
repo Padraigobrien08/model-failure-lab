@@ -7,7 +7,7 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
-## [0.9.0] - Unreleased
+## [0.9.0] - 2026-08-22
 
 First public beta. Establishes the supported `run → report → compare → harvest → promote` workflow as
 the product, with the optional research/ML stack quarantined behind extras.
