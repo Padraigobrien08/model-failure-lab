@@ -238,9 +238,6 @@ export function RunDetailPage() {
           <MetricCard
             label="Failure rate"
             value={formatPercent(metrics.failureRate)}
-            valueClassName={
-              metrics.failureRate != null && metrics.failureRate >= 0.3 ? "text-bad" : undefined
-            }
             sub={`${metrics.failureCaseCount} of ${metrics.classifiedCaseCount} classified`}
           />
           <MetricCard
@@ -319,7 +316,7 @@ export function RunDetailPage() {
                   <div
                     className={cn(
                       "font-mono text-[11.5px]",
-                      row.label !== "no_failure" ? "font-semibold text-bad" : "text-muted-ink",
+                      row.label !== "no_failure" ? "font-semibold text-ink" : "text-muted-ink",
                     )}
                   >
                     {row.count} · {formatPercent(row.share)}

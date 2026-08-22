@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -59,10 +60,16 @@ function DetailsPanel({
   children: React.ReactNode;
 }) {
   return (
-    <details className="rounded-tok border border-line bg-panel">
-      <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-heading text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-ink">
+    <details className="group rounded-tok border border-line bg-panel">
+      <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 font-heading text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-ink">
+        <ChevronDown
+          size={14}
+          strokeWidth={1.5}
+          aria-hidden="true"
+          className="-rotate-90 transition-transform group-open:rotate-0"
+        />
         {title}
-        <span className="font-mono text-[11px] font-normal normal-case tracking-normal">
+        <span className="ml-auto font-mono text-[11px] font-normal normal-case tracking-normal">
           {count}
         </span>
       </summary>

@@ -137,7 +137,7 @@ export function GatePage() {
                           {row.policyRule}
                         </td>
                         <td className="px-2 py-[9px]">
-                          <StatusChip tone={row.blocked ? "bad" : "good"}>
+                          <StatusChip tone={row.blocked ? "bad" : "neutral"}>
                             {row.blocked ? "blocked" : "clear"}
                           </StatusChip>
                         </td>

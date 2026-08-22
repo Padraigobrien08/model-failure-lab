@@ -22,7 +22,7 @@
   --accent-wash: rgba(89, 128, 166, 0.1);
   --on-accent: #f2f2f3;
   /* Accent fill darkened one step from the accent so small labels clear 4.5:1. */
-  --accent-fill: #4d7093;
+  --accent-fill: #496b8d;
   --btn-bg: var(--accent-fill);
   --btn-ink: #f2f2f3;
   --red: #8f3a2e;
