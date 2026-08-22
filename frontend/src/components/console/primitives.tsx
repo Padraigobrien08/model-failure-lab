@@ -163,7 +163,7 @@ export function SegmentedControl<T extends string>({
             className={cn(
               "cursor-pointer border-y-0 border-r-0 px-3 py-1.5 font-body text-[12.5px]",
               index > 0 ? "border-l border-solid border-line" : "border-l-0",
-              selected ? "bg-accent text-on-accent" : "bg-transparent text-muted-ink",
+              selected ? "bg-accent-fill text-on-accent" : "bg-transparent text-muted-ink",
             )}
           >
             {option.label}

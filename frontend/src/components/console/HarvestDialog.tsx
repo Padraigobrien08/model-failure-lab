@@ -251,7 +251,7 @@ export function HarvestDialog({
                   />
                 ) : (
                   <div className="w-fit rounded-tok border border-line bg-raised px-3 py-1.5 font-body text-[12.5px]">
-                    New draft pack — no matching family yet
+                    New draft pack · no matching family yet
                   </div>
                 )}
               </div>

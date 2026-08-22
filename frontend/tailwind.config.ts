@@ -16,6 +16,7 @@ const config: Config = {
         accent: "var(--accent)",
         "accent-text": "var(--accent-text)",
         "accent-wash": "var(--accent-wash)",
+        "accent-fill": "var(--accent-fill)",
         "on-accent": "var(--on-accent)",
         "btn-bg": "var(--btn-bg)",
         "btn-ink": "var(--btn-ink)",

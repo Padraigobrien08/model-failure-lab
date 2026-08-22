@@ -21,7 +21,9 @@
   --accent-text: #416180;
   --accent-wash: rgba(89, 128, 166, 0.1);
   --on-accent: #f2f2f3;
-  --btn-bg: #5980a6;
+  /* Accent fill darkened one step from the accent so small labels clear 4.5:1. */
+  --accent-fill: #4d7093;
+  --btn-bg: var(--accent-fill);
   --btn-ink: #f2f2f3;
   --red: #8f3a2e;
   --red-bg: #f2dedb;
@@ -55,6 +57,7 @@
   --accent-text: #9ecbf5;
   --accent-wash: rgba(110, 168, 224, 0.13);
   --on-accent: #161826;
+  --accent-fill: #6ea8e0;
   --btn-bg: transparent;
   --btn-ink: #9ecbf5;
   --red: #e8a79b;
