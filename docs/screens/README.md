@@ -1,11 +1,11 @@
 # Screens
 
-Screenshots of the React debugger (`frontend/`), captured against a real
+Screenshots of the operator console (`frontend/`), captured against a real
 `failure-lab` workspace (the bundled regression demo plus a `demo` model run).
 
 - `comparison-detail.png` — baseline-vs-candidate comparison report: verdict,
   failure-rate delta, governance recommendation, and matched dataset family.
-- `run-detail.png` — a saved run opened in the run debugger: failure rate,
+- `run-detail.png` — a saved run opened in the run detail view: failure rate,
   coverage, and the staged investigation flow.
 - `runs-inventory.png` — the saved-runs inventory the UI opens on.
 
