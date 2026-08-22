@@ -14,3 +14,4 @@ To recapture: point the UI at a workspace and take 1440px-wide screenshots.
 ```bash
 FAILURE_LAB_ARTIFACT_ROOT=/path/to/workspace npm --prefix frontend run dev
 ```
+- `evidence.png` — case evidence: baseline/candidate side-by-side with the classifier's "why it failed" note.
