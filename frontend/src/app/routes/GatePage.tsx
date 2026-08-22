@@ -9,6 +9,7 @@ import {
   StatusChip,
   TableHeadCell,
   formatScore,
+  rowActivationProps,
 } from "@/components/console/primitives";
 import type { GateResponse } from "@/lib/artifacts/extended";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,10 @@ function GateBanner({ gate }: { gate: GateResponse }) {
           gate.
         </div>
         <div className="mt-1.5 font-mono text-[11.5px] text-muted-ink">{policyRule}</div>
+        <div className="mt-2.5 font-mono text-[11.5px] text-ink">
+          harvest the regression: failure-lab regressions apply · or waive it: failure-lab
+          regressions gate --waivers waivers.yml
+        </div>
       </div>
     );
   }
@@ -72,7 +77,7 @@ export function GatePage() {
 
       <div className="flex-1 overflow-auto px-7 pb-[22px] pt-[18px]">
         {isLoading ? (
-          <div aria-label="Loading gate" className="flex flex-col gap-2">
+          <div role="status" aria-label="Loading gate" className="flex flex-col gap-2">
             {[0, 1, 2, 3].map((row) => (
               <div key={row} className="h-9 animate-pulse rounded-tok bg-panel" />
             ))}
@@ -88,34 +93,12 @@ export function GatePage() {
             <GateBanner gate={gate} />
 
             <div className="flex flex-col gap-2">
-              <SectionLabel>Policy</SectionLabel>
-              <div className="rounded-tok border border-line bg-panel px-4 py-3">
-                {policyEntries(gate.policy).map(([key, value], index, entries) => (
-                  <div
-                    key={key}
-                    className={cn(
-                      "flex items-center justify-between gap-6 py-[6px] font-mono text-[11.5px]",
-                      index < entries.length - 1 && "border-b border-line-soft",
-                    )}
-                  >
-                    <span className="text-muted-ink">{key}</span>
-                    <span className="text-ink">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
               <SectionLabel>Decisions</SectionLabel>
               <span className="text-[12px] text-muted-ink">
-                {gate.rows.length}{" "}
-                {gate.rows.length === 1 ? "decision" : "decisions"}
+                {gate.rows.length} {gate.rows.length === 1 ? "decision" : "decisions"}
               </span>
               {gate.rows.length === 0 ? (
-                <EmptyState
-                  title="No comparisons evaluated."
-                  detail={GATE_COMMAND}
-                />
+                <EmptyState title="No comparisons evaluated." detail={GATE_COMMAND} />
               ) : (
                 <table className="w-full border-collapse text-[13.5px]">
                   <thead>
@@ -132,13 +115,12 @@ export function GatePage() {
                     {gate.rows.map((row, index) => (
                       <tr
                         key={row.comparisonId}
-                        onClick={() =>
-                          navigate(`/comparisons/${encodeURIComponent(row.comparisonId)}`)
-                        }
+                        {...rowActivationProps(() =>
+                          navigate(`/comparisons/${encodeURIComponent(row.comparisonId)}`),
+                        )}
                         className={cn(
                           "cursor-pointer hover:bg-accent-wash",
-                          index < gate.rows.length - 1 &&
-                            "border-b border-line-soft",
+                          index < gate.rows.length - 1 && "border-b border-line-soft",
                         )}
                       >
                         <td className="px-2 py-[9px] font-semibold">{row.comparisonId}</td>
@@ -163,8 +145,7 @@ export function GatePage() {
                           {row.waiver ? (
                             <span className="inline-flex items-center gap-2">
                               <span className="text-[11px] text-muted-ink">
-                                {row.waiver.owner ?? "—"} · expires{" "}
-                                {row.waiver.expiresAt ?? "—"}
+                                {row.waiver.owner ?? "—"} · expires {row.waiver.expiresAt ?? "—"}
                               </span>
                               {row.waived ? (
                                 <StatusChip tone="warn">waived</StatusChip>
@@ -181,6 +162,24 @@ export function GatePage() {
                   </tbody>
                 </table>
               )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <SectionLabel>Policy</SectionLabel>
+              <div className="rounded-tok border border-line bg-panel px-4 py-3">
+                {policyEntries(gate.policy).map(([key, value], index, entries) => (
+                  <div
+                    key={key}
+                    className={cn(
+                      "flex items-center justify-between gap-6 py-[6px] font-mono text-[11.5px]",
+                      index < entries.length - 1 && "border-b border-line-soft",
+                    )}
+                  >
+                    <span className="text-muted-ink">{key}</span>
+                    <span className="text-ink">{value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ) : null}

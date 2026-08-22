@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -64,10 +65,38 @@ export function HarvestDialog({
   const [result, setResult] = useState<WriteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
+    const panel = panelRef.current;
+    const focusables = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((element) => !element.hasAttribute("disabled"))
+        : [];
+    focusables()[1]?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusables();
+      if (elements.length === 0) return;
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -85,6 +114,9 @@ export function HarvestDialog({
 
   const matched = recommendation?.matchedFamily ?? null;
   const selectedCount = recommendation?.selectedCaseCount ?? null;
+  const regressedCaseCount = signal.topDrivers
+    .filter((driver) => driver.direction === "regression")
+    .reduce((total, driver) => total + driver.caseIds.length, 0);
 
   const write = () => {
     setWriting(true);
@@ -125,7 +157,10 @@ export function HarvestDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="w-[760px] max-w-full overflow-hidden rounded-tok border border-line bg-ground shadow-[0_24px_60px_rgba(15,17,24,0.45)]">
+      <div
+        ref={panelRef}
+        className="w-[760px] max-w-full overflow-hidden rounded-tok border border-line bg-ground shadow-[0_24px_60px_rgba(15,17,24,0.45)]"
+      >
         <div className="flex items-center gap-3.5 border-b border-line px-6 py-[18px]">
           <div>
             <SectionLabel className="tracking-[0.18em]">Harvest</SectionLabel>
@@ -143,7 +178,7 @@ export function HarvestDialog({
             onClick={onClose}
             className="ml-auto h-8 w-8 cursor-pointer rounded-tok border border-line bg-transparent text-ink hover:bg-raised"
           >
-            ✕
+            <X size={12} strokeWidth={1.5} aria-hidden="true" />
           </button>
         </div>
 
@@ -201,22 +236,24 @@ export function HarvestDialog({
             <div className="flex flex-col gap-3.5 px-6 py-5">
               <div>
                 <div className="mb-[5px] text-[12px] text-muted-ink">Dataset family</div>
-                <SegmentedControl
-                  aria-label="Dataset family mode"
-                  options={[
-                    ...(familyExists
-                      ? [
-                          {
-                            value: "evolve" as const,
-                            label: `Evolve ${matched?.familyId ?? "family"}`,
-                          },
-                        ]
-                      : []),
-                    { value: "create" as const, label: "New draft pack" },
-                  ]}
-                  value={familyExists ? mode : "create"}
-                  onChange={setMode}
-                />
+                {familyExists ? (
+                  <SegmentedControl
+                    aria-label="Dataset family mode"
+                    options={[
+                      {
+                        value: "evolve" as const,
+                        label: `Evolve ${matched?.familyId ?? "family"}`,
+                      },
+                      { value: "create" as const, label: "New draft pack" },
+                    ]}
+                    value={mode}
+                    onChange={setMode}
+                  />
+                ) : (
+                  <div className="w-fit rounded-tok border border-line bg-raised px-3 py-1.5 font-body text-[12.5px]">
+                    New draft pack — no matching family yet
+                  </div>
+                )}
               </div>
               <div>
                 <div className="mb-[5px] text-[12px] text-muted-ink">Family id</div>
@@ -224,8 +261,14 @@ export function HarvestDialog({
                   aria-label="Family id"
                   value={familyId}
                   onChange={(event) => setFamilyId(event.target.value)}
-                  className="w-full text-[13px]"
+                  title={familyId}
+                  className="w-full text-[12px]"
                 />
+                <div className="mt-1 break-all font-mono text-[10.5px] text-muted-ink">
+                  {mode === "evolve" && matched
+                    ? `datasets/${familyId}-v${(matched.versionCount ?? 0) + 1}.json`
+                    : `datasets/${familyId}.json`}
+                </div>
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -250,10 +293,16 @@ export function HarvestDialog({
                     aria-label="Top N cases"
                     type="number"
                     min={1}
+                    max={regressedCaseCount || undefined}
                     value={topN}
                     onChange={(event) => setTopN(Number(event.target.value) || 1)}
                     className="w-full"
                   />
+                  {regressedCaseCount > 0 ? (
+                    <div className="mt-1 font-mono text-[10.5px] text-muted-ink">
+                      of {regressedCaseCount} regressed
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className="flex gap-3">

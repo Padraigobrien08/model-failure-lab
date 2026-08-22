@@ -58,12 +58,28 @@ export function StatusChip({
   );
 }
 
+/** Amber = partial/degraded run state; red stays reserved for regression. */
 export function runStatusTone(status: string): ChipTone {
   const normalized = status.toLowerCase();
   if (normalized === "completed" || normalized === "complete") return "good";
-  if (normalized === "partial") return "warn";
-  if (normalized.includes("error") || normalized === "failed") return "bad";
+  if (normalized === "partial" || normalized.includes("error") || normalized === "failed") {
+    return "warn";
+  }
   return "neutral";
+}
+
+/** Keyboard-reachable clickable row: Enter/Space activate, rows stay table rows. */
+export function rowActivationProps(activate: () => void) {
+  return {
+    tabIndex: 0,
+    onClick: activate,
+    onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        activate();
+      }
+    },
+  };
 }
 
 type ConsoleButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -145,11 +161,10 @@ export function SegmentedControl<T extends string>({
             aria-checked={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              "cursor-pointer border-0 px-3 py-1.5 font-body text-[12.5px]",
-              index > 0 && "border-l border-line",
+              "cursor-pointer border-y-0 border-r-0 px-3 py-1.5 font-body text-[12.5px]",
+              index > 0 ? "border-l border-solid border-line" : "border-l-0",
               selected ? "bg-accent text-on-accent" : "bg-transparent text-muted-ink",
             )}
-            style={index > 0 ? { borderLeftWidth: 1, borderLeftStyle: "solid" } : undefined}
           >
             {option.label}
           </button>
@@ -253,6 +268,29 @@ export function formatPercent(value: number | null): string {
 
 export function formatScore(value: number): string {
   return value.toFixed(3);
+}
+
+/** Signed three-decimal score with a true minus sign. */
+export function formatSignedScore(value: number): string {
+  const magnitude = Math.abs(value).toFixed(3);
+  if (value < 0) return `−${magnitude}`;
+  if (value > 0) return `+${magnitude}`;
+  return magnitude;
+}
+
+/**
+ * Run ids are `%Y%m%d_%H%M%S[_micro]_slug_hash`; the timestamp prefix repeats
+ * row to row, so mute it and let the eye land on the distinguishing slug.
+ */
+export function RunIdText({ runId }: { runId: string }) {
+  const match = runId.match(/^(\d{8}_\d{6}(?:_\d+)?_)(.+)$/);
+  if (!match) return <>{runId}</>;
+  return (
+    <>
+      <span className="font-normal text-muted-ink">{match[1]}</span>
+      {match[2]}
+    </>
+  );
 }
 
 /** Run ids keep their raw form; ellipsis-truncate only in tight contexts. */

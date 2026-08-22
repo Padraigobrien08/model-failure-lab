@@ -10,6 +10,7 @@ import {
   StatusChip,
   TableHeadCell,
   formatPercent,
+  rowActivationProps,
 } from "@/components/console/primitives";
 import type { ChipTone } from "@/components/console/primitives";
 import { cn } from "@/lib/utils";
@@ -114,7 +115,7 @@ export function DatasetsPage() {
               {filtered.map((family, index) => (
                 <tr
                   key={family.familyId}
-                  onClick={() => navigate(`/datasets/${encodeURIComponent(family.familyId)}`)}
+                  {...rowActivationProps(() => navigate(`/datasets/${encodeURIComponent(family.familyId)}`))}
                   className={cn(
                     "cursor-pointer hover:bg-accent-wash",
                     index < filtered.length - 1 && "border-b border-line-soft",

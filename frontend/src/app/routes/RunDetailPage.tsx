@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -12,6 +13,7 @@ import {
   formatPercent,
   formatTimestamp,
   runStatusTone,
+  rowActivationProps,
 } from "@/components/console/primitives";
 import type { ChipTone } from "@/components/console/primitives";
 import { loadRunDetail } from "@/lib/artifacts/load";
@@ -292,7 +294,7 @@ export function RunDetailPage() {
               >
                 failure type: <span className="font-mono">{failureTypeFilter}</span>
                 <span aria-hidden="true" className="text-muted-ink">
-                  ✕
+                  <X size={12} strokeWidth={1.5} aria-hidden="true" />
                 </span>
               </button>
             ) : null}
@@ -375,7 +377,7 @@ export function RunDetailPage() {
                     {filtered.map((record, index) => (
                       <tr
                         key={record.caseId}
-                        onClick={() => setParam("caseId", record.caseId)}
+                        {...rowActivationProps(() => setParam("caseId", record.caseId))}
                         className={cn(
                           "cursor-pointer hover:bg-accent-wash",
                           index < filtered.length - 1 && "border-b border-line-soft",
@@ -431,7 +433,7 @@ export function RunDetailPage() {
                     onClick={() => setParam("caseId", "")}
                     className="cursor-pointer border-0 bg-transparent p-0 text-[12px] text-muted-ink hover:text-ink"
                   >
-                    ✕
+                    <X size={12} strokeWidth={1.5} aria-hidden="true" />
                   </button>
                 </div>
                 <div className="mt-1 font-mono text-[12.5px] font-semibold text-ink">

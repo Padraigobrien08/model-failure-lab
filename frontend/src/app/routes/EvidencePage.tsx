@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
@@ -159,7 +160,7 @@ function CasePane({
           <div className="font-mono text-[11.5px] text-muted-ink">no output captured</div>
         )}
 
-        {explanation && (regressed || side === "Baseline" ? explanation : explanation) ? (
+        {explanation ? (
           <div
             className={cn(
               "mt-4 rounded-tok border px-[13px] py-[11px]",
@@ -201,12 +202,18 @@ export function EvidencePage() {
   );
   const detail = detailState.data;
 
+  // The inventory already knows the run pair, so both run details can start
+  // in parallel with the comparison detail instead of waterfalling behind it.
+  const inventoryItem =
+    context.comparisonInventoryState.inventory?.comparisons.find(
+      (comparison) => comparison.reportId === reportId,
+    ) ?? null;
   const [baselineState] = useRemoteResource<RunDetail>(
-    detail?.comparison.baselineRunId ?? null,
+    detail?.comparison.baselineRunId ?? inventoryItem?.baselineRunId ?? null,
     loadRunDetail,
   );
   const [candidateState] = useRemoteResource<RunDetail>(
-    detail?.comparison.candidateRunId ?? null,
+    detail?.comparison.candidateRunId ?? inventoryItem?.candidateRunId ?? null,
     loadRunDetail,
   );
 
@@ -284,7 +291,7 @@ export function EvidencePage() {
               onClick={() => setParam("transition", "")}
               className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-tok border border-line bg-transparent px-2 py-1 font-mono text-[10.5px] text-ink"
             >
-              {transitionFilter} <span className="text-muted-ink">✕</span>
+              {transitionFilter} <span className="text-muted-ink"><X size={12} strokeWidth={1.5} aria-hidden="true" /></span>
             </button>
           ) : null}
         </div>

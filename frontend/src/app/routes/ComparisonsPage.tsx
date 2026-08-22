@@ -10,6 +10,8 @@ import {
   StatusChip,
   TableHeadCell,
   formatScore,
+  formatSignedScore,
+  rowActivationProps,
   truncateRunId,
   formatTimestamp,
 } from "@/components/console/primitives";
@@ -129,9 +131,9 @@ export function ComparisonsPage() {
                 return (
                   <tr
                     key={comparison.reportId}
-                    onClick={() =>
-                      navigate(`/comparisons/${encodeURIComponent(comparison.reportId)}`)
-                    }
+                    {...rowActivationProps(() =>
+                      navigate(`/comparisons/${encodeURIComponent(comparison.reportId)}`),
+                    )}
                     className={cn(
                       "cursor-pointer hover:bg-accent-wash",
                       index < filtered.length - 1 && "border-b border-line-soft",
@@ -161,7 +163,7 @@ export function ComparisonsPage() {
                       {formatScore(comparison.severity)}
                     </td>
                     <td className="px-2 py-[9px] text-right text-muted-ink">
-                      {formatScore(comparison.netScore).replace("-", "−")}
+                      {formatSignedScore(comparison.netScore)}
                     </td>
                     <td className="px-2 py-[9px] text-muted-ink">
                       {topDriver ? topDriver.failureType : "—"}

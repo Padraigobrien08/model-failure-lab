@@ -49,11 +49,22 @@ function StatCard({
   );
 }
 
-function DetailsPanel({ title, children }: { title: string; children: React.ReactNode }) {
+function DetailsPanel({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count: number;
+  children: React.ReactNode;
+}) {
   return (
     <details className="rounded-tok border border-line bg-panel">
-      <summary className="cursor-pointer px-4 py-3 font-heading text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-ink">
+      <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-heading text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-ink">
         {title}
+        <span className="font-mono text-[11px] font-normal normal-case tracking-normal">
+          {count}
+        </span>
       </summary>
       <div className="border-t border-line-soft px-4 py-3">{children}</div>
     </details>
@@ -314,7 +325,7 @@ export function DatasetFamilyPage() {
             )}
           </div>
 
-          <DetailsPanel title="Portfolio">
+          <DetailsPanel title="Portfolio" count={portfolioItem ? 1 : 0}>
             {portfolioItem ? (
               <div className="flex flex-col gap-1.5">
                 <div className="font-mono text-[11px] text-ink">
@@ -354,7 +365,7 @@ export function DatasetFamilyPage() {
             )}
           </DetailsPanel>
 
-          <DetailsPanel title="Plans">
+          <DetailsPanel title="Plans" count={portfolioPlans.length}>
             {portfolioPlans.length === 0 ? (
               <NoneRecorded />
             ) : (
@@ -376,7 +387,7 @@ export function DatasetFamilyPage() {
             )}
           </DetailsPanel>
 
-          <DetailsPanel title="Executions">
+          <DetailsPanel title="Executions" count={planExecutions.length}>
             {planExecutions.length === 0 ? (
               <NoneRecorded />
             ) : (
@@ -396,7 +407,7 @@ export function DatasetFamilyPage() {
             )}
           </DetailsPanel>
 
-          <DetailsPanel title="Outcomes">
+          <DetailsPanel title="Outcomes" count={outcomes.length}>
             {outcomes.length === 0 ? (
               <NoneRecorded />
             ) : (

@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -11,6 +12,7 @@ import {
   formatScore,
   formatTimestamp,
   truncateRunId,
+  rowActivationProps,
 } from "@/components/console/primitives";
 import type { ChipTone } from "@/components/console/primitives";
 import type { ArtifactClusterDetailResponse } from "@/lib/artifacts/extended";
@@ -197,7 +199,7 @@ function ClusterDetailPanel({
           onClick={onClose}
           className="cursor-pointer rounded-tok border border-transparent px-1 text-[13px] text-muted-ink hover:bg-raised"
         >
-          ✕
+          <X size={12} strokeWidth={1.5} aria-hidden="true" />
         </button>
       </div>
       {state.status === "loading" ? (
@@ -349,11 +351,11 @@ export function ExplorerPage() {
             {response.rows.map((row, index) => (
               <tr
                 key={`${row.runId}-${row.caseId}`}
-                onClick={() =>
+                {...rowActivationProps(() =>
                   navigate(
                     `/runs/${encodeURIComponent(row.runId)}?caseId=${encodeURIComponent(row.caseId)}`,
-                  )
-                }
+                  ),
+                )}
                 className={cn(
                   "cursor-pointer hover:bg-accent-wash",
                   index < response.rows.length - 1 && "border-b border-line-soft",
@@ -393,11 +395,11 @@ export function ExplorerPage() {
             {response.rows.map((row, index) => (
               <tr
                 key={`${row.reportId}-${row.caseId}`}
-                onClick={() =>
+                {...rowActivationProps(() =>
                   navigate(
                     `/comparisons/${encodeURIComponent(row.reportId)}/evidence?caseId=${encodeURIComponent(row.caseId)}`,
-                  )
-                }
+                  ),
+                )}
                 className={cn(
                   "cursor-pointer hover:bg-accent-wash",
                   index < response.rows.length - 1 && "border-b border-line-soft",
@@ -479,7 +481,7 @@ export function ExplorerPage() {
             {response.rows.map((row, index) => (
               <tr
                 key={row.reportId}
-                onClick={() => navigate(`/comparisons/${encodeURIComponent(row.reportId)}`)}
+                {...rowActivationProps(() => navigate(`/comparisons/${encodeURIComponent(row.reportId)}`))}
                 className={cn(
                   "cursor-pointer hover:bg-accent-wash",
                   index < response.rows.length - 1 && "border-b border-line-soft",
@@ -531,7 +533,7 @@ export function ExplorerPage() {
           {response.rows.map((row, index) => (
             <tr
               key={row.clusterId}
-              onClick={() => setParam("clusterId", row.clusterId)}
+              {...rowActivationProps(() => setParam("clusterId", row.clusterId))}
               className={cn(
                 "cursor-pointer hover:bg-accent-wash",
                 index < response.rows.length - 1 && "border-b border-line-soft",
@@ -619,10 +621,17 @@ export function ExplorerPage() {
               }
             />
           ) : rowCount === 0 && !hasFilters ? (
-            <EmptyState
-              title="No indexed evidence."
-              detail=".failure_lab/query_index.sqlite3 · run: failure-lab index rebuild"
-            />
+            mode === "clusters" ? (
+              <EmptyState
+                title="No recurring failure clusters."
+                detail="clusters need the same failure to recur across artifacts · run: failure-lab clusters"
+              />
+            ) : (
+              <EmptyState
+                title="No indexed evidence."
+                detail=".failure_lab/query_index.sqlite3 · run: failure-lab index rebuild"
+              />
+            )
           ) : rowCount === 0 ? (
             <EmptyState
               title="No rows match the current filters."

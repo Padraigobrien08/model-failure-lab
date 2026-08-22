@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -10,8 +11,10 @@ import {
   SegmentedControl,
   StatusChip,
   TableHeadCell,
+  RunIdText,
   formatPercent,
   formatTimestamp,
+  rowActivationProps,
   runStatusTone,
   truncateRunId,
 } from "@/components/console/primitives";
@@ -160,9 +163,7 @@ export function RunsPage() {
             className="inline-flex cursor-pointer items-center gap-2 rounded-tok border border-line bg-transparent px-[11px] py-[5px] font-body text-[12px] font-medium text-ink"
           >
             model: <span className="font-mono">{modelFilter}</span>
-            <span aria-hidden="true" className="text-muted-ink">
-              ✕
-            </span>
+            <span className="text-muted-ink"><X size={12} strokeWidth={1.5} aria-hidden="true" /></span>
           </button>
         ) : null}
         {statusFilter ? (
@@ -172,9 +173,7 @@ export function RunsPage() {
             className="inline-flex cursor-pointer items-center gap-2 rounded-tok border border-line bg-transparent px-[11px] py-[5px] font-body text-[12px] font-medium text-ink"
           >
             status: <span className="font-mono">{statusFilter}</span>
-            <span aria-hidden="true" className="text-muted-ink">
-              ✕
-            </span>
+            <span className="text-muted-ink"><X size={12} strokeWidth={1.5} aria-hidden="true" /></span>
           </button>
         ) : null}
         <span className="ml-auto text-[12px] text-muted-ink">
@@ -240,7 +239,9 @@ export function RunsPage() {
                 return (
                   <tr
                     key={run.runId}
-                    onClick={() => navigate(`/runs/${encodeURIComponent(run.runId)}`)}
+                    {...rowActivationProps(() =>
+                      navigate(`/runs/${encodeURIComponent(run.runId)}`),
+                    )}
                     className={cn(
                       "cursor-pointer hover:bg-accent-wash",
                       index < filtered.length - 1 && "border-b border-line-soft",
@@ -258,21 +259,14 @@ export function RunsPage() {
                       />
                     </td>
                     <td className="max-w-[420px] break-all px-2 py-[9px] font-semibold">
-                      {run.runId}
+                      <RunIdText runId={run.runId} />
                     </td>
                     <td className="px-2 py-[9px] text-muted-ink">{run.dataset}</td>
                     <td className="px-2 py-[9px] text-muted-ink">{run.model}</td>
                     <td className="px-2 py-[9px] text-right text-muted-ink">
                       {run.attemptedCaseCount ?? "—"}
                     </td>
-                    <td
-                      className={cn(
-                        "px-2 py-[9px] text-right",
-                        run.failureRate != null && run.failureRate >= 0.3
-                          ? "font-semibold text-bad"
-                          : "text-muted-ink",
-                      )}
-                    >
+                    <td className="px-2 py-[9px] text-right text-muted-ink">
                       {formatPercent(run.failureRate)}
                     </td>
                     <td className="px-2 py-[9px] text-right text-muted-ink">

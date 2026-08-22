@@ -13,6 +13,7 @@ import {
   formatPercent,
   formatScore,
   formatSignedPts,
+  formatSignedScore,
   truncateRunId,
 } from "@/components/console/primitives";
 import { loadComparisonDetail } from "@/lib/artifacts/load";
@@ -318,7 +319,20 @@ export function ComparisonDetailPage() {
                 <div className="w-px self-stretch bg-line" />
                 <div className="flex w-[190px] flex-none flex-col gap-2">
                   <SectionLabel className="text-[9.5px] tracking-[0.16em]">CI gate</SectionLabel>
-                  {gateRow ? (
+                  {verdict === "incompatible" ? (
+                    <>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-heading text-[22px] font-semibold leading-none text-muted-ink">
+                          not evaluated
+                        </span>
+                      </div>
+                      <div className="font-mono text-[10.5px] leading-normal text-muted-ink">
+                        signal discarded · incompatible_signal
+                        <br />
+                        rerun on a shared dataset to gate
+                      </div>
+                    </>
+                  ) : gateRow ? (
                     <>
                       <div className="flex items-baseline gap-2">
                         <span
@@ -473,7 +487,7 @@ export function ComparisonDetailPage() {
                   <div className="font-mono text-[11px] text-muted-ink">
                     regression {formatScore(detail.signal.regressionScore)} · improvement{" "}
                     {formatScore(detail.signal.improvementScore)} · net{" "}
-                    {formatScore(detail.signal.netScore).replace("-", "−")}
+                    {formatSignedScore(detail.signal.netScore)}
                   </div>
                 </section>
 
