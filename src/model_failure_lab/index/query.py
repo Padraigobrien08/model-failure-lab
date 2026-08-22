@@ -60,7 +60,9 @@ def list_run_inventory(*, root: str | Path | None = None) -> list[dict[str, Any]
     with _connection(root=root) as connection:
         rows = connection.execute(
             """
-            SELECT run_id, dataset, model, created_at, status
+            SELECT run_id, dataset, model, created_at, status,
+                   attempted_case_count, execution_error_count,
+                   failure_rate, classification_coverage
             FROM runs
             ORDER BY created_at DESC, run_id DESC
             """

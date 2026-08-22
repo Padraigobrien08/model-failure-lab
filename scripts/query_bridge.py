@@ -22,7 +22,9 @@ from model_failure_lab.datasets import (  # noqa: E402
 )
 from model_failure_lab.governance import (  # noqa: E402
     PortfolioFilters,
+    evaluate_regression_gate,
     get_dataset_portfolio_item,
+    list_dataset_family_health,
     list_dataset_lifecycle_actions,
     list_portfolio_execution_outcomes,
     list_saved_portfolio_plan_executions,
@@ -313,6 +315,34 @@ def main(argv: list[str] | None = None) -> int:
             "source": build_source_descriptor(root),
             **detail.to_payload(),
         }
+    elif args.command == "dataset-families":
+        health_rows = list_dataset_family_health(root=root)
+        payload = {
+            "source": build_source_descriptor(root),
+            "families": [
+                {
+                    "family_id": row.family_id,
+                    "version_count": row.version_count,
+                    "latest_dataset_id": row.latest_dataset_id,
+                    "latest_version_tag": row.latest_version_tag,
+                    "latest_created_at": row.latest_created_at,
+                    "case_count": row.latest_case_count,
+                    "source_dataset_id": row.source_dataset_id,
+                    "primary_failure_type": row.primary_failure_type,
+                    "health_label": row.health_label,
+                    "recent_fail_rate": row.recent_fail_rate,
+                }
+                for row in sorted(health_rows, key=lambda record: record.family_id)
+            ],
+        }
+    elif args.command == "gate":
+        result = evaluate_regression_gate(root=root)
+        payload = {
+            "source": build_source_descriptor(root),
+            "blocked": result.blocked,
+            "policy": result.policy.to_payload(),
+            "rows": [row.to_payload() for row in result.rows],
+        }
     elif args.command == "comparison-clusters":
         rows = list_clusters_for_comparison(
             args.report_id,
@@ -443,6 +473,12 @@ def build_parser() -> argparse.ArgumentParser:
     cluster_detail_parser.add_argument("--root", required=True)
     cluster_detail_parser.add_argument("--cluster-id", required=True)
     cluster_detail_parser.add_argument("--limit", type=int, default=20)
+
+    dataset_families_parser = subparsers.add_parser("dataset-families")
+    dataset_families_parser.add_argument("--root", required=True)
+
+    gate_parser = subparsers.add_parser("gate")
+    gate_parser.add_argument("--root", required=True)
 
     comparison_clusters_parser = subparsers.add_parser("comparison-clusters")
     comparison_clusters_parser.add_argument("--root", required=True)

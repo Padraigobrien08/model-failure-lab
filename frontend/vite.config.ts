@@ -16,6 +16,10 @@ const ARTIFACT_HARVEST_PATH = "/__failure_lab__/artifacts/harvest.json";
 const ARTIFACT_REGRESSION_PACK_PATH = "/__failure_lab__/artifacts/regression-pack.json";
 const ARTIFACT_DATASET_EVOLVE_PATH = "/__failure_lab__/artifacts/dataset-evolve.json";
 const ARTIFACT_DATASET_VERSIONS_PATH = "/__failure_lab__/artifacts/dataset-versions.json";
+const ARTIFACT_DATASET_FAMILIES_PATH = "/__failure_lab__/artifacts/dataset-families.json";
+const ARTIFACT_GATE_PATH = "/__failure_lab__/artifacts/gate.json";
+const ARTIFACT_HISTORY_PATH = "/__failure_lab__/artifacts/history.json";
+const ARTIFACT_CLUSTER_DETAIL_PATH = "/__failure_lab__/artifacts/cluster-detail.json";
 const ARTIFACT_ROOT_ENV = "FAILURE_LAB_ARTIFACT_ROOT";
 const RUN_FILENAME = "run.json";
 const RESULTS_FILENAME = "results.json";
@@ -1959,6 +1963,120 @@ function failureLabArtifactsPlugin(): Plugin {
     }
   }
 
+  async function handleDatasetFamilies(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    try {
+      const payload = await invokeQueryBridge("dataset-families");
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "dataset families failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
+  async function handleGate(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    try {
+      const payload = await invokeQueryBridge("gate");
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "regression gate failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
+  async function handleHistorySnapshot(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const requestUrl = new URL(req.url ?? ARTIFACT_HISTORY_PATH, "http://failure-lab.local");
+    const args: string[] = [];
+    const optionMap: Array<[string, string]> = [
+      ["dataset", "--dataset"],
+      ["model", "--model"],
+      ["familyId", "--family-id"],
+      ["limit", "--limit"],
+    ];
+    for (const [searchKey, argName] of optionMap) {
+      const value = requestUrl.searchParams.get(searchKey);
+      if (value && value.trim().length > 0) {
+        args.push(argName, value);
+      }
+    }
+    const scopeArgCount = ["--dataset", "--model", "--family-id"].filter((flag) =>
+      args.includes(flag),
+    ).length;
+    if (scopeArgCount !== 1) {
+      res.statusCode = 400;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          message: "exactly one of dataset, model, or familyId query parameters is required",
+        }),
+      );
+      return;
+    }
+
+    try {
+      const payload = await invokeQueryBridge("history", args);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "history snapshot failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
+  async function handleClusterDetail(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const requestUrl = new URL(
+      req.url ?? ARTIFACT_CLUSTER_DETAIL_PATH,
+      "http://failure-lab.local",
+    );
+    const clusterId = requestUrl.searchParams.get("clusterId");
+    if (!clusterId) {
+      res.statusCode = 400;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message: "clusterId query parameter is required" }));
+      return;
+    }
+    const args = ["--cluster-id", clusterId];
+    const limit = requestUrl.searchParams.get("limit");
+    if (limit && limit.trim().length > 0) {
+      args.push("--limit", limit);
+    }
+
+    try {
+      const payload = await invokeQueryBridge("cluster-detail", args);
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "cluster detail failed";
+      const statusCode = message.includes("cluster not found") ? 404 : 500;
+      res.statusCode = statusCode;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
   async function handleComparisonDetail(
     req: IncomingMessage,
     res: ServerResponse,
@@ -2098,6 +2216,26 @@ function failureLabArtifactsPlugin(): Plugin {
 
       if (pathname === ARTIFACT_DATASET_VERSIONS_PATH) {
         void handleDatasetVersions(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_DATASET_FAMILIES_PATH) {
+        void handleDatasetFamilies(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_GATE_PATH) {
+        void handleGate(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_HISTORY_PATH) {
+        void handleHistorySnapshot(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_CLUSTER_DETAIL_PATH) {
+        void handleClusterDetail(req, res).catch(next);
         return;
       }
 
