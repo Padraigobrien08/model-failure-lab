@@ -13,15 +13,28 @@ def build_comparison_signal(
     *,
     failure_rate_deltas: Mapping[str, float],
     case_deltas: Sequence[Mapping[str, JsonValue]],
+    execution_success_delta: float | None = None,
 ) -> dict[str, JsonValue]:
-    regression_score = round(
-        sum(max(float(delta), 0.0) for delta in failure_rate_deltas.values()),
-        6,
+    regression_score = sum(max(float(delta), 0.0) for delta in failure_rate_deltas.values())
+    improvement_score = sum(
+        abs(float(delta)) for delta in failure_rate_deltas.values() if float(delta) < 0.0
     )
-    improvement_score = round(
-        sum(abs(float(delta)) for delta in failure_rate_deltas.values() if float(delta) < 0.0),
-        6,
-    )
+
+    # Execution errors are excluded from the classified-case failure-rate denominator,
+    # so a candidate that errors on cases the baseline completed never appears in
+    # failure_rate_deltas -- it silently shrinks the denominator instead. Fold the
+    # execution-success regression straight into the score so a candidate cannot pass
+    # the gate simply by failing to run. execution_success_delta is candidate minus
+    # baseline: negative means the candidate errored more (a regression).
+    if execution_success_delta is not None:
+        execution_regression = -float(execution_success_delta)
+        if execution_regression > 0.0:
+            regression_score += execution_regression
+        elif execution_regression < 0.0:
+            improvement_score += -execution_regression
+
+    regression_score = round(regression_score, 6)
+    improvement_score = round(improvement_score, 6)
     net_score = round(improvement_score - regression_score, 6)
     if regression_score > improvement_score:
         verdict = "regression"

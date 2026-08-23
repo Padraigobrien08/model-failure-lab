@@ -4271,6 +4271,18 @@ def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str
         return 1, "Gate: FAIL (runs are not comparable)"
     if verdict == "regression":
         return 1, f"Gate: FAIL (signal verdict: {verdict})"
+    # Defense in depth: the signal verdict already folds in the execution-success
+    # delta, but the gate is the last line before CI turns green, so it fails closed
+    # on any drop in the candidate's ability to run or classify -- a candidate cannot
+    # pass simply by erroring on (or failing to classify) cases the baseline handled.
+    delta = report.metrics.get("delta", {}) if isinstance(report.metrics, dict) else {}
+    for label, key in (
+        ("execution success", "execution_success_rate"),
+        ("classification coverage", "classification_coverage"),
+    ):
+        value = delta.get(key)
+        if isinstance(value, (int, float)) and value < 0:
+            return 1, f"Gate: FAIL ({label} regressed by {_format_signed_rate(value)})"
     return 0, f"Gate: PASS (signal verdict: {verdict})"
 
 

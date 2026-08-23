@@ -326,6 +326,95 @@ def test_build_comparison_report_flags_incompatible_datasets(tmp_path) -> None:
     assert built.details["signal"] == built.report.comparison["signal"]
 
 
+def test_build_comparison_report_flags_zero_shared_cases_as_incompatible(tmp_path) -> None:
+    # Same dataset id, but the candidate renamed every case id: no case overlaps.
+    adapter_id = "unit-comparison-adapter-renamed"
+    classifier_id = "unit-comparison-classifier-renamed"
+    register_model(adapter_id, ComparisonAdapter)
+    register_classifier(classifier_id, ComparisonClassifier())
+
+    baseline_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-001", prompt="shared improvement"),),
+        ),
+        model="baseline-model",
+        seed=41,
+        suffix_minutes=0,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+    candidate_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-001-renamed", prompt="shared improvement"),),
+        ),
+        model="candidate-model",
+        seed=42,
+        suffix_minutes=1,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+
+    built = build_comparison_report(
+        load_saved_run_artifacts(baseline_run_id, root=tmp_path),
+        load_saved_run_artifacts(candidate_run_id, root=tmp_path),
+        now=datetime(2026, 3, 30, 12, 50, 0, tzinfo=timezone.utc),
+    )
+
+    assert built.report.comparison["compatible"] is False
+    assert built.report.comparison["reason"] == "no_shared_cases"
+    assert built.report.comparison["signal"]["verdict"] == "incompatible"
+    assert built.report.status == {"overall": "incompatible_cases"}
+
+
+def test_build_comparison_report_flags_mutated_prompt_content_as_incompatible(tmp_path) -> None:
+    # Same dataset id and same case id, but the prompt content was changed underneath it.
+    adapter_id = "unit-comparison-adapter-mutated"
+    classifier_id = "unit-comparison-classifier-mutated"
+    register_model(adapter_id, ComparisonAdapter)
+    register_classifier(classifier_id, ComparisonClassifier())
+
+    baseline_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-001", prompt="shared improvement"),),
+        ),
+        model="baseline-model",
+        seed=43,
+        suffix_minutes=0,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+    candidate_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="reasoning-basics-v1",
+            cases=(PromptCase(id="case-001", prompt="a completely different question"),),
+        ),
+        model="candidate-model",
+        seed=44,
+        suffix_minutes=1,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+
+    built = build_comparison_report(
+        load_saved_run_artifacts(baseline_run_id, root=tmp_path),
+        load_saved_run_artifacts(candidate_run_id, root=tmp_path),
+        now=datetime(2026, 3, 30, 12, 50, 0, tzinfo=timezone.utc),
+    )
+
+    assert built.report.comparison["compatible"] is False
+    assert built.report.comparison["reason"] == "dataset_content_mismatch"
+    assert built.report.comparison["shared_case_count"] == 1
+    assert built.report.comparison["signal"]["verdict"] == "incompatible"
+    assert built.report.status == {"overall": "incompatible_cases"}
+
+
 def test_write_comparison_report_artifacts_persists_summary_and_detail_payloads(tmp_path) -> None:
     adapter_id = "unit-comparison-adapter-write"
     classifier_id = "unit-comparison-classifier-write"
