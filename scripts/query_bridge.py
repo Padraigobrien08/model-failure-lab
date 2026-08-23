@@ -23,6 +23,7 @@ from model_failure_lab.datasets import (  # noqa: E402
 from model_failure_lab.governance import (  # noqa: E402
     PortfolioFilters,
     evaluate_regression_gate,
+    list_baselines,
     get_dataset_portfolio_item,
     list_dataset_family_health,
     list_dataset_lifecycle_actions,
@@ -335,6 +336,11 @@ def main(argv: list[str] | None = None) -> int:
                 for row in sorted(health_rows, key=lambda record: record.family_id)
             ],
         }
+    elif args.command == "baselines":
+        payload = {
+            "source": build_source_descriptor(root),
+            "baselines": [entry.to_payload() for entry in list_baselines(root=root)],
+        }
     elif args.command == "gate":
         result = evaluate_regression_gate(root=root)
         payload = {
@@ -479,6 +485,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     gate_parser = subparsers.add_parser("gate")
     gate_parser.add_argument("--root", required=True)
+
+    baselines_parser = subparsers.add_parser("baselines")
+    baselines_parser.add_argument("--root", required=True)
 
     comparison_clusters_parser = subparsers.add_parser("comparison-clusters")
     comparison_clusters_parser.add_argument("--root", required=True)

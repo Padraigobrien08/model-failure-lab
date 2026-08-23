@@ -720,6 +720,57 @@ export async function loadDatasetFamilies(
   return validateDatasetFamiliesResponse(payload);
 }
 
+export type BaselineEntry = {
+  name: string;
+  runId: string;
+  model: string | null;
+  dataset: string | null;
+  owner: string | null;
+  notes: string | null;
+  updatedAt: string;
+};
+
+export type BaselinesResponse = {
+  source: ArtifactSourceDescriptor;
+  baselines: BaselineEntry[];
+};
+
+export const ARTIFACT_BASELINES_PATH = "/__failure_lab__/artifacts/baselines.json";
+
+export function validateBaselinesResponse(payload: unknown): BaselinesResponse {
+  const data = requireObject(payload, "baselines");
+  const rows = data.baselines;
+  if (!Array.isArray(rows)) {
+    throw new Error("baselines.baselines must be an array");
+  }
+  return {
+    source: requireSource(data.source, "baselines.source"),
+    baselines: rows.map((entry, index) => {
+      const row = requireObject(entry, `baselines[${index}]`);
+      return {
+        name: requireString(row.name, `baselines[${index}].name`),
+        runId: requireString(row.run_id, `baselines[${index}].run_id`),
+        model: requireStringOrNull(row.model, `baselines[${index}].model`),
+        dataset: requireStringOrNull(row.dataset, `baselines[${index}].dataset`),
+        owner: requireStringOrNull(row.owner, `baselines[${index}].owner`),
+        notes: requireStringOrNull(row.notes, `baselines[${index}].notes`),
+        updatedAt: requireString(row.updated_at, `baselines[${index}].updated_at`),
+      };
+    }),
+  };
+}
+
+export async function loadBaselines(
+  fetchImpl: typeof fetch = fetch,
+): Promise<BaselinesResponse> {
+  const payload = await fetchArtifactJson(
+    ARTIFACT_BASELINES_PATH,
+    "baseline registry",
+    fetchImpl,
+  );
+  return validateBaselinesResponse(payload);
+}
+
 export async function loadGate(fetchImpl: typeof fetch = fetch): Promise<GateResponse> {
   const payload = await fetchArtifactJson(ARTIFACT_GATE_PATH, "regression gate", fetchImpl);
   return validateGateResponse(payload);

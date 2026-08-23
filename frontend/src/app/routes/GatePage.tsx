@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
@@ -11,7 +12,8 @@ import {
   formatScore,
   rowActivationProps,
 } from "@/components/console/primitives";
-import type { GateResponse } from "@/lib/artifacts/extended";
+import type { BaselinesResponse, GateResponse } from "@/lib/artifacts/extended";
+import { loadBaselines } from "@/lib/artifacts/extended";
 import { cn } from "@/lib/utils";
 
 const GATE_COMMAND = "run: failure-lab regressions gate";
@@ -60,6 +62,79 @@ function GateBanner({ gate }: { gate: GateResponse }) {
         All recent comparisons pass the gate.
       </div>
       <div className="mt-1.5 font-mono text-[11.5px] text-muted-ink">{policyRule}</div>
+    </div>
+  );
+}
+
+type BaselinesState =
+  | { status: "loading"; data: null }
+  | { status: "ready"; data: BaselinesResponse }
+  | { status: "failed"; data: null };
+
+function BaselinesSection({ navigate }: { navigate: (to: string) => void }) {
+  const [state, setState] = useState<BaselinesState>({ status: "loading", data: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadBaselines()
+      .then((data) => {
+        if (!cancelled) setState({ status: "ready", data });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: "failed", data: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <SectionLabel>Baselines</SectionLabel>
+      {state.status === "loading" ? (
+        <div role="status" aria-label="Loading baselines" className="flex flex-col gap-2">
+          <div className="h-9 animate-pulse rounded-tok bg-panel" />
+        </div>
+      ) : state.status === "failed" || state.data.baselines.length === 0 ? (
+        <div className="rounded-tok border border-line bg-panel px-4 py-3 font-mono text-[11.5px] text-muted-ink">
+          no baselines registered · .failure_lab/baseline_registry.json · run: failure-lab
+          baselines set &lt;name&gt; --run &lt;run-id&gt;
+        </div>
+      ) : (
+        <table className="w-full border-collapse text-[13.5px]">
+          <thead>
+            <tr className="border-b border-line">
+              <TableHeadCell>Name</TableHeadCell>
+              <TableHeadCell>Run id</TableHeadCell>
+              <TableHeadCell>Model</TableHeadCell>
+              <TableHeadCell>Dataset</TableHeadCell>
+              <TableHeadCell>Owner</TableHeadCell>
+              <TableHeadCell>Updated</TableHeadCell>
+            </tr>
+          </thead>
+          <tbody className="font-mono text-[12.5px]">
+            {state.data.baselines.map((baseline, index) => (
+              <tr
+                key={baseline.name}
+                {...rowActivationProps(() =>
+                  navigate(`/runs/${encodeURIComponent(baseline.runId)}`),
+                )}
+                className={cn(
+                  "cursor-pointer hover:bg-accent-wash",
+                  index < state.data.baselines.length - 1 && "border-b border-line-soft",
+                )}
+              >
+                <td className="px-2 py-[9px] font-semibold">{baseline.name}</td>
+                <td className="px-2 py-[9px] text-muted-ink">{baseline.runId}</td>
+                <td className="px-2 py-[9px] text-muted-ink">{baseline.model ?? "—"}</td>
+                <td className="px-2 py-[9px] text-muted-ink">{baseline.dataset ?? "—"}</td>
+                <td className="px-2 py-[9px] text-muted-ink">{baseline.owner ?? "—"}</td>
+                <td className="px-2 py-[9px] text-muted-ink">{baseline.updatedAt || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -181,6 +256,8 @@ export function GatePage() {
                 ))}
               </div>
             </div>
+
+            <BaselinesSection navigate={navigate} />
           </div>
         ) : null}
       </div>
