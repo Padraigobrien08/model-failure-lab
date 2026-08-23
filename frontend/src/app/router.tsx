@@ -7,34 +7,28 @@ import type {
   RunInventoryState,
 } from "@/lib/artifacts/types";
 import type {
-  ArtifactIndex,
-  FailureDomainKey,
-  FinalRobustnessBundle,
-  WorkbenchSelection,
-} from "@/lib/manifest/types";
+  DatasetFamiliesResponse,
+  GateResponse,
+} from "@/lib/artifacts/extended";
+
+type RemoteState<T> =
+  | { status: "idle" | "loading"; data: null; message: null }
+  | { status: "ready"; data: T; message: null }
+  | { status: "incompatible"; data: null; message: string };
+
+export type DatasetFamiliesState = RemoteState<DatasetFamiliesResponse>;
+export type GateState = RemoteState<GateResponse>;
 
 export type NavigationItem = {
   label: string;
   path: string;
-  description: string;
 };
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
-  {
-    label: "Analysis",
-    path: "/analysis",
-    description: "Cross-run artifact analysis backed by the derived local index",
-  },
-  {
-    label: "Runs",
-    path: "/",
-    description: "Saved run artifacts from the local engine contract",
-  },
-  {
-    label: "Comparisons",
-    path: "/comparisons",
-    description: "Baseline-to-candidate comparison artifacts",
-  },
+  { label: "Runs", path: "/" },
+  { label: "Comparisons", path: "/comparisons" },
+  { label: "Evidence", path: "/evidence" },
+  { label: "Datasets", path: "/datasets" },
 ];
 
 export type AppRouteContext = {
@@ -45,32 +39,10 @@ export type AppRouteContext = {
   reloadRunInventory: () => void;
   comparisonInventoryState: ComparisonInventoryState;
   reloadComparisonInventory: () => void;
-  index: ArtifactIndex | null;
-  isLoading: boolean;
-  error: string | null;
-  includeExploratory: boolean;
-  setIncludeExploratory: (value: boolean) => void;
-  manifestPath: string;
-  finalRobustnessBundle: FinalRobustnessBundle | null;
-  finalRobustnessBundleError: string | null;
-  isFinalRobustnessBundleLoading: boolean;
-  selection: WorkbenchSelection;
-  setSelection: (patch: Partial<WorkbenchSelection>) => void;
-  selectedVerdict: string | null;
-  setSelectedVerdict: (value: string | null) => void;
-  selectedLane: string | null;
-  setSelectedLane: (value: string | null) => void;
-  selectedMethod: string | null;
-  setSelectedMethod: (value: string | null) => void;
-  selectedDomain: FailureDomainKey | null;
-  setSelectedDomain: (value: FailureDomainKey | null) => void;
-  selectedRunId: string | null;
-  setSelectedRunId: (value: string | null) => void;
-  selectedArtifact: string | null;
-  setSelectedArtifact: (value: string | null) => void;
-  isEvidenceDrawerOpen: boolean;
-  openEvidenceDrawer: (runId: string) => void;
-  closeEvidenceDrawer: () => void;
+  datasetFamiliesState: DatasetFamiliesState;
+  reloadDatasetFamilies: () => void;
+  gateState: GateState;
+  reloadGate: () => void;
 };
 
 export function useAppRouteContext() {

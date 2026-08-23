@@ -41,7 +41,7 @@ flowchart TD
 Everything is plain JSON written to disk, so your evaluation history lives in git next to your code —
 diffable, reviewable, reproducible.
 
-![Comparison report in the React debugger](docs/screens/comparison-detail.png)
+![Comparison detail in the operator console](docs/screens/comparison-detail.png)
 
 ---
 
@@ -186,12 +186,14 @@ You can also export any report or comparison as a self-contained HTML file to at
 failure-lab compare <baseline> <candidate> --html regression-report.html
 ```
 
-## Visual debugger
+## Operator console
 
-The repo ships a React UI (in [`frontend/`](frontend/)) that opens your workspace's saved runs and
-comparison reports for point-and-click investigation:
+The repo ships an operator console (React, in [`frontend/`](frontend/)) over the same artifact
+contract: runs inventory, verdict-first comparisons, side-by-side case evidence, dataset-family
+governance, the regression gate, and a cross-artifact query explorer — all read from your
+workspace's saved JSON artifacts:
 
-![Run detail in the React debugger](docs/screens/run-detail.png)
+![Comparison detail in the operator console](docs/screens/comparison-detail.png)
 
 ```bash
 FAILURE_LAB_ARTIFACT_ROOT=/path/to/your/workspace npm --prefix frontend run dev

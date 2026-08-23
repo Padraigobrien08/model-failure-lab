@@ -58,3 +58,11 @@ A quick guide for contributors to find the right files fast.
 - CI workflow: `.github/workflows/ci.yml`
 - Packaging metadata: `pyproject.toml`
 - Shortcut commands: `Makefile`
+
+## Frontend (operator console)
+
+- Screens: `frontend/src/app/routes/` (one file per route)
+- Shell + primitives: `frontend/src/components/layout/ConsoleShell.tsx`, `frontend/src/components/console/`
+- Artifact contract layer: `frontend/src/lib/artifacts/{load,extended,types}.ts`
+- Dev-server bridge: `frontend/vite.config.ts` → `scripts/query_bridge.py`
+- Design rules: `frontend/DESIGN.md` · architecture: `frontend/README.md`

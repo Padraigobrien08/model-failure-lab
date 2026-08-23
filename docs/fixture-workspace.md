@@ -10,7 +10,7 @@ Default output:
 
 - `artifacts/insight-fixture-workspace`
 
-Then point the React debugger at that root:
+Then point the operator console at that root:
 
 ```bash
 export FAILURE_LAB_ARTIFACT_ROOT="$(pwd)/artifacts/insight-fixture-workspace"

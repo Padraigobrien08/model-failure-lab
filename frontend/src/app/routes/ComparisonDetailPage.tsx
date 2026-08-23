@@ -1,1329 +1,761 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
-import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
-import { ComparisonCaseDetailPanel } from "@/components/comparisons/ComparisonCaseDetailPanel";
-import { ComparisonCoverageSummary } from "@/components/comparisons/ComparisonCoverageSummary";
-import { ComparisonDeltaStrip } from "@/components/comparisons/ComparisonDeltaStrip";
-import { ComparisonDetailHeader } from "@/components/comparisons/ComparisonDetailHeader";
-import { ComparisonTransitionGroups } from "@/components/comparisons/ComparisonTransitionGroups";
-import { SignalDatasetAutomationPanel } from "@/components/datasets/SignalDatasetAutomationPanel";
-import { InsightPanel } from "@/components/insights/InsightPanel";
-import { Badge } from "@/components/ui/badge";
+import { HarvestDialog } from "@/components/console/HarvestDialog";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  buildComparisonDetailSearchParams,
-  buildRunDetailSearchParams,
-  COMPARISON_DETAIL_SECTIONS,
-  parseComparisonDetailSearch,
-  resolveComparisonCaseForTransition,
-  resolveComparisonDetailSection,
-  searchParamsEqual,
-  type ComparisonDetailSectionKey,
-} from "@/lib/artifacts/detailRouteState";
-import { createSearchString, resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
-import { createArtifactHarvestDraft, loadComparisonDetail } from "@/lib/artifacts/load";
+  ConsoleButton,
+  EmptyState,
+  SectionLabel,
+  SegmentedControl,
+  StatusChip,
+  TableHeadCell,
+  formatPercent,
+  formatScore,
+  formatSignedPts,
+  formatSignedScore,
+  truncateRunId,
+} from "@/components/console/primitives";
+import { loadComparisonDetail } from "@/lib/artifacts/load";
 import type {
-  ArtifactDatasetVersionsResponse,
-  ArtifactHarvestResponse,
-  ArtifactInsightEvidenceRef,
   ComparisonCaseDeltaRecord,
-  ComparisonDetailState,
+  ComparisonDetail,
 } from "@/lib/artifacts/types";
-import { formatLabel } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
-type ExportState =
-  | { status: "idle"; response: null; message: null }
-  | { status: "loading"; response: null; message: null }
-  | { status: "ready"; response: ArtifactHarvestResponse; message: string | null }
-  | { status: "error"; response: null; message: string };
+type DetailState =
+  | { status: "loading"; detail: null; message: null }
+  | { status: "ready"; detail: ComparisonDetail; message: null }
+  | { status: "incompatible"; detail: null; message: string };
 
-type DatasetVersionsState =
-  | { status: "idle"; value: null; message: null }
-  | { status: "loading"; value: null; message: null }
-  | { status: "ready"; value: ArtifactDatasetVersionsResponse; message: null }
-  | { status: "error"; value: null; message: string };
+export const REGRESSION_TRANSITIONS = new Set([
+  "no_failure_to_failure",
+  "new_error",
+  "error_stage_changed",
+]);
+export const IMPROVEMENT_TRANSITIONS = new Set(["failure_to_no_failure", "error_cleared"]);
 
-function signalTone(verdict: string): "accent" | "default" | "muted" {
-  if (verdict === "improvement") {
-    return "accent";
-  }
-  if (verdict === "regression") {
-    return "default";
-  }
-  return "muted";
+const TRANSITION_ORDER = [
+  "no_failure_to_failure",
+  "new_error",
+  "error_stage_changed",
+  "failure_type_swap",
+  "error_cleared",
+  "failure_to_no_failure",
+];
+
+export function transitionGroupTone(transitionType: string): "bad" | "good" | "neutral" {
+  if (REGRESSION_TRANSITIONS.has(transitionType)) return "bad";
+  if (IMPROVEMENT_TRANSITIONS.has(transitionType)) return "good";
+  return "neutral";
 }
 
-function recommendationTone(action: string | null): "accent" | "default" | "muted" {
-  if (action === "create" || action === "evolve") {
-    return "accent";
-  }
-  if (action === "ignore") {
-    return "default";
-  }
-  return "muted";
+export function caseSideLabel(
+  failureType: string | null,
+  errorStage: string | null,
+): string {
+  if (errorStage) return `error:${errorStage}`;
+  return failureType ?? "no_failure";
 }
 
-function escalationTone(status: string | null): "accent" | "default" | "muted" {
-  if (status === "critical") {
-    return "default";
-  }
-  if (status) {
-    return "accent";
-  }
-  return "muted";
-}
-
-function priorityTone(priorityBand: string | null): "accent" | "default" | "muted" {
-  if (priorityBand === "urgent") {
-    return "default";
-  }
-  if (priorityBand === "high") {
-    return "accent";
-  }
-  return "muted";
-}
-
-function outcomeTone(status: string | null): "accent" | "default" | "muted" {
-  if (status === "regressed") {
-    return "default";
-  }
-  if (status === "improved" || status === "attested") {
-    return "accent";
-  }
-  return "muted";
-}
-
-function formatPercent(value: number | null): string {
-  return value == null ? "n/a" : `${(value * 100).toFixed(1)}%`;
-}
-
-function selectCasesByOrder(
-  orderedCaseIds: string[],
-  cases: ComparisonCaseDeltaRecord[],
-): ComparisonCaseDeltaRecord[] {
-  const caseMap = new Map(cases.map((caseRow) => [caseRow.caseId, caseRow]));
-  return orderedCaseIds
-    .map((caseId) => caseMap.get(caseId))
-    .filter((caseRow): caseRow is ComparisonCaseDeltaRecord => caseRow !== undefined);
-}
-
-function resolveObservedSection<SectionKey extends string>(
-  entries: IntersectionObserverEntry[],
-): SectionKey | null {
-  const visibleEntries = entries.filter((entry) => entry.isIntersecting);
-  if (visibleEntries.length === 0) {
-    return null;
-  }
-
-  const closestEntry = visibleEntries.sort(
-    (left, right) =>
-      Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top),
-  )[0];
-
-  const sectionId = closestEntry.target.getAttribute("data-section-id");
-  return sectionId as SectionKey | null;
-}
-
-function buildRunCaseDrillthroughHref(runId: string, caseId: string): string {
-  const search = buildRunDetailSearchParams(new URLSearchParams(), {
-    section: "evidence",
-    caseId,
-    lens: null,
-  });
-
-  return `/runs/${encodeURIComponent(runId)}${createSearchString(search)}`;
-}
-
-function buildComparisonExportStem(reportId: string, transitionType: string): string {
-  return `comparison-${reportId}-${transitionType}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-export function ComparisonDetailPage() {
-  const { reportId } = useParams();
-  const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { artifactState, artifactOverview, comparisonInventoryState, runInventoryState } =
-    useAppRouteContext();
-  const [detailState, setDetailState] = useState<ComparisonDetailState>({
-    status: "idle",
+function useComparisonDetail(reportId: string | undefined): [DetailState, () => void] {
+  const [state, setState] = useState<DetailState>({
+    status: "loading",
     detail: null,
     message: null,
   });
-  const [exportState, setExportState] = useState<ExportState>({
-    status: "idle",
-    response: null,
-    message: null,
-  });
-  const [datasetVersionsState, setDatasetVersionsState] = useState<DatasetVersionsState>({
-    status: "idle",
-    value: null,
-    message: null,
-  });
-
-  const inventory =
-    comparisonInventoryState.status === "ready" ? comparisonInventoryState.inventory : null;
-  const comparison = inventory?.comparisons.find((item) => item.reportId === reportId);
-  const requestedState = useMemo(
-    () => parseComparisonDetailSearch(searchParams),
-    [searchParams],
-  );
-  const returnHref = useMemo(
-    () => resolveArtifactReturnHref(location.state, "/comparisons"),
-    [location.state],
-  );
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!reportId || comparison === undefined) {
-      setDatasetVersionsState({
-        status: "idle",
-        value: null,
-        message: null,
-      });
-      startTransition(() => {
-        setDetailState({
-          status: "idle",
-          detail: null,
-          message: null,
-        });
-      });
-      return;
-    }
-
-    startTransition(() => {
-      setDetailState({
-        status: "loading",
-        detail: null,
-        message: null,
-      });
-    });
-    setDatasetVersionsState({
-      status: "idle",
-      value: null,
-      message: null,
-    });
-
+    if (!reportId) return;
+    let cancelled = false;
+    setState({ status: "loading", detail: null, message: null });
     void loadComparisonDetail(reportId)
       .then((detail) => {
-        startTransition(() => {
-          setDetailState({
-            status: "ready",
-            detail,
-            message: null,
-          });
-        });
+        if (!cancelled) setState({ status: "ready", detail, message: null });
       })
       .catch((error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : "Failed to load comparison detail";
-        startTransition(() => {
-          setDetailState({
+        if (!cancelled) {
+          setState({
             status: "incompatible",
             detail: null,
-            message,
+            message: error instanceof Error ? error.message : "comparison detail failed",
           });
-        });
-      });
-  }, [comparison, reportId]);
-
-  const orderedCases = useMemo(() => {
-    if (detailState.status !== "ready") {
-      return [];
-    }
-
-    const orderedIds = detailState.detail.transitions.summary.flatMap((row) => row.caseIds);
-    return selectCasesByOrder(orderedIds, detailState.detail.caseDeltas);
-  }, [detailState]);
-
-  const resolvedSelection = useMemo(() => {
-    if (detailState.status !== "ready") {
-      return {
-        caseId: null as string | null,
-        transition: null as string | null,
-      };
-    }
-
-    const caseMap = new Map(
-      detailState.detail.caseDeltas.map((caseRow) => [caseRow.caseId, caseRow]),
-    );
-    const requestedCase =
-      requestedState.caseId !== null ? caseMap.get(requestedState.caseId) ?? null : null;
-    const requestedTransitionCase = resolveComparisonCaseForTransition(
-      detailState.detail.transitions.summary,
-      detailState.detail.caseDeltas,
-      requestedState.transition,
-    );
-
-    if (requestedCase) {
-      if (
-        requestedState.transition === null ||
-        requestedCase.transitionType === requestedState.transition
-      ) {
-        return {
-          caseId: requestedCase.caseId,
-          transition: requestedCase.transitionType,
-        };
-      }
-
-      if (requestedTransitionCase) {
-        return {
-          caseId: requestedTransitionCase.caseId,
-          transition: requestedTransitionCase.transitionType,
-        };
-      }
-    }
-
-    if (requestedTransitionCase) {
-      return {
-        caseId: requestedTransitionCase.caseId,
-        transition: requestedTransitionCase.transitionType,
-      };
-    }
-
-    return {
-      caseId: orderedCases[0]?.caseId ?? null,
-      transition: orderedCases[0]?.transitionType ?? null,
-    };
-  }, [detailState, orderedCases, requestedState.caseId, requestedState.transition]);
-
-  const selectedCase = useMemo(() => {
-    if (resolvedSelection.caseId === null) {
-      return null;
-    }
-
-    return orderedCases.find((caseRow) => caseRow.caseId === resolvedSelection.caseId) ?? null;
-  }, [orderedCases, resolvedSelection.caseId]);
-
-  const selectedCaseId = resolvedSelection.caseId;
-
-  useEffect(() => {
-    setExportState({ status: "idle", response: null, message: null });
-  }, [reportId, selectedCaseId, resolvedSelection.transition]);
-
-  const resolvedSection = useMemo(
-    () =>
-      resolveComparisonDetailSection(
-        requestedState.section,
-        requestedState.caseId,
-        requestedState.transition,
-      ),
-    [requestedState.caseId, requestedState.section, requestedState.transition],
-  );
-  const [activeSectionId, setActiveSectionId] =
-    useState<ComparisonDetailSectionKey>(resolvedSection);
-  const [highlightedSectionId, setHighlightedSectionId] =
-    useState<ComparisonDetailSectionKey | null>(null);
-  const [highlightedTransitionType, setHighlightedTransitionType] = useState<string | null>(
-    null,
-  );
-  const [landingNotice, setLandingNotice] = useState<string | null>(null);
-  const sectionRefs = useRef<Record<ComparisonDetailSectionKey, HTMLElement | null>>({
-    framing: null,
-    coverage: null,
-    transitions: null,
-  });
-  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
-
-  const setSectionRef =
-    (sectionId: ComparisonDetailSectionKey) => (element: HTMLElement | null) => {
-      sectionRefs.current[sectionId] = element;
-    };
-  const setGroupRef = (transitionType: string) => (element: HTMLDivElement | null) => {
-    groupRefs.current[transitionType] = element;
-  };
-
-  const resolvedLandingNotice = useMemo(() => {
-    const notices: string[] = [];
-
-    if (
-      requestedState.transition !== null &&
-      requestedState.transition !== resolvedSelection.transition
-    ) {
-      notices.push(
-        `Requested transition ${requestedState.transition} is unavailable. Showing ${resolvedSelection.transition ?? "the nearest available transition section"} instead.`,
-      );
-    }
-
-    if (requestedState.caseId !== null && requestedState.caseId !== resolvedSelection.caseId) {
-      notices.push(
-        resolvedSelection.caseId
-          ? `Requested case ${requestedState.caseId} is unavailable in this transition context. Showing ${resolvedSelection.caseId} instead.`
-          : `Requested case ${requestedState.caseId} is unavailable in this transition context.`,
-      );
-    }
-
-    return notices.length > 0 ? notices.join(" ") : null;
-  }, [
-    requestedState.caseId,
-    requestedState.transition,
-    resolvedSelection.caseId,
-    resolvedSelection.transition,
-  ]);
-
-  useEffect(() => {
-    if (resolvedLandingNotice === null) {
-      return;
-    }
-
-    setLandingNotice(resolvedLandingNotice);
-    const timeout = window.setTimeout(() => {
-      setLandingNotice((current) =>
-        current === resolvedLandingNotice ? null : current,
-      );
-    }, 2400);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [resolvedLandingNotice]);
-
-  useEffect(() => {
-    if (detailState.status !== "ready") {
-      return;
-    }
-
-    const nextSearchParams = buildComparisonDetailSearchParams(searchParams, {
-      section: resolvedSection,
-      caseId: resolvedSelection.caseId,
-      transition: resolvedSelection.transition,
-    });
-
-    if (searchParamsEqual(searchParams, nextSearchParams)) {
-      return;
-    }
-
-    setSearchParams(nextSearchParams, {
-      replace: true,
-      state: location.state,
-    });
-  }, [
-    detailState.status,
-    location.state,
-    resolvedSection,
-    resolvedSelection.caseId,
-    resolvedSelection.transition,
-    searchParams,
-    setSearchParams,
-  ]);
-
-  useEffect(() => {
-    setActiveSectionId(resolvedSection);
-  }, [resolvedSection]);
-
-  useEffect(() => {
-    if (detailState.status !== "ready" || typeof IntersectionObserver === "undefined") {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const observedSection =
-          resolveObservedSection<ComparisonDetailSectionKey>(entries);
-        if (observedSection) {
-          setActiveSectionId(observedSection);
         }
-      },
-      {
-        rootMargin: "-18% 0px -58% 0px",
-        threshold: [0.2, 0.35, 0.5, 0.7],
-      },
-    );
-
-    for (const sectionRef of Object.values(sectionRefs.current)) {
-      if (sectionRef) {
-        observer.observe(sectionRef);
-      }
-    }
-
+      });
     return () => {
-      observer.disconnect();
+      cancelled = true;
     };
-  }, [detailState.status]);
+  }, [reportId, attempt]);
 
-  useEffect(() => {
-    if (detailState.status !== "ready") {
-      return;
-    }
+  return [state, () => setAttempt((n) => n + 1)];
+}
 
-    const transitionTarget =
-      resolvedSection === "transitions" && resolvedSelection.transition
-        ? groupRefs.current[resolvedSelection.transition] ?? null
-        : null;
-    const targetElement = transitionTarget ?? sectionRefs.current[resolvedSection];
-    if (!targetElement) {
-      return;
-    }
-
-    const animationFrame = window.requestAnimationFrame(() => {
-      if (typeof targetElement.scrollIntoView === "function") {
-        targetElement.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }
-
-      setActiveSectionId(resolvedSection);
-      setHighlightedSectionId(resolvedSection);
-      setHighlightedTransitionType(transitionTarget ? resolvedSelection.transition : null);
-    });
-
-    const timeout = window.setTimeout(() => {
-      setHighlightedSectionId((current) =>
-        current === resolvedSection ? null : current,
-      );
-      setHighlightedTransitionType((current) =>
-        current === resolvedSelection.transition ? null : current,
-      );
-    }, 1800);
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      window.clearTimeout(timeout);
-    };
-  }, [
-    detailState.status,
-    resolvedSection,
-    resolvedSelection.caseId,
-    resolvedSelection.transition,
-  ]);
-
-  if (artifactState.status !== "ready") {
-    return <ArtifactStatePanel area="Comparisons" state={artifactState} />;
+function headlineSentence(detail: ComparisonDetail): string {
+  if (!detail.comparison.compatible) {
+    return `Comparison incompatible: ${detail.comparison.reason ?? "runs do not share a dataset"}.`;
   }
-
-  if (
-    comparisonInventoryState.status === "idle" ||
-    comparisonInventoryState.status === "loading"
-  ) {
-    return (
-      <section className="space-y-4">
-        <Badge tone="accent">Comparison detail</Badge>
-        <Card>
-          <CardHeader>
-            <CardTitle>Loading selected comparison.</CardTitle>
-            <CardDescription>
-              The comparisons route is resolving the saved comparison detail payload from the
-              active artifact root.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </section>
-    );
+  const deltaRate = detail.metrics.delta.failureRate;
+  const shared = detail.coverage.sharedCaseCount;
+  if (deltaRate == null) {
+    return `Candidate compared on ${shared} shared cases; failure-rate delta unavailable.`;
   }
+  const pts = Math.abs(deltaRate * 100).toFixed(1);
+  if (deltaRate > 0) return `Candidate raised failure rate ${pts} pts on ${shared} shared cases.`;
+  if (deltaRate < 0) return `Candidate lowered failure rate ${pts} pts on ${shared} shared cases.`;
+  return `Candidate held failure rate flat on ${shared} shared cases.`;
+}
 
-  if (comparisonInventoryState.status === "incompatible") {
-    return (
-      <section className="space-y-4">
-        <Badge tone="default">Comparison detail</Badge>
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle>The selected comparison could not be resolved.</CardTitle>
-            <CardDescription>
-              The comparisons inventory is not available under the supported artifact contract.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {comparisonInventoryState.message}
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (inventory === null || !reportId) {
-    return null;
-  }
-
-  if (comparison === undefined) {
-    return (
-      <section className="space-y-4">
-        <Badge tone="default">Comparison detail</Badge>
-        <Card>
-          <CardHeader>
-            <CardTitle>Comparison not found.</CardTitle>
-            <CardDescription>
-              The requested comparison id is not present in the active inventory.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
-              Back to comparisons
-            </Link>
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (detailState.status === "idle" || detailState.status === "loading") {
-    return (
-      <section className="space-y-4">
-        <Badge tone="accent">Comparison detail</Badge>
-        <Card>
-          <CardHeader>
-            <CardTitle>Loading comparison report detail.</CardTitle>
-            <CardDescription>
-              Reading `report.json` and `report_details.json` for {comparison.reportId} from{" "}
-              {artifactOverview?.source.label ?? "the active artifact root"}.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </section>
-    );
-  }
-
-  if (detailState.status === "incompatible") {
-    return (
-      <section className="space-y-4">
-        <Badge tone="default">Comparison detail</Badge>
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle>The saved comparison detail could not be loaded.</CardTitle>
-            <CardDescription>
-              The selected comparison exists in the inventory, but its saved detail artifacts do
-              not match the supported contract.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {detailState.message}
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (detailState.status !== "ready") {
-    return null;
-  }
-
-  const detail = detailState.detail;
-  const activeRecommendation =
-    detail.governanceRecommendation ?? comparison.governanceRecommendation ?? null;
-  const loadedDatasetVersions =
-    datasetVersionsState.status === "ready" ? datasetVersionsState.value : null;
-  const activeHistoryContext = activeRecommendation?.historyContext ?? null;
-  const activeFamilyHealth =
-    loadedDatasetVersions?.history.datasetHealth ?? activeHistoryContext?.familyHealth ?? null;
-  const activeLifecycleActions = loadedDatasetVersions?.lifecycleActions ?? [];
-  const activeLifecycleAction =
-    activeLifecycleActions.length > 0
-      ? activeLifecycleActions[activeLifecycleActions.length - 1]
-      : null;
-  const activePortfolioItem =
-    loadedDatasetVersions?.portfolioItem ?? comparison.portfolioItem ?? null;
-  const activePortfolioPlans = loadedDatasetVersions?.portfolioPlans ?? [];
-  const matchedFamilyId =
-    activeRecommendation?.matchedFamily.familyId ?? loadedDatasetVersions?.familyId ?? null;
-  const activePlanExecutions = loadedDatasetVersions?.planExecutions ?? [];
-  const activeOutcomes = loadedDatasetVersions?.outcomes ?? [];
-  const latestPlanExecution =
-    activePlanExecutions.length > 0 ? activePlanExecutions[0] : null;
-  const latestExecutionReceipt =
-    latestPlanExecution?.receipts.find((receipt) => receipt.familyId === matchedFamilyId) ??
-    (latestPlanExecution?.receipts.length ? latestPlanExecution.receipts[0] : null);
-  const familyOutcomes = activeOutcomes.filter((outcome) => outcome.familyId === matchedFamilyId);
-  const latestOutcome = familyOutcomes.length > 0 ? familyOutcomes[0] : activeOutcomes[0] ?? null;
-  const detailReturnState = {
-    returnTo: {
-      pathname: location.pathname,
-      search: location.search,
-    },
-  };
-  const baselineUnavailableReason =
-    runInventoryState.status === "incompatible"
-      ? "Saved runs are unavailable under the active artifact contract."
-      : runInventoryState.status === "ready" &&
-          !runInventoryState.inventory.runs.some(
-            (candidate) => candidate.runId === detail.comparison.baselineRunId,
-          )
-        ? `Saved baseline run ${detail.comparison.baselineRunId} is unavailable in the active run inventory.`
-        : null;
-  const candidateUnavailableReason =
-    runInventoryState.status === "incompatible"
-      ? "Saved runs are unavailable under the active artifact contract."
-      : runInventoryState.status === "ready" &&
-          !runInventoryState.inventory.runs.some(
-            (candidate) => candidate.runId === detail.comparison.candidateRunId,
-          )
-        ? `Saved candidate run ${detail.comparison.candidateRunId} is unavailable in the active run inventory.`
-        : null;
-  const baselineCaseHref =
-    selectedCase !== null
-      ? buildRunCaseDrillthroughHref(
-          detail.comparison.baselineRunId,
-          selectedCase.caseId,
-        )
-      : null;
-  const candidateCaseHref =
-    selectedCase !== null
-      ? buildRunCaseDrillthroughHref(
-          detail.comparison.candidateRunId,
-          selectedCase.caseId,
-        )
-      : null;
-  const renderInsightEvidenceLink = (reference: ArtifactInsightEvidenceRef) => {
-    if (reference.kind !== "comparison_case" || !reference.caseId) {
-      return null;
-    }
-    const search = buildComparisonDetailSearchParams(new URLSearchParams(searchParams), {
-      section: reference.section === "transitions" ? "transitions" : "transitions",
-      caseId: reference.caseId,
-      transition: reference.transitionType,
-    }).toString();
-    return (
-      <Link
-        key={`${reference.kind}:${reference.reportId ?? "local"}:${reference.caseId}`}
-        className="inline-flex rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground no-underline transition-colors hover:bg-background"
-        to={{
-          pathname: location.pathname,
-          search: search.length > 0 ? `?${search}` : "",
-        }}
-        state={location.state}
+function DeltaCard({
+  label,
+  value,
+  sub,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-tok border border-line bg-panel px-4 py-[14px]">
+      <SectionLabel className="text-[9.5px] tracking-[0.16em]">{label}</SectionLabel>
+      <div
+        className={cn(
+          "mt-2.5 font-heading text-[26px] font-semibold leading-none",
+          valueClassName,
+        )}
       >
-        {reference.label}
-      </Link>
-    );
+        {value}
+      </div>
+      <div className="mt-2 font-mono text-[11.5px] text-muted-ink">{sub}</div>
+    </div>
+  );
+}
+
+type MatrixCell = { baseline: string; candidate: string; cases: ComparisonCaseDeltaRecord[] };
+
+function buildMatrix(caseDeltas: ComparisonCaseDeltaRecord[]) {
+  const cells = new Map<string, MatrixCell>();
+  const baselineLabels = new Set<string>();
+  const candidateLabels = new Set<string>();
+  for (const delta of caseDeltas) {
+    const baseline = caseSideLabel(delta.baselineFailureType, delta.baselineErrorStage);
+    const candidate = caseSideLabel(delta.candidateFailureType, delta.candidateErrorStage);
+    baselineLabels.add(baseline);
+    candidateLabels.add(candidate);
+    const key = `${baseline}→${candidate}`;
+    const cell = cells.get(key) ?? { baseline, candidate, cases: [] };
+    cell.cases.push(delta);
+    cells.set(key, cell);
+  }
+  const order = (labels: Set<string>) =>
+    [...labels].sort((a, b) => {
+      if (a === "no_failure") return -1;
+      if (b === "no_failure") return 1;
+      return a.localeCompare(b);
+    });
+  return {
+    cells,
+    baselineLabels: order(baselineLabels),
+    candidateLabels: order(candidateLabels),
   };
+}
+
+export function ComparisonDetailPage() {
+  const { reportId } = useParams<{ reportId: string }>();
+  const context = useAppRouteContext();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [state, retry] = useComparisonDetail(reportId);
+  const [showRawJson, setShowRawJson] = useState(false);
+  const [harvestOpen, setHarvestOpen] = useState(false);
+  const [selectedCellKey, setSelectedCellKey] = useState<string | null>(null);
+
+  const section = searchParams.get("section") === "matrix" ? "matrix" : "transitions";
+  const detail = state.detail;
+
+  const groups = useMemo(() => {
+    if (!detail) return [];
+    const byType = new Map<string, ComparisonCaseDeltaRecord[]>();
+    for (const delta of detail.caseDeltas) {
+      const list = byType.get(delta.transitionType) ?? [];
+      list.push(delta);
+      byType.set(delta.transitionType, list);
+    }
+    const orderIndex = (type: string) => {
+      const index = TRANSITION_ORDER.indexOf(type);
+      return index === -1 ? TRANSITION_ORDER.length : index;
+    };
+    return [...byType.entries()].sort(
+      (a, b) => orderIndex(a[0]) - orderIndex(b[0]) || a[0].localeCompare(b[0]),
+    );
+  }, [detail]);
+
+  const matrix = useMemo(() => (detail ? buildMatrix(detail.caseDeltas) : null), [detail]);
+
+  if (!reportId) return null;
+
+  const gateRow = context.gateState.status === "ready"
+    ? context.gateState.data.rows.find((row) => row.comparisonId === reportId) ?? null
+    : null;
+  const recommendation = detail?.governanceRecommendation ?? null;
+
+  const evidenceHref = (caseId?: string, transition?: string) => {
+    const params = new URLSearchParams();
+    if (caseId) params.set("caseId", caseId);
+    if (transition) params.set("transition", transition);
+    const query = params.toString();
+    return `/comparisons/${encodeURIComponent(reportId)}/evidence${query ? `?${query}` : ""}`;
+  };
+
+  const changedCount = detail?.caseDeltas.length ?? 0;
+  const verdict = detail?.signal.verdict ?? "neutral";
+  const bannerTone =
+    verdict === "regression" ? "bad" : verdict === "improvement" ? "good" : "neutral";
 
   return (
-    <section className="space-y-8">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] xl:items-start">
-        <div className="min-w-0 space-y-8">
-          <section
-            id="comparison-detail-framing"
-            ref={setSectionRef("framing")}
-            data-section-id="framing"
-            className={cn(
-              "scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
-              highlightedSectionId === "framing"
-                ? "border-primary/25 bg-primary/[0.035]"
-                : "",
-            )}
+    <div className="flex h-full flex-col overflow-hidden">
+      <header className="flex items-end justify-between gap-5 border-b border-line px-7 pb-[14px] pt-[18px]">
+        <div className="min-w-0">
+          <Link
+            to="/comparisons"
+            className="font-mono text-[11px] text-accent-text"
           >
-            <div className="space-y-8">
-              <ComparisonDetailHeader
-                comparison={detail.comparison}
-                signal={detail.signal}
-                governanceRecommendation={activeRecommendation}
-                inventoryHref={returnHref}
-                baselineRunState={detailReturnState}
-                candidateRunState={detailReturnState}
-              />
-
-              <ComparisonDeltaStrip
-                signal={detail.signal}
-                metrics={detail.metrics}
-                compatible={detail.comparison.compatible}
-                onOpenDriverCase={(caseId) => {
-                  const caseRow =
-                    detail.caseDeltas.find((candidate) => candidate.caseId === caseId) ?? null;
-                  setSearchParams(
-                    buildComparisonDetailSearchParams(searchParams, {
-                      section: "transitions",
-                      caseId,
-                      transition: caseRow?.transitionType ?? null,
-                    }),
-                    {
-                      replace: true,
-                      state: location.state,
-                    },
-                  );
-                }}
-              />
-
-              <SignalDatasetAutomationPanel
-                comparisonId={detail.comparison.reportId}
-                dataset={detail.comparison.dataset}
-                signal={detail.signal}
-                recommendation={activeRecommendation}
-                historyContext={activeRecommendation?.historyContext ?? null}
-                returnState={detailReturnState}
-                autoLoadVersions
-                title="Regression enforcement surface"
-                onVersionsStateChange={(state) => setDatasetVersionsState(state)}
-              />
-
-              <InsightPanel
-                badgeLabel="Insights"
-                title="Grounded comparison explanation"
-                description="This heuristic insight layer explains the saved comparison in-place and keeps every pattern attached to the same transition evidence route."
-                report={detail.insightReport}
-                renderEvidenceLink={renderInsightEvidenceLink}
-              />
-            </div>
-          </section>
-
-          <section
-            id="comparison-detail-coverage"
-            ref={setSectionRef("coverage")}
-            data-section-id="coverage"
-            className={cn(
-              "scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
-              highlightedSectionId === "coverage"
-                ? "border-primary/25 bg-primary/[0.035]"
-                : "",
-            )}
-          >
-            <ComparisonCoverageSummary
-              comparison={detail.comparison}
-              coverage={detail.coverage}
-            />
-          </section>
+            ← comparisons / {reportId}
+          </Link>
+          <h1 className="mt-2 font-heading text-[28px] font-semibold leading-[1.1]">
+            Baseline → candidate
+          </h1>
         </div>
+        <div className="flex flex-none gap-2">
+          <ConsoleButton onClick={() => setShowRawJson((value) => !value)}>
+            {showRawJson ? "Close report.json" : "Open report.json"}
+          </ConsoleButton>
+          <ConsoleButton
+            variant="primary"
+            onClick={() => setHarvestOpen(true)}
+            disabled={!detail || verdict !== "regression"}
+          >
+            Harvest regressions
+          </ConsoleButton>
+        </div>
+      </header>
 
-        <aside className="space-y-4 xl:sticky xl:top-28">
-          <Card className="rounded-[24px] border border-border/70 bg-card/75">
-            <CardHeader className="space-y-1 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Operator summary
-              </p>
-              <CardTitle className="text-lg">Keep the decision state visible</CardTitle>
-              <CardDescription>
-                Recommendation, family pressure, and saved plan context stay anchored here while
-                you inspect the evidence below.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={signalTone(detail.signal.verdict)}>
-                  {formatLabel(detail.signal.verdict)}
-                </Badge>
-                <Badge tone="muted">{(detail.signal.severity * 100).toFixed(1)}% severity</Badge>
-                {activeRecommendation ? (
-                  <Badge tone={recommendationTone(activeRecommendation.action)}>
-                    {formatLabel(activeRecommendation.action)}
-                  </Badge>
-                ) : null}
-                {activeRecommendation?.escalation ? (
-                  <Badge tone={escalationTone(activeRecommendation.escalation.status)}>
-                    {formatLabel(activeRecommendation.escalation.status)}
-                  </Badge>
-                ) : null}
-                {activeRecommendation?.lifecycleRecommendation ? (
-                  <Badge tone="muted">
-                    {formatLabel(activeRecommendation.lifecycleRecommendation.action)}
-                  </Badge>
-                ) : null}
-                {activePortfolioItem ? (
-                  <Badge tone={priorityTone(activePortfolioItem.priorityBand)}>
-                    {formatLabel(activePortfolioItem.priorityBand)}
-                  </Badge>
-                ) : null}
+      <div className="flex flex-1 flex-col gap-4 overflow-auto px-7 py-5">
+        {state.status === "loading" ? (
+          <div aria-label="Loading comparison" className="flex flex-col gap-3">
+            <div className="h-28 animate-pulse rounded-tok bg-panel" />
+            <div className="grid grid-cols-4 gap-3">
+              {[0, 1, 2, 3].map((card) => (
+                <div key={card} className="h-24 animate-pulse rounded-tok bg-panel" />
+              ))}
+            </div>
+          </div>
+        ) : state.status === "incompatible" ? (
+          <EmptyState
+            title="Comparison failed to load."
+            detail={state.message}
+            action={<ConsoleButton onClick={retry}>Retry</ConsoleButton>}
+          />
+        ) : detail ? (
+          showRawJson ? (
+            <pre className="flex-1 overflow-auto rounded-tok border border-line bg-panel p-4 font-mono text-[11.5px] leading-relaxed">
+              {JSON.stringify(detail, null, 2)}
+            </pre>
+          ) : (
+            <>
+              <section
+                className={cn(
+                  "flex items-center gap-7 rounded-tok border p-[22px]",
+                  bannerTone === "bad" &&
+                    "border-bad-line border-l-[3px] border-l-bad bg-bad-panel",
+                  bannerTone === "good" &&
+                    "border-line border-l-[3px] border-l-good bg-good-bg",
+                  bannerTone === "neutral" && "border-line bg-panel",
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2.5">
+                    <StatusChip
+                      tone={
+                        bannerTone === "bad"
+                          ? "bad-strong"
+                          : bannerTone === "good"
+                            ? "good"
+                            : "neutral"
+                      }
+                      uppercase
+                      className="px-[11px] py-1"
+                    >
+                      {verdict === "regression"
+                        ? "Regressed"
+                        : verdict === "improvement"
+                          ? "Improved"
+                          : verdict}
+                    </StatusChip>
+                    <span className="font-mono text-[11.5px] text-muted-ink">
+                      severity {formatScore(detail.signal.severity)}
+                      {recommendation ? ` · gate rule ${recommendation.policyRule}` : ""}
+                    </span>
+                  </div>
+                  <div
+                    className={cn(
+                      "mt-[11px] font-heading text-[26px] font-semibold leading-[1.2]",
+                      bannerTone === "bad" && "text-bad-head",
+                      bannerTone === "good" && "text-good",
+                    )}
+                  >
+                    {headlineSentence(detail)}
+                  </div>
+                  <div className="mt-[9px] font-mono text-[12px] text-muted-ink">
+                    {detail.transitions.summary.length > 0
+                      ? detail.transitions.summary
+                          .map((row) => `${row.count} ${row.transitionType}`)
+                          .join(" · ")
+                      : "no case transitions"}
+                  </div>
+                </div>
+                <div className="w-px self-stretch bg-line" />
+                <div className="flex w-[190px] flex-none flex-col gap-2">
+                  <SectionLabel className="text-[9.5px] tracking-[0.16em]">CI gate</SectionLabel>
+                  {verdict === "incompatible" ? (
+                    <>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-heading text-[22px] font-semibold leading-none text-muted-ink">
+                          not evaluated
+                        </span>
+                      </div>
+                      <div className="font-mono text-[10.5px] leading-normal text-muted-ink">
+                        signal discarded · incompatible_signal
+                        <br />
+                        rerun on a shared dataset to gate
+                      </div>
+                    </>
+                  ) : gateRow ? (
+                    <>
+                      <div className="flex items-baseline gap-2">
+                        <span
+                          className={cn(
+                            "font-heading text-[30px] font-semibold leading-none",
+                            gateRow.blocked ? "text-bad" : "text-good",
+                          )}
+                        >
+                          {gateRow.blocked ? "FAIL" : "PASS"}
+                        </span>
+                        <span className="font-mono text-[11px] text-muted-ink">
+                          {gateRow.blocked ? "blocked" : "clear"}
+                        </span>
+                      </div>
+                      <div className="font-mono text-[10.5px] leading-normal text-muted-ink">
+                        policy: {gateRow.policyRule}
+                        <br />
+                        {gateRow.waiver
+                          ? gateRow.waived
+                            ? `waived by ${gateRow.waiver.owner}`
+                            : "waiver inactive"
+                          : "no active waiver"}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="font-mono text-[10.5px] leading-normal text-muted-ink">
+                      not evaluated
+                      <br />
+                      run: failure-lab regressions gate
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <div className="grid grid-cols-4 gap-3">
+                <DeltaCard
+                  label="Failure rate"
+                  value={
+                    detail.metrics.delta.failureRate != null
+                      ? `${formatSignedPts(detail.metrics.delta.failureRate * 100)} pts`
+                      : "—"
+                  }
+                  valueClassName={
+                    detail.metrics.delta.failureRate == null
+                      ? undefined
+                      : detail.metrics.delta.failureRate > 0
+                        ? "text-bad"
+                        : detail.metrics.delta.failureRate < 0
+                          ? "text-good"
+                          : undefined
+                  }
+                  sub={`${formatPercent(detail.metrics.baseline.failureRate)} → ${formatPercent(
+                    detail.metrics.candidate.failureRate,
+                  )}`}
+                />
+                <DeltaCard
+                  label="Classification coverage"
+                  value={
+                    detail.metrics.delta.classificationCoverage != null
+                      ? `${formatSignedPts(detail.metrics.delta.classificationCoverage * 100)} pts`
+                      : "—"
+                  }
+                  sub={`${formatPercent(
+                    detail.metrics.baseline.classificationCoverage,
+                  )} → ${formatPercent(detail.metrics.candidate.classificationCoverage)}`}
+                />
+                <DeltaCard
+                  label="Execution success"
+                  value={
+                    detail.metrics.delta.executionSuccessRate != null
+                      ? `${formatSignedPts(detail.metrics.delta.executionSuccessRate * 100)} pts`
+                      : "—"
+                  }
+                  sub={`${formatPercent(
+                    detail.metrics.baseline.executionSuccessRate,
+                  )} → ${formatPercent(detail.metrics.candidate.executionSuccessRate)}`}
+                />
+                <DeltaCard
+                  label="Shared scope"
+                  value={`${detail.coverage.sharedCaseCount} / ${
+                    detail.coverage.sharedCaseCount +
+                    detail.coverage.baselineOnlyCaseCount +
+                    detail.coverage.candidateOnlyCaseCount
+                  }`}
+                  sub={detail.comparison.dataset ?? "cross-dataset"}
+                />
               </div>
 
-              <div className="space-y-3">
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Recommended next move
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-foreground">
-                    {activeRecommendation
-                      ? formatLabel(activeRecommendation.action)
-                      : "No governance recommendation"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {activeRecommendation?.rationale ??
-                      "This comparison exposes evidence and metrics only; no dataset action recommendation is attached."}
-                  </p>
-                </div>
-
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Matched family
-                  </p>
-                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                    {matchedFamilyId ?? "New family not resolved yet"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {activeRecommendation
-                      ? `${formatLabel(activeRecommendation.matchedFamily.matchKind)} · ${activeRecommendation.matchedFamily.versionCount} versions · ${activeRecommendation.matchedFamily.projectedCaseCount} projected cases`
-                      : "Load family history to inspect immutable versions, lifecycle actions, and portfolio context."}
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Active family state
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {activeLifecycleAction
-                        ? `${formatLabel(activeLifecycleAction.action)} · ${formatLabel(activeLifecycleAction.healthCondition)}`
-                        : activeRecommendation?.lifecycleRecommendation
-                          ? `${formatLabel(activeRecommendation.lifecycleRecommendation.action)} · ${formatLabel(activeRecommendation.lifecycleRecommendation.healthCondition)}`
-                          : activeFamilyHealth?.healthLabel ?? "No lifecycle action recorded"}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {activeLifecycleAction
-                        ? `Applied ${activeLifecycleAction.appliedAt}`
-                        : activeFamilyHealth
-                          ? `${formatLabel(activeFamilyHealth.trend.label)} trend · ${activeFamilyHealth.evaluationRunCount} runs evaluated`
-                          : "Family history is still loading for this comparison."}
-                    </p>
+              <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-[18px]">
+                <section className="flex flex-col gap-2.5">
+                  <SectionLabel className="tracking-[0.2em]">Top drivers</SectionLabel>
+                  {detail.signal.topDrivers.length === 0 ? (
+                    <div className="rounded-tok border border-line bg-panel px-4 py-4 font-mono text-[11.5px] text-muted-ink">
+                      no failure-type drivers · failure mix unchanged
+                    </div>
+                  ) : (
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-line">
+                          <TableHeadCell>Failure type</TableHeadCell>
+                          <TableHeadCell align="right">Δ rate</TableHeadCell>
+                          <TableHeadCell>Direction</TableHeadCell>
+                          <TableHeadCell>Evidence</TableHeadCell>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.signal.topDrivers.map((driver) => {
+                          const isRegression = driver.direction === "regression";
+                          return (
+                            <tr key={driver.failureType} className="border-b border-line-soft">
+                              <td className="px-2 py-[9px] font-mono text-[12.5px] font-semibold">
+                                {driver.failureType}
+                              </td>
+                              <td
+                                className={cn(
+                                  "px-2 py-[9px] text-right font-mono font-semibold",
+                                  isRegression ? "text-bad" : "text-good",
+                                )}
+                              >
+                                {formatSignedPts(driver.delta * 100)}%
+                              </td>
+                              <td className="px-2 py-[9px]">
+                                <StatusChip tone={isRegression ? "bad" : "good"}>
+                                  {driver.direction}
+                                </StatusChip>
+                              </td>
+                              <td className="px-2 py-[9px]">
+                                <span className="flex flex-wrap gap-1.5">
+                                  {driver.caseIds.slice(0, 3).map((caseId) => (
+                                    <button
+                                      key={caseId}
+                                      type="button"
+                                      onClick={() => navigate(evidenceHref(caseId))}
+                                      className="cursor-pointer rounded-tok-sm border border-line bg-transparent px-[7px] py-[2px] font-mono text-[11px] text-ink hover:bg-accent-wash"
+                                    >
+                                      {caseId}
+                                    </button>
+                                  ))}
+                                  {driver.caseIds.length > 3 ? (
+                                    <span className="font-mono text-[11px] text-muted-ink">
+                                      +{driver.caseIds.length - 3}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                  <div className="font-mono text-[11px] text-muted-ink">
+                    regression {formatScore(detail.signal.regressionScore)} · improvement{" "}
+                    {formatScore(detail.signal.improvementScore)} · net{" "}
+                    {formatSignedScore(detail.signal.netScore)}
                   </div>
+                </section>
 
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Portfolio priority
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {activePortfolioItem
-                        ? `Rank ${activePortfolioItem.priorityRank} · ${formatLabel(activePortfolioItem.priorityBand)}`
-                        : "Priority not loaded yet"}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {activePortfolioItem
-                        ? `Score ${activePortfolioItem.priorityScore.toFixed(3)} · ${activePortfolioItem.recentRegressionCount} recent regressions · ${activePortfolioItem.recurringClusterCount} recurring clusters`
-                        : "Load linked family context to inspect queue placement and plan relevance."}
-                    </p>
-                  </div>
-
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Saved plans
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {activePortfolioPlans.length > 0
-                        ? `${activePortfolioPlans.length} linked`
-                        : "No saved plans linked"}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {activePortfolioPlans.slice(0, 3).map((plan) => (
-                        <Badge key={plan.planId} tone="muted">
-                          {plan.planId}
-                        </Badge>
-                      ))}
+                <section className="flex flex-col gap-2.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <SectionLabel className="tracking-[0.2em]">
+                      Case transitions · {changedCount} changed
+                    </SectionLabel>
+                    <div className="flex items-center gap-3">
+                      <SegmentedControl
+                        aria-label="Transition view"
+                        options={[
+                          { value: "transitions", label: "Grouped" },
+                          { value: "matrix", label: "Matrix" },
+                        ]}
+                        value={section}
+                        onChange={(value) => {
+                          const next = new URLSearchParams(searchParams);
+                          if (value === "matrix") {
+                            next.set("section", "matrix");
+                          } else {
+                            next.delete("section");
+                          }
+                          setSearchParams(next, { replace: true });
+                        }}
+                      />
+                      <Link
+                        to={evidenceHref()}
+                        className="font-mono text-[11px] text-accent-text"
+                      >
+                        open evidence →
+                      </Link>
                     </div>
                   </div>
 
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Latest execution
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {latestPlanExecution
-                        ? `${formatLabel(latestPlanExecution.status)} · ${formatLabel(latestPlanExecution.mode)}`
-                        : "No plan execution recorded"}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {latestExecutionReceipt
-                        ? `${formatLabel(latestExecutionReceipt.action)} · ${latestExecutionReceipt.recordedAt}`
-                        : latestPlanExecution
-                          ? `${latestPlanExecution.completedCheckpointCount}/${latestPlanExecution.totalActionCount} checkpoints saved`
-                          : "Execution receipts will appear here after a saved plan is preflighted or executed."}
-                    </p>
-                  </div>
-
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Latest outcome
-                    </p>
-                    {latestOutcome ? (
-                      <>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <Badge tone={outcomeTone(latestOutcome.attestation.state)}>
-                            {formatLabel(latestOutcome.attestation.state)}
-                          </Badge>
-                          {latestOutcome.attestation.verdict ? (
-                            <Badge tone={outcomeTone(latestOutcome.attestation.verdict.status)}>
-                              {formatLabel(latestOutcome.attestation.verdict.status)}
-                            </Badge>
-                          ) : null}
+                  {changedCount === 0 ? (
+                    <div className="rounded-tok border border-line bg-panel px-4 py-4 font-mono text-[11.5px] text-muted-ink">
+                      no changed cases between the two runs
+                    </div>
+                  ) : section === "transitions" ? (
+                    <div className="overflow-hidden rounded-tok border border-line">
+                      {groups.map(([transitionType, cases]) => {
+                        const tone = transitionGroupTone(transitionType);
+                        return (
+                          <div key={transitionType}>
+                            <div
+                              className={cn(
+                                "flex items-center justify-between border-b border-line px-3 py-2",
+                                tone === "bad" && "bg-bad-bg",
+                                tone === "good" && "bg-good-bg",
+                                tone === "neutral" && "bg-panel",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "font-heading text-[11.5px] font-semibold uppercase tracking-[0.08em]",
+                                  tone === "bad" && "text-bad",
+                                  tone === "good" && "text-good",
+                                )}
+                              >
+                                {transitionType}
+                              </span>
+                              <span
+                                className={cn(
+                                  "font-mono text-[11px]",
+                                  tone === "bad"
+                                    ? "text-bad"
+                                    : tone === "good"
+                                      ? "text-good"
+                                      : "text-muted-ink",
+                                )}
+                              >
+                                {cases.length} {cases.length === 1 ? "case" : "cases"} ·{" "}
+                                {Math.round((cases.length / changedCount) * 100)}%
+                              </span>
+                            </div>
+                            {cases.map((delta, index) => (
+                              <button
+                                key={delta.caseId}
+                                type="button"
+                                onClick={() => navigate(evidenceHref(delta.caseId))}
+                                className={cn(
+                                  "block w-full cursor-pointer bg-transparent px-3 py-2.5 text-left font-body text-ink hover:bg-accent-wash",
+                                  index < cases.length - 1 && "border-b border-line-soft",
+                                )}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span className="font-mono text-[12px] font-semibold">
+                                    {delta.caseId}
+                                  </span>
+                                  <span className="font-mono text-[11px] text-muted-ink">
+                                    {caseSideLabel(
+                                      delta.baselineFailureType,
+                                      delta.baselineErrorStage,
+                                    )}{" "}
+                                    →{" "}
+                                    {caseSideLabel(
+                                      delta.candidateFailureType,
+                                      delta.candidateErrorStage,
+                                    )}
+                                  </span>
+                                </span>
+                                <span className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] text-muted-ink">
+                                  {delta.prompt}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : matrix ? (
+                    <div className="flex flex-col gap-2.5">
+                      <div className="overflow-x-auto rounded-tok border border-line">
+                        <table className="w-full border-collapse text-[12px]">
+                          <thead>
+                            <tr className="border-b border-line">
+                              <TableHeadCell className="w-[150px]">
+                                baseline ↓ / cand →
+                              </TableHeadCell>
+                              {matrix.candidateLabels.map((label) => (
+                                <TableHeadCell key={label} align="center">
+                                  {label.replace("instruction_following", "instruction")}
+                                </TableHeadCell>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="font-mono">
+                            {matrix.baselineLabels.map((baseline) => (
+                              <tr key={baseline} className="border-b border-line-soft">
+                                <td className="px-2 py-[7px] font-semibold">{baseline}</td>
+                                {matrix.candidateLabels.map((candidate) => {
+                                  const key = `${baseline}→${candidate}`;
+                                  const cell = matrix.cells.get(key);
+                                  if (!cell) {
+                                    return (
+                                      <td
+                                        key={candidate}
+                                        className="px-2 py-[7px] text-center text-muted-ink"
+                                      >
+                                        ·
+                                      </td>
+                                    );
+                                  }
+                                  const tone =
+                                    candidate === "no_failure"
+                                      ? "good"
+                                      : baseline === "no_failure"
+                                        ? "bad"
+                                        : "neutral";
+                                  return (
+                                    <td key={candidate} className="p-0 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSelectedCellKey(
+                                            selectedCellKey === key ? null : key,
+                                          )
+                                        }
+                                        className={cn(
+                                          "w-full cursor-pointer border-0 px-2 py-[7px] font-mono text-[12px] font-semibold",
+                                          tone === "bad" && "bg-bad-bg text-bad",
+                                          tone === "good" && "bg-good-bg text-good",
+                                          tone === "neutral" && "bg-panel text-ink",
+                                          selectedCellKey === key &&
+                                            "outline outline-2 outline-[var(--accent)]",
+                                        )}
+                                      >
+                                        {cell.cases.length}
+                                      </button>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="font-mono text-[11px] text-muted-ink">
+                        matrix covers the {changedCount} changed cases · unchanged cases are not
+                        broken out per type · click a cell to list its cases
+                      </div>
+                      {selectedCellKey && matrix.cells.get(selectedCellKey) ? (
+                        <div className="rounded-tok border border-line bg-panel p-3">
+                          <SectionLabel className="text-[9.5px] tracking-[0.16em]">
+                            Cell · {selectedCellKey}
+                          </SectionLabel>
+                          <div className="mt-2 flex flex-col gap-1">
+                            {matrix.cells.get(selectedCellKey)!.cases.map((delta) => (
+                              <button
+                                key={delta.caseId}
+                                type="button"
+                                onClick={() => navigate(evidenceHref(delta.caseId))}
+                                className="cursor-pointer rounded-tok border border-line bg-ground px-2.5 py-2 text-left font-mono text-[12px] text-ink hover:bg-accent-wash"
+                              >
+                                {delta.caseId}
+                                <span className="ml-2 text-[11px] text-muted-ink">
+                                  {delta.transitionType}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                          {latestOutcome.attestation.verdict
-                            ? `${latestOutcome.attestation.linkedComparisonIds.length} linked follow-up comparisons · severity delta ${formatPercent(latestOutcome.attestation.verdict.deltaSummary.severityDelta)}`
-                            : `${latestOutcome.attestation.linkedComparisonIds.length} linked follow-up comparisons · ${latestOutcome.attestation.linkedRunIds.length} linked runs`}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="mt-2 text-sm font-semibold text-foreground">
-                          No outcome attestation recorded
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                          {activePortfolioItem?.outcomeFeedback
-                            ? `${activePortfolioItem.outcomeFeedback.openCount} open · ${activePortfolioItem.outcomeFeedback.evidenceLinkedCount} evidence linked · ${activePortfolioItem.outcomeFeedback.attestedCount} attested`
-                            : "Follow-up closure and measured outcome feedback will appear here after execution evidence is linked."}
-                        </p>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Recent pressure
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {activeRecommendation?.escalation
-                        ? `${formatLabel(activeRecommendation.escalation.status)} escalation`
-                        : "No escalation attached"}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {activeRecommendation?.escalation
-                        ? `${activeRecommendation.escalation.recentRegressionCount} recent regressions · ${activeRecommendation.escalation.recurringClusterCount} recurring clusters · fail rate ${formatPercent(activeFamilyHealth?.recentFailRate ?? null)}`
-                        : activeHistoryContext
-                          ? `${activeHistoryContext.recentRegressionCount}/${activeHistoryContext.recentComparisonCount} recent regressions · ${activeHistoryContext.recurringClusters.length} recurring clusters`
-                          : "Escalation and recent-history context are unavailable for this comparison."}
-                    </p>
-                  </div>
-                </div>
-
-                {datasetVersionsState.status === "loading" ? (
-                  <p className="text-sm text-muted-foreground">
-                    Loading immutable family history and saved plan context for{" "}
-                    {matchedFamilyId ?? detail.comparison.reportId}.
-                  </p>
-                ) : null}
-                {datasetVersionsState.status === "error" ? (
-                  <p className="text-sm text-destructive">{datasetVersionsState.message}</p>
-                ) : null}
+                      ) : null}
+                    </div>
+                  ) : null}
+                </section>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="rounded-[24px] border border-border/70 bg-card/75">
-            <CardHeader className="space-y-1 pb-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Section jumps
-              </p>
-              <CardTitle className="text-lg">Traverse comparison evidence</CardTitle>
-              <CardDescription>
-                Move between framing, shared-case scope, and grouped transition evidence without
-                dropping the current selection.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {COMPARISON_DETAIL_SECTIONS.map((section, index) => (
-                <button
-                  key={section.id}
-                  type="button"
-                  aria-pressed={activeSectionId === section.id}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 text-left transition-colors",
-                    activeSectionId === section.id
-                      ? "border-primary/35 bg-primary/10 text-primary"
-                      : "border-border/60 bg-background/70 text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() =>
-                    setSearchParams(
-                      buildComparisonDetailSearchParams(searchParams, {
-                        section: section.id,
-                        caseId: resolvedSelection.caseId,
-                        transition: resolvedSelection.transition,
-                      }),
-                      {
-                        replace: true,
-                        state: location.state,
-                      },
-                    )
-                  }
-                >
-                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/85 text-[11px] font-semibold text-muted-foreground">
-                    {index + 1}
-                  </span>
-                  <span className="text-sm font-semibold">{section.label}</span>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+              {recommendation ? (
+                <details className="rounded-tok border border-line bg-panel">
+                  <summary className="cursor-pointer px-4 py-3 font-heading text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-ink">
+                    Governance · {recommendation.action} · {recommendation.policyRule}
+                  </summary>
+                  <div className="flex flex-col gap-3 border-t border-line px-4 py-4">
+                    <div className="text-[13px] leading-relaxed">
+                      {recommendation.rationale}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 font-mono text-[11.5px] text-muted-ink">
+                      <div>
+                        family {recommendation.matchedFamily.familyId} ·{" "}
+                        {recommendation.matchedFamily.exists
+                          ? `${recommendation.matchedFamily.versionCount} versions · ${recommendation.matchedFamily.currentCaseCount} cases`
+                          : "new family"}
+                        <br />
+                        proposed +{recommendation.matchedFamily.proposedAdditionCount} →{" "}
+                        {recommendation.matchedFamily.projectedCaseCount} cases
+                        {recommendation.matchedFamily.duplicateCaseCount > 0
+                          ? ` · ${recommendation.matchedFamily.duplicateCaseCount} duplicates`
+                          : ""}
+                      </div>
+                      <div>
+                        {recommendation.escalation
+                          ? `escalation ${recommendation.escalation.status} · score ${formatScore(
+                              recommendation.escalation.score,
+                            )} · ${recommendation.escalation.severityBand}`
+                          : "no escalation context"}
+                        <br />
+                        {recommendation.lifecycleRecommendation
+                          ? `lifecycle ${recommendation.lifecycleRecommendation.action} · ${recommendation.lifecycleRecommendation.healthCondition}`
+                          : "no lifecycle action recommended"}
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              ) : null}
 
-          <Card className="rounded-[24px] border border-border/70 bg-card/75">
-            <CardHeader className="space-y-1 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Execution frame
-              </p>
-              <CardTitle className="text-lg">Route provenance</CardTitle>
-              <CardDescription>
-                Keep the durable comparison lineage and evaluation scope visible while you inspect
-                grouped transition evidence below.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3">
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Source root
-                  </p>
-                  <p className="mt-2 break-all font-mono text-xs text-foreground">
-                    {detail.source.path}
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Report ID
-                    </p>
-                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                      {detail.comparison.reportId}
-                    </p>
-                  </div>
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Baseline run
-                    </p>
-                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                      {detail.comparison.baselineRunId}
-                    </p>
-                  </div>
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Candidate run
-                    </p>
-                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                      {detail.comparison.candidateRunId}
-                    </p>
-                  </div>
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Compare mode
-                    </p>
-                    <p className="mt-2 text-sm text-foreground">
-                      {detail.comparison.comparisonMode ?? "n/a"}
-                    </p>
-                  </div>
-                  <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Metrics scope
-                    </p>
-                    <p className="mt-2 text-sm text-foreground">
-                      {detail.comparison.metricsComputedOn ?? "n/a"}
-                    </p>
-                  </div>
-                </div>
+              <div className="font-mono text-[10.5px] text-muted-ink">
+                {truncateRunId(detail.comparison.baselineRunId)} →{" "}
+                {truncateRunId(detail.comparison.candidateRunId)} · reports/
+                {detail.comparison.reportId}/report.json
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[24px] border border-border/70 bg-card/75">
-            <CardHeader className="space-y-1 pb-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Route helper
-              </p>
-              <CardTitle className="text-lg">Open linked runs</CardTitle>
-              <CardDescription>
-                Switch straight to the saved baseline or candidate route without losing the current
-                comparison state.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {baselineUnavailableReason ? (
-                <div
-                  aria-disabled="true"
-                  className="rounded-[18px] border border-border/60 bg-background/55 px-4 py-3 text-muted-foreground"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">
-                    Open baseline
-                  </p>
-                  <p className="mt-2 break-all text-sm font-semibold text-foreground/75">
-                    {detail.comparison.baselineRunId}
-                  </p>
-                  <p className="mt-2 text-sm leading-6">{baselineUnavailableReason}</p>
-                </div>
-              ) : (
-                <Link
-                  className="block rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
-                  to={`/runs/${encodeURIComponent(detail.comparison.baselineRunId)}`}
-                  state={detailReturnState}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Open baseline
-                  </p>
-                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                    {detail.comparison.baselineRunId}
-                  </p>
-                </Link>
-              )}
-
-              {candidateUnavailableReason ? (
-                <div
-                  aria-disabled="true"
-                  className="rounded-[18px] border border-border/60 bg-background/55 px-4 py-3 text-muted-foreground"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em]">
-                    Open candidate
-                  </p>
-                  <p className="mt-2 break-all text-sm font-semibold text-foreground/75">
-                    {detail.comparison.candidateRunId}
-                  </p>
-                  <p className="mt-2 text-sm leading-6">{candidateUnavailableReason}</p>
-                </div>
-              ) : (
-                <Link
-                  className="block rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
-                  to={`/runs/${encodeURIComponent(detail.comparison.candidateRunId)}`}
-                  state={detailReturnState}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Open candidate
-                  </p>
-                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                    {detail.comparison.candidateRunId}
-                  </p>
-                </Link>
-              )}
-            </CardContent>
-          </Card>
-        </aside>
+            </>
+          )
+        ) : null}
       </div>
 
-      <section
-        id="comparison-detail-transitions"
-        ref={setSectionRef("transitions")}
-        data-section-id="transitions"
-        aria-label="Case transitions"
-        className={cn(
-          "space-y-4 scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
-          highlightedSectionId === "transitions"
-            ? "border-primary/25 bg-primary/[0.035]"
-            : "",
-        )}
-      >
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Stage 3 · Transition evidence
-          </p>
-          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-            Grouped case transitions
-          </h2>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            Follow the saved transition groups first, then inspect one changed case at a time
-            without leaving this comparison route.
-          </p>
-        </div>
-
-        {landingNotice ? (
-          <div className="rounded-[18px] border border-border/60 bg-background/75 px-4 py-3 text-sm text-muted-foreground">
-            {landingNotice}
-          </div>
-        ) : null}
-
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.9fr)] lg:items-start">
-          <ComparisonTransitionGroups
-            summary={detail.transitions.summary}
-            caseDeltas={detail.caseDeltas}
-            selectedCaseId={selectedCaseId}
-            highlightedTransitionType={highlightedTransitionType}
-            setGroupRef={setGroupRef}
-            onSelectCase={(caseId) => {
-              const caseRow =
-                detail.caseDeltas.find((candidate) => candidate.caseId === caseId) ?? null;
-              setSearchParams(
-                buildComparisonDetailSearchParams(searchParams, {
-                  section: "transitions",
-                  caseId,
-                  transition: caseRow?.transitionType ?? null,
-                }),
-                {
-                  replace: true,
-                  state: location.state,
-                },
-              );
-            }}
-          />
-          <div className="lg:sticky lg:top-6">
-            <ComparisonCaseDetailPanel
-              baselineAction={
-                selectedCase
-                  ? {
-                      label: "Open baseline evidence",
-                      ariaLabel: `Open case ${selectedCase.caseId} in baseline run ${detail.comparison.baselineRunId}`,
-                      href: baselineUnavailableReason ? null : baselineCaseHref,
-                      runId: detail.comparison.baselineRunId,
-                      state: detailReturnState,
-                      disabledReason: baselineUnavailableReason,
-                    }
-                  : null
-              }
-              candidateAction={
-                selectedCase
-                  ? {
-                      label: "Open candidate evidence",
-                      ariaLabel: `Open case ${selectedCase.caseId} in candidate run ${detail.comparison.candidateRunId}`,
-                      href: candidateUnavailableReason ? null : candidateCaseHref,
-                      runId: detail.comparison.candidateRunId,
-                      state: detailReturnState,
-                      disabledReason: candidateUnavailableReason,
-                    }
-                  : null
-              }
-              artifactContext={
-                selectedCase
-                  ? {
-                      reportId: detail.comparison.reportId,
-                      baselineRunId: detail.comparison.baselineRunId,
-                      candidateRunId: detail.comparison.candidateRunId,
-                      sourcePath: detail.source.path,
-                    }
-                  : null
-              }
-              exportAction={
-                selectedCase
-                  ? {
-                      label: `Export ${selectedCase.transitionLabel} draft`,
-                      status: exportState.status,
-                      message:
-                        exportState.status === "ready"
-                          ? `${exportState.response.datasetId} written to ${exportState.response.outputPath}.`
-                          : exportState.status === "error"
-                            ? exportState.message
-                            : null,
-                      onExport: () => {
-                        setExportState({ status: "loading", response: null, message: null });
-                        void createArtifactHarvestDraft({
-                          mode: "deltas",
-                          filters: {
-                            comparisonId: detail.comparison.reportId,
-                            reportId: detail.comparison.reportId,
-                            delta: selectedCase.transitionType,
-                            limit: detail.caseDeltas.length,
-                          },
-                          outputStem: buildComparisonExportStem(
-                            detail.comparison.reportId,
-                            selectedCase.transitionType,
-                          ),
-                        })
-                          .then((harvestResponse) => {
-                            setExportState({
-                              status: "ready",
-                              response: harvestResponse,
-                              message: null,
-                            });
-                          })
-                          .catch((error: unknown) => {
-                            setExportState({
-                              status: "error",
-                              response: null,
-                              message:
-                                error instanceof Error
-                                  ? error.message
-                                  : "Failed to export a comparison draft dataset pack",
-                            });
-                          });
-                      },
-                    }
-                  : null
-              }
-              caseDelta={selectedCase}
-            />
-          </div>
-        </div>
-      </section>
-
-      <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
-        Back to comparisons
-      </Link>
-    </section>
+      {detail ? (
+        <HarvestDialog
+          open={harvestOpen}
+          onClose={() => setHarvestOpen(false)}
+          reportId={detail.comparison.reportId}
+          dataset={detail.comparison.dataset}
+          signal={detail.signal}
+          recommendation={detail.governanceRecommendation}
+          onWritten={context.reloadDatasetFamilies}
+        />
+      ) : null}
+    </div>
   );
 }

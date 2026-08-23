@@ -2,59 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Operator console theme. Two token sets from the design handoff:
+ * light is the default on :root, dark is wired behind [data-theme="dark"] on <html>.
+ * Radius is a theme token (0px light, 8px dark); status chips stay fully rounded.
+ */
+
 :root {
-  --background: 40 22% 92%;
-  --foreground: 210 23% 14%;
-  --card: 42 18% 88%;
-  --card-foreground: 210 25% 16%;
-  --muted: 41 14% 84%;
-  --muted-foreground: 212 15% 36%;
-  --border: 38 13% 70%;
-  --primary: 176 78% 26%;
-  --primary-foreground: 42 25% 95%;
-  --accent: 176 78% 26%;
-  --accent-foreground: 42 25% 95%;
-  --destructive: 6 80% 41%;
-  --destructive-foreground: 40 29% 96%;
+  --ground: #f2f2f3;
+  --panel: #e9e9ea;
+  --panel-raised: #f5f5f8;
+  --ink: #1d1f20;
+  /* 0.66 alpha keeps muted text >= 4.9:1 on the panel surface (WCAG AA). */
+  --muted-ink: rgba(29, 31, 32, 0.66);
+  --line: rgba(29, 31, 32, 0.16);
+  --line-soft: rgba(29, 31, 32, 0.08);
+  --accent: #5980a6;
+  --accent-text: #416180;
+  --accent-wash: rgba(89, 128, 166, 0.1);
+  --on-accent: #f2f2f3;
+  /* Accent fill darkened one step from the accent so small labels clear 4.5:1. */
+  --accent-fill: #496b8d;
+  --btn-bg: var(--accent-fill);
+  --btn-ink: #f2f2f3;
+  --red: #8f3a2e;
+  --red-bg: #f2dedb;
+  --red-panel: #faf2f0;
+  --red-line: rgba(143, 58, 46, 0.28);
+  --red-head: #7a2f24;
+  --red-chip-bg: #8f3a2e;
+  --red-chip-ink: #f7f2f1;
+  --green: #2f6b4f;
+  --green-bg: #e2ebe5;
+  --warn: #7a5320;
+  --warn-bg: #f0e6d8;
+  --cand-panel: #fdf8f7;
+  --cand-head: #7a2f24;
+  --radius-tok: 0px;
+  --font-heading: "Barlow Condensed", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --heading-weight: 600;
+}
+
+[data-theme="dark"] {
+  --ground: #161826;
+  --panel: #1e2130;
+  --panel-raised: #232532;
+  --ink: #e9e9ed;
+  --muted-ink: #9397ab;
+  --line: rgba(233, 233, 237, 0.13);
+  --line-soft: rgba(233, 233, 237, 0.07);
+  --accent: #6ea8e0;
+  --accent-text: #9ecbf5;
+  --accent-wash: rgba(110, 168, 224, 0.13);
+  --on-accent: #161826;
+  --accent-fill: #6ea8e0;
+  --btn-bg: transparent;
+  --btn-ink: #9ecbf5;
+  --red: #e8a79b;
+  --red-bg: #3b1f20;
+  --red-panel: #241b23;
+  --red-line: rgba(224, 139, 125, 0.3);
+  --red-head: #f2d6d0;
+  --red-chip-bg: #3b1f20;
+  --red-chip-ink: #f0b6aa;
+  --green: #86c8a4;
+  --green-bg: #1c2a24;
+  --warn: #d8b57a;
+  --warn-bg: #2b2519;
+  --cand-panel: #1c1a26;
+  --cand-head: #e8a79b;
+  --radius-tok: 8px;
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --heading-weight: 500;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html {
-  min-height: 100%;
-  background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.09), transparent 32%),
-    linear-gradient(135deg, #f0ebe2 0%, #e7dfcf 54%, #f3efe7 100%);
+html,
+body {
+  margin: 0;
+  height: 100%;
 }
 
 body {
-  margin: 0;
-  min-height: 100vh;
-  color: hsl(var(--foreground));
-  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.18)),
-    linear-gradient(90deg, rgba(31, 41, 51, 0.035) 1px, transparent 1px),
-    linear-gradient(rgba(31, 41, 51, 0.035) 1px, transparent 1px);
-  background-size: auto, 36px 36px, 36px 36px;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.08;
-  background-image: radial-gradient(rgba(31, 41, 51, 0.25) 0.7px, transparent 0.7px);
-  background-size: 18px 18px;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
 }
 
 #root {
-  min-height: 100vh;
+  height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-body);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 code {
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+/* Dark theme carries one subtle radial lift on the content column — nothing else. */
+[data-theme="dark"] .console-main {
+  background: radial-gradient(120% 80% at 12% 0%, #1d2032 0%, #161826 58%);
 }

@@ -51,7 +51,7 @@ model-failure-lab/
 │   └── utils/                  # paths.py (legacy roots), runtime.py
 ├── scripts/                    # Operational scripts (mostly legacy ML pipelines)
 ├── configs/                    # YAML experiment configs (all CivilComments/DistilBERT) — LEGACY
-├── frontend/                   # React 19 + Vite debugger UI
+├── frontend/                   # React 19 + Vite operator console
 ├── tests/unit/                 # 60 test files
 ├── docs/                       # This documentation set
 ├── artifacts/                  # Legacy artifact root (gitignored except .gitkeep)

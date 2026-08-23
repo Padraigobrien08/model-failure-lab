@@ -53,7 +53,7 @@ npm --prefix frontend install           #
 |---|---|---|---|
 | `MODEL_FAILURE_LAB_ARTIFACT_ROOT` | `src/.../utils/paths.py` (legacy + test fixtures) | `<repo>/artifacts` | Legacy artifact root |
 | `MODEL_FAILURE_LAB_CONFIG_ROOT` | `src/.../utils/paths.py` | `<repo>/configs` | Legacy config root |
-| `FAILURE_LAB_ARTIFACT_ROOT` | React UI, `scripts/run_react_ui.py` | — | Workspace the React debugger reads |
+| `FAILURE_LAB_ARTIFACT_ROOT` | React UI, `scripts/run_react_ui.py` | — | Workspace the operator console reads |
 | `TWINE_USERNAME` / `TWINE_PASSWORD` | `make publish` | — | PyPI upload (`__token__` + token) |
 | API keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) | SDKs inside adapters | — | Live model calls (read by the SDKs, not custom code) |
 

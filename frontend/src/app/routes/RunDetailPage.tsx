@@ -1,938 +1,533 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { useAppRouteContext } from "@/app/router";
-import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
-import { RunCaseDetailPanel } from "@/components/run/RunCaseDetailPanel";
-import { RunCaseLensTabs } from "@/components/run/RunCaseLensTabs";
-import { RunCaseTable } from "@/components/run/RunCaseTable";
-import { RunDetailHeader } from "@/components/run/RunDetailHeader";
-import { RunNotableCases } from "@/components/run/RunNotableCases";
-import { RunSummaryMetricStrip } from "@/components/run/RunSummaryMetricStrip";
-import { RunSummarySections } from "@/components/run/RunSummarySections";
-import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  buildRunDetailSearchParams,
-  parseRunDetailSearch,
-  resolveRunDetailSection,
-  resolveRunLensForCase,
-  RUN_DETAIL_SECTIONS,
-  searchParamsEqual,
-  type RunDetailSectionKey,
-} from "@/lib/artifacts/detailRouteState";
-import { resolveArtifactReturnHref } from "@/lib/artifacts/navigation";
+  ConsoleButton,
+  ConsoleInput,
+  EmptyState,
+  SectionLabel,
+  SegmentedControl,
+  StatusChip,
+  TableHeadCell,
+  formatPercent,
+  formatTimestamp,
+  runStatusTone,
+  rowActivationProps,
+} from "@/components/console/primitives";
+import type { ChipTone } from "@/components/console/primitives";
+import { RunHarvestDialog } from "@/components/console/RunHarvestDialog";
 import { loadRunDetail } from "@/lib/artifacts/load";
 import type {
   RunCaseLensKey,
   RunCaseRecord,
+  RunDetail,
   RunDetailState,
 } from "@/lib/artifacts/types";
-import type { ComparisonInventoryItem } from "@/lib/artifacts/types";
 import { cn } from "@/lib/utils";
 
-function selectCasesById(caseIds: string[], cases: RunCaseRecord[]): RunCaseRecord[] {
-  const caseMap = new Map(cases.map((caseRow) => [caseRow.caseId, caseRow]));
-  return caseIds
-    .map((caseId) => caseMap.get(caseId))
-    .filter((caseRow): caseRow is RunCaseRecord => caseRow !== undefined);
+const LENS_KEYS: RunCaseLensKey[] = ["mismatches", "notable", "all", "errors"];
+
+function lensCaseIds(detail: RunDetail, lens: RunCaseLensKey): string[] {
+  switch (lens) {
+    case "mismatches":
+      return detail.lenses.mismatchCaseIds;
+    case "notable":
+      return detail.lenses.notableCaseIds;
+    case "errors":
+      return detail.lenses.errorCaseIds;
+    default:
+      return detail.lenses.allCaseIds;
+  }
 }
 
-function resolveLensCases(
-  lens: RunCaseLensKey,
-  detail: {
-    lenses: {
-      mismatchCaseIds: string[];
-      notableCaseIds: string[];
-      allCaseIds: string[];
-      errorCaseIds: string[];
-    };
-    cases: RunCaseRecord[];
-  },
-) {
-  if (lens === "mismatches") {
-    return selectCasesById(detail.lenses.mismatchCaseIds, detail.cases);
-  }
-
-  if (lens === "notable") {
-    return selectCasesById(detail.lenses.notableCaseIds, detail.cases);
-  }
-
-  if (lens === "errors") {
-    return selectCasesById(detail.lenses.errorCaseIds, detail.cases);
-  }
-
-  return selectCasesById(detail.lenses.allCaseIds, detail.cases);
+function expectationVerdictTone(verdict: string | null): ChipTone {
+  if (verdict === "match") return "good";
+  if (verdict === "mismatch") return "bad";
+  return "neutral";
 }
 
-function resolvePreferredLens(detail: {
-  lenses: {
-    mismatchCaseIds: string[];
-    notableCaseIds: string[];
-    allCaseIds: string[];
-    errorCaseIds: string[];
-  };
-}): RunCaseLensKey {
-  if (detail.lenses.mismatchCaseIds.length > 0) {
-    return "mismatches";
-  }
-
-  if (detail.lenses.notableCaseIds.length > 0) {
-    return "notable";
-  }
-
-  if (detail.lenses.allCaseIds.length > 0) {
-    return "all";
-  }
-
-  if (detail.lenses.errorCaseIds.length > 0) {
-    return "errors";
-  }
-
-  return "mismatches";
-}
-
-function formatOptionalValue(value: string | number | null): string {
-  if (value === null || value === "") {
-    return "n/a";
-  }
-  return String(value);
-}
-
-function resolveObservedSection<SectionKey extends string>(
-  entries: IntersectionObserverEntry[],
-): SectionKey | null {
-  const visibleEntries = entries.filter((entry) => entry.isIntersecting);
-  if (visibleEntries.length === 0) {
-    return null;
-  }
-
-  const closestEntry = visibleEntries.sort(
-    (left, right) =>
-      Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top),
-  )[0];
-
-  const sectionId = closestEntry.target.getAttribute("data-section-id");
-  return sectionId as SectionKey | null;
+function MetricCard({
+  label,
+  value,
+  sub,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-tok border border-line bg-panel p-[14px_16px]">
+      <SectionLabel>{label}</SectionLabel>
+      <div className={cn("mt-1 font-heading text-[26px] font-semibold text-ink", valueClassName)}>
+        {value}
+      </div>
+      <div className="mt-0.5 font-mono text-[11.5px] text-muted-ink">{sub}</div>
+    </div>
+  );
 }
 
 export function RunDetailPage() {
-  const { runId } = useParams();
-  const location = useLocation();
+  const { runId = "" } = useParams();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const {
-    artifactState,
-    artifactOverview,
-    runInventoryState,
-    comparisonInventoryState,
-  } = useAppRouteContext();
-  const [detailState, setDetailState] = useState<RunDetailState>({
+  const [state, setState] = useState<RunDetailState>({
     status: "idle",
     detail: null,
     message: null,
   });
-  const inventory = runInventoryState.status === "ready" ? runInventoryState.inventory : null;
-  const run = inventory?.runs.find((item) => item.runId === runId);
-  const requestedState = useMemo(() => parseRunDetailSearch(searchParams), [searchParams]);
-  const returnHref = useMemo(
-    () => resolveArtifactReturnHref(location.state, "/"),
-    [location.state],
-  );
+  const [showRawJson, setShowRawJson] = useState(false);
+  const [harvestOpen, setHarvestOpen] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
-    if (!runId || run === undefined) {
-      startTransition(() => {
-        setDetailState({
-          status: "idle",
-          detail: null,
-          message: null,
-        });
-      });
-      return;
-    }
-
-    startTransition(() => {
-      setDetailState({
-        status: "loading",
-        detail: null,
-        message: null,
-      });
-    });
-
-    void loadRunDetail(runId)
+    let cancelled = false;
+    setState({ status: "loading", detail: null, message: null });
+    loadRunDetail(runId)
       .then((detail) => {
-        startTransition(() => {
-          setDetailState({
-            status: "ready",
-            detail,
-            message: null,
-          });
-        });
+        if (!cancelled) setState({ status: "ready", detail, message: null });
       })
       .catch((error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : "Failed to load run detail";
-        startTransition(() => {
-          setDetailState({
+        if (!cancelled) {
+          setState({
             status: "incompatible",
             detail: null,
-            message,
+            message: error instanceof Error ? error.message : String(error),
           });
-        });
+        }
       });
-  }, [run, runId]);
-
-  const activeLens = useMemo<RunCaseLensKey>(() => {
-    if (detailState.status !== "ready") {
-      return "mismatches";
-    }
-
-    return (
-      requestedState.lens ??
-      resolveRunLensForCase(detailState.detail, requestedState.caseId) ??
-      resolvePreferredLens(detailState.detail)
-    );
-  }, [detailState, requestedState.caseId, requestedState.lens]);
-
-  const notableCases = useMemo(() => {
-    if (detailState.status !== "ready") {
-      return [];
-    }
-    return selectCasesById(
-      detailState.detail.lenses.notableCaseIds,
-      detailState.detail.cases,
-    ).slice(0, 3);
-  }, [detailState]);
-
-  const caseLensCounts = useMemo(
-    () => ({
-      mismatches:
-        detailState.status === "ready" ? detailState.detail.lenses.mismatchCaseIds.length : 0,
-      notable:
-        detailState.status === "ready" ? detailState.detail.lenses.notableCaseIds.length : 0,
-      all: detailState.status === "ready" ? detailState.detail.lenses.allCaseIds.length : 0,
-      errors: detailState.status === "ready" ? detailState.detail.lenses.errorCaseIds.length : 0,
-    }),
-    [detailState],
-  );
-
-  const visibleCases = useMemo(() => {
-    if (detailState.status !== "ready") {
-      return [];
-    }
-
-    return resolveLensCases(activeLens, detailState.detail);
-  }, [activeLens, detailState]);
-
-  const selectedCase = useMemo(() => {
-    const selectedCaseId =
-      requestedState.caseId &&
-      visibleCases.some((caseRow) => caseRow.caseId === requestedState.caseId)
-        ? requestedState.caseId
-        : visibleCases[0]?.caseId ?? null;
-
-    if (selectedCaseId === null) {
-      return null;
-    }
-
-    return visibleCases.find((caseRow) => caseRow.caseId === selectedCaseId) ?? null;
-  }, [requestedState.caseId, visibleCases]);
-
-  const selectedCaseId = selectedCase?.caseId ?? null;
-
-  const resolvedSection = useMemo(
-    () =>
-      resolveRunDetailSection(
-        requestedState.section,
-        requestedState.lens,
-        requestedState.caseId,
-      ),
-    [requestedState.caseId, requestedState.lens, requestedState.section],
-  );
-  const [activeSectionId, setActiveSectionId] =
-    useState<RunDetailSectionKey>(resolvedSection);
-  const [highlightedSectionId, setHighlightedSectionId] =
-    useState<RunDetailSectionKey | null>(null);
-  const [landingNotice, setLandingNotice] = useState<string | null>(null);
-  const sectionRefs = useRef<Record<RunDetailSectionKey, HTMLElement | null>>({
-    identity: null,
-    shape: null,
-    diagnosis: null,
-    notable: null,
-    evidence: null,
-  });
-
-  const setSectionRef =
-    (sectionId: RunDetailSectionKey) => (element: HTMLElement | null) => {
-      sectionRefs.current[sectionId] = element;
-    };
-
-  const resolvedLandingNotice = useMemo(() => {
-    if (requestedState.caseId === null || requestedState.caseId === selectedCaseId) {
-      return null;
-    }
-
-    if (selectedCaseId === null) {
-      return `Requested case ${requestedState.caseId} is unavailable. Showing the nearest available evidence section instead.`;
-    }
-
-    return `Requested case ${requestedState.caseId} is unavailable in this evidence state. Showing ${selectedCaseId} instead.`;
-  }, [requestedState.caseId, selectedCaseId]);
-
-  useEffect(() => {
-    if (resolvedLandingNotice === null) {
-      return;
-    }
-
-    setLandingNotice(resolvedLandingNotice);
-    const timeout = window.setTimeout(() => {
-      setLandingNotice((current) =>
-        current === resolvedLandingNotice ? null : current,
-      );
-    }, 2400);
-
     return () => {
-      window.clearTimeout(timeout);
+      cancelled = true;
     };
-  }, [resolvedLandingNotice]);
+  }, [runId, reloadToken]);
 
-  const relatedComparisons = useMemo(() => {
-    if (comparisonInventoryState.status !== "ready" || !runId) {
-      return [];
+  const lensParam = searchParams.get("lens") ?? "all";
+  const lens: RunCaseLensKey = (LENS_KEYS as string[]).includes(lensParam)
+    ? (lensParam as RunCaseLensKey)
+    : "all";
+  const q = searchParams.get("q") ?? "";
+  const failureTypeFilter = searchParams.get("failureType") ?? "";
+  const selectedCaseId = searchParams.get("caseId") ?? "";
+
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) {
+      next.set(key, value);
+    } else {
+      next.delete(key);
     }
-
-    return comparisonInventoryState.inventory.comparisons
-      .filter(
-        (comparison) =>
-          comparison.baselineRunId === runId || comparison.candidateRunId === runId,
-      )
-      .slice()
-      .sort((left, right) => {
-        const leftTime = Date.parse(left.createdAt);
-        const rightTime = Date.parse(right.createdAt);
-
-        if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
-          return rightTime - leftTime;
-        }
-
-        if (left.createdAt !== right.createdAt) {
-          return right.createdAt.localeCompare(left.createdAt);
-        }
-
-        return right.reportId.localeCompare(left.reportId);
-      });
-  }, [comparisonInventoryState, runId]);
-
-  const handleSelectNotableCase = (caseId: string) => {
-    setSearchParams(
-      buildRunDetailSearchParams(searchParams, {
-        section: "evidence",
-        lens: "notable",
-        caseId,
-      }),
-      {
-        replace: true,
-        state: location.state,
-      },
-    );
+    setSearchParams(next, { replace: true });
   };
 
-  useEffect(() => {
-    if (detailState.status !== "ready") {
-      return;
+  const detail = state.status === "ready" ? state.detail : null;
+
+  const casesById = useMemo(() => {
+    const map = new Map<string, RunCaseRecord>();
+    for (const record of detail?.cases ?? []) {
+      map.set(record.caseId, record);
     }
+    return map;
+  }, [detail]);
 
-    const nextSearchParams = buildRunDetailSearchParams(searchParams, {
-      section: resolvedSection,
-      lens: activeLens,
-      caseId: selectedCaseId,
-    });
+  const lensCases = useMemo(() => {
+    if (!detail) return [];
+    return lensCaseIds(detail, lens)
+      .map((caseId) => casesById.get(caseId))
+      .filter((record): record is RunCaseRecord => Boolean(record));
+  }, [detail, lens, casesById]);
 
-    if (searchParamsEqual(searchParams, nextSearchParams)) {
-      return;
-    }
+  const filtered = lensCases.filter(
+    (record) =>
+      (!q || record.caseId.includes(q) || record.prompt.includes(q)) &&
+      (!failureTypeFilter ||
+        record.classification?.failure.failureType === failureTypeFilter),
+  );
 
-    setSearchParams(nextSearchParams, {
-      replace: true,
-      state: location.state,
-    });
-  }, [
-    activeLens,
-    detailState.status,
-    location.state,
-    resolvedSection,
-    searchParams,
-    selectedCaseId,
-    setSearchParams,
-  ]);
+  const selectedCase = selectedCaseId ? (casesById.get(selectedCaseId) ?? null) : null;
 
-  useEffect(() => {
-    setActiveSectionId(resolvedSection);
-  }, [resolvedSection]);
-
-  useEffect(() => {
-    if (detailState.status !== "ready" || typeof IntersectionObserver === "undefined") {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const observedSection = resolveObservedSection<RunDetailSectionKey>(entries);
-        if (observedSection) {
-          setActiveSectionId(observedSection);
-        }
-      },
-      {
-        rootMargin: "-18% 0px -58% 0px",
-        threshold: [0.2, 0.35, 0.5, 0.7],
-      },
-    );
-
-    for (const sectionRef of Object.values(sectionRefs.current)) {
-      if (sectionRef) {
-        observer.observe(sectionRef);
-      }
-    }
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [detailState.status]);
-
-  useEffect(() => {
-    if (detailState.status !== "ready") {
-      return;
-    }
-
-    const targetSection = sectionRefs.current[resolvedSection];
-    if (!targetSection) {
-      return;
-    }
-
-    const animationFrame = window.requestAnimationFrame(() => {
-      if (typeof targetSection.scrollIntoView === "function") {
-        targetSection.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }
-      setActiveSectionId(resolvedSection);
-      setHighlightedSectionId(resolvedSection);
-    });
-
-    const timeout = window.setTimeout(() => {
-      setHighlightedSectionId((current) =>
-        current === resolvedSection ? null : current,
-      );
-    }, 1800);
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      window.clearTimeout(timeout);
-    };
-  }, [detailState.status, resolvedSection, activeLens, selectedCaseId]);
-
-  if (artifactState.status !== "ready") {
-    return <ArtifactStatePanel area="Runs" state={artifactState} />;
-  }
-
-  if (runInventoryState.status === "idle" || runInventoryState.status === "loading") {
+  if (state.status === "loading" || state.status === "idle") {
     return (
-      <section className="space-y-4">
-        <Badge tone="accent">Run detail</Badge>
-        <Card>
-          <CardHeader>
-            <CardTitle>Loading selected run.</CardTitle>
-            <CardDescription>
-              The inventory route is resolving the saved run detail payload from the active
-              artifact root.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </section>
-    );
-  }
-
-  if (runInventoryState.status === "incompatible") {
-    return (
-      <section className="space-y-4">
-        <Badge tone="default">Run detail</Badge>
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle>The selected run could not be resolved.</CardTitle>
-            <CardDescription>
-              The runs inventory is not available under the supported artifact contract.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {runInventoryState.message}
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (inventory === null || !runId) {
-    return null;
-  }
-
-  if (run === undefined) {
-    return (
-      <section className="space-y-4">
-        <Badge tone="default">Run detail</Badge>
-        <Card>
-          <CardHeader>
-            <CardTitle>Run not found.</CardTitle>
-            <CardDescription>
-              The requested run id is not present in the active inventory.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
-              Back to runs
-            </Link>
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (detailState.status === "idle" || detailState.status === "loading") {
-    return (
-      <section className="space-y-4">
-        <Badge tone="accent">Run detail</Badge>
-        <Card>
-          <CardHeader>
-            <CardTitle>Loading run report detail.</CardTitle>
-            <CardDescription>
-              Reading `run.json`, `results.json`, `report.json`, and `report_details.json` for{" "}
-              {run.runId} from {artifactOverview?.source.label ?? "the active artifact root"}.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </section>
-    );
-  }
-
-  if (detailState.status === "incompatible") {
-    return (
-      <section className="space-y-4">
-        <Badge tone="default">Run detail</Badge>
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle>The saved run detail could not be loaded.</CardTitle>
-            <CardDescription>
-              The selected run exists in the inventory, but its saved detail artifacts do not
-              match the supported contract.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {detailState.message}
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (detailState.status !== "ready") {
-    return null;
-  }
-
-  const detail = detailState.detail;
-
-  return (
-    <section className="space-y-8">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.58fr)_minmax(14rem,0.42fr)] xl:items-start">
-        <div className="min-w-0 space-y-8">
-          <section
-            id="run-detail-identity"
-            ref={setSectionRef("identity")}
-            data-section-id="identity"
-            className={cn(
-              "scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
-              highlightedSectionId === "identity"
-                ? "border-primary/25 bg-primary/[0.035]"
-                : "",
-            )}
+      <div className="flex h-full flex-col overflow-hidden">
+        <header className="border-b border-line px-7 pb-[15px] pt-[22px]">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="cursor-pointer border-0 bg-transparent p-0 font-mono text-[11px] text-accent-text"
           >
-            <RunDetailHeader
-              runId={detail.run.runId}
-              dataset={detail.run.dataset}
-              model={detail.run.model}
-              status={detail.run.status}
-              createdAt={detail.run.createdAt}
-              inventoryHref={returnHref}
-              reportId={detail.run.reportId}
-              adapterId={detail.run.adapterId}
-              classifierId={detail.run.classifierId}
-              runSeed={detail.run.runSeed}
-            />
-          </section>
-
-          <section
-            id="run-detail-shape"
-            ref={setSectionRef("shape")}
-            data-section-id="shape"
-            className={cn(
-              "scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
-              highlightedSectionId === "shape"
-                ? "border-primary/25 bg-primary/[0.035]"
-                : "",
-            )}
-          >
-            <RunSummaryMetricStrip metrics={detail.metrics} />
-          </section>
-
-          <section
-            id="run-detail-diagnosis"
-            ref={setSectionRef("diagnosis")}
-            data-section-id="diagnosis"
-            className={cn(
-              "scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
-              highlightedSectionId === "diagnosis"
-                ? "border-primary/25 bg-primary/[0.035]"
-                : "",
-            )}
-          >
-            <RunSummarySections
-              failureTypes={detail.summary.failureTypes}
-              expectationVerdicts={detail.summary.expectationVerdicts}
-              tagSlices={detail.summary.tagSlices}
-            />
-          </section>
-
-          <section
-            id="run-detail-notable"
-            ref={setSectionRef("notable")}
-            data-section-id="notable"
-            className={cn(
-              "scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
-              highlightedSectionId === "notable"
-                ? "border-primary/25 bg-primary/[0.035]"
-                : "",
-            )}
-          >
-            <RunNotableCases
-              cases={notableCases}
-              selectedCaseId={selectedCaseId}
-              onSelectCase={handleSelectNotableCase}
-            />
-          </section>
+            ← runs
+          </button>
+          <h1 className="mt-1.5 font-mono text-[22px] font-semibold leading-[1.1] text-ink">
+            {runId}
+          </h1>
+        </header>
+        <div aria-label="Loading run detail" className="mt-4 flex flex-col gap-2 px-7">
+          {[0, 1, 2, 3].map((row) => (
+            <div key={row} className="h-9 animate-pulse rounded-tok bg-panel" />
+          ))}
         </div>
-
-        <aside className="space-y-4 xl:sticky xl:top-24">
-          <Card className="rounded-[24px] border border-border/70 bg-card/75">
-            <CardHeader className="space-y-1 pb-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Section jumps
-              </p>
-              <CardTitle className="text-lg">Stay inside the run flow</CardTitle>
-              <CardDescription>
-                Move between the saved investigation stages without dropping the selected evidence
-                state.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {RUN_DETAIL_SECTIONS.map((section, index) => (
-                <button
-                  key={section.id}
-                  type="button"
-                  aria-pressed={activeSectionId === section.id}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 text-left transition-colors",
-                    activeSectionId === section.id
-                      ? "border-primary/35 bg-primary/10 text-primary"
-                      : "border-border/60 bg-background/70 text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() =>
-                    setSearchParams(
-                      buildRunDetailSearchParams(searchParams, {
-                        section: section.id,
-                        lens: activeLens,
-                        caseId: selectedCaseId,
-                      }),
-                      {
-                        replace: true,
-                        state: location.state,
-                      },
-                    )
-                  }
-                >
-                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/85 text-[11px] font-semibold text-muted-foreground">
-                    {index + 1}
-                  </span>
-                  <span className="text-sm font-semibold">{section.label}</span>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[24px] border border-border/70 bg-card/75">
-            <CardHeader className="space-y-1 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Execution frame
-              </p>
-              <CardTitle className="text-lg">Route provenance</CardTitle>
-              <CardDescription>
-                Keep the durable run lineage visible while you read the failure shape, diagnosis,
-                and selected evidence.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Source root
-                </p>
-                <p className="mt-2 break-all font-mono text-xs text-foreground">
-                  {detail.source.path}
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Run ID
-                  </p>
-                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                    {detail.run.runId}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Report ID
-                  </p>
-                  <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                    {detail.run.reportId}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Adapter
-                  </p>
-                  <p className="mt-2 text-sm text-foreground">
-                    {formatOptionalValue(detail.run.adapterId)}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Classifier
-                  </p>
-                  <p className="mt-2 text-sm text-foreground">
-                    {formatOptionalValue(detail.run.classifierId)}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/60 bg-background/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Run seed
-                  </p>
-                  <p className="mt-2 text-sm text-foreground">
-                    {formatOptionalValue(detail.run.runSeed)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {relatedComparisons.length > 0 ? (
-            <Card className="rounded-[24px] border border-border/70 bg-card/75">
-              <CardHeader className="space-y-1 pb-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Route helper
-                </p>
-                <CardTitle className="text-lg">Related comparisons</CardTitle>
-                <CardDescription>
-                  Jump straight into the saved reports that already reference this run.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {relatedComparisons.slice(0, 2).map((comparison: ComparisonInventoryItem) => (
-                  <Link
-                    key={comparison.reportId}
-                    className="block rounded-[18px] border border-border/60 bg-background/70 px-4 py-3 text-inherit no-underline transition-colors hover:bg-background"
-                    to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
-                    state={{
-                      returnTo: {
-                        pathname: location.pathname,
-                        search: location.search,
-                      },
-                    }}
-                  >
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      {comparison.baselineRunId === runId ? "Candidate report" : "Baseline report"}
-                    </p>
-                    <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                      {comparison.reportId}
-                    </p>
-                  </Link>
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
-        </aside>
       </div>
+    );
+  }
 
-      <section
-        id="run-detail-evidence"
-        ref={setSectionRef("evidence")}
-        data-section-id="evidence"
-        aria-label="Case inspection"
-        className={cn(
-          "space-y-3 scroll-mt-28 rounded-[28px] border border-transparent transition-colors duration-300",
-          highlightedSectionId === "evidence"
-            ? "border-primary/25 bg-primary/[0.035]"
-            : "",
-        )}
-      >
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Stage 5 · Selected evidence
-            </p>
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-              Selected case evidence
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Stay inside the run flow while you move between mismatches, notable examples, saved
-              errors, and the full case set. The evidence panel is the destination.
-            </p>
-          </div>
-
-          {landingNotice ? (
-            <div className="rounded-[18px] border border-border/60 bg-background/75 px-4 py-3 text-sm text-muted-foreground">
-              {landingNotice}
-            </div>
-          ) : null}
-
-          <RunCaseLensTabs
-            value={activeLens}
-            counts={caseLensCounts}
-            onValueChange={(lens) =>
-              setSearchParams(
-                buildRunDetailSearchParams(searchParams, {
-                  section: "evidence",
-                  lens,
-                  caseId: null,
-                }),
-                {
-                  replace: true,
-                  state: location.state,
-                },
-              )
+  if (state.status === "incompatible" || !detail) {
+    return (
+      <div className="flex h-full flex-col overflow-hidden">
+        <header className="border-b border-line px-7 pb-[15px] pt-[22px]">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="cursor-pointer border-0 bg-transparent p-0 font-mono text-[11px] text-accent-text"
+          >
+            ← runs
+          </button>
+          <h1 className="mt-1.5 font-mono text-[22px] font-semibold leading-[1.1] text-ink">
+            {runId}
+          </h1>
+        </header>
+        <div className="flex-1 overflow-auto px-7 pb-[22px]">
+          <EmptyState
+            title="Run detail failed to load."
+            detail={state.status === "incompatible" ? state.message : "unknown error"}
+            action={
+              <ConsoleButton onClick={() => setReloadToken((token) => token + 1)}>
+                Retry
+              </ConsoleButton>
             }
           />
         </div>
+      </div>
+    );
+  }
 
-        {visibleCases.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No cases match this lens.</CardTitle>
-              <CardDescription>
-                This run has no saved rows under the {activeLens} lens. Switch lenses to inspect
-                other cases without leaving the route.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-[minmax(16rem,0.78fr)_minmax(0,1.22fr)] lg:items-start">
-            <div>
-              <RunCaseTable
-                cases={visibleCases}
-                selectedCaseId={selectedCaseId}
-                onSelectCase={(caseId) =>
-                  setSearchParams(
-                    buildRunDetailSearchParams(searchParams, {
-                      section: "evidence",
-                      lens: activeLens,
-                      caseId,
-                    }),
-                    {
-                      replace: true,
-                      state: location.state,
-                    },
-                  )
-                }
-              />
-            </div>
-            <div className="lg:sticky lg:top-24">
-              <RunCaseDetailPanel
-                artifactContext={{
-                  runId: detail.run.runId,
-                  reportId: detail.run.reportId,
-                  sourcePath: detail.source.path,
-                }}
-                caseRow={selectedCase}
-              />
-            </div>
-          </div>
-        )}
-      </section>
+  const { run, metrics } = detail;
+  const countLabel = `${filtered.length} ${filtered.length === 1 ? "case" : "cases"} · dataset order`;
 
-      {relatedComparisons.length > 0 ? (
-        <section className="space-y-4">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Related comparisons
-            </p>
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-              Saved comparisons touching this run
-            </h2>
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              Open the fuller saved-comparison list here once you have the current run evidence in
-              view.
-            </p>
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <header className="flex items-end justify-between gap-6 border-b border-line px-7 pb-[15px] pt-[22px]">
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="cursor-pointer border-0 bg-transparent p-0 font-mono text-[11px] text-accent-text"
+          >
+            ← runs
+          </button>
+          <h1 className="mt-1.5 font-mono text-[22px] font-semibold leading-[1.1] text-ink">
+            {run.runId}
+          </h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-ink">
+            <span>
+              dataset {run.dataset} · model {run.model} · adapter {run.adapterId ?? "—"} ·
+              classifier {run.classifierId ?? "—"} · seed{" "}
+              {run.runSeed != null ? String(run.runSeed) : "—"}
+            </span>
+            <StatusChip tone={runStatusTone(run.status)}>{run.status}</StatusChip>
+            <span>{formatTimestamp(run.createdAt)}</span>
           </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {relatedComparisons.map((comparison: ComparisonInventoryItem) => (
-              <div
-                key={comparison.reportId}
-                className="space-y-2 rounded-[18px] border border-border/55 bg-card/70 px-4 py-4"
+        </div>
+        <div className="flex flex-none gap-2">
+          <ConsoleButton variant="secondary" onClick={() => setShowRawJson((value) => !value)}>
+            Open run.json
+          </ConsoleButton>
+          <ConsoleButton
+            variant="primary"
+            onClick={() => setHarvestOpen(true)}
+            disabled={metrics.failureCaseCount === 0}
+          >
+            Harvest failures
+          </ConsoleButton>
+        </div>
+      </header>
+
+      <div className="border-b border-line px-7 py-[14px]">
+        <div className="grid grid-cols-4 gap-[10px]">
+          <MetricCard
+            label="Failure rate"
+            value={formatPercent(metrics.failureRate)}
+            sub={`${metrics.failureCaseCount} of ${metrics.classifiedCaseCount} classified`}
+          />
+          <MetricCard
+            label="Classification coverage"
+            value={formatPercent(metrics.classificationCoverage)}
+            sub={`${metrics.classifiedCaseCount} / ${metrics.attemptedCaseCount}`}
+          />
+          <MetricCard
+            label="Execution success"
+            value={formatPercent(metrics.executionSuccessRate)}
+            sub={`${metrics.executionErrorCount} ${metrics.executionErrorCount === 1 ? "error" : "errors"}`}
+          />
+          <MetricCard
+            label="Cases"
+            value={String(metrics.attemptedCaseCount)}
+            sub={run.dataset}
+          />
+        </div>
+      </div>
+
+      {showRawJson ? (
+        <div className="flex-1 overflow-auto px-7 py-[14px]">
+          <pre className="rounded-tok border border-line bg-panel p-4 font-mono text-[11.5px] leading-relaxed text-ink">
+            {JSON.stringify(detail, null, 2)}
+          </pre>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-[9px] border-b border-line bg-panel px-7 py-[11px]">
+            <SegmentedControl
+              aria-label="Case lens"
+              options={LENS_KEYS.map((key) => ({
+                value: key,
+                label: `${key} (${lensCaseIds(detail, key).length})`,
+              }))}
+              value={lens}
+              onChange={(value) => setParam("lens", value === "all" ? "" : value)}
+            />
+            <ConsoleInput
+              aria-label="Filter cases"
+              placeholder="case id or prompt contains…"
+              value={q}
+              onChange={(event) => setParam("q", event.target.value)}
+              className="w-64"
+            />
+            {failureTypeFilter ? (
+              <button
+                type="button"
+                onClick={() => setParam("failureType", "")}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-tok border border-line bg-transparent px-[11px] py-[5px] font-body text-[12px] font-medium text-ink"
               >
-                <div className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {comparison.baselineRunId === runId ? "Candidate report" : "Baseline report"}
-                  </p>
-                  <Link
-                    className="block break-all font-mono text-sm font-semibold text-primary no-underline"
-                    to={`/comparisons/${encodeURIComponent(comparison.reportId)}`}
-                    state={{
-                      returnTo: {
-                        pathname: location.pathname,
-                        search: location.search,
-                      },
-                    }}
-                  >
-                    {comparison.reportId}
-                  </Link>
-                  <p className="text-sm text-muted-foreground">
-                    {comparison.baselineRunId === runId ? "Baseline" : "Candidate"} counterpart:{" "}
-                    <span className="break-all font-mono text-xs text-foreground">
-                      {comparison.baselineRunId === runId
-                        ? comparison.candidateRunId
-                        : comparison.baselineRunId}
-                    </span>
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <Badge tone="muted">{comparison.dataset ?? "Multiple datasets"}</Badge>
-                  <Badge tone={comparison.compatible ? "accent" : "default"}>
-                    {comparison.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
+                failure type: <span className="font-mono">{failureTypeFilter}</span>
+                <span aria-hidden="true" className="text-muted-ink">
+                  <X size={12} strokeWidth={1.5} aria-hidden="true" />
+                </span>
+              </button>
+            ) : null}
+            <span className="ml-auto text-[12px] text-muted-ink">{countLabel}</span>
           </div>
-        </section>
-      ) : null}
 
-      <Link className="text-sm font-semibold text-primary no-underline" to={returnHref}>
-        Back to runs
-      </Link>
-    </section>
+          {detail.summary.failureTypes.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-line px-7 py-[10px]">
+              {detail.summary.failureTypes.map((row) => (
+                <button
+                  key={row.label}
+                  type="button"
+                  onClick={() =>
+                    setParam("failureType", failureTypeFilter === row.label ? "" : row.label)
+                  }
+                  className={cn(
+                    "cursor-pointer rounded-tok border border-line bg-transparent px-3 py-2 text-left hover:bg-accent-wash",
+                    failureTypeFilter === row.label && "bg-accent-wash",
+                  )}
+                >
+                  <div className="font-mono text-[11px] text-ink">{row.label}</div>
+                  <div
+                    className={cn(
+                      "font-mono text-[11.5px]",
+                      row.label !== "no_failure" ? "font-semibold text-ink" : "text-muted-ink",
+                    )}
+                  >
+                    {row.count} · {formatPercent(row.share)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="flex min-h-0 flex-1">
+            <div className="flex-1 overflow-auto px-7 pb-[22px]">
+              {detail.cases.length === 0 ? (
+                <EmptyState
+                  title="No cases in this run."
+                  detail={`read runs/${run.runId}/results.json`}
+                />
+              ) : filtered.length === 0 ? (
+                <EmptyState
+                  title="No cases match the current filters."
+                  detail={
+                    q
+                      ? `clear the case filter "${q}"`
+                      : failureTypeFilter
+                        ? `clear the failure type filter "${failureTypeFilter}"`
+                        : `clear the "${lens}" lens`
+                  }
+                  action={
+                    <ConsoleButton
+                      onClick={() => {
+                        const next = new URLSearchParams(searchParams);
+                        next.delete("lens");
+                        next.delete("q");
+                        next.delete("failureType");
+                        setSearchParams(next, { replace: true });
+                      }}
+                    >
+                      Clear filters
+                    </ConsoleButton>
+                  }
+                />
+              ) : (
+                <table className="w-full border-collapse text-[13.5px]">
+                  <thead>
+                    <tr className="border-b border-line">
+                      <TableHeadCell>Case id</TableHeadCell>
+                      <TableHeadCell>Failure type</TableHeadCell>
+                      <TableHeadCell>Subtype</TableHeadCell>
+                      <TableHeadCell>Verdict</TableHeadCell>
+                      <TableHeadCell align="right">Conf</TableHeadCell>
+                      <TableHeadCell>Tags</TableHeadCell>
+                      <TableHeadCell>Error</TableHeadCell>
+                    </tr>
+                  </thead>
+                  <tbody className="font-mono text-[12.5px]">
+                    {filtered.map((record, index) => (
+                      <tr
+                        key={record.caseId}
+                        {...rowActivationProps(() => setParam("caseId", record.caseId))}
+                        className={cn(
+                          "cursor-pointer hover:bg-accent-wash",
+                          index < filtered.length - 1 && "border-b border-line-soft",
+                          record.caseId === selectedCaseId && "bg-accent-wash",
+                        )}
+                      >
+                        <td className="px-2 py-[9px] font-semibold">{record.caseId}</td>
+                        <td className="px-2 py-[9px] text-muted-ink">
+                          {record.classification?.failure.failureType ?? "—"}
+                        </td>
+                        <td className="px-2 py-[9px] text-muted-ink">
+                          {record.classification?.failure.failureSubtype ?? "—"}
+                        </td>
+                        <td className="px-2 py-[9px]">
+                          <StatusChip tone={expectationVerdictTone(record.expectation.verdict)}>
+                            {record.expectation.verdict ?? "—"}
+                          </StatusChip>
+                        </td>
+                        <td className="px-2 py-[9px] text-right text-muted-ink">
+                          {record.classification?.confidence != null
+                            ? record.classification.confidence.toFixed(2)
+                            : "—"}
+                        </td>
+                        <td className="px-2 py-[9px]">
+                          <span className="flex flex-wrap gap-1">
+                            {record.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-raised px-2 py-[1px] text-[10.5px] text-muted-ink"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </span>
+                        </td>
+                        <td className="px-2 py-[9px] text-muted-ink">
+                          {record.error?.stage ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {selectedCase ? (
+              <aside className="w-[360px] flex-none overflow-auto border-l border-line bg-panel p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <SectionLabel>Case</SectionLabel>
+                  <button
+                    type="button"
+                    aria-label="Close case panel"
+                    onClick={() => setParam("caseId", "")}
+                    className="cursor-pointer border-0 bg-transparent p-0 text-[12px] text-muted-ink hover:text-ink"
+                  >
+                    <X size={12} strokeWidth={1.5} aria-hidden="true" />
+                  </button>
+                </div>
+                <div className="mt-1 font-mono text-[12.5px] font-semibold text-ink">
+                  {selectedCase.caseId}
+                </div>
+                <div className="font-mono text-[11px] text-muted-ink">
+                  {selectedCase.promptId}
+                </div>
+
+                <SectionLabel className="mt-4">Prompt</SectionLabel>
+                <div className="mt-1 font-body text-[13.5px] leading-relaxed text-ink">
+                  {selectedCase.prompt}
+                </div>
+
+                <SectionLabel className="mt-4">Output</SectionLabel>
+                {selectedCase.outputText != null ? (
+                  <div className="mt-1 whitespace-pre-wrap font-body text-[13px] leading-relaxed text-ink">
+                    {selectedCase.outputText}
+                  </div>
+                ) : (
+                  <div className="mt-1 font-mono text-[11.5px] text-muted-ink">
+                    no output captured
+                  </div>
+                )}
+
+                {selectedCase.classification ? (
+                  <>
+                    <SectionLabel className="mt-4">Classification</SectionLabel>
+                    <div className="mt-1 font-mono text-[12px] text-ink">
+                      {selectedCase.classification.failure.failureType}
+                      {selectedCase.classification.failure.failureSubtype
+                        ? ` / ${selectedCase.classification.failure.failureSubtype}`
+                        : ""}
+                    </div>
+                    <div className="font-mono text-[11px] text-muted-ink">
+                      conf{" "}
+                      {selectedCase.classification.confidence != null
+                        ? selectedCase.classification.confidence.toFixed(2)
+                        : "—"}
+                    </div>
+                    {selectedCase.classification.explanation ? (
+                      <div className="mt-1 font-body text-[12.5px] leading-relaxed text-ink">
+                        {selectedCase.classification.explanation}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+
+                <SectionLabel className="mt-4">Expectation</SectionLabel>
+                <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[11.5px] text-muted-ink">
+                  <span>
+                    expected{" "}
+                    {selectedCase.expectation.expectedFailure?.failureType ?? "—"} · observed{" "}
+                    {selectedCase.expectation.observedFailure?.failureType ?? "—"}
+                  </span>
+                  <StatusChip tone={expectationVerdictTone(selectedCase.expectation.verdict)}>
+                    {selectedCase.expectation.verdict ?? "—"}
+                  </StatusChip>
+                </div>
+
+                {selectedCase.error ? (
+                  <>
+                    <SectionLabel className="mt-4">Error</SectionLabel>
+                    <div className="mt-1 rounded-tok border border-bad-line bg-bad-panel p-3 font-mono text-[11.5px] leading-relaxed text-ink">
+                      <div>stage {selectedCase.error.stage}</div>
+                      <div>type {selectedCase.error.type}</div>
+                      <div className="mt-1">{selectedCase.error.message}</div>
+                    </div>
+                  </>
+                ) : null}
+
+                <div className="mt-5 font-mono text-[10.5px] text-muted-ink">
+                  runs/{run.runId}/results.json#{selectedCase.caseId}
+                </div>
+              </aside>
+            ) : null}
+          </div>
+        </>
+      )}
+
+      <RunHarvestDialog
+        open={harvestOpen}
+        onClose={() => setHarvestOpen(false)}
+        runId={run.runId}
+        dataset={run.dataset}
+        failureTypes={detail.summary.failureTypes}
+        initialFailureType={failureTypeFilter}
+      />
+    </div>
   );
 }

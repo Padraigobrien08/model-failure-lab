@@ -1700,7 +1700,7 @@ function requireArtifactDatasetVersionRecords(
       versionTag: requireString(row.version_tag, `${field}[${index}].version_tag`),
       createdAt: requireStringOrNull(row.created_at, `${field}[${index}].created_at`),
       caseCount: requireCount(row.case_count, `${field}[${index}].case_count`),
-      path: requireString(row.path, `${field}[${index}].path`),
+      path: row.path == null ? "" : requireString(row.path, `${field}[${index}].path`),
       parentDatasetId: requireStringOrNull(
         row.parent_dataset_id,
         `${field}[${index}].parent_dataset_id`,
@@ -2433,6 +2433,25 @@ function requireRunInventoryItems(value: unknown, field: string): RunInventoryIt
       model: requireString(row.model, `${field}[${index}].model`),
       createdAt: requireString(row.created_at, `${field}[${index}].created_at`),
       status: requireString(row.status, `${field}[${index}].status`),
+      attemptedCaseCount:
+        row.attempted_case_count == null
+          ? null
+          : requireCount(row.attempted_case_count, `${field}[${index}].attempted_case_count`),
+      failureRate:
+        row.failure_rate == null
+          ? null
+          : requireNumber(row.failure_rate, `${field}[${index}].failure_rate`),
+      classificationCoverage:
+        row.classification_coverage == null
+          ? null
+          : requireNumber(
+              row.classification_coverage,
+              `${field}[${index}].classification_coverage`,
+            ),
+      executionErrorCount:
+        row.execution_error_count == null
+          ? null
+          : requireCount(row.execution_error_count, `${field}[${index}].execution_error_count`),
     };
   });
 }

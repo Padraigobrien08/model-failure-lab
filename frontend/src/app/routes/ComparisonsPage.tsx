@@ -2,344 +2,185 @@ import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
-import { ArtifactStatePanel } from "@/components/layout/ArtifactStatePanel";
-import { ComparisonInventoryTable } from "@/components/comparisons/ComparisonInventoryTable";
 import {
-  buildArtifactReturnState,
-  createSearchString,
-} from "@/lib/artifacts/navigation";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import type { ComparisonInventoryItem } from "@/lib/artifacts/types";
-import { formatLabel } from "@/lib/formatters";
+  ConsoleButton,
+  ConsoleInput,
+  EmptyState,
+  RouteHeader,
+  StatusChip,
+  TableHeadCell,
+  formatScore,
+  formatSignedScore,
+  rowActivationProps,
+  truncateRunId,
+  formatTimestamp,
+} from "@/components/console/primitives";
+import type { ChipTone } from "@/components/console/primitives";
+import { cn } from "@/lib/utils";
 
-type ComparisonTriageLens = "all" | "actionable" | "critical" | "lifecycle";
-type ComparisonOrder = "severity" | "priority" | "newest";
-
-function compareComparisonsSeverityFirst(
-  left: ComparisonInventoryItem,
-  right: ComparisonInventoryItem,
-): number {
-  if (left.severity !== right.severity) {
-    return right.severity - left.severity;
+export function verdictTone(verdict: string): ChipTone {
+  switch (verdict) {
+    case "regression":
+      return "bad";
+    case "improvement":
+      return "good";
+    case "incompatible":
+      return "warn";
+    default:
+      return "neutral";
   }
-
-  const leftTime = Date.parse(left.createdAt);
-  const rightTime = Date.parse(right.createdAt);
-
-  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
-    return rightTime - leftTime;
-  }
-
-  if (left.createdAt !== right.createdAt) {
-    return right.createdAt.localeCompare(left.createdAt);
-  }
-
-  return right.reportId.localeCompare(left.reportId);
-}
-
-function compareComparisonsNewestFirst(
-  left: ComparisonInventoryItem,
-  right: ComparisonInventoryItem,
-): number {
-  const leftTime = Date.parse(left.createdAt);
-  const rightTime = Date.parse(right.createdAt);
-
-  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
-    return rightTime - leftTime;
-  }
-
-  if (left.createdAt !== right.createdAt) {
-    return right.createdAt.localeCompare(left.createdAt);
-  }
-
-  return right.reportId.localeCompare(left.reportId);
-}
-
-function isActionableComparison(row: ComparisonInventoryItem): boolean {
-  return row.governanceRecommendation?.action != null
-    && row.governanceRecommendation.action !== "ignore";
-}
-
-function hasLifecycleFollowUp(row: ComparisonInventoryItem): boolean {
-  const lifecycleAction =
-    row.governanceRecommendation?.lifecycleRecommendation?.action
-    ?? row.portfolioItem?.lifecycleAction
-    ?? null;
-  return lifecycleAction != null && lifecycleAction !== "keep";
-}
-
-function isCriticalComparison(row: ComparisonInventoryItem): boolean {
-  return row.governanceRecommendation?.escalation?.status === "critical"
-    || row.portfolioItem?.priorityBand === "urgent";
-}
-
-function compareComparisonsPriorityFirst(
-  left: ComparisonInventoryItem,
-  right: ComparisonInventoryItem,
-): number {
-  const leftRank = left.portfolioItem?.priorityRank ?? Number.MAX_SAFE_INTEGER;
-  const rightRank = right.portfolioItem?.priorityRank ?? Number.MAX_SAFE_INTEGER;
-  if (leftRank !== rightRank) {
-    return leftRank - rightRank;
-  }
-
-  const leftActionable = isActionableComparison(left) ? 1 : 0;
-  const rightActionable = isActionableComparison(right) ? 1 : 0;
-  if (leftActionable !== rightActionable) {
-    return rightActionable - leftActionable;
-  }
-
-  return compareComparisonsSeverityFirst(left, right);
-}
-
-function readTriageLens(searchParams: URLSearchParams): ComparisonTriageLens {
-  const value = searchParams.get("triage");
-  if (value === "actionable" || value === "critical" || value === "lifecycle") {
-    return value;
-  }
-  return "all";
-}
-
-function readComparisonOrder(searchParams: URLSearchParams): ComparisonOrder {
-  const value = searchParams.get("order");
-  if (value === "priority" || value === "newest") {
-    return value;
-  }
-  return "severity";
-}
-
-function buildComparisonsSearchParams(
-  current: URLSearchParams,
-  patch: Partial<Record<"triage" | "order", string>>,
-): URLSearchParams {
-  const next = new URLSearchParams(current);
-  for (const [key, value] of Object.entries(patch)) {
-    if (!value || value === "all" || value === "severity") {
-      next.delete(key);
-    } else {
-      next.set(key, value);
-    }
-  }
-  return next;
 }
 
 export function ComparisonsPage() {
+  const context = useAppRouteContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { artifactState, artifactOverview, comparisonInventoryState } = useAppRouteContext();
+  const q = searchParams.get("q") ?? "";
 
-  const inventory =
-    comparisonInventoryState.status === "ready" ? comparisonInventoryState.inventory : null;
-  const comparisons = inventory?.comparisons ?? [];
-  const triageLens = readTriageLens(searchParams);
-  const order = readComparisonOrder(searchParams);
-  const actionableCount = useMemo(
-    () => comparisons.filter(isActionableComparison).length,
-    [comparisons],
-  );
-  const criticalCount = useMemo(
-    () => comparisons.filter(isCriticalComparison).length,
-    [comparisons],
-  );
-  const lifecycleCount = useMemo(
-    () => comparisons.filter(hasLifecycleFollowUp).length,
-    [comparisons],
-  );
-  const visibleComparisons = useMemo(
-    () => {
-      const filtered = comparisons.filter((row) => {
-        if (triageLens === "actionable") {
-          return isActionableComparison(row);
-        }
-        if (triageLens === "critical") {
-          return isCriticalComparison(row);
-        }
-        if (triageLens === "lifecycle") {
-          return hasLifecycleFollowUp(row);
-        }
-        return true;
-      });
+  const comparisons = useMemo(() => {
+    const rows = context.comparisonInventoryState.inventory?.comparisons ?? [];
+    return [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [context.comparisonInventoryState.inventory]);
 
-      const compare =
-        order === "priority"
-          ? compareComparisonsPriorityFirst
-          : order === "newest"
-            ? compareComparisonsNewestFirst
-            : compareComparisonsSeverityFirst;
-
-      return filtered.slice().sort(compare);
-    },
-    [comparisons, order, triageLens],
+  const filtered = comparisons.filter(
+    (comparison) =>
+      !q ||
+      comparison.reportId.includes(q) ||
+      comparison.baselineRunId.includes(q) ||
+      comparison.candidateRunId.includes(q),
   );
 
-  if (artifactState.status !== "ready" || artifactOverview === null) {
-    return <ArtifactStatePanel area="Comparisons" state={artifactState} />;
-  }
-
-  const readyOverview = artifactOverview;
-
-  if (
-    comparisonInventoryState.status === "idle" ||
-    comparisonInventoryState.status === "loading"
-  ) {
-    return (
-      <section className="space-y-4">
-        <Badge tone="accent">Comparisons</Badge>
-        <Card>
-          <CardHeader>
-            <CardTitle>Loading saved comparisons inventory.</CardTitle>
-            <CardDescription>
-              The shell is resolving the browser-facing comparison index from the default local
-              artifact root.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </section>
-    );
-  }
-
-  if (comparisonInventoryState.status === "incompatible") {
-    return (
-      <section className="space-y-4">
-        <Badge tone="default">Comparisons</Badge>
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle>The comparisons inventory could not be read.</CardTitle>
-            <CardDescription>
-              The shell found report artifacts, but the saved comparison inventory does not match
-              the supported contract.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {comparisonInventoryState.message}
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  if (inventory === null || inventory.comparisons.length === 0) {
-    return (
-      <section className="space-y-4">
-        <Badge tone="accent">Comparisons</Badge>
-        <Card>
-          <CardHeader>
-            <CardTitle>No comparison reports are available yet.</CardTitle>
-            <CardDescription>
-              The shell is reading the right artifact root, but there are no saved comparison
-              reports to index yet.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p className="font-mono text-foreground">{readyOverview.source.reportsPath}</p>
-            <p>Generate a comparison with `failure-lab compare` to populate the inventory.</p>
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
+  const reportsPath = context.artifactOverview?.source.reportsPath ?? "reports/";
+  const isLoading =
+    context.comparisonInventoryState.status === "loading" ||
+    context.comparisonInventoryState.status === "idle";
 
   return (
-    <section className="space-y-6">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone="accent">Comparisons</Badge>
-          <Badge tone="muted">{visibleComparisons.length} visible</Badge>
-          <Badge tone="muted">{actionableCount} actionable</Badge>
-          <Badge tone="muted">{criticalCount} critical</Badge>
-          <Badge tone="muted">{lifecycleCount} lifecycle follow-up</Badge>
-        </div>
-        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-          Saved comparisons inventory.
-        </h1>
-        <p className="max-w-3xl text-base leading-7 text-muted-foreground">
-          The comparisons route reads saved baseline-to-candidate reports from the engine contract
-          and now surfaces the operator context needed to triage what deserves attention before you
-          open a report: recommendation, escalation, lifecycle posture, matched family, and
-          portfolio priority.
-        </p>
+    <div className="flex h-full flex-col overflow-hidden">
+      <RouteHeader eyebrow="Inventory" title="Comparisons" />
+
+      <div className="flex items-center gap-[9px] border-b border-line bg-panel px-7 py-[11px]">
+        <ConsoleInput
+          aria-label="Filter comparisons by id"
+          placeholder="report or run id contains…"
+          value={q}
+          onChange={(event) => {
+            const next = new URLSearchParams(searchParams);
+            if (event.target.value) {
+              next.set("q", event.target.value);
+            } else {
+              next.delete("q");
+            }
+            setSearchParams(next, { replace: true });
+          }}
+          className="w-72"
+        />
+        <span className="ml-auto text-[12px] text-muted-ink">
+          {filtered.length} {filtered.length === 1 ? "comparison" : "comparisons"} · newest first
+        </span>
       </div>
 
-      <Card className="border-border/70 bg-card/70">
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-xl">Triage focus</CardTitle>
-          <CardDescription>
-            Move between all comparisons, immediately actionable items, critical escalations, and
-            lifecycle follow-up without leaving the saved inventory.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: "all", label: "All comparisons" },
-              { value: "actionable", label: "Actionable" },
-              { value: "critical", label: "Critical" },
-              { value: "lifecycle", label: "Lifecycle follow-up" },
-            ].map((lens) => (
-              <Button
-                key={lens.value}
-                variant={triageLens === lens.value ? "default" : "ghost"}
-                size="sm"
-                onClick={() =>
-                  setSearchParams(
-                    buildComparisonsSearchParams(searchParams, { triage: lens.value }),
-                    { replace: true },
-                  )
-                }
-              >
-                {lens.label}
-              </Button>
+      <div className="flex-1 overflow-auto px-7 pb-[22px]">
+        {isLoading ? (
+          <div aria-label="Loading comparisons" className="mt-4 flex flex-col gap-2">
+            {[0, 1, 2].map((row) => (
+              <div key={row} className="h-9 animate-pulse rounded-tok bg-panel" />
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Order
-            </span>
-            {[
-              { value: "severity", label: "Severity first" },
-              { value: "priority", label: "Priority first" },
-              { value: "newest", label: "Newest first" },
-            ].map((option) => (
-              <Button
-                key={option.value}
-                variant={order === option.value ? "default" : "ghost"}
-                size="sm"
-                onClick={() =>
-                  setSearchParams(
-                    buildComparisonsSearchParams(searchParams, { order: option.value }),
-                    { replace: true },
-                  )
-                }
-              >
-                {option.label}
-              </Button>
-            ))}
-            <Badge tone="muted">
-              {formatLabel(triageLens === "all" ? "all" : triageLens)}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      <ComparisonInventoryTable
-        rows={visibleComparisons}
-        onOpenComparison={(selectedReportId) =>
-          navigate(`/comparisons/${encodeURIComponent(selectedReportId)}`, {
-            state: buildArtifactReturnState(
-              "/comparisons",
-              createSearchString(searchParams),
-            ),
-          })
-        }
-      />
-    </section>
+        ) : context.comparisonInventoryState.status === "incompatible" ? (
+          <EmptyState
+            title="Comparison inventory failed to load."
+            detail={context.comparisonInventoryState.message}
+            action={
+              <ConsoleButton onClick={context.reloadComparisonInventory}>Retry</ConsoleButton>
+            }
+          />
+        ) : comparisons.length === 0 ? (
+          <EmptyState
+            title="No saved comparisons."
+            detail={`read ${reportsPath} · run: failure-lab compare <baseline-run> <candidate-run>`}
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title="No comparisons match the current filter."
+            detail={`clear the id filter "${q}"`}
+            action={
+              <ConsoleButton onClick={() => setSearchParams({}, { replace: true })}>
+                Clear filter
+              </ConsoleButton>
+            }
+          />
+        ) : (
+          <table className="w-full border-collapse text-[13.5px]">
+            <thead>
+              <tr className="border-b border-line">
+                <TableHeadCell>Report id</TableHeadCell>
+                <TableHeadCell>Dataset</TableHeadCell>
+                <TableHeadCell>Baseline → candidate</TableHeadCell>
+                <TableHeadCell>Verdict</TableHeadCell>
+                <TableHeadCell align="right">Severity</TableHeadCell>
+                <TableHeadCell align="right">Net score</TableHeadCell>
+                <TableHeadCell>Top driver</TableHeadCell>
+                <TableHeadCell>Saved at</TableHeadCell>
+                <TableHeadCell />
+              </tr>
+            </thead>
+            <tbody className="font-mono text-[12.5px]">
+              {filtered.map((comparison, index) => {
+                const topDriver = comparison.topDrivers[0] ?? null;
+                return (
+                  <tr
+                    key={comparison.reportId}
+                    {...rowActivationProps(() =>
+                      navigate(`/comparisons/${encodeURIComponent(comparison.reportId)}`),
+                    )}
+                    className={cn(
+                      "cursor-pointer hover:bg-accent-wash",
+                      index < filtered.length - 1 && "border-b border-line-soft",
+                    )}
+                  >
+                    <td className="px-2 py-[9px] font-semibold">{comparison.reportId}</td>
+                    <td className="px-2 py-[9px] text-muted-ink">
+                      {comparison.dataset ?? "—"}
+                    </td>
+                    <td className="px-2 py-[9px] text-muted-ink">
+                      {truncateRunId(comparison.baselineRunId)} →{" "}
+                      {truncateRunId(comparison.candidateRunId)}
+                    </td>
+                    <td className="px-2 py-[9px]">
+                      <StatusChip tone={verdictTone(comparison.signalVerdict)}>
+                        {comparison.signalVerdict}
+                      </StatusChip>
+                    </td>
+                    <td
+                      className={cn(
+                        "px-2 py-[9px] text-right",
+                        comparison.signalVerdict === "regression"
+                          ? "font-semibold text-bad"
+                          : "text-muted-ink",
+                      )}
+                    >
+                      {formatScore(comparison.severity)}
+                    </td>
+                    <td className="px-2 py-[9px] text-right text-muted-ink">
+                      {formatSignedScore(comparison.netScore)}
+                    </td>
+                    <td className="px-2 py-[9px] text-muted-ink">
+                      {topDriver ? topDriver.failureType : "—"}
+                    </td>
+                    <td className="px-2 py-[9px] text-muted-ink">
+                      {formatTimestamp(comparison.createdAt)}
+                    </td>
+                    <td className="px-2 py-[9px] text-right font-body text-[12.5px] text-accent-text">
+                      open →
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
   );
 }

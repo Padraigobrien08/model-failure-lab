@@ -48,6 +48,10 @@ export type RunInventoryItem = {
   model: string;
   createdAt: string;
   status: string;
+  attemptedCaseCount: number | null;
+  failureRate: number | null;
+  classificationCoverage: number | null;
+  executionErrorCount: number | null;
 };
 
 export type RunInventory = {
