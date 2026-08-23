@@ -10,9 +10,9 @@ import yaml
 
 from model_failure_lab.index import QueryFilters
 from model_failure_lab.schemas import JsonValue
-from model_failure_lab.storage import read_json
 from model_failure_lab.storage.layout import project_root
 
+from .lifecycle import get_active_lifecycle_action
 from .policy import GovernancePolicy
 from .workflow import review_dataset_actions
 
@@ -126,6 +126,20 @@ def evaluate_regression_gate(
         severity = float(recommendation.signal.get("severity", 0.0) or 0.0)
         should_block = recommendation.action in {"create", "evolve"}
         waiver = waivers.get(recommendation.comparison_id)
+        if waiver is None:
+            # A retired dataset family is being wound down, so its regressions should
+            # stop blocking CI. Surface it through the existing waiver channel with a
+            # clear reason rather than silently un-blocking.
+            family_id = recommendation.matched_family.family_id
+            active_lifecycle = get_active_lifecycle_action(family_id, root=root)
+            if active_lifecycle is not None and active_lifecycle.action == "retire":
+                waiver = GateWaiver(
+                    comparison_id=recommendation.comparison_id,
+                    reason=f"family retired via lifecycle action ({family_id})",
+                    owner=None,
+                    expires_at=None,
+                    active=True,
+                )
         waived = waiver is not None and waiver.active
         rows.append(
             GateDecision(
@@ -153,9 +167,11 @@ def _load_waivers(
 ) -> dict[str, GateWaiver]:
     if waiver_path is None:
         return {}
-    payload = read_json(Path(waiver_path))
+    # Accept YAML or JSON (YAML is a JSON superset) so the waiver file matches the
+    # policy file's format and the console's `--waivers waivers.yml` remedy works.
+    payload = yaml.safe_load(Path(waiver_path).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("waiver file must be a JSON object")
+        raise ValueError("waiver file must be a YAML or JSON mapping")
     raw_rows = payload.get("waivers")
     if not isinstance(raw_rows, list):
         raise ValueError("waiver file must contain a `waivers` list")
