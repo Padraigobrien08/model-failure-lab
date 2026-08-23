@@ -32,6 +32,26 @@ def _report_with(*, verdict: str, delta: dict) -> _FakeReport:
     )
 
 
+def test_gate_fails_when_candidate_drops_baseline_failing_cases() -> None:
+    # Neutral verdict, no execution/coverage drop, but the candidate omitted a baseline
+    # case that was failing -- hiding a regression by removing the broken case.
+    exit_code, message = _evaluate_compare_gate(
+        _report_with(verdict="neutral", delta={}),
+        {"dropped_baseline_failure_case_ids": ["case-broken-1", "case-broken-2"]},
+    )
+    assert exit_code == 1
+    assert "dropped 2 baseline failing case(s)" in message
+
+
+def test_gate_passes_when_only_passing_baseline_cases_are_dropped() -> None:
+    exit_code, message = _evaluate_compare_gate(
+        _report_with(verdict="neutral", delta={}),
+        {"dropped_baseline_failure_case_ids": []},
+    )
+    assert exit_code == 0
+    assert "Gate: PASS" in message
+
+
 def test_gate_fails_on_regression(tmp_path, capsys) -> None:
     exit_code = main(["compare", BASELINE, CANDIDATE, "--gate", "--root", str(tmp_path)])
     output = capsys.readouterr().out

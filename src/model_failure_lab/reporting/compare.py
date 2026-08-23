@@ -31,6 +31,14 @@ TRANSITION_ORDER = (
 )
 
 
+def _case_is_failure(case) -> bool:
+    """True when a baseline case was a classified failure (not a pass or an error)."""
+
+    if case.output is None or case.classification is None:
+        return False
+    return case.classification.failure_type != NO_FAILURE_TYPE
+
+
 def _prompt_content_fingerprint(case) -> str:
     """Deterministic digest of the load-bearing prompt content for one case.
 
@@ -266,6 +274,11 @@ def build_comparison_report(
             "detail_artifact": "report_details.json",
         },
     )
+    dropped_baseline_failure_case_ids = tuple(
+        case_id
+        for case_id in baseline_only_case_ids
+        if _case_is_failure(baseline_map[case_id])
+    )
     details: dict[str, JsonValue] = {
         "report_id": report_id,
         "report_kind": "comparison",
@@ -275,6 +288,7 @@ def build_comparison_report(
         "shared_case_ids": list(shared_case_ids),
         "baseline_only_case_ids": list(baseline_only_case_ids),
         "candidate_only_case_ids": list(candidate_only_case_ids),
+        "dropped_baseline_failure_case_ids": list(dropped_baseline_failure_case_ids),
         "baseline_full_metrics": baseline_full.metrics_payload(),
         "candidate_full_metrics": candidate_full.metrics_payload(),
         "baseline_shared_metrics": baseline_shared.metrics_payload(),

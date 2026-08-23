@@ -4322,7 +4322,29 @@ def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str
         value = delta.get(key)
         if isinstance(value, (int, float)) and value < 0:
             return 1, f"Gate: FAIL ({label} regressed by {_format_signed_rate(value)})"
+    dropped_failures = _dropped_baseline_failure_ids(details)
+    if dropped_failures:
+        preview = ", ".join(dropped_failures[:3])
+        return 1, (
+            f"Gate: FAIL (candidate dropped {len(dropped_failures)} baseline failing "
+            f"case(s): {preview})"
+        )
     return 0, f"Gate: PASS (signal verdict: {verdict})"
+
+
+def _dropped_baseline_failure_ids(details: dict[str, object]) -> list[str]:
+    """Baseline cases that were failing and are absent from the candidate.
+
+    Removing failing cases from the candidate hides them from the shared-scope verdict
+    math, so a candidate could pass simply by deleting the cases it broke. The comparison
+    records these ids in `dropped_baseline_failure_case_ids` (dropping passing cases is
+    benign and is not recorded).
+    """
+
+    dropped = details.get("dropped_baseline_failure_case_ids")
+    if not isinstance(dropped, list):
+        return []
+    return sorted(value for value in dropped if isinstance(value, str))
 
 
 def _render_compare_markdown(report, details: dict[str, object], *, gate_line: str | None) -> str:
