@@ -7,7 +7,7 @@ import type { ChipTone } from "@/components/console/primitives";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION = "v0.9.0 · local";
+const APP_VERSION = "v0.10.0 · local";
 
 function navCount(context: AppRouteContext, path: string): string | null {
   const overview = context.artifactOverview;
