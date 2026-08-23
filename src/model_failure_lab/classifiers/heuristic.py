@@ -1,10 +1,23 @@
-"""Baseline deterministic heuristic classifier."""
+"""Baseline deterministic heuristic classifier.
+
+`heuristic_v1` is intentionally narrow: it can only emit the four failure types below
+plus `no_failure`. The full taxonomy (`schemas.taxonomy.FAILURE_TYPES`) also defines
+`retrieval`, `safety`, `format`, and `tool_use`, which this classifier does not detect --
+they require a richer (e.g. model-graded) classifier. This subset is declared explicitly
+so callers and filters do not assume coverage the baseline classifier cannot provide.
+"""
 
 from __future__ import annotations
 
 import re
 
 from .contracts import ClassifierInput, ClassifierResult
+
+# The failure types heuristic_v1 can actually produce. A strict subset of the full
+# taxonomy; see the module docstring. Enforced by test_heuristic_classifier_coverage.
+HEURISTIC_V1_EMITTED_FAILURE_TYPES: frozenset[str] = frozenset(
+    {"no_failure", "reasoning", "instruction_following", "hallucination"}
+)
 
 _HALLUCINATION_MARKERS = (
     "according to a study",

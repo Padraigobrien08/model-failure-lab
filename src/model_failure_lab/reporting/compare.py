@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections import Counter
 from datetime import datetime, timezone
 
@@ -28,6 +29,99 @@ TRANSITION_ORDER = (
     "new_error",
     "error_stage_changed",
 )
+
+
+def _case_is_failure(case) -> bool:
+    """True when a baseline case was a classified failure (not a pass or an error)."""
+
+    if case.output is None or case.classification is None:
+        return False
+    return case.classification.failure_type != NO_FAILURE_TYPE
+
+
+def _prompt_content_fingerprint(case) -> str:
+    """Deterministic digest of the load-bearing prompt content for one case.
+
+    Covers the prompt text and its expectations -- the two things a regression
+    comparison depends on -- but not cosmetic fields (tags, id), so a reordering
+    does not spuriously flag a mismatch.
+    """
+
+    snapshot = case.prompt.to_payload()
+    material = {
+        "prompt": snapshot.get("prompt"),
+        "expectations": snapshot.get("expectations"),
+    }
+    canonical = json.dumps(material, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _build_incompatible_comparison(
+    baseline: SavedRunArtifacts,
+    candidate: SavedRunArtifacts,
+    *,
+    report_id: str,
+    created_at: str,
+    reason: str,
+    status_overall: str,
+    baseline_full,
+    candidate_full,
+    shared_case_count: int,
+    baseline_only_case_count: int,
+    candidate_only_case_count: int,
+) -> BuiltReport:
+    """Assemble one incompatible comparison report (no verdict math is meaningful)."""
+
+    signal = build_incompatible_signal(reason=reason)
+    comparison = {
+        "baseline_run_id": baseline.run.run_id,
+        "candidate_run_id": candidate.run.run_id,
+        "baseline_dataset_id": baseline.dataset_id,
+        "candidate_dataset_id": candidate.dataset_id,
+        "compatible": False,
+        "reason": reason,
+        "shared_case_count": shared_case_count,
+        "baseline_only_case_count": baseline_only_case_count,
+        "candidate_only_case_count": candidate_only_case_count,
+        "signal": signal,
+    }
+    report = Report(
+        report_id=report_id,
+        run_ids=(baseline.run.run_id, candidate.run.run_id),
+        created_at=created_at,
+        total_cases=0,
+        failure_counts={},
+        failure_rates={},
+        comparison=comparison,
+        metrics={
+            "baseline": baseline_full.metrics_payload(),
+            "candidate": candidate_full.metrics_payload(),
+            "delta": {},
+        },
+        status={"overall": status_overall},
+        metadata={
+            "report_kind": "comparison",
+            "comparison_mode": "baseline_to_candidate",
+            "detail_artifact": "report_details.json",
+        },
+    )
+    details: dict[str, JsonValue] = {
+        "report_id": report_id,
+        "report_kind": "comparison",
+        "comparison_mode": "baseline_to_candidate",
+        "compatibility": dict(comparison),
+        "baseline_full_metrics": baseline_full.metrics_payload(),
+        "candidate_full_metrics": candidate_full.metrics_payload(),
+        "baseline_case_ids": list(baseline.case_ids),
+        "candidate_case_ids": list(candidate.case_ids),
+        "signal": signal,
+        "case_transition_counts": {},
+        "case_transition_summary": [],
+        "case_deltas": [],
+    }
+    return BuiltReport(report=report, details=details)
+
+
 def build_comparison_report(
     baseline: SavedRunArtifacts,
     candidate: SavedRunArtifacts,
@@ -46,56 +140,66 @@ def build_comparison_report(
     candidate_only_case_ids = tuple(sorted(set(candidate.case_ids) - set(baseline.case_ids)))
 
     if baseline.dataset_id != candidate.dataset_id:
-        signal = build_incompatible_signal(reason="dataset_mismatch")
-        report = Report(
+        # Different dataset ids: nothing is comparable.
+        return _build_incompatible_comparison(
+            baseline,
+            candidate,
             report_id=report_id,
-            run_ids=(baseline.run.run_id, candidate.run.run_id),
             created_at=created_at,
-            total_cases=0,
-            failure_counts={},
-            failure_rates={},
-            comparison={
-                "baseline_run_id": baseline.run.run_id,
-                "candidate_run_id": candidate.run.run_id,
-                "baseline_dataset_id": baseline.dataset_id,
-                "candidate_dataset_id": candidate.dataset_id,
-                "compatible": False,
-                "reason": "dataset_mismatch",
-                "shared_case_count": 0,
-                "baseline_only_case_count": len(baseline.case_ids),
-                "candidate_only_case_count": len(candidate.case_ids),
-                "signal": signal,
-            },
-            metrics={
-                "baseline": baseline_full.metrics_payload(),
-                "candidate": candidate_full.metrics_payload(),
-                "delta": {},
-            },
-            status={"overall": "incompatible_dataset"},
-            metadata={
-                "report_kind": "comparison",
-                "comparison_mode": "baseline_to_candidate",
-                "detail_artifact": "report_details.json",
-            },
+            reason="dataset_mismatch",
+            status_overall="incompatible_dataset",
+            baseline_full=baseline_full,
+            candidate_full=candidate_full,
+            shared_case_count=0,
+            baseline_only_case_count=len(baseline.case_ids),
+            candidate_only_case_count=len(candidate.case_ids),
         )
-        details: dict[str, JsonValue] = {
-            "report_id": report_id,
-            "report_kind": "comparison",
-            "comparison_mode": "baseline_to_candidate",
-            "compatibility": dict(report.comparison),
-            "baseline_full_metrics": baseline_full.metrics_payload(),
-            "candidate_full_metrics": candidate_full.metrics_payload(),
-            "baseline_case_ids": list(baseline.case_ids),
-            "candidate_case_ids": list(candidate.case_ids),
-            "signal": signal,
-            "case_transition_counts": {},
-            "case_transition_summary": [],
-            "case_deltas": [],
-        }
-        return BuiltReport(report=report, details=details)
+
+    if not shared_case_ids:
+        # Same dataset id but no case id is shared -- e.g. the candidate renamed every
+        # case. Verdict math over an empty shared set would score "neutral" and pass the
+        # gate, so treat a zero-overlap comparison as incompatible instead.
+        return _build_incompatible_comparison(
+            baseline,
+            candidate,
+            report_id=report_id,
+            created_at=created_at,
+            reason="no_shared_cases",
+            status_overall="incompatible_cases",
+            baseline_full=baseline_full,
+            candidate_full=candidate_full,
+            shared_case_count=0,
+            baseline_only_case_count=len(baseline_only_case_ids),
+            candidate_only_case_count=len(candidate_only_case_ids),
+        )
 
     baseline_map = baseline.case_map()
     candidate_map = candidate.case_map()
+
+    content_mismatch_ids = tuple(
+        case_id
+        for case_id in shared_case_ids
+        if _prompt_content_fingerprint(baseline_map[case_id])
+        != _prompt_content_fingerprint(candidate_map[case_id])
+    )
+    if content_mismatch_ids:
+        # Same case id, different prompt/expectation content: the dataset was mutated
+        # under a stable id, so the runs are not comparable on those cases. Fail closed
+        # rather than silently comparing across changed prompts.
+        return _build_incompatible_comparison(
+            baseline,
+            candidate,
+            report_id=report_id,
+            created_at=created_at,
+            reason="dataset_content_mismatch",
+            status_overall="incompatible_cases",
+            baseline_full=baseline_full,
+            candidate_full=candidate_full,
+            shared_case_count=len(shared_case_ids),
+            baseline_only_case_count=len(baseline_only_case_ids),
+            candidate_only_case_count=len(candidate_only_case_ids),
+        )
+
     baseline_shared_cases = tuple(baseline_map[case_id] for case_id in shared_case_ids)
     candidate_shared_cases = tuple(candidate_map[case_id] for case_id in shared_case_ids)
     baseline_shared = summarize_case_executions(baseline_shared_cases)
@@ -129,9 +233,15 @@ def build_comparison_report(
     )
 
     case_deltas = _case_deltas(shared_case_ids, baseline_map, candidate_map)
+    execution_success_delta = delta_metrics["execution_success_rate"]
     signal = build_comparison_signal(
         failure_rate_deltas=failure_rate_deltas,
         case_deltas=case_deltas,
+        execution_success_delta=(
+            float(execution_success_delta)
+            if isinstance(execution_success_delta, (int, float))
+            else None
+        ),
     )
 
     report = Report(
@@ -164,6 +274,11 @@ def build_comparison_report(
             "detail_artifact": "report_details.json",
         },
     )
+    dropped_baseline_failure_case_ids = tuple(
+        case_id
+        for case_id in baseline_only_case_ids
+        if _case_is_failure(baseline_map[case_id])
+    )
     details: dict[str, JsonValue] = {
         "report_id": report_id,
         "report_kind": "comparison",
@@ -173,6 +288,7 @@ def build_comparison_report(
         "shared_case_ids": list(shared_case_ids),
         "baseline_only_case_ids": list(baseline_only_case_ids),
         "candidate_only_case_ids": list(candidate_only_case_ids),
+        "dropped_baseline_failure_case_ids": list(dropped_baseline_failure_case_ids),
         "baseline_full_metrics": baseline_full.metrics_payload(),
         "candidate_full_metrics": candidate_full.metrics_payload(),
         "baseline_shared_metrics": baseline_shared.metrics_payload(),

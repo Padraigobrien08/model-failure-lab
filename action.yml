@@ -30,7 +30,7 @@ inputs:
 
 outputs:
   verdict:
-    description: "Signal verdict: regression, improvement, or stable."
+    description: "Signal verdict: regression, improvement, neutral, or incompatible."
     value: ${{ steps.compare.outputs.verdict }}
 
 runs:
@@ -54,11 +54,16 @@ runs:
         STATUS=$?
         cat compare.md
         cat compare.md >> "$GITHUB_STEP_SUMMARY"
-        if grep -q "regression" compare.md; then
+        # Read the verdict off the "Verdict:" headline only. The metrics table always
+        # contains "Regression score"/"Improvement score" rows, so a bare grep would
+        # match every comparison.
+        if grep -q "Verdict:.*regression" compare.md; then
           echo "verdict=regression" >> "$GITHUB_OUTPUT"
-        elif grep -q "improvement" compare.md; then
+        elif grep -q "Verdict:.*improvement" compare.md; then
           echo "verdict=improvement" >> "$GITHUB_OUTPUT"
+        elif grep -q "Verdict:.*incompatible" compare.md; then
+          echo "verdict=incompatible" >> "$GITHUB_OUTPUT"
         else
-          echo "verdict=stable" >> "$GITHUB_OUTPUT"
+          echo "verdict=neutral" >> "$GITHUB_OUTPUT"
         fi
         exit $STATUS

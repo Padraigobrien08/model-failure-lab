@@ -263,11 +263,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compare_parser.add_argument(
         "baseline",
-        help="Baseline run directory/path or canonical run ID.",
+        nargs="?",
+        help=(
+            "Baseline run directory/path or canonical run ID. Omit when resolving the "
+            "baseline from the registry with --baseline-name."
+        ),
     )
     compare_parser.add_argument(
         "candidate",
         help="Candidate run directory/path or canonical run ID.",
+    )
+    compare_parser.add_argument(
+        "--baseline-name",
+        help=(
+            "Resolve the baseline run from the shared baseline registry by name "
+            "(see `failure-lab baselines set`). Mutually exclusive with the positional "
+            "baseline."
+        ),
     )
     compare_parser.add_argument(
         "--root",
@@ -1442,7 +1454,8 @@ def _handle_compare(args: argparse.Namespace) -> int:
         )
 
     root = _normalized_root(args.root)
-    baseline = _load_saved_run_reference(args.baseline, root=root)
+    baseline_reference = _resolve_baseline_reference(args, root=root)
+    baseline = _load_saved_run_reference(baseline_reference, root=root)
     candidate = _load_saved_run_reference(args.candidate, root=root)
     built = _build_comparison_report(baseline, candidate)
     report_path, details_path = _write_comparison_report_artifacts(
@@ -2118,14 +2131,18 @@ def _handle_baselines_list(args: argparse.Namespace) -> int:
 
 
 def _handle_baselines_set(args: argparse.Namespace) -> int:
+    root = _normalized_root(args.root)
+    # Confirm the run actually exists before registering it, so the registry can never
+    # hold a dangling pointer, and backfill model/dataset from the run when omitted.
+    referenced_run = _load_saved_run_reference(args.run_id, root=root)
     row = upsert_baseline(
         args.name,
-        run_id=args.run_id,
-        model=args.model,
-        dataset=args.dataset,
+        run_id=referenced_run.run.run_id,
+        model=args.model or referenced_run.run.model,
+        dataset=args.dataset or referenced_run.dataset_id,
         owner=args.owner,
         notes=args.notes,
-        root=_normalized_root(args.root),
+        root=root,
     )
     if args.as_json:
         print(_render_json_payload(row.to_payload()))
@@ -2507,6 +2524,28 @@ def _parse_model_options(values: Sequence[str]) -> dict[str, object]:
             raise ValueError(f"model option must use `key=json-value`: {raw_option}") from exc
         parsed[key.strip()] = value
     return parsed
+
+
+def _resolve_baseline_reference(args: argparse.Namespace, *, root: Path | None) -> str:
+    """Resolve the compare baseline from either the positional arg or the registry."""
+
+    baseline_name = getattr(args, "baseline_name", None)
+    if baseline_name:
+        if args.baseline:
+            raise ValueError(
+                "pass either a positional baseline or --baseline-name, not both"
+            )
+        entries = {entry.name: entry for entry in list_baselines(root=root)}
+        entry = entries.get(baseline_name)
+        if entry is None:
+            known = ", ".join(sorted(entries)) or "none registered"
+            raise ValueError(
+                f"baseline name not found in registry: {baseline_name} (known: {known})"
+            )
+        return entry.run_id
+    if not args.baseline:
+        raise ValueError("a baseline run reference or --baseline-name is required")
+    return args.baseline
 
 
 def _load_saved_run_reference(reference: str, *, root: Path | None) -> SavedRunArtifacts:
@@ -4271,7 +4310,41 @@ def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str
         return 1, "Gate: FAIL (runs are not comparable)"
     if verdict == "regression":
         return 1, f"Gate: FAIL (signal verdict: {verdict})"
+    # Defense in depth: the signal verdict already folds in the execution-success
+    # delta, but the gate is the last line before CI turns green, so it fails closed
+    # on any drop in the candidate's ability to run or classify -- a candidate cannot
+    # pass simply by erroring on (or failing to classify) cases the baseline handled.
+    delta = report.metrics.get("delta", {}) if isinstance(report.metrics, dict) else {}
+    for label, key in (
+        ("execution success", "execution_success_rate"),
+        ("classification coverage", "classification_coverage"),
+    ):
+        value = delta.get(key)
+        if isinstance(value, (int, float)) and value < 0:
+            return 1, f"Gate: FAIL ({label} regressed by {_format_signed_rate(value)})"
+    dropped_failures = _dropped_baseline_failure_ids(details)
+    if dropped_failures:
+        preview = ", ".join(dropped_failures[:3])
+        return 1, (
+            f"Gate: FAIL (candidate dropped {len(dropped_failures)} baseline failing "
+            f"case(s): {preview})"
+        )
     return 0, f"Gate: PASS (signal verdict: {verdict})"
+
+
+def _dropped_baseline_failure_ids(details: dict[str, object]) -> list[str]:
+    """Baseline cases that were failing and are absent from the candidate.
+
+    Removing failing cases from the candidate hides them from the shared-scope verdict
+    math, so a candidate could pass simply by deleting the cases it broke. The comparison
+    records these ids in `dropped_baseline_failure_case_ids` (dropping passing cases is
+    benign and is not recorded).
+    """
+
+    dropped = details.get("dropped_baseline_failure_case_ids")
+    if not isinstance(dropped, list):
+        return []
+    return sorted(value for value in dropped if isinstance(value, str))
 
 
 def _render_compare_markdown(report, details: dict[str, object], *, gate_line: str | None) -> str:
@@ -4279,7 +4352,12 @@ def _render_compare_markdown(report, details: dict[str, object], *, gate_line: s
     signal = _comparison_signal_payload(report, details)
     delta = report.metrics.get("delta", {})
     verdict = signal.get("verdict", "unknown")
-    icon = {"regression": "🔴", "improvement": "🟢", "stable": "⚪"}.get(str(verdict), "⚪")
+    icon = {
+        "regression": "🔴",
+        "improvement": "🟢",
+        "neutral": "⚪",
+        "incompatible": "⚪",
+    }.get(str(verdict), "⚪")
     lines = [
         "## Failure Lab Compare",
         "",
