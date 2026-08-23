@@ -332,6 +332,53 @@ function failureLabArtifactsPlugin(): Plugin {
     return payload as Record<string, unknown>;
   }
 
+  function isSameOriginWrite(req: IncomingMessage): boolean {
+    // The bridge write endpoints run on a localhost dev server with no auth, so a
+    // cross-site page open in the developer's browser could otherwise drive writes
+    // (CSRF). Browsers always attach Origin / Sec-Fetch-Site to a cross-site POST, so
+    // require the request to be same-origin. Non-browser callers (curl, tests) send
+    // neither header and are the local developer, so they are allowed through.
+    const secFetchSite = req.headers["sec-fetch-site"];
+    if (typeof secFetchSite === "string" && secFetchSite !== "same-origin") {
+      return false;
+    }
+    const origin = req.headers.origin;
+    if (typeof origin === "string" && origin.length > 0) {
+      let originHost: string;
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        return false;
+      }
+      if (originHost !== req.headers.host) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function rejectCrossOriginWrite(res: ServerResponse): void {
+    res.statusCode = 403;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ message: "cross-origin writes are not allowed" }));
+  }
+
+  function assertSafeArtifactId(id: string, label: string): void {
+    // Run/report ids are flat directory names joined onto the artifact root. Reject any
+    // separator, null byte, "..", or absolute path so a crafted id cannot traverse out
+    // of the workspace and read arbitrary files.
+    if (
+      id.length === 0 ||
+      id.includes("/") ||
+      id.includes("\\") ||
+      id.includes("\0") ||
+      id === ".." ||
+      path.isAbsolute(id)
+    ) {
+      throw new Error(`${label} contains an invalid path segment`);
+    }
+  }
+
   function requireStringField(
     payload: Record<string, unknown>,
     key: string,
@@ -988,6 +1035,7 @@ function failureLabArtifactsPlugin(): Plugin {
     reportsPath: string,
     runsPath: string,
   ): Promise<ComparisonDetailPayload> {
+    assertSafeArtifactId(reportId, "reportId");
     const reportDir = path.join(reportsPath, reportId);
     const reportPayload = await readJsonRecord(
       path.join(reportDir, REPORT_FILENAME),
@@ -1204,6 +1252,7 @@ function failureLabArtifactsPlugin(): Plugin {
     runsPath: string,
     reportsPath: string,
   ): Promise<RunDetailPayload> {
+    assertSafeArtifactId(runId, "runId");
     const runDir = path.join(runsPath, runId);
     const reportDir = path.join(reportsPath, `${runId}_report`);
     const runPayload = await readJsonRecord(path.join(runDir, RUN_FILENAME), `${runId}.run`);
@@ -1789,6 +1838,10 @@ function failureLabArtifactsPlugin(): Plugin {
       res.end(JSON.stringify({ message: "harvest endpoint requires POST" }));
       return;
     }
+    if (!isSameOriginWrite(req)) {
+      rejectCrossOriginWrite(res);
+      return;
+    }
 
     try {
       const body = await readJsonBody(req);
@@ -1852,6 +1905,10 @@ function failureLabArtifactsPlugin(): Plugin {
       res.end(JSON.stringify({ message: "regression pack endpoint requires POST" }));
       return;
     }
+    if (!isSameOriginWrite(req)) {
+      rejectCrossOriginWrite(res);
+      return;
+    }
 
     try {
       const body = await readJsonBody(req);
@@ -1873,10 +1930,9 @@ function failureLabArtifactsPlugin(): Plugin {
       if (typeof topN === "number" && Number.isInteger(topN) && topN > 0) {
         args.push("--top-n", String(topN));
       }
-      const outputPath = optionalStringField(body, "outputPath", "regression_pack.outputPath");
-      if (outputPath) {
-        args.push("--out", outputPath);
-      }
+      // Writes are deterministic and land under the artifact root; a client-supplied
+      // output path is intentionally ignored so the bridge cannot be pointed at an
+      // arbitrary filesystem location.
 
       const payload = await invokeQueryBridge("regression-pack", args);
       res.statusCode = 200;
@@ -1898,6 +1954,10 @@ function failureLabArtifactsPlugin(): Plugin {
       res.statusCode = 405;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message: "dataset evolve endpoint requires POST" }));
+      return;
+    }
+    if (!isSameOriginWrite(req)) {
+      rejectCrossOriginWrite(res);
       return;
     }
 
@@ -1922,10 +1982,9 @@ function failureLabArtifactsPlugin(): Plugin {
       if (typeof topN === "number" && Number.isInteger(topN) && topN > 0) {
         args.push("--top-n", String(topN));
       }
-      const outputPath = optionalStringField(body, "outputPath", "dataset_evolve.outputPath");
-      if (outputPath) {
-        args.push("--out", outputPath);
-      }
+      // Writes are deterministic and land under the artifact root; a client-supplied
+      // output path is intentionally ignored so the bridge cannot be pointed at an
+      // arbitrary filesystem location.
 
       const payload = await invokeQueryBridge("dataset-evolve", args);
       res.statusCode = 200;
