@@ -394,7 +394,16 @@ export function HarvestDialog({
                 >
                   Open family
                 </ConsoleButton>
-              ) : null}
+              ) : (
+                <ConsoleButton
+                  onClick={() => {
+                    onClose();
+                    navigate("/datasets");
+                  }}
+                >
+                  View drafts
+                </ConsoleButton>
+              )}
               <ConsoleButton variant="primary" onClick={onClose}>
                 Done
               </ConsoleButton>

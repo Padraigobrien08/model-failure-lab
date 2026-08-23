@@ -2,25 +2,36 @@ import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { useAppRouteContext } from "@/app/router";
 import {
   ConsoleButton,
   EmptyState,
   RouteHeader,
+  RunIdText,
+  SectionLabel,
   SegmentedControl,
   StatusChip,
   TableHeadCell,
+  formatPercent,
   formatScore,
+  formatSignedPts,
+  formatSignedScore,
   formatTimestamp,
   truncateRunId,
   rowActivationProps,
+  runStatusTone,
 } from "@/components/console/primitives";
 import type { ChipTone } from "@/components/console/primitives";
-import type { ArtifactClusterDetailResponse } from "@/lib/artifacts/extended";
-import { loadClusterDetail } from "@/lib/artifacts/extended";
+import type {
+  ArtifactClusterDetailResponse,
+  ArtifactHistorySnapshotResponse,
+} from "@/lib/artifacts/extended";
+import { loadClusterDetail, loadHistorySnapshot } from "@/lib/artifacts/extended";
 import { loadArtifactQuery } from "@/lib/artifacts/load";
 import type {
   ArtifactFailureClusterOccurrence,
   ArtifactInsightEvidenceRef,
+  ArtifactMetricTrend,
   ArtifactQueryMode,
   ArtifactQueryResponse,
 } from "@/lib/artifacts/types";
@@ -28,12 +39,15 @@ import { cn } from "@/lib/utils";
 
 const QUERY_LIMIT = 200;
 
-const MODE_OPTIONS: { value: ArtifactQueryMode; label: string }[] = [
+type ExplorerMode = ArtifactQueryMode | "history";
+
+const MODE_OPTIONS: { value: ExplorerMode; label: string }[] = [
   { value: "cases", label: "Cases" },
   { value: "deltas", label: "Deltas" },
   { value: "aggregates", label: "Aggregates" },
   { value: "signals", label: "Signals" },
   { value: "clusters", label: "Clusters" },
+  { value: "history", label: "History" },
 ];
 
 const MODE_VALUES = new Set<string>(MODE_OPTIONS.map((option) => option.value));
@@ -42,6 +56,12 @@ type QueryState =
   | { status: "loading"; response: null; message: null }
   | { status: "ready"; response: ArtifactQueryResponse; message: null }
   | { status: "incompatible"; response: null; message: string };
+
+type HistoryState =
+  | { status: "idle"; snapshot: null; message: null }
+  | { status: "loading"; snapshot: null; message: null }
+  | { status: "ready"; snapshot: ArtifactHistorySnapshotResponse; message: null }
+  | { status: "incompatible"; snapshot: null; message: string };
 
 type ClusterDetailState =
   | { status: "loading"; detail: null; message: null }
@@ -59,6 +79,45 @@ function verdictTone(verdict: string): ChipTone {
     default:
       return "neutral";
   }
+}
+
+function trendToneClass(label: string): string {
+  const normalized = label.toLowerCase();
+  if (
+    normalized.includes("degrad") ||
+    normalized.includes("worsen") ||
+    normalized.includes("rising")
+  ) {
+    return "text-bad";
+  }
+  if (normalized.includes("improv")) return "text-good";
+  return "text-ink";
+}
+
+function TrendCard({ label, trend }: { label: string; trend: ArtifactMetricTrend | null }) {
+  return (
+    <div className="rounded-tok border border-line bg-panel p-[14px_16px]">
+      <SectionLabel>{label}</SectionLabel>
+      {trend === null ? (
+        <div className="mt-2 font-mono text-[11.5px] text-muted-ink">no signal</div>
+      ) : (
+        <>
+          <div
+            className={cn(
+              "mt-1.5 font-heading text-[20px] font-semibold leading-[1.1]",
+              trendToneClass(trend.label),
+            )}
+          >
+            {trend.label}
+          </div>
+          <div className="mt-1 font-mono text-[11.5px] text-muted-ink">
+            Δ {trend.delta != null ? formatSignedScore(trend.delta) : "—"} ·{" "}
+            {trend.sampleCount} samples · volatility {trend.volatilityLabel}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function transitionToneClass(transitionType: string): string {
@@ -267,6 +326,7 @@ function ClusterDetailPanel({
 }
 
 export function ExplorerPage() {
+  const context = useAppRouteContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<QueryState>({
@@ -274,11 +334,17 @@ export function ExplorerPage() {
     response: null,
     message: null,
   });
+  const [historyState, setHistoryState] = useState<HistoryState>({
+    status: "idle",
+    snapshot: null,
+    message: null,
+  });
+  const [lastFacets, setLastFacets] = useState<ArtifactQueryResponse["facets"] | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const modeParam = searchParams.get("mode") ?? "";
-  const mode: ArtifactQueryMode = MODE_VALUES.has(modeParam)
-    ? (modeParam as ArtifactQueryMode)
+  const mode: ExplorerMode = MODE_VALUES.has(modeParam)
+    ? (modeParam as ExplorerMode)
     : "deltas";
   const datasetFilter = searchParams.get("dataset") ?? "";
   const modelFilter = searchParams.get("model") ?? "";
@@ -295,12 +361,25 @@ export function ExplorerPage() {
     return params.toString();
   }, [mode, datasetFilter, modelFilter, failureTypeFilter]);
 
+  const isHistoryMode = mode === "history";
+  const historyScope: { kind: "dataset" | "model"; value: string } | null = isHistoryMode
+    ? datasetFilter
+      ? { kind: "dataset", value: datasetFilter }
+      : modelFilter
+        ? { kind: "model", value: modelFilter }
+        : null
+    : null;
+
   useEffect(() => {
+    if (isHistoryMode) return;
     let cancelled = false;
     setState({ status: "loading", response: null, message: null });
     loadArtifactQuery(new URLSearchParams(queryString))
       .then((response) => {
-        if (!cancelled) setState({ status: "ready", response, message: null });
+        if (!cancelled) {
+          setState({ status: "ready", response, message: null });
+          setLastFacets(response.facets);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -314,7 +393,39 @@ export function ExplorerPage() {
     return () => {
       cancelled = true;
     };
-  }, [queryString, reloadKey]);
+  }, [queryString, reloadKey, isHistoryMode]);
+
+  const historyScopeKind = historyScope?.kind ?? null;
+  const historyScopeValue = historyScope?.value ?? null;
+
+  useEffect(() => {
+    if (!isHistoryMode || historyScopeKind === null || historyScopeValue === null) {
+      setHistoryState({ status: "idle", snapshot: null, message: null });
+      return;
+    }
+    let cancelled = false;
+    setHistoryState({ status: "loading", snapshot: null, message: null });
+    loadHistorySnapshot(
+      historyScopeKind === "dataset"
+        ? { dataset: historyScopeValue }
+        : { model: historyScopeValue },
+    )
+      .then((snapshot) => {
+        if (!cancelled) setHistoryState({ status: "ready", snapshot, message: null });
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setHistoryState({
+            status: "incompatible",
+            snapshot: null,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isHistoryMode, historyScopeKind, historyScopeValue, reloadKey]);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -326,11 +437,40 @@ export function ExplorerPage() {
     setSearchParams(next, { replace: true });
   };
 
+  const setHistoryScope = (kind: "dataset" | "model", value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) {
+      next.set(kind, value);
+      next.delete(kind === "dataset" ? "model" : "dataset");
+    } else {
+      next.delete(kind);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
   const response = state.status === "ready" ? state.response : null;
   const facets = response?.facets ?? null;
   const rowCount = response?.rows.length ?? 0;
   const hasFilters = Boolean(datasetFilter || modelFilter || failureTypeFilter);
   const insightReport = response?.insightReport ?? null;
+
+  const inventoryRuns = context.runInventoryState.inventory?.runs ?? null;
+  const historyDatasetOptions = useMemo(() => {
+    const base =
+      lastFacets?.datasets ??
+      [...new Set((inventoryRuns ?? []).map((run) => run.dataset))].sort();
+    return datasetFilter && !base.includes(datasetFilter)
+      ? [...base, datasetFilter].sort()
+      : base;
+  }, [lastFacets, inventoryRuns, datasetFilter]);
+  const historyModelOptions = useMemo(() => {
+    const base =
+      lastFacets?.models ??
+      [...new Set((inventoryRuns ?? []).map((run) => run.model))].sort();
+    return modelFilter && !base.includes(modelFilter)
+      ? [...base, modelFilter].sort()
+      : base;
+  }, [lastFacets, inventoryRuns, modelFilter]);
 
   const renderTable = () => {
     if (!response) return null;
@@ -560,6 +700,236 @@ export function ExplorerPage() {
     );
   };
 
+  const renderHistory = () => {
+    if (!historyScope) {
+      return (
+        <div className="mt-6 rounded-tok border border-line bg-panel px-5 py-6">
+          <div className="font-body text-[13.5px] text-ink">
+            Pick a dataset or model scope to load history.
+          </div>
+          <div className="mt-1.5 font-mono text-[11.5px] leading-relaxed text-muted-ink">
+            run: failure-lab history --dataset &lt;id&gt; · or --model &lt;id&gt;
+          </div>
+        </div>
+      );
+    }
+    if (historyState.status === "loading" || historyState.status === "idle") {
+      return (
+        <div aria-label="Loading history" className="mt-4 flex flex-col gap-2">
+          {[0, 1, 2, 3].map((row) => (
+            <div key={row} className="h-9 animate-pulse rounded-tok bg-panel" />
+          ))}
+        </div>
+      );
+    }
+    if (historyState.status === "incompatible") {
+      return (
+        <EmptyState
+          title="History snapshot failed."
+          detail={historyState.message}
+          action={
+            <ConsoleButton onClick={() => setReloadKey((key) => key + 1)}>
+              Retry
+            </ConsoleButton>
+          }
+        />
+      );
+    }
+    const snapshot = historyState.snapshot;
+    if (snapshot.runHistory.length === 0 && snapshot.comparisonHistory.length === 0) {
+      return (
+        <EmptyState
+          title="No history in this scope."
+          detail={`run: failure-lab history --${historyScope.kind} ${historyScope.value}`}
+        />
+      );
+    }
+    return (
+      <div className="mt-4 flex flex-col gap-[22px]">
+        <div>
+          <SectionLabel>Trends</SectionLabel>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            <TrendCard label="Run failure-rate trend" trend={snapshot.runTrend} />
+            <TrendCard label="Comparison severity trend" trend={snapshot.comparisonTrend} />
+          </div>
+        </div>
+        <div>
+          <div className="flex items-baseline gap-3">
+            <SectionLabel>Run history</SectionLabel>
+            <span className="font-mono text-[11px] text-muted-ink">
+              {snapshot.runHistory.length}{" "}
+              {snapshot.runHistory.length === 1 ? "run" : "runs"}
+            </span>
+          </div>
+          <table className="mt-2 w-full border-collapse text-[13.5px]">
+            <thead>
+              <tr className="border-b border-line">
+                <TableHeadCell>Run id</TableHeadCell>
+                <TableHeadCell>Model</TableHeadCell>
+                <TableHeadCell align="right">Cases</TableHeadCell>
+                <TableHeadCell align="right">Failure rate</TableHeadCell>
+                <TableHeadCell align="right">Coverage</TableHeadCell>
+                <TableHeadCell>Saved at</TableHeadCell>
+                <TableHeadCell>Status</TableHeadCell>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-[12.5px]">
+              {snapshot.runHistory.map((row, index) => (
+                <tr
+                  key={row.runId}
+                  {...rowActivationProps(() =>
+                    navigate(`/runs/${encodeURIComponent(row.runId)}`),
+                  )}
+                  className={cn(
+                    "cursor-pointer hover:bg-accent-wash",
+                    index < snapshot.runHistory.length - 1 && "border-b border-line-soft",
+                  )}
+                >
+                  <td className="whitespace-nowrap px-2 py-[9px] font-semibold">
+                    <RunIdText runId={row.runId} />
+                  </td>
+                  <td className="px-2 py-[9px] text-muted-ink">{row.model}</td>
+                  <td className="px-2 py-[9px] text-right text-muted-ink">
+                    {row.attemptedCaseCount}
+                  </td>
+                  <td className="px-2 py-[9px] text-right">
+                    {formatPercent(row.failureRate)}
+                  </td>
+                  <td className="px-2 py-[9px] text-right text-muted-ink">
+                    {formatPercent(row.classificationCoverage)}
+                  </td>
+                  <td className="px-2 py-[9px] text-muted-ink">
+                    {formatTimestamp(row.createdAt)}
+                  </td>
+                  <td className="px-2 py-[9px]">
+                    <StatusChip tone={runStatusTone(row.status)}>{row.status}</StatusChip>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div className="flex items-baseline gap-3">
+            <SectionLabel>Comparison history</SectionLabel>
+            <span className="font-mono text-[11px] text-muted-ink">
+              {snapshot.comparisonHistory.length}{" "}
+              {snapshot.comparisonHistory.length === 1 ? "comparison" : "comparisons"}
+            </span>
+          </div>
+          <table className="mt-2 w-full border-collapse text-[13.5px]">
+            <thead>
+              <tr className="border-b border-line">
+                <TableHeadCell>Report id</TableHeadCell>
+                <TableHeadCell>Baseline → candidate</TableHeadCell>
+                <TableHeadCell>Verdict</TableHeadCell>
+                <TableHeadCell align="right">Severity</TableHeadCell>
+                <TableHeadCell align="right">Net</TableHeadCell>
+                <TableHeadCell>Saved at</TableHeadCell>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-[12.5px]">
+              {snapshot.comparisonHistory.map((row, index) => (
+                <tr
+                  key={row.reportId}
+                  {...rowActivationProps(() =>
+                    navigate(`/comparisons/${encodeURIComponent(row.reportId)}`),
+                  )}
+                  className={cn(
+                    "cursor-pointer hover:bg-accent-wash",
+                    index < snapshot.comparisonHistory.length - 1 &&
+                      "border-b border-line-soft",
+                  )}
+                >
+                  <td className="px-2 py-[9px] font-semibold">{row.reportId}</td>
+                  <td className="px-2 py-[9px] text-muted-ink">
+                    {truncateRunId(row.baselineRunId)} → {truncateRunId(row.candidateRunId)}
+                  </td>
+                  <td className="px-2 py-[9px]">
+                    <StatusChip tone={verdictTone(row.signalVerdict)}>
+                      {row.signalVerdict}
+                    </StatusChip>
+                  </td>
+                  <td
+                    className={cn(
+                      "px-2 py-[9px] text-right",
+                      row.signalVerdict === "regression"
+                        ? "font-semibold text-bad"
+                        : "text-muted-ink",
+                    )}
+                  >
+                    {formatScore(row.severity)}
+                  </td>
+                  <td className="px-2 py-[9px] text-right text-muted-ink">
+                    {formatSignedScore(row.netScore)}
+                  </td>
+                  <td className="px-2 py-[9px] text-muted-ink">
+                    {formatTimestamp(row.createdAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <SectionLabel>Recurring failures</SectionLabel>
+          {snapshot.recurringFailures.length === 0 ? (
+            <div className="mt-2 font-mono text-[11.5px] text-muted-ink">
+              no recurring failure patterns in this scope
+            </div>
+          ) : (
+            <div className="mt-2 flex flex-col">
+              {snapshot.recurringFailures.map((pattern, index) => (
+                <div
+                  key={pattern.failureType}
+                  className={cn(
+                    "flex flex-wrap items-center gap-3 px-1 py-[9px]",
+                    index < snapshot.recurringFailures.length - 1 &&
+                      "border-b border-line-soft",
+                  )}
+                >
+                  <span className="font-mono text-[12.5px] font-semibold text-ink">
+                    {pattern.failureType}
+                  </span>
+                  <span className="font-mono text-[11.5px] text-muted-ink">
+                    {pattern.occurrences}{" "}
+                    {pattern.occurrences === 1 ? "occurrence" : "occurrences"}
+                  </span>
+                  {pattern.latestDelta != null ? (
+                    <span
+                      className={cn(
+                        "font-mono text-[11.5px]",
+                        pattern.latestDelta > 0
+                          ? "text-bad"
+                          : pattern.latestDelta < 0
+                            ? "text-good"
+                            : "text-muted-ink",
+                      )}
+                    >
+                      {formatSignedPts(pattern.latestDelta * 100)}%
+                    </span>
+                  ) : null}
+                  {pattern.comparisonIds.map((comparisonId) => (
+                    <button
+                      key={comparisonId}
+                      type="button"
+                      onClick={() =>
+                        navigate(`/comparisons/${encodeURIComponent(comparisonId)}`)
+                      }
+                      className="cursor-pointer rounded-tok border border-line bg-raised px-[7px] py-[3px] font-mono text-[11px] text-accent-text hover:bg-accent-wash"
+                    >
+                      {comparisonId}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <RouteHeader eyebrow="Derived index" title="Evidence" />
@@ -579,32 +949,54 @@ export function ExplorerPage() {
         <FacetSelect
           label="Filter by dataset"
           allLabel="all datasets"
-          options={facets?.datasets ?? (datasetFilter ? [datasetFilter] : [])}
+          options={
+            isHistoryMode
+              ? historyDatasetOptions
+              : facets?.datasets ?? (datasetFilter ? [datasetFilter] : [])
+          }
           value={datasetFilter}
-          onChange={(value) => setParam("dataset", value)}
+          onChange={(value) =>
+            isHistoryMode ? setHistoryScope("dataset", value) : setParam("dataset", value)
+          }
         />
         <FacetSelect
           label="Filter by model"
           allLabel="all models"
-          options={facets?.models ?? (modelFilter ? [modelFilter] : [])}
+          options={
+            isHistoryMode
+              ? historyModelOptions
+              : facets?.models ?? (modelFilter ? [modelFilter] : [])
+          }
           value={modelFilter}
-          onChange={(value) => setParam("model", value)}
+          onChange={(value) =>
+            isHistoryMode ? setHistoryScope("model", value) : setParam("model", value)
+          }
         />
-        <FacetSelect
-          label="Filter by failure type"
-          allLabel="all types"
-          options={facets?.failureTypes ?? (failureTypeFilter ? [failureTypeFilter] : [])}
-          value={failureTypeFilter}
-          onChange={(value) => setParam("failureType", value)}
-        />
-        <span className="ml-auto text-[12px] text-muted-ink">
-          {rowCount} {rowCount === 1 ? "row" : "rows"} · limit {QUERY_LIMIT}
-        </span>
+        {isHistoryMode ? null : (
+          <FacetSelect
+            label="Filter by failure type"
+            allLabel="all types"
+            options={facets?.failureTypes ?? (failureTypeFilter ? [failureTypeFilter] : [])}
+            value={failureTypeFilter}
+            onChange={(value) => setParam("failureType", value)}
+          />
+        )}
+        {isHistoryMode ? (
+          <span className="ml-auto font-mono text-[12px] text-muted-ink">
+            {historyScope ? `scope: ${historyScope.kind} ${historyScope.value}` : "no scope"}
+          </span>
+        ) : (
+          <span className="ml-auto text-[12px] text-muted-ink">
+            {rowCount} {rowCount === 1 ? "row" : "rows"} · limit {QUERY_LIMIT}
+          </span>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 overflow-auto px-7 pb-[22px]">
-          {state.status === "loading" ? (
+          {isHistoryMode ? (
+            renderHistory()
+          ) : state.status === "loading" ? (
             <div aria-label="Loading evidence" className="mt-4 flex flex-col gap-2">
               {[0, 1, 2, 3].map((row) => (
                 <div key={row} className="h-9 animate-pulse rounded-tok bg-panel" />

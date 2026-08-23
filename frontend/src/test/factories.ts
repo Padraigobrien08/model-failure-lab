@@ -933,3 +933,111 @@ export function buildDatasetEvolutionWire(): Record<string, unknown> {
     ],
   };
 }
+
+// ---------------------------------------------------------------------------
+// History snapshot (wire shape for history.json)
+// ---------------------------------------------------------------------------
+
+function buildHistoryRunRowWire(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    run_id: BASELINE_RUN_ID,
+    dataset: DATASET_ID,
+    model: "demo-baseline",
+    created_at: "2026-08-01T10:00:00Z",
+    status: "completed",
+    attempted_case_count: 12,
+    classified_case_count: 12,
+    execution_error_count: 0,
+    unclassified_count: 0,
+    successful_model_invocation_count: 12,
+    failure_case_count: 3,
+    failure_rate: 0.25,
+    classification_coverage: 1,
+    execution_success_rate: 1,
+    ...overrides,
+  };
+}
+
+export function buildHistorySnapshotWire(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    source: {
+      label: SOURCE.label,
+      path: SOURCE.path,
+      runsPath: SOURCE.runsPath,
+      reportsPath: SOURCE.reportsPath,
+    },
+    scope_kind: "dataset",
+    scope_value: DATASET_ID,
+    run_history: [
+      buildHistoryRunRowWire({
+        run_id: CANDIDATE_RUN_ID,
+        model: "demo-candidate",
+        created_at: "2026-08-02T10:00:00Z",
+        failure_case_count: 4,
+        failure_rate: 0.35,
+      }),
+      buildHistoryRunRowWire(),
+    ],
+    comparison_history: [
+      {
+        report_id: REPORT_ID,
+        created_at: "2026-08-02T11:00:00Z",
+        dataset: DATASET_ID,
+        baseline_run_id: BASELINE_RUN_ID,
+        candidate_run_id: CANDIDATE_RUN_ID,
+        baseline_model: "demo-baseline",
+        candidate_model: "demo-candidate",
+        status: "completed",
+        compatible: true,
+        signal_verdict: "regression",
+        regression_score: 0.42,
+        improvement_score: 0.06,
+        net_score: -0.36,
+        severity: 0.36,
+        top_drivers: [
+          {
+            driver_rank: 0,
+            failure_type: "hallucination",
+            delta: 0.1,
+            direction: "regression",
+            case_ids: ["case_reg"],
+          },
+        ],
+      },
+    ],
+    run_trend: {
+      label: "degrading",
+      delta: 0.1,
+      sample_count: 2,
+      first_value: 0.25,
+      last_value: 0.35,
+      volatility: 0.05,
+      volatility_label: "stable",
+    },
+    comparison_trend: {
+      label: "flat",
+      delta: 0,
+      sample_count: 1,
+      first_value: 0.36,
+      last_value: 0.36,
+      volatility: 0,
+      volatility_label: "stable",
+    },
+    recurring_failures: [
+      {
+        failure_type: "hallucination",
+        occurrences: 2,
+        comparison_ids: [REPORT_ID],
+        latest_delta: 0.1,
+      },
+    ],
+    recurring_clusters: [],
+    dataset_versions: [],
+    dataset_health: null,
+    ...overrides,
+  };
+}

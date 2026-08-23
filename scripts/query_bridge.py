@@ -23,8 +23,8 @@ from model_failure_lab.datasets import (  # noqa: E402
 from model_failure_lab.governance import (  # noqa: E402
     PortfolioFilters,
     evaluate_regression_gate,
-    list_baselines,
     get_dataset_portfolio_item,
+    list_baselines,
     list_dataset_family_health,
     list_dataset_lifecycle_actions,
     list_portfolio_execution_outcomes,
@@ -48,6 +48,42 @@ from model_failure_lab.index import (  # noqa: E402
     query_cases,
     query_comparison_signals,
 )
+
+
+def _list_dataset_drafts(root: Path) -> list[dict]:
+    """Deterministic inventory of harvested draft packs awaiting promotion."""
+    harvested_dir = root / "datasets" / "harvested"
+    drafts: list[dict] = []
+    if not harvested_dir.is_dir():
+        return drafts
+    for path in sorted(harvested_dir.glob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
+        filters = source.get("filters") if isinstance(source.get("filters"), dict) else {}
+        cases = payload.get("cases")
+        drafts.append(
+            {
+                "dataset_id": payload.get("dataset_id"),
+                "name": payload.get("name"),
+                "lifecycle": payload.get("lifecycle"),
+                "created_at": payload.get("created_at"),
+                "case_count": len(cases) if isinstance(cases, list) else 0,
+                "mode": source.get("mode"),
+                "origin": source.get("origin"),
+                "comparison_report_id": source.get("comparison_report_id"),
+                "run_id": filters.get("run_id"),
+                "failure_type": filters.get("failure_type"),
+                "suggested_family_id": source.get("suggested_family_id"),
+                "path": str(path.relative_to(root)),
+            }
+        )
+    drafts.sort(key=lambda row: (row["created_at"] or "", row["dataset_id"] or ""), reverse=True)
+    return drafts
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -336,6 +372,11 @@ def main(argv: list[str] | None = None) -> int:
                 for row in sorted(health_rows, key=lambda record: record.family_id)
             ],
         }
+    elif args.command == "dataset-drafts":
+        payload = {
+            "source": build_source_descriptor(root),
+            "drafts": _list_dataset_drafts(root),
+        }
     elif args.command == "baselines":
         payload = {
             "source": build_source_descriptor(root),
@@ -488,6 +529,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     baselines_parser = subparsers.add_parser("baselines")
     baselines_parser.add_argument("--root", required=True)
+
+    dataset_drafts_parser = subparsers.add_parser("dataset-drafts")
+    dataset_drafts_parser.add_argument("--root", required=True)
 
     comparison_clusters_parser = subparsers.add_parser("comparison-clusters")
     comparison_clusters_parser.add_argument("--root", required=True)

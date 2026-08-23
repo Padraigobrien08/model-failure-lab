@@ -19,6 +19,7 @@ const ARTIFACT_DATASET_VERSIONS_PATH = "/__failure_lab__/artifacts/dataset-versi
 const ARTIFACT_DATASET_FAMILIES_PATH = "/__failure_lab__/artifacts/dataset-families.json";
 const ARTIFACT_GATE_PATH = "/__failure_lab__/artifacts/gate.json";
 const ARTIFACT_BASELINES_PATH = "/__failure_lab__/artifacts/baselines.json";
+const ARTIFACT_DATASET_DRAFTS_PATH = "/__failure_lab__/artifacts/dataset-drafts.json";
 const ARTIFACT_HISTORY_PATH = "/__failure_lab__/artifacts/history.json";
 const ARTIFACT_CLUSTER_DETAIL_PATH = "/__failure_lab__/artifacts/cluster-detail.json";
 const ARTIFACT_ROOT_ENV = "FAILURE_LAB_ARTIFACT_ROOT";
@@ -1981,6 +1982,23 @@ function failureLabArtifactsPlugin(): Plugin {
     }
   }
 
+  async function handleDatasetDrafts(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    try {
+      const payload = await invokeQueryBridge("dataset-drafts");
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(payload));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "dataset drafts failed";
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ message }));
+    }
+  }
+
   async function handleBaselines(
     _req: IncomingMessage,
     res: ServerResponse,
@@ -2244,6 +2262,11 @@ function failureLabArtifactsPlugin(): Plugin {
 
       if (pathname === ARTIFACT_BASELINES_PATH) {
         void handleBaselines(req, res).catch(next);
+        return;
+      }
+
+      if (pathname === ARTIFACT_DATASET_DRAFTS_PATH) {
+        void handleDatasetDrafts(req, res).catch(next);
         return;
       }
 

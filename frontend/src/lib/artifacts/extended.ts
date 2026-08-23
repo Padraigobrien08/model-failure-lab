@@ -760,6 +760,77 @@ export function validateBaselinesResponse(payload: unknown): BaselinesResponse {
   };
 }
 
+export type DatasetDraftSummary = {
+  datasetId: string;
+  name: string | null;
+  lifecycle: string | null;
+  createdAt: string | null;
+  caseCount: number;
+  mode: string | null;
+  origin: string | null;
+  comparisonReportId: string | null;
+  runId: string | null;
+  failureType: string | null;
+  suggestedFamilyId: string | null;
+  path: string;
+};
+
+export type DatasetDraftsResponse = {
+  source: ArtifactSourceDescriptor;
+  drafts: DatasetDraftSummary[];
+};
+
+export const ARTIFACT_DATASET_DRAFTS_PATH = "/__failure_lab__/artifacts/dataset-drafts.json";
+
+export function validateDatasetDraftsResponse(payload: unknown): DatasetDraftsResponse {
+  const data = requireObject(payload, "dataset drafts");
+  const rows = data.drafts;
+  if (!Array.isArray(rows)) {
+    throw new Error("dataset drafts.drafts must be an array");
+  }
+  return {
+    source: requireSource(data.source, "dataset drafts.source"),
+    drafts: rows.map((entry, index) => {
+      const row = requireObject(entry, `drafts[${index}]`);
+      const cases = row.case_count;
+      if (typeof cases !== "number" || !Number.isInteger(cases) || cases < 0) {
+        throw new Error(`drafts[${index}].case_count must be a non-negative integer`);
+      }
+      return {
+        datasetId: requireString(row.dataset_id, `drafts[${index}].dataset_id`),
+        name: requireStringOrNull(row.name, `drafts[${index}].name`),
+        lifecycle: requireStringOrNull(row.lifecycle, `drafts[${index}].lifecycle`),
+        createdAt: requireStringOrNull(row.created_at, `drafts[${index}].created_at`),
+        caseCount: cases,
+        mode: requireStringOrNull(row.mode, `drafts[${index}].mode`),
+        origin: requireStringOrNull(row.origin, `drafts[${index}].origin`),
+        comparisonReportId: requireStringOrNull(
+          row.comparison_report_id,
+          `drafts[${index}].comparison_report_id`,
+        ),
+        runId: requireStringOrNull(row.run_id, `drafts[${index}].run_id`),
+        failureType: requireStringOrNull(row.failure_type, `drafts[${index}].failure_type`),
+        suggestedFamilyId: requireStringOrNull(
+          row.suggested_family_id,
+          `drafts[${index}].suggested_family_id`,
+        ),
+        path: requireString(row.path, `drafts[${index}].path`),
+      };
+    }),
+  };
+}
+
+export async function loadDatasetDrafts(
+  fetchImpl: typeof fetch = fetch,
+): Promise<DatasetDraftsResponse> {
+  const payload = await fetchArtifactJson(
+    ARTIFACT_DATASET_DRAFTS_PATH,
+    "dataset drafts",
+    fetchImpl,
+  );
+  return validateDatasetDraftsResponse(payload);
+}
+
 export async function loadBaselines(
   fetchImpl: typeof fetch = fetch,
 ): Promise<BaselinesResponse> {

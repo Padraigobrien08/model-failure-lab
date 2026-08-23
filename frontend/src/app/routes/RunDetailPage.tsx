@@ -16,6 +16,7 @@ import {
   rowActivationProps,
 } from "@/components/console/primitives";
 import type { ChipTone } from "@/components/console/primitives";
+import { RunHarvestDialog } from "@/components/console/RunHarvestDialog";
 import { loadRunDetail } from "@/lib/artifacts/load";
 import type {
   RunCaseLensKey,
@@ -78,6 +79,7 @@ export function RunDetailPage() {
     message: null,
   });
   const [showRawJson, setShowRawJson] = useState(false);
+  const [harvestOpen, setHarvestOpen] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -229,6 +231,13 @@ export function RunDetailPage() {
         <div className="flex flex-none gap-2">
           <ConsoleButton variant="secondary" onClick={() => setShowRawJson((value) => !value)}>
             Open run.json
+          </ConsoleButton>
+          <ConsoleButton
+            variant="primary"
+            onClick={() => setHarvestOpen(true)}
+            disabled={metrics.failureCaseCount === 0}
+          >
+            Harvest failures
           </ConsoleButton>
         </div>
       </header>
@@ -510,6 +519,15 @@ export function RunDetailPage() {
           </div>
         </>
       )}
+
+      <RunHarvestDialog
+        open={harvestOpen}
+        onClose={() => setHarvestOpen(false)}
+        runId={run.runId}
+        dataset={run.dataset}
+        failureTypes={detail.summary.failureTypes}
+        initialFailureType={failureTypeFilter}
+      />
     </div>
   );
 }
