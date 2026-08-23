@@ -584,7 +584,10 @@ function requireDatasetVersionRecords(
       versionTag: requireString(row.version_tag, `${field}[${index}].version_tag`),
       createdAt: requireStringOrNull(row.created_at, `${field}[${index}].created_at`),
       caseCount: requireCount(row.case_count, `${field}[${index}].case_count`),
-      path: requireString(row.path, `${field}[${index}].path`),
+      // History-scoped version records aggregate stats and carry no filesystem path;
+      // accept its absence here to match the lenient loader in load.ts and keep one
+      // contract for this record shape.
+      path: row.path == null ? "" : requireString(row.path, `${field}[${index}].path`),
       parentDatasetId: requireStringOrNull(
         row.parent_dataset_id,
         `${field}[${index}].parent_dataset_id`,

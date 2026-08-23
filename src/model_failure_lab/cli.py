@@ -4352,7 +4352,12 @@ def _render_compare_markdown(report, details: dict[str, object], *, gate_line: s
     signal = _comparison_signal_payload(report, details)
     delta = report.metrics.get("delta", {})
     verdict = signal.get("verdict", "unknown")
-    icon = {"regression": "🔴", "improvement": "🟢", "stable": "⚪"}.get(str(verdict), "⚪")
+    icon = {
+        "regression": "🔴",
+        "improvement": "🟢",
+        "neutral": "⚪",
+        "incompatible": "⚪",
+    }.get(str(verdict), "⚪")
     lines = [
         "## Failure Lab Compare",
         "",
