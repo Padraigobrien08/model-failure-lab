@@ -340,6 +340,7 @@ export function buildGateState(
   const rows: GateDecisionRow[] = [
     {
       comparisonId: REPORT_ID,
+      verdict: blocked ? "regression" : "improvement",
       action: blocked ? "block" : "allow",
       severity: 0.42,
       policyRule: "severity_above_threshold",
@@ -349,6 +350,7 @@ export function buildGateState(
     },
     {
       comparisonId: "cmp_waived_002",
+      verdict: "regression",
       action: "allow",
       severity: 0.3,
       policyRule: "severity_above_threshold",
@@ -370,6 +372,8 @@ export function buildGateState(
     source: SOURCE,
     blocked,
     policy: buildGovernancePolicy(),
+    policySource: "default",
+    waiverSource: null,
     rows,
   };
   return { status: "ready", data, message: null };

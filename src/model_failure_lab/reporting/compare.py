@@ -237,6 +237,7 @@ def build_comparison_report(
     signal = build_comparison_signal(
         failure_rate_deltas=failure_rate_deltas,
         case_deltas=case_deltas,
+        shared_case_count=len(shared_case_ids),
         execution_success_delta=(
             float(execution_success_delta)
             if isinstance(execution_success_delta, (int, float))

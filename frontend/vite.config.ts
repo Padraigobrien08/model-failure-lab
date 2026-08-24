@@ -456,10 +456,6 @@ function failureLabArtifactsPlugin(): Plugin {
     });
   }
 
-  function roundSignal(value: number): number {
-    return Math.round(value * 1_000_000) / 1_000_000;
-  }
-
   async function readJsonRecord(
     filePath: string,
     label: string,
@@ -869,106 +865,6 @@ function failureLabArtifactsPlugin(): Plugin {
     });
   }
 
-  function deriveComparisonSignalPayload(
-    reportPayload: Record<string, unknown>,
-    reportDetailsPayload: Record<string, unknown>,
-    label: string,
-  ): ComparisonSignalPayload {
-    const comparison = requireObjectField(reportPayload, "comparison", `${label}.comparison`);
-    const compatible =
-      typeof comparison.compatible === "boolean"
-        ? comparison.compatible
-        : (() => {
-            throw new Error(`${label}.comparison.compatible must be a boolean`);
-          })();
-    if (!compatible) {
-      return {
-        verdict: "incompatible",
-        reason:
-          typeof comparison.reason === "string" && comparison.reason.trim().length > 0
-            ? comparison.reason
-            : "incompatible",
-        regressionScore: 0,
-        improvementScore: 0,
-        netScore: 0,
-        severity: 0,
-        topDrivers: [],
-      };
-    }
-
-    const failureRates = requireObjectField(reportPayload, "failure_rates", `${label}.failure_rates`);
-    const caseDeltas = Array.isArray(reportDetailsPayload.case_deltas)
-      ? reportDetailsPayload.case_deltas.filter(
-          (entry): entry is Record<string, unknown> =>
-            entry !== null && typeof entry === "object" && !Array.isArray(entry),
-        )
-      : [];
-
-    let regressionScore = 0;
-    let improvementScore = 0;
-    const rawDrivers: Array<{ failureType: string; delta: number }> = [];
-    for (const [failureType, rawDelta] of Object.entries(failureRates)) {
-      if (typeof rawDelta !== "number" || Number.isNaN(rawDelta) || rawDelta === 0) {
-        continue;
-      }
-      if (rawDelta > 0) {
-        regressionScore += rawDelta;
-      } else {
-        improvementScore += Math.abs(rawDelta);
-      }
-      rawDrivers.push({ failureType, delta: rawDelta });
-    }
-
-    const regression = roundSignal(regressionScore);
-    const improvement = roundSignal(improvementScore);
-    return {
-      verdict:
-        regression > improvement
-          ? "regression"
-          : improvement > regression
-            ? "improvement"
-            : "neutral",
-      reason: null,
-      regressionScore: regression,
-      improvementScore: improvement,
-      netScore: roundSignal(improvement - regression),
-      severity: Math.max(regression, improvement),
-      topDrivers: rawDrivers
-        .sort((left, right) => {
-          const magnitude = Math.abs(right.delta) - Math.abs(left.delta);
-          if (magnitude !== 0) {
-            return magnitude;
-          }
-          if ((left.delta > 0) !== (right.delta > 0)) {
-            return left.delta > 0 ? -1 : 1;
-          }
-          return left.failureType.localeCompare(right.failureType);
-        })
-        .slice(0, 4)
-        .map((driver, index) => ({
-          driverRank: index,
-          failureType: driver.failureType,
-          delta: roundSignal(driver.delta),
-          direction: driver.delta > 0 ? "regression" : "improvement",
-          caseIds: Array.from(
-            new Set(
-              caseDeltas
-                .filter((row) => {
-                  const baselineFailureType = row.baseline_failure_type;
-                  const candidateFailureType = row.candidate_failure_type;
-                  return driver.delta > 0
-                    ? candidateFailureType === driver.failureType &&
-                        baselineFailureType !== driver.failureType
-                    : baselineFailureType === driver.failureType &&
-                        candidateFailureType !== driver.failureType;
-                })
-                .map((row) => String(row.case_id)),
-            ),
-          ).sort(),
-        })),
-    };
-  }
-
   function requireComparisonSignalPayload(
     reportPayload: Record<string, unknown>,
     reportDetailsPayload: Record<string, unknown>,
@@ -978,7 +874,20 @@ function failureLabArtifactsPlugin(): Plugin {
     const rawSignal =
       comparison.signal !== undefined ? comparison.signal : reportDetailsPayload.signal;
     if (rawSignal == null) {
-      return deriveComparisonSignalPayload(reportPayload, reportDetailsPayload, label);
+      // The backend always persists the governance signal. If it is genuinely
+      // absent (a malformed/legacy artifact), do NOT re-derive a verdict here: a
+      // second scoring implementation would drift from reporting/signals.py and
+      // could paint a masked regression as an improvement. Fail safe to an explicit
+      // "unknown" verdict (rendered in the neutral tone, never green).
+      return {
+        verdict: "unknown",
+        reason: "signal unavailable",
+        regressionScore: 0,
+        improvementScore: 0,
+        netScore: 0,
+        severity: 0,
+        topDrivers: [],
+      };
     }
 
     const signal = requireObjectField({ value: rawSignal }, "value", `${label}.signal`);

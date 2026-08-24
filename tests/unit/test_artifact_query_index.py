@@ -189,7 +189,9 @@ def test_rebuild_query_index_creates_expected_rows(tmp_path: Path) -> None:
     comparison_inventory = list_comparison_inventory(root=tmp_path)
     assert [row["report_id"] for row in comparison_inventory] == [ids["comparison_report_id"]]
     assert comparison_inventory[0]["compatible"] is True
-    assert comparison_inventory[0]["signal_verdict"] == "neutral"
+    # case-regression (no_failure -> hallucination) is a net-new failure, so the
+    # verdict is a regression even though the offsetting rate deltas net to zero.
+    assert comparison_inventory[0]["signal_verdict"] == "regression"
     assert comparison_inventory[0]["regression_score"] == 0.25
     assert comparison_inventory[0]["improvement_score"] == 0.25
     assert comparison_inventory[0]["severity"] == 0.25
@@ -331,18 +333,20 @@ def test_query_comparison_signals_orders_by_severity_and_supports_failure_type_f
     ids = _materialize_workspace(tmp_path)
     rebuild_query_index(root=tmp_path)
 
-    neutral_rows = query_comparison_signals(
+    # The fixture comparison carries a net-new failure (case-regression), so it is
+    # classified as a regression even though the failure-rate deltas net to zero.
+    regression_rows = query_comparison_signals(
         QueryFilters(limit=10),
-        verdict="neutral",
+        verdict="regression",
         root=tmp_path,
     )
-    assert [row["report_id"] for row in neutral_rows] == [ids["comparison_report_id"]]
-    assert neutral_rows[0]["compatible"] is True
-    assert neutral_rows[0]["top_drivers"][0]["failure_type"] == "instruction_following"
+    assert [row["report_id"] for row in regression_rows] == [ids["comparison_report_id"]]
+    assert regression_rows[0]["compatible"] is True
+    assert regression_rows[0]["top_drivers"][0]["failure_type"] == "instruction_following"
 
     filtered_rows = query_comparison_signals(
         QueryFilters(failure_type="instruction_following", limit=10),
-        verdict="neutral",
+        verdict="regression",
         root=tmp_path,
     )
     assert [row["report_id"] for row in filtered_rows] == [ids["comparison_report_id"]]
