@@ -673,17 +673,29 @@ def test_cli_index_validate_regression_gate_patterns_and_baselines(
     validate_exit = main(["index", "validate", "--root", str(workspace.root), "--json"])
     validate_payload = json.loads(capsys.readouterr().out)
 
+    # Waive every regression comparison so the gate passes under --strict-exit; the
+    # fixture can contain more than one blocking regression.
+    regression_ids = [
+        str(row["report_id"])
+        for row in query_comparison_signals(
+            QueryFilters(limit=20),
+            verdict="regression",
+            root=workspace.root,
+        )
+    ]
+    assert comparison_id in regression_ids
     waiver_path = workspace.root / "waivers.json"
     waiver_path.write_text(
         json.dumps(
             {
                 "waivers": [
                     {
-                        "comparison_id": comparison_id,
+                        "comparison_id": regression_id,
                         "reason": "temporary waiver for fixture test",
                         "owner": "ci",
                         "expires_at": "2999-01-01T00:00:00Z",
                     }
+                    for regression_id in regression_ids
                 ]
             }
         ),

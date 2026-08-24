@@ -6,7 +6,7 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-from .builder import QUERY_INDEX_SCHEMA_VERSION, ensure_query_index, query_index_path
+from .builder import QUERY_INDEX_SCHEMA_VERSION, query_index_path, rebuild_query_index
 
 REQUIRED_INDEX_TABLES = (
     "metadata",
@@ -49,8 +49,30 @@ class ArtifactContractValidation:
 
 
 def validate_artifact_contracts(*, root: str | Path | None = None) -> ArtifactContractValidation:
-    ensure_query_index(root=root)
+    # Force a strict rebuild so validation actually re-reads every source artifact
+    # through the builder's field-level contract checks (`_require_string`, etc.),
+    # rather than trusting a possibly-current derived index. A malformed run,
+    # report, or comparison artifact raises here and is reported as a contract
+    # error instead of silently passing.
+    ingestion_errors: list[str] = []
+    try:
+        rebuild_query_index(root=root)
+    except (ValueError, KeyError) as exc:
+        ingestion_errors.append(f"artifact contract violation: {exc}")
+
     index_path = query_index_path(root=root)
+    if not index_path.exists():
+        # The rebuild failed before writing an index; report the ingestion error
+        # without attempting to open a non-existent database.
+        return ArtifactContractValidation(
+            schema_version="missing",
+            required_tables_present=False,
+            missing_tables=REQUIRED_INDEX_TABLES,
+            run_count=0,
+            comparison_count=0,
+            case_count=0,
+            errors=tuple(ingestion_errors or ("query index could not be built",)),
+        )
     with sqlite3.connect(index_path) as connection:
         schema_row = connection.execute(
             "SELECT value FROM metadata WHERE key = 'schema_version'"
@@ -67,7 +89,7 @@ def validate_artifact_contracts(*, root: str | Path | None = None) -> ArtifactCo
         comparison_count = _count_rows(connection, "comparisons")
         case_count = _count_rows(connection, "cases")
 
-    errors: list[str] = []
+    errors: list[str] = list(ingestion_errors)
     if schema_version != QUERY_INDEX_SCHEMA_VERSION:
         errors.append(
             f"schema_version mismatch: expected {QUERY_INDEX_SCHEMA_VERSION}, got {schema_version}"

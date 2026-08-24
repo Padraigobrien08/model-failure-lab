@@ -218,10 +218,13 @@ def test_recommend_dataset_action_ignores_non_regression_and_below_threshold_sig
     )
 
     first = recommend_dataset_action(non_regression["report_id"], root=workspace.root)
+    # Disable the recurrence override so this asserts the severity floor in isolation:
+    # the fixture now contains multiple same-type regressions, which would otherwise
+    # trip `recurring_regression_override` and escalate a below-threshold regression.
     second = recommend_dataset_action(
         _pick_regression_comparison(workspace.root),
         root=workspace.root,
-        policy=GovernancePolicy(minimum_severity=1.0),
+        policy=GovernancePolicy(minimum_severity=1.0, recurrence_threshold=None),
     )
 
     assert first.action == "ignore"

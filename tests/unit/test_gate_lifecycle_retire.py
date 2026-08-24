@@ -55,12 +55,14 @@ def test_retire_action_unblocks_gate_for_that_family(tmp_path: Path) -> None:
         if rec.action in {"create", "evolve"}
     ]
     assert blocking, "fixture should contain at least one blocking recommendation"
-    family_id = blocking[0].matched_family.family_id
     comparison_id = blocking[0].comparison_id
 
     assert evaluate_regression_gate(root=root).blocked is True
 
-    _retire_family(family_id, root)
+    # Retire every family with a blocking recommendation so the gate fully unblocks;
+    # the fixture can surface more than one blocking family.
+    for family_id in {rec.matched_family.family_id for rec in blocking}:
+        _retire_family(family_id, root)
 
     result = evaluate_regression_gate(root=root)
     assert result.blocked is False

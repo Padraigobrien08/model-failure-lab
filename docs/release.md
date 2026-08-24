@@ -1,16 +1,27 @@
-# Release Runbook (v0.9.0)
+# Release Runbook
 
-This is the runbook for the **first public OSS release**. It covers versioning/tag strategy and a
-**TestPyPI dry run** before any real publish. For the production publish mechanics (token handling,
-`make publish`), see `docs/release-and-pypi.md`.
+This is the runbook for cutting a public OSS release. It covers versioning/tag strategy and a
+**TestPyPI dry run** before any real publish. Production publish mechanics (token handling) are the
+`make publish` target, documented inline below.
 
 > **No upload is performed by following the "build/check" steps here.** Only the explicit
-> `twine upload` commands publish anything, and they require credentials you supply yourself. Do not
-> upload to real PyPI until the TestPyPI dry run passes and a maintainer has confirmed it is safe.
+> `twine upload` / `make publish` commands publish anything, and they require credentials you supply
+> yourself. Do not upload to real PyPI until the TestPyPI dry run passes and a maintainer has
+> confirmed it is safe.
+
+## Current release: 0.10.1 (security patch)
+
+`0.10.1` is the first release to include the regression-gate and dev-server-bridge hardening (see the
+CHANGELOG). The `0.10.0` tag on PyPI predates those fixes, so cutting and publishing `0.10.1` is what
+actually ships the hardening to consumers. The composite action (`action.yml`) already floors the
+installed package at `>=0.10.1`; that floor only takes effect once `0.10.1` is on PyPI.
+
+Before tagging: bump the version in `pyproject.toml` and `src/model_failure_lab/__init__.py`, add the
+matching `CHANGELOG.md` entry, and confirm `make check` and the frontend build are green.
 
 ## Public versioning policy
 
-**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.9.0`.
+**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.10.1`.
 
 Pre-1.0 semantics (also in the README): patch = fixes/docs, minor = CLI-compatible additions,
 breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
@@ -24,8 +35,6 @@ conflict with a `v0.9.0` public release in two ways:
 1. GitHub shows the highest semver tag (`v5.3`) as the "latest release," which directly contradicts a
    `0.9.0` package on PyPI and a v0.1 announcement.
 2. A new visitor cannot tell which tags (if any) are real releases.
-
-See `docs/oss-readiness.md` (P0) for the impact assessment.
 
 ### Recommended tag cleanup strategy
 
@@ -53,11 +62,11 @@ git tag -d v1.0 v1.1 ... v5.3
 git push origin --delete v1.0 v1.1 ... v5.3
 ```
 
-**Then, in either case, cut the public release:**
+**Then, in either case, cut the public release** (substitute the version being released):
 
 ```bash
-git tag -a v0.9.0 -m "First public release"
-git push origin v0.9.0
+git tag -a v0.10.1 -m "Gate and dev-server-bridge hardening"
+git push origin v0.10.1
 ```
 
 > Until a maintainer performs the cleanup, **do not** create a GitHub Release from any `vX.Y` tag.
@@ -116,11 +125,25 @@ failure-lab demo
 deactivate
 ```
 
-If the smoke test passes, proceed to the real publish per `docs/release-and-pypi.md` — **only after**
-the tag cleanup above is done and a maintainer signs off.
+If the smoke test passes, proceed to the real publish — **only after** the tag cleanup above is done
+and a maintainer signs off.
 
-## Pre-release checklist pointer
+## Real PyPI publish
 
-Resolve the remaining P0 items in `docs/oss-readiness.md` before announcing. Several files still
-contain placeholder contacts (`security@example.com`, `conduct@example.com`,
-`maintainer@example.com`) that must be replaced with real, monitored addresses.
+`make publish` runs `verify-dist` (build + `twine check`) and then `twine upload dist/*`. It requires
+`TWINE_USERNAME` (`__token__`) and `TWINE_PASSWORD` (a PyPI API token) in the environment; the token
+is never persisted. Publish only after the tag is pushed and the TestPyPI dry run passed.
+
+```bash
+export TWINE_USERNAME=__token__
+export TWINE_PASSWORD=<your-pypi-token>
+make publish
+```
+
+## Pre-release checklist
+
+- `make check` and `npm --prefix frontend run build` are green.
+- Version bumped in `pyproject.toml` + `src/model_failure_lab/__init__.py`, with a matching
+  `CHANGELOG.md` entry.
+- Community-health files (`SECURITY.md`, `CODE_OF_CONDUCT.md`) point at real, monitored contacts —
+  no `*@example.com` placeholders.

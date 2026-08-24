@@ -2019,11 +2019,15 @@ def _handle_regressions_apply(args: argparse.Namespace) -> int:
 
 
 def _handle_regressions_gate(args: argparse.Namespace) -> int:
-    policy = (
-        load_governance_policy_from_file(args.policy_file)
-        if args.policy_file is not None
-        else _build_governance_policy(args)
-    )
+    if args.policy_file is not None:
+        policy: GovernancePolicy | None = load_governance_policy_from_file(args.policy_file)
+    else:
+        # When the operator sets no --policy-file and no policy-tuning flags, defer
+        # to evaluate_regression_gate's conventional discovery (governance/policy.*)
+        # so the CLI default and the read-only console `gate` endpoint agree. An
+        # explicit tuning flag still wins.
+        built = _build_governance_policy(args)
+        policy = built if built != GovernancePolicy() else None
     result = evaluate_regression_gate(
         root=_normalized_root(args.root),
         filters=_build_signal_filters(args),
@@ -2707,10 +2711,11 @@ def _render_gate_decisions(rows: tuple[GateDecision, ...]) -> str:
             "Failure Lab Regression Gate",
             _render_table(
                 [
-                    ("comparison", "blocked", "waived", "action", "severity", "rule"),
+                    ("comparison", "verdict", "blocked", "waived", "action", "severity", "rule"),
                     *[
                         (
                             row.comparison_id,
+                            row.verdict,
                             "yes" if row.blocked else "no",
                             "yes" if row.waived else "no",
                             row.action,
@@ -2766,7 +2771,7 @@ def _render_baselines(rows: tuple[BaselineEntry, ...]) -> str:
                             row.model or "n/a",
                             row.dataset or "n/a",
                             row.owner or "n/a",
-                            row.updated_at,
+                            row.updated_at or "n/a",
                         )
                         for row in rows
                     ],
@@ -2785,7 +2790,7 @@ def _render_baseline_entry(row: BaselineEntry) -> str:
             f"Model: {row.model or 'n/a'}",
             f"Dataset: {row.dataset or 'n/a'}",
             f"Owner: {row.owner or 'n/a'}",
-            f"Updated at: {row.updated_at}",
+            f"Updated at: {row.updated_at or 'n/a'}",
         ]
     )
 

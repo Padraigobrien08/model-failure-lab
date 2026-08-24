@@ -252,7 +252,7 @@ The production CLI is dependency-isolated from the optional research/ML stack: r
 
 ## Project status
 
-Pre-1.0 (`0.9.0`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
+Pre-1.0 (`0.10.1`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
 = CLI or artifact-schema changes. The DistilBERT/CivilComments benchmark stack under `[legacy]` is
 retained for reference and is not part of the supported workflow (`docs/legacy.md`).
 

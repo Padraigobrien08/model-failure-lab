@@ -1947,8 +1947,14 @@ function requireComparisonSignalDrivers(
   value: unknown,
   field: string,
 ): ComparisonSignalDriver[] {
-  if (!Array.isArray(value)) {
+  // Tolerate an absent drivers list (an empty signal legitimately omits it),
+  // but fail closed on a present-but-malformed value rather than silently
+  // dropping a corrupted drivers block to [].
+  if (value == null) {
     return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
   }
   return value.map((entry, index) => {
     const row = requireObject(entry, `${field}[${index}]`);
@@ -1979,9 +1985,14 @@ function requireComparisonSignal(
   field: string,
 ): ComparisonSignal {
   if (value == null) {
+    // A comparison whose signal block is entirely absent is NOT a computed
+    // "neutral" verdict — that would fail open, painting missing/corrupt data
+    // as a healthy comparison. Surface it as an explicit "unknown" verdict
+    // instead; `verdictTone` renders it in the neutral (never green) tone and
+    // the label makes the absence visible.
     return {
-      verdict: "neutral",
-      reason: null,
+      verdict: "unknown",
+      reason: "signal unavailable",
       regressionScore: 0,
       improvementScore: 0,
       netScore: 0,
@@ -2491,7 +2502,7 @@ function requireComparisonInventoryItems(
             })(),
       signalVerdict:
         row.signal_verdict == null
-          ? "neutral"
+          ? "unknown"
           : requireString(row.signal_verdict, `${field}[${index}].signal_verdict`),
       regressionScore:
         row.regression_score == null

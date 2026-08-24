@@ -8,7 +8,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from model_failure_lab.governance.gates import _load_waivers
+from model_failure_lab.governance.gates import (
+    _load_waivers,
+    default_policy_path,
+    default_waiver_path,
+    evaluate_regression_gate,
+)
 
 
 def test_load_waivers_accepts_yaml(tmp_path: Path) -> None:
@@ -41,3 +46,41 @@ def test_load_waivers_still_accepts_json(tmp_path: Path) -> None:
     waivers = _load_waivers(root=tmp_path, waiver_path=waiver_path)
 
     assert set(waivers) == {"c1"}
+
+
+def test_gate_discovers_conventional_files_so_console_matches_cli(tmp_path: Path) -> None:
+    """The read-only console `gate` endpoint passes no waiver/policy path; it must
+    still see a workspace's committed governance/policy.yml + governance/waivers.yml,
+    exactly like the CLI default, so the two surfaces never disagree."""
+    governance = tmp_path / "governance"
+    governance.mkdir()
+    (governance / "policy.yml").write_text("minimum_severity: 0.2\n", encoding="utf-8")
+    (governance / "waivers.yml").write_text("waivers: []\n", encoding="utf-8")
+
+    result = evaluate_regression_gate(root=tmp_path)
+
+    assert result.policy.minimum_severity == 0.2
+    assert result.policy_source == "governance/policy.yml"
+    assert result.waiver_source == "governance/waivers.yml"
+
+
+def test_gate_reports_default_sources_when_no_files_present(tmp_path: Path) -> None:
+    result = evaluate_regression_gate(root=tmp_path)
+
+    assert result.policy_source == "default"
+    assert result.waiver_source is None
+    assert default_policy_path(tmp_path) is None
+    assert default_waiver_path(tmp_path) is None
+
+
+def test_explicit_policy_argument_overrides_conventional_file(tmp_path: Path) -> None:
+    from model_failure_lab.governance.policy import GovernancePolicy
+
+    governance = tmp_path / "governance"
+    governance.mkdir()
+    (governance / "policy.yml").write_text("minimum_severity: 0.9\n", encoding="utf-8")
+
+    result = evaluate_regression_gate(root=tmp_path, policy=GovernancePolicy(minimum_severity=0.1))
+
+    assert result.policy.minimum_severity == 0.1
+    assert result.policy_source == "argument"

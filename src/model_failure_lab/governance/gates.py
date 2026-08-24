@@ -16,6 +16,43 @@ from .lifecycle import get_active_lifecycle_action
 from .policy import GovernancePolicy
 from .workflow import review_dataset_actions
 
+# Conventional in-workspace locations the gate falls back to when no explicit
+# --waivers / --policy-file is supplied. Both the CLI gate and the operator
+# console's read-only `gate` endpoint resolve through the same helpers, so the
+# console can never show a gate state that silently ignores a team's committed
+# waivers or policy. Explicit arguments always win over these defaults.
+DEFAULT_WAIVER_FILENAMES: tuple[str, ...] = (
+    "governance/waivers.yml",
+    "governance/waivers.yaml",
+    "governance/waivers.json",
+)
+DEFAULT_POLICY_FILENAMES: tuple[str, ...] = (
+    "governance/policy.yml",
+    "governance/policy.yaml",
+    "governance/policy.json",
+)
+
+
+def _first_existing(root: str | Path | None, filenames: tuple[str, ...]) -> Path | None:
+    base = project_root(root)
+    for name in filenames:
+        candidate = base / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def default_waiver_path(root: str | Path | None = None) -> Path | None:
+    """Conventional committed waiver file for this workspace, if present."""
+
+    return _first_existing(root, DEFAULT_WAIVER_FILENAMES)
+
+
+def default_policy_path(root: str | Path | None = None) -> Path | None:
+    """Conventional committed policy file for this workspace, if present."""
+
+    return _first_existing(root, DEFAULT_POLICY_FILENAMES)
+
 
 @dataclass(slots=True, frozen=True)
 class GateWaiver:
@@ -38,6 +75,7 @@ class GateWaiver:
 @dataclass(slots=True, frozen=True)
 class GateDecision:
     comparison_id: str
+    verdict: str
     action: str
     severity: float
     policy_rule: str
@@ -48,6 +86,7 @@ class GateDecision:
     def to_payload(self) -> dict[str, JsonValue]:
         return {
             "comparison_id": self.comparison_id,
+            "verdict": self.verdict,
             "action": self.action,
             "severity": round(self.severity, 6),
             "policy_rule": self.policy_rule,
@@ -63,11 +102,15 @@ class RegressionGateResult:
     policy: GovernancePolicy
     filters: QueryFilters
     rows: tuple[GateDecision, ...]
+    policy_source: str
+    waiver_source: str | None
 
     def to_payload(self) -> dict[str, JsonValue]:
         return {
             "blocked": self.blocked,
             "policy": self.policy.to_payload(),
+            "policy_source": self.policy_source,
+            "waiver_source": self.waiver_source,
             "filters": {
                 "failure_type": self.filters.failure_type,
                 "model": self.filters.model,
@@ -113,8 +156,30 @@ def evaluate_regression_gate(
     waiver_path: str | Path | None = None,
 ) -> RegressionGateResult:
     active_filters = filters or QueryFilters(limit=20)
-    active_policy = policy or GovernancePolicy()
-    waivers = _load_waivers(root=root, waiver_path=waiver_path)
+
+    # Resolve policy: an explicit policy object wins; otherwise fall back to a
+    # conventional committed policy file, and only then to built-in defaults.
+    if policy is not None:
+        active_policy = policy
+        policy_source = "argument"
+    else:
+        discovered_policy = default_policy_path(root)
+        if discovered_policy is not None:
+            active_policy = load_governance_policy_from_file(discovered_policy)
+            policy_source = _relative_source(discovered_policy, root)
+        else:
+            active_policy = GovernancePolicy()
+            policy_source = "default"
+
+    # Resolve waivers the same way: an explicit --waivers path wins; otherwise
+    # fall back to a conventional committed waiver file if one exists.
+    resolved_waiver_path = waiver_path
+    waiver_source: str | None = None
+    if resolved_waiver_path is None:
+        resolved_waiver_path = default_waiver_path(root)
+    if resolved_waiver_path is not None:
+        waiver_source = _relative_source(resolved_waiver_path, root)
+    waivers = _load_waivers(root=root, waiver_path=resolved_waiver_path)
     recommendations = review_dataset_actions(
         filters=active_filters,
         root=project_root(root),
@@ -124,7 +189,14 @@ def evaluate_regression_gate(
     rows: list[GateDecision] = []
     for recommendation in recommendations:
         severity = float(recommendation.signal.get("severity", 0.0) or 0.0)
-        should_block = recommendation.action in {"create", "evolve"}
+        signal_verdict = str(recommendation.signal.get("verdict", "unknown"))
+        # CI blocking is a verdict decision, not a dataset-governance decision. Any
+        # un-waived regression blocks the gate, exactly like `compare --gate` -- the
+        # severity floor governs only whether to create/evolve a dataset family
+        # (recommendation.action), never whether CI turns green. Tying blocking to the
+        # create/evolve action previously let a below-minimum-severity regression pass
+        # the governance/console gate while failing `compare --gate` on the same runs.
+        should_block = signal_verdict == "regression"
         waiver = waivers.get(recommendation.comparison_id)
         if waiver is None:
             # A retired dataset family is being wound down, so its regressions should
@@ -144,6 +216,7 @@ def evaluate_regression_gate(
         rows.append(
             GateDecision(
                 comparison_id=recommendation.comparison_id,
+                verdict=signal_verdict,
                 action=recommendation.action,
                 severity=severity,
                 policy_rule=recommendation.policy_rule,
@@ -157,7 +230,17 @@ def evaluate_regression_gate(
         policy=active_policy,
         filters=active_filters,
         rows=tuple(rows),
+        policy_source=policy_source,
+        waiver_source=waiver_source,
     )
+
+
+def _relative_source(path: str | Path, root: str | Path | None) -> str:
+    resolved = Path(path)
+    try:
+        return resolved.resolve().relative_to(project_root(root).resolve()).as_posix()
+    except ValueError:
+        return resolved.as_posix()
 
 
 def _load_waivers(

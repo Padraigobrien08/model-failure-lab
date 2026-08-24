@@ -22,7 +22,7 @@ class BaselineEntry:
     dataset: str | None
     owner: str | None
     notes: str | None
-    updated_at: str
+    updated_at: str | None
 
     def to_payload(self) -> dict[str, JsonValue]:
         return {
@@ -57,7 +57,7 @@ def list_baselines(*, root: str | Path | None = None) -> tuple[BaselineEntry, ..
                 dataset=_optional_string(row.get("dataset")),
                 owner=_optional_string(row.get("owner")),
                 notes=_optional_string(row.get("notes")),
-                updated_at=_optional_string(row.get("updated_at")) or "",
+                updated_at=_optional_string(row.get("updated_at")),
             )
         )
     return tuple(sorted(entries, key=lambda entry: entry.name))

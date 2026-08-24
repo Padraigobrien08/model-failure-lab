@@ -221,13 +221,35 @@ def test_query_command_can_summarize_in_heuristic_json_mode(tmp_path: Path, caps
 
 
 def test_compare_alert_stays_silent_for_neutral_signals(tmp_path: Path, capsys) -> None:
-    baseline_run_id, candidate_run_id = _materialize_workspace(tmp_path)
+    # Two identical same-model runs produce a comparison with no case transitions --
+    # a genuinely neutral signal -- so `--alert` must stay silent. (The mixed
+    # baseline/candidate fixture carries a net-new failure and is a regression.)
+    _ensure_test_registry()
+    dataset = _dataset()
+    first = execute_dataset_run(
+        dataset=dataset,
+        adapter_id=TEST_ADAPTER_ID,
+        classifier_id=TEST_CLASSIFIER_ID,
+        model="baseline-model",
+        run_seed=13,
+        now=datetime(2026, 4, 1, 10, 0, tzinfo=timezone.utc),
+    )
+    second = execute_dataset_run(
+        dataset=dataset,
+        adapter_id=TEST_ADAPTER_ID,
+        classifier_id=TEST_CLASSIFIER_ID,
+        model="baseline-model",
+        run_seed=13,
+        now=datetime(2026, 4, 1, 10, 5, tzinfo=timezone.utc),
+    )
+    write_run_artifacts(first, root=tmp_path)
+    write_run_artifacts(second, root=tmp_path)
 
     exit_code = main(
         [
             "compare",
-            baseline_run_id,
-            candidate_run_id,
+            first.run.run_id,
+            second.run.run_id,
             "--root",
             str(tmp_path),
             "--alert",

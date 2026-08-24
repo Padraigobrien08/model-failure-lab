@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAppRouteContext } from "@/app/router";
+import { verdictTone } from "@/app/routes/ComparisonsPage";
 import {
   ConsoleButton,
   EmptyState,
@@ -179,6 +180,7 @@ export function GatePage() {
                   <thead>
                     <tr className="border-b border-line">
                       <TableHeadCell>Comparison id</TableHeadCell>
+                      <TableHeadCell>Verdict</TableHeadCell>
                       <TableHeadCell>Action</TableHeadCell>
                       <TableHeadCell align="right">Severity</TableHeadCell>
                       <TableHeadCell>Policy rule</TableHeadCell>
@@ -199,6 +201,9 @@ export function GatePage() {
                         )}
                       >
                         <td className="px-2 py-[9px] font-semibold">{row.comparisonId}</td>
+                        <td className="px-2 py-[9px]">
+                          <StatusChip tone={verdictTone(row.verdict)}>{row.verdict}</StatusChip>
+                        </td>
                         <td className="px-2 py-[9px] text-muted-ink">{row.action}</td>
                         <td
                           className={cn(
@@ -241,6 +246,11 @@ export function GatePage() {
 
             <div className="flex flex-col gap-2">
               <SectionLabel>Policy</SectionLabel>
+              <div className="font-mono text-[11px] text-muted-ink">
+                policy: {gate.policySource === "default" ? "built-in defaults" : gate.policySource}
+                {" · "}
+                waivers: {gate.waiverSource ?? "none"}
+              </div>
               <div className="rounded-tok border border-line bg-panel px-4 py-3">
                 {policyEntries(gate.policy).map(([key, value], index, entries) => (
                   <div

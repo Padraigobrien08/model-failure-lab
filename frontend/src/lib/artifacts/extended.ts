@@ -50,6 +50,7 @@ export type GateWaiver = {
 
 export type GateDecisionRow = {
   comparisonId: string;
+  verdict: string;
   action: string;
   severity: number;
   policyRule: string;
@@ -62,6 +63,8 @@ export type GateResponse = {
   source: ArtifactSourceDescriptor;
   blocked: boolean;
   policy: ArtifactGovernancePolicy;
+  policySource: string;
+  waiverSource: string | null;
   rows: GateDecisionRow[];
 };
 
@@ -213,6 +216,7 @@ function requireGateDecisionRows(value: unknown, field: string): GateDecisionRow
     const row = requireObject(entry, `${field}[${index}]`);
     return {
       comparisonId: requireString(row.comparison_id, `${field}[${index}].comparison_id`),
+      verdict: requireStringOrNull(row.verdict, `${field}[${index}].verdict`) ?? "unknown",
       action: requireString(row.action, `${field}[${index}].action`),
       severity: requireNumber(row.severity, `${field}[${index}].severity`),
       policyRule: requireString(row.policy_rule, `${field}[${index}].policy_rule`),
@@ -259,6 +263,8 @@ export function validateGateResponse(payload: unknown): GateResponse {
     source: requireSource(data.source, "gate.source"),
     blocked: requireBoolean(data.blocked, "gate.blocked"),
     policy: requireGovernancePolicy(data.policy, "gate.policy"),
+    policySource: requireStringOrNull(data.policy_source, "gate.policy_source") ?? "default",
+    waiverSource: requireStringOrNull(data.waiver_source, "gate.waiver_source"),
     rows: requireGateDecisionRows(data.rows, "gate.rows"),
   };
 }
@@ -267,8 +273,13 @@ function requireComparisonSignalDrivers(
   value: unknown,
   field: string,
 ): ComparisonSignalDriver[] {
-  if (!Array.isArray(value)) {
+  // Tolerate an absent drivers list but fail closed on a malformed one, rather
+  // than silently dropping a corrupted drivers block to [].
+  if (value == null) {
     return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array`);
   }
   return value.map((entry, index) => {
     const row = requireObject(entry, `${field}[${index}]`);
@@ -730,7 +741,7 @@ export type BaselineEntry = {
   dataset: string | null;
   owner: string | null;
   notes: string | null;
-  updatedAt: string;
+  updatedAt: string | null;
 };
 
 export type BaselinesResponse = {
@@ -757,7 +768,7 @@ export function validateBaselinesResponse(payload: unknown): BaselinesResponse {
         dataset: requireStringOrNull(row.dataset, `baselines[${index}].dataset`),
         owner: requireStringOrNull(row.owner, `baselines[${index}].owner`),
         notes: requireStringOrNull(row.notes, `baselines[${index}].notes`),
-        updatedAt: requireString(row.updated_at, `baselines[${index}].updated_at`),
+        updatedAt: requireStringOrNull(row.updated_at, `baselines[${index}].updated_at`),
       };
     }),
   };

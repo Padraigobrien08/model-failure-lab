@@ -70,3 +70,22 @@ def test_compare_rejects_both_positional_and_name(tmp_path: Path, capsys) -> Non
     )
     assert exit_code == 1
     assert "not both" in capsys.readouterr().err
+
+
+def test_legacy_entry_without_timestamp_yields_null_not_empty_string(tmp_path: Path) -> None:
+    """A hand-edited/legacy registry row without `updated_at` must serialize as
+    null, not "" — the console's baselines validator rejects empty strings, so an
+    empty string would crash the whole panel on one bad row."""
+    from model_failure_lab.governance.baselines import list_baselines
+
+    registry = tmp_path / ".failure_lab" / "baseline_registry.json"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(
+        '{"baselines": [{"name": "legacy", "run_id": "run-x"}]}',
+        encoding="utf-8",
+    )
+
+    entry = list_baselines(root=tmp_path)[0]
+
+    assert entry.updated_at is None
+    assert entry.to_payload()["updated_at"] is None
