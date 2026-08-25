@@ -72,6 +72,7 @@ def upsert_baseline(
     owner: str | None = None,
     notes: str | None = None,
     root: str | Path | None = None,
+    now: datetime | None = None,
 ) -> BaselineEntry:
     artifact_root = project_root(root).resolve()
     existing = {entry.name: entry for entry in list_baselines(root=artifact_root)}
@@ -82,7 +83,9 @@ def upsert_baseline(
         dataset=dataset,
         owner=owner,
         notes=notes,
-        updated_at=datetime.now(timezone.utc).isoformat(),
+        # Clock injection seam, matching every other artifact writer in the package, so a
+        # test or fixture generator can produce a byte-stable registry.
+        updated_at=(now or datetime.now(timezone.utc)).isoformat(),
     )
     existing[name] = updated
     _write_registry(

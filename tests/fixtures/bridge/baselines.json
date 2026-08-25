@@ -1,0 +1,19 @@
+{
+  "baselines": [
+    {
+      "dataset": null,
+      "model": null,
+      "name": "contract-baseline",
+      "notes": null,
+      "owner": null,
+      "run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+      "updated_at": "2026-04-02T09:30:00+00:00"
+    }
+  ],
+  "source": {
+    "label": "Configured artifact store",
+    "path": "{WORKSPACE}",
+    "reportsPath": "{WORKSPACE}/reports",
+    "runsPath": "{WORKSPACE}/runs"
+  }
+}

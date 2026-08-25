@@ -348,6 +348,15 @@ export function ComparisonDetailPage() {
                         </span>
                       </div>
                       <div className="font-mono text-[10.5px] leading-normal text-muted-ink">
+                        {/* The engine's block reason, verbatim. Without it a FAIL driven by
+                            dropped failing cases or a coverage drop showed only a policy
+                            rule that did not explain it. */}
+                        {gateRow.blocked && gateRow.blockReason ? (
+                          <>
+                            {gateRow.blockReason}
+                            <br />
+                          </>
+                        ) : null}
                         policy: {gateRow.policyRule}
                         <br />
                         {gateRow.waiver

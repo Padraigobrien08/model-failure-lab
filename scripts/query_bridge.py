@@ -383,12 +383,14 @@ def main(argv: list[str] | None = None) -> int:
             "baselines": [entry.to_payload() for entry in list_baselines(root=root)],
         }
     elif args.command == "gate":
+        # Emit the gate result whole rather than hand-picking fields. Hand-picking
+        # previously dropped `policy_source` and `waiver_source`, so the console showed
+        # "built-in defaults / waivers: none" while a committed governance/policy.yml was
+        # in force -- the exact contradiction the console is meant to prevent.
         result = evaluate_regression_gate(root=root)
         payload = {
             "source": build_source_descriptor(root),
-            "blocked": result.blocked,
-            "policy": result.policy.to_payload(),
-            "rows": [row.to_payload() for row in result.rows],
+            **result.to_payload(),
         }
     elif args.command == "comparison-clusters":
         rows = list_clusters_for_comparison(

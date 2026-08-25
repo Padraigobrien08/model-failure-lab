@@ -34,8 +34,15 @@ function GateBanner({ gate }: { gate: GateResponse }) {
       </div>
     );
   }
-  const blockingCount = gate.rows.filter((row) => row.blocked).length;
-  const policyRule = gate.rows.find((row) => row.blocked)?.policyRule ?? gate.rows[0].policyRule;
+  const blockingRows = gate.rows.filter((row) => row.blocked);
+  const blockingCount = blockingRows.length;
+  const policyRule = blockingRows[0]?.policyRule ?? gate.rows[0].policyRule;
+  // The engine's own block reasons, verbatim. Showing the policy rule alone hid the
+  // non-verdict reasons CI fails on (incompatible runs, coverage drops, dropped failing
+  // cases), so the screen could not explain a FAIL that the CLI explained fully.
+  const blockReasons = Array.from(
+    new Set(blockingRows.map((row) => row.blockReason).filter((reason): reason is string => !!reason)),
+  );
   if (gate.blocked) {
     return (
       <div className="rounded-tok border border-bad-line border-l-[3px] border-l-bad bg-bad-panel p-[20px_22px]">
@@ -46,7 +53,9 @@ function GateBanner({ gate }: { gate: GateResponse }) {
           {blockingCount} {blockingCount === 1 ? "comparison blocks" : "comparisons block"} the
           gate.
         </div>
-        <div className="mt-1.5 font-mono text-[11.5px] text-muted-ink">{policyRule}</div>
+        <div className="mt-1.5 font-mono text-[11.5px] text-muted-ink">
+          {blockReasons.length > 0 ? blockReasons.join(" · ") : policyRule}
+        </div>
         <div className="mt-2.5 font-mono text-[11.5px] text-ink">
           harvest the regression: failure-lab regressions apply · or waive it: failure-lab
           regressions gate --waivers waivers.yml

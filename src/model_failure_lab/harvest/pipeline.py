@@ -90,6 +90,13 @@ def harvest_artifact_cases(
         source={
             "type": "artifact_harvest",
             "mode": resolved_mode,
+            # Provenance keys shared with `generate_regression_pack` in
+            # datasets/evolution.py. Omitting them here meant a draft harvested from the
+            # CLI showed a blank source and suggested family on the console's Datasets
+            # screen, while a draft created through the console showed both -- the same
+            # artifact with two different amounts of provenance depending on who wrote it.
+            "origin": "artifact_harvest_cli",
+            "comparison_report_id": comparison_id or normalized_filters.report_id,
             "artifact_root": str(artifact_root),
             "filters": _query_filters_payload(normalized_filters),
         },

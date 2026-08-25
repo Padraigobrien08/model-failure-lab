@@ -21,10 +21,13 @@ from .execution import (
     preflight_saved_portfolio_plan,
 )
 from .gates import (
+    GateConditions,
     GateDecision,
     GateWaiver,
     RegressionGateResult,
+    evaluate_gate_conditions,
     evaluate_regression_gate,
+    load_gate_conditions,
     load_governance_policy_from_file,
 )
 from .intelligence import RootCauseSummary, summarize_recurring_root_causes
@@ -96,6 +99,7 @@ __all__ = [
     "DatasetPlanningUnit",
     "DatasetPortfolioItem",
     "BaselineEntry",
+    "GateConditions",
     "GateDecision",
     "GateWaiver",
     "DatasetFamilyHealth",
@@ -137,7 +141,9 @@ __all__ = [
     "apply_dataset_lifecycle_action",
     "create_saved_portfolio_plan",
     "build_pr_reliability_comment",
+    "evaluate_gate_conditions",
     "evaluate_regression_gate",
+    "load_gate_conditions",
     "describe_dataset_family_lifecycle",
     "execute_saved_portfolio_plan",
     "get_active_lifecycle_action",

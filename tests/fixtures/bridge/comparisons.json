@@ -1,0 +1,1447 @@
+[
+  {
+    "baseline_run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+    "candidate_run_id": "20260402_093000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_stable_model_seed_13_f3aee19c",
+    "compatible": true,
+    "created_at": "2026-04-02T09:33:00Z",
+    "dataset": "insight-fixture-v1",
+    "governance_recommendation": {
+      "action": "ignore",
+      "cluster_context": [
+        {
+          "cluster_id": "cd_4933581a246ff990",
+          "cluster_kind": "comparison_delta",
+          "datasets": [
+            "insight-fixture-v1"
+          ],
+          "failure_types": [
+            "instruction_following"
+          ],
+          "first_seen_at": "2026-04-02T09:31:00Z",
+          "label": "instruction_following \u00b7 failure to no failure",
+          "last_seen_at": "2026-04-02T09:33:00Z",
+          "models": [
+            "baseline-model\u2192candidate-model",
+            "baseline-model\u2192stable-model"
+          ],
+          "occurrence_count": 2,
+          "recent_severity": 0.75,
+          "representative_evidence": [
+            {
+              "case_id": "case-gamma-001",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_8349ec56_1865e407:case-gamma-001",
+              "prompt_id": "case-gamma-001",
+              "report_id": "compare_98587f75_to_8349ec56_1865e407",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            },
+            {
+              "case_id": "case-gamma-001",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-gamma-001",
+              "prompt_id": "case-gamma-001",
+              "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            }
+          ],
+          "scope_count": 2,
+          "summary": "instruction_following failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+          "transition_types": [
+            "failure_to_no_failure"
+          ]
+        },
+        {
+          "cluster_id": "cd_c06605707385d758",
+          "cluster_kind": "comparison_delta",
+          "datasets": [
+            "insight-fixture-v1"
+          ],
+          "failure_types": [
+            "reasoning"
+          ],
+          "first_seen_at": "2026-04-02T09:31:00Z",
+          "label": "reasoning \u00b7 failure to no failure",
+          "last_seen_at": "2026-04-02T09:33:00Z",
+          "models": [
+            "baseline-model\u2192candidate-model",
+            "baseline-model\u2192stable-model"
+          ],
+          "occurrence_count": 2,
+          "recent_severity": 0.75,
+          "representative_evidence": [
+            {
+              "case_id": "case-beta-002",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_8349ec56_1865e407:case-beta-002",
+              "prompt_id": "case-beta-002",
+              "report_id": "compare_98587f75_to_8349ec56_1865e407",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            },
+            {
+              "case_id": "case-beta-002",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-beta-002",
+              "prompt_id": "case-beta-002",
+              "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            }
+          ],
+          "scope_count": 2,
+          "summary": "reasoning failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+          "transition_types": [
+            "failure_to_no_failure"
+          ]
+        },
+        {
+          "cluster_id": "cd_c0713f74bce5b393",
+          "cluster_kind": "comparison_delta",
+          "datasets": [
+            "insight-fixture-v1"
+          ],
+          "failure_types": [
+            "hallucination"
+          ],
+          "first_seen_at": "2026-04-02T09:31:00Z",
+          "label": "hallucination \u00b7 failure to no failure",
+          "last_seen_at": "2026-04-02T09:33:00Z",
+          "models": [
+            "baseline-model\u2192candidate-model",
+            "baseline-model\u2192stable-model"
+          ],
+          "occurrence_count": 2,
+          "recent_severity": 0.75,
+          "representative_evidence": [
+            {
+              "case_id": "case-alpha-001",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_8349ec56_1865e407:case-alpha-001",
+              "prompt_id": "case-alpha-001",
+              "report_id": "compare_98587f75_to_8349ec56_1865e407",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            },
+            {
+              "case_id": "case-alpha-001",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-alpha-001",
+              "prompt_id": "case-alpha-001",
+              "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            }
+          ],
+          "scope_count": 2,
+          "summary": "hallucination failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+          "transition_types": [
+            "failure_to_no_failure"
+          ]
+        }
+      ],
+      "comparison_id": "compare_98587f75_to_8349ec56_1865e407",
+      "escalation": {
+        "family_health_label": null,
+        "reason": "severity=0.750, recent_regressions=2, recurring_clusters=3",
+        "recent_regression_count": 2,
+        "recurring_cluster_count": 3,
+        "score": 0.92,
+        "severity_band": "high",
+        "status": "critical"
+      },
+      "evidence_case_ids": [],
+      "history_context": {
+        "candidate_run_trend": {
+          "delta": null,
+          "first_value": 0.0,
+          "label": "insufficient_history",
+          "last_value": 0.0,
+          "sample_count": 1,
+          "volatility": null,
+          "volatility_label": "insufficient_history"
+        },
+        "comparison_trend": {
+          "delta": 0.625,
+          "first_value": 0.125,
+          "label": "degrading",
+          "last_value": 0.75,
+          "sample_count": 3,
+          "volatility": 0.9375,
+          "volatility_label": "high"
+        },
+        "family_health": null,
+        "recent_comparison_count": 3,
+        "recent_comparisons": [
+          {
+            "baseline_model": "baseline-model",
+            "baseline_run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+            "candidate_model": "candidate-model",
+            "candidate_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+            "compatible": true,
+            "created_at": "2026-04-02T09:31:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.25,
+            "net_score": 0.125,
+            "regression_score": 0.125,
+            "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+            "severity": 0.125,
+            "signal_verdict": "regression",
+            "status": "improved",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 0,
+                "failure_type": "reasoning"
+              }
+            ]
+          },
+          {
+            "baseline_model": "candidate-model",
+            "baseline_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+            "candidate_model": "noisy-model",
+            "candidate_run_id": "20260402_092000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_noisy_model_seed_13_e8a28c49",
+            "compatible": true,
+            "created_at": "2026-04-02T09:32:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.0,
+            "net_score": -0.5,
+            "regression_score": 0.5,
+            "report_id": "compare_66f669a9_to_df4f8650_1094b97e",
+            "severity": 0.5,
+            "signal_verdict": "regression",
+            "status": "regressed",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-alpha-001",
+                  "case-delta-002"
+                ],
+                "delta": 0.25,
+                "direction": "regression",
+                "driver_rank": 0,
+                "failure_type": "hallucination"
+              },
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": 0.25,
+                "direction": "regression",
+                "driver_rank": 1,
+                "failure_type": "reasoning"
+              }
+            ]
+          },
+          {
+            "baseline_model": "baseline-model",
+            "baseline_run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+            "candidate_model": "stable-model",
+            "candidate_run_id": "20260402_093000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_stable_model_seed_13_f3aee19c",
+            "compatible": true,
+            "created_at": "2026-04-02T09:33:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.75,
+            "net_score": 0.75,
+            "regression_score": 0.0,
+            "report_id": "compare_98587f75_to_8349ec56_1865e407",
+            "severity": 0.75,
+            "signal_verdict": "improvement",
+            "status": "improved",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-alpha-001",
+                  "case-alpha-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 0,
+                "failure_type": "hallucination"
+              },
+              {
+                "case_ids": [
+                  "case-gamma-001",
+                  "case-gamma-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 1,
+                "failure_type": "instruction_following"
+              },
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 2,
+                "failure_type": "reasoning"
+              }
+            ]
+          }
+        ],
+        "recent_regression_count": 2,
+        "recurring_clusters": [
+          {
+            "cluster_id": "cd_4933581a246ff990",
+            "cluster_kind": "comparison_delta",
+            "datasets": [
+              "insight-fixture-v1"
+            ],
+            "failure_types": [
+              "instruction_following"
+            ],
+            "first_seen_at": "2026-04-02T09:31:00Z",
+            "label": "instruction_following \u00b7 failure to no failure",
+            "last_seen_at": "2026-04-02T09:33:00Z",
+            "models": [
+              "baseline-model\u2192candidate-model",
+              "baseline-model\u2192stable-model"
+            ],
+            "occurrence_count": 2,
+            "recent_severity": 0.75,
+            "representative_evidence": [
+              {
+                "case_id": "case-gamma-001",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_8349ec56_1865e407:case-gamma-001",
+                "prompt_id": "case-gamma-001",
+                "report_id": "compare_98587f75_to_8349ec56_1865e407",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              },
+              {
+                "case_id": "case-gamma-001",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-gamma-001",
+                "prompt_id": "case-gamma-001",
+                "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              }
+            ],
+            "scope_count": 2,
+            "summary": "instruction_following failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+            "transition_types": [
+              "failure_to_no_failure"
+            ]
+          },
+          {
+            "cluster_id": "cd_c06605707385d758",
+            "cluster_kind": "comparison_delta",
+            "datasets": [
+              "insight-fixture-v1"
+            ],
+            "failure_types": [
+              "reasoning"
+            ],
+            "first_seen_at": "2026-04-02T09:31:00Z",
+            "label": "reasoning \u00b7 failure to no failure",
+            "last_seen_at": "2026-04-02T09:33:00Z",
+            "models": [
+              "baseline-model\u2192candidate-model",
+              "baseline-model\u2192stable-model"
+            ],
+            "occurrence_count": 2,
+            "recent_severity": 0.75,
+            "representative_evidence": [
+              {
+                "case_id": "case-beta-002",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_8349ec56_1865e407:case-beta-002",
+                "prompt_id": "case-beta-002",
+                "report_id": "compare_98587f75_to_8349ec56_1865e407",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              },
+              {
+                "case_id": "case-beta-002",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-beta-002",
+                "prompt_id": "case-beta-002",
+                "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              }
+            ],
+            "scope_count": 2,
+            "summary": "reasoning failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+            "transition_types": [
+              "failure_to_no_failure"
+            ]
+          },
+          {
+            "cluster_id": "cd_c0713f74bce5b393",
+            "cluster_kind": "comparison_delta",
+            "datasets": [
+              "insight-fixture-v1"
+            ],
+            "failure_types": [
+              "hallucination"
+            ],
+            "first_seen_at": "2026-04-02T09:31:00Z",
+            "label": "hallucination \u00b7 failure to no failure",
+            "last_seen_at": "2026-04-02T09:33:00Z",
+            "models": [
+              "baseline-model\u2192candidate-model",
+              "baseline-model\u2192stable-model"
+            ],
+            "occurrence_count": 2,
+            "recent_severity": 0.75,
+            "representative_evidence": [
+              {
+                "case_id": "case-alpha-001",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_8349ec56_1865e407:case-alpha-001",
+                "prompt_id": "case-alpha-001",
+                "report_id": "compare_98587f75_to_8349ec56_1865e407",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              },
+              {
+                "case_id": "case-alpha-001",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-alpha-001",
+                "prompt_id": "case-alpha-001",
+                "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              }
+            ],
+            "scope_count": 2,
+            "summary": "hallucination failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+            "transition_types": [
+              "failure_to_no_failure"
+            ]
+          }
+        ],
+        "recurring_failures": [
+          {
+            "comparison_ids": [
+              "compare_98587f75_to_66f669a9_9a5ddb75",
+              "compare_66f669a9_to_df4f8650_1094b97e"
+            ],
+            "failure_type": "reasoning",
+            "latest_delta": 0.25,
+            "occurrences": 2
+          }
+        ],
+        "scope_kind": "dataset",
+        "scope_value": "insight-fixture-v1"
+      },
+      "lifecycle_recommendation": {
+        "action": "keep",
+        "evaluation_run_count": null,
+        "family_id": "regression-insight-fixture-general",
+        "health_condition": "keepable",
+        "latest_dataset_id": null,
+        "primary_failure_type": null,
+        "projected_case_count": 0,
+        "rationale": "Family `regression-insight-fixture-general` does not exist yet, so lifecycle management stays neutral until the first immutable version is created.",
+        "recent_fail_rate": null,
+        "related_family_ids": [],
+        "source_dataset_id": null,
+        "target_family_id": null,
+        "version_count": null
+      },
+      "matched_family": {
+        "cap_reached": false,
+        "current_case_count": 0,
+        "duplicate_case_count": 0,
+        "duplicate_ratio": 0.0,
+        "duplicate_ratio_exceeded": false,
+        "exists": false,
+        "family_case_cap": 200,
+        "family_id": "regression-insight-fixture-general",
+        "latest_dataset_id": null,
+        "match_kind": "suggested_new",
+        "projected_case_count": 0,
+        "proposed_addition_count": 0,
+        "version_count": 0
+      },
+      "policy": {
+        "failure_type": null,
+        "family_case_cap": 200,
+        "family_id": null,
+        "max_duplicate_ratio": 0.6,
+        "minimum_severity": 0.05,
+        "recurrence_threshold": 2,
+        "recurrence_window": 5,
+        "strategy": "exact_suggested_family_then_health_guards",
+        "top_n": 10
+      },
+      "policy_rule": "non_regression_signal",
+      "preview_cases": [],
+      "rationale": "Signal verdict is `improvement`, so the comparison does not qualify for regression-pack governance. Primary recurring cluster `cd_4933581a246ff990` (instruction_following \u00b7 failure to no failure) spans 2 saved artifacts.",
+      "selected_case_count": 0,
+      "signal": {
+        "improvement_score": 0.75,
+        "net_score": 0.75,
+        "regression_score": 0.0,
+        "severity": 0.75,
+        "top_drivers": [
+          {
+            "case_ids": [
+              "case-alpha-001",
+              "case-alpha-002"
+            ],
+            "delta": -0.25,
+            "direction": "improvement",
+            "driver_rank": 0,
+            "failure_type": "hallucination"
+          },
+          {
+            "case_ids": [
+              "case-gamma-001",
+              "case-gamma-002"
+            ],
+            "delta": -0.25,
+            "direction": "improvement",
+            "driver_rank": 1,
+            "failure_type": "instruction_following"
+          },
+          {
+            "case_ids": [
+              "case-beta-001",
+              "case-beta-002"
+            ],
+            "delta": -0.25,
+            "direction": "improvement",
+            "driver_rank": 2,
+            "failure_type": "reasoning"
+          }
+        ],
+        "verdict": "improvement"
+      }
+    },
+    "improvement_score": 0.75,
+    "net_score": 0.75,
+    "portfolio_item": null,
+    "regression_score": 0.0,
+    "report_id": "compare_98587f75_to_8349ec56_1865e407",
+    "severity": 0.75,
+    "signal_verdict": "improvement",
+    "status": "improved",
+    "top_drivers": [
+      {
+        "case_ids": [
+          "case-alpha-001",
+          "case-alpha-002"
+        ],
+        "delta": -0.25,
+        "direction": "improvement",
+        "driver_rank": 0,
+        "failure_type": "hallucination"
+      },
+      {
+        "case_ids": [
+          "case-gamma-001",
+          "case-gamma-002"
+        ],
+        "delta": -0.25,
+        "direction": "improvement",
+        "driver_rank": 1,
+        "failure_type": "instruction_following"
+      },
+      {
+        "case_ids": [
+          "case-beta-001",
+          "case-beta-002"
+        ],
+        "delta": -0.25,
+        "direction": "improvement",
+        "driver_rank": 2,
+        "failure_type": "reasoning"
+      }
+    ]
+  },
+  {
+    "baseline_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+    "candidate_run_id": "20260402_092000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_noisy_model_seed_13_e8a28c49",
+    "compatible": true,
+    "created_at": "2026-04-02T09:32:00Z",
+    "dataset": "insight-fixture-v1",
+    "governance_recommendation": {
+      "action": "create",
+      "cluster_context": [],
+      "comparison_id": "compare_66f669a9_to_df4f8650_1094b97e",
+      "escalation": {
+        "family_health_label": null,
+        "reason": "severity=0.500, recent_regressions=2",
+        "recent_regression_count": 2,
+        "recurring_cluster_count": 0,
+        "score": 0.58,
+        "severity_band": "high",
+        "status": "critical"
+      },
+      "evidence_case_ids": [
+        "case-alpha-001",
+        "case-delta-002",
+        "case-beta-002"
+      ],
+      "history_context": {
+        "candidate_run_trend": {
+          "delta": null,
+          "first_value": 1.0,
+          "label": "insufficient_history",
+          "last_value": 1.0,
+          "sample_count": 1,
+          "volatility": null,
+          "volatility_label": "insufficient_history"
+        },
+        "comparison_trend": {
+          "delta": 0.625,
+          "first_value": 0.125,
+          "label": "degrading",
+          "last_value": 0.75,
+          "sample_count": 3,
+          "volatility": 0.9375,
+          "volatility_label": "high"
+        },
+        "family_health": null,
+        "recent_comparison_count": 3,
+        "recent_comparisons": [
+          {
+            "baseline_model": "baseline-model",
+            "baseline_run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+            "candidate_model": "candidate-model",
+            "candidate_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+            "compatible": true,
+            "created_at": "2026-04-02T09:31:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.25,
+            "net_score": 0.125,
+            "regression_score": 0.125,
+            "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+            "severity": 0.125,
+            "signal_verdict": "regression",
+            "status": "improved",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 0,
+                "failure_type": "reasoning"
+              }
+            ]
+          },
+          {
+            "baseline_model": "candidate-model",
+            "baseline_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+            "candidate_model": "noisy-model",
+            "candidate_run_id": "20260402_092000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_noisy_model_seed_13_e8a28c49",
+            "compatible": true,
+            "created_at": "2026-04-02T09:32:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.0,
+            "net_score": -0.5,
+            "regression_score": 0.5,
+            "report_id": "compare_66f669a9_to_df4f8650_1094b97e",
+            "severity": 0.5,
+            "signal_verdict": "regression",
+            "status": "regressed",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-alpha-001",
+                  "case-delta-002"
+                ],
+                "delta": 0.25,
+                "direction": "regression",
+                "driver_rank": 0,
+                "failure_type": "hallucination"
+              },
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": 0.25,
+                "direction": "regression",
+                "driver_rank": 1,
+                "failure_type": "reasoning"
+              }
+            ]
+          },
+          {
+            "baseline_model": "baseline-model",
+            "baseline_run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+            "candidate_model": "stable-model",
+            "candidate_run_id": "20260402_093000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_stable_model_seed_13_f3aee19c",
+            "compatible": true,
+            "created_at": "2026-04-02T09:33:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.75,
+            "net_score": 0.75,
+            "regression_score": 0.0,
+            "report_id": "compare_98587f75_to_8349ec56_1865e407",
+            "severity": 0.75,
+            "signal_verdict": "improvement",
+            "status": "improved",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-alpha-001",
+                  "case-alpha-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 0,
+                "failure_type": "hallucination"
+              },
+              {
+                "case_ids": [
+                  "case-gamma-001",
+                  "case-gamma-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 1,
+                "failure_type": "instruction_following"
+              },
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 2,
+                "failure_type": "reasoning"
+              }
+            ]
+          }
+        ],
+        "recent_regression_count": 2,
+        "recurring_clusters": [],
+        "recurring_failures": [
+          {
+            "comparison_ids": [
+              "compare_98587f75_to_66f669a9_9a5ddb75",
+              "compare_66f669a9_to_df4f8650_1094b97e"
+            ],
+            "failure_type": "reasoning",
+            "latest_delta": 0.25,
+            "occurrences": 2
+          }
+        ],
+        "scope_kind": "dataset",
+        "scope_value": "insight-fixture-v1"
+      },
+      "lifecycle_recommendation": {
+        "action": "keep",
+        "evaluation_run_count": null,
+        "family_id": "regression-insight-fixture-hallucination",
+        "health_condition": "keepable",
+        "latest_dataset_id": null,
+        "primary_failure_type": null,
+        "projected_case_count": 3,
+        "rationale": "Family `regression-insight-fixture-hallucination` does not exist yet, so lifecycle management stays neutral until the first immutable version is created.",
+        "recent_fail_rate": null,
+        "related_family_ids": [],
+        "source_dataset_id": null,
+        "target_family_id": null,
+        "version_count": null
+      },
+      "matched_family": {
+        "cap_reached": false,
+        "current_case_count": 0,
+        "duplicate_case_count": 0,
+        "duplicate_ratio": 0.0,
+        "duplicate_ratio_exceeded": false,
+        "exists": false,
+        "family_case_cap": 200,
+        "family_id": "regression-insight-fixture-hallucination",
+        "latest_dataset_id": null,
+        "match_kind": "suggested_new",
+        "projected_case_count": 3,
+        "proposed_addition_count": 3,
+        "version_count": 0
+      },
+      "policy": {
+        "failure_type": null,
+        "family_case_cap": 200,
+        "family_id": null,
+        "max_duplicate_ratio": 0.6,
+        "minimum_severity": 0.05,
+        "recurrence_threshold": 2,
+        "recurrence_window": 5,
+        "strategy": "exact_suggested_family_then_health_guards",
+        "top_n": 10
+      },
+      "policy_rule": "new_family_required",
+      "preview_cases": [
+        {
+          "case_id": "harvest-dd07d8f0ffc225f8",
+          "driver_failure_type": "hallucination",
+          "driver_rank": 0,
+          "prompt": "Fixture alpha 1. According to a study, explain why the bridge hums at sunset.",
+          "prompt_id": "case-alpha-001",
+          "source_case_id": "case-alpha-001",
+          "source_report_id": "compare_66f669a9_to_df4f8650_1094b97e",
+          "source_run_id": "20260402_092000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_noisy_model_seed_13_e8a28c49",
+          "transition_type": "no_failure_to_failure"
+        },
+        {
+          "case_id": "harvest-d658a55fd2ec79e9",
+          "driver_failure_type": "hallucination",
+          "driver_rank": 0,
+          "prompt": "Fixture delta 2. Draft a grounded support reply with no invented details.",
+          "prompt_id": "case-delta-002",
+          "source_case_id": "case-delta-002",
+          "source_report_id": "compare_66f669a9_to_df4f8650_1094b97e",
+          "source_run_id": "20260402_092000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_noisy_model_seed_13_e8a28c49",
+          "transition_type": "no_failure_to_failure"
+        },
+        {
+          "case_id": "harvest-f11c7302d8e8e5ec",
+          "driver_failure_type": "reasoning",
+          "driver_rank": 1,
+          "prompt": "Fixture beta 2. Return only the hidden validation code GREEN CIRCLE.",
+          "prompt_id": "case-beta-002",
+          "source_case_id": "case-beta-002",
+          "source_report_id": "compare_66f669a9_to_df4f8650_1094b97e",
+          "source_run_id": "20260402_092000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_noisy_model_seed_13_e8a28c49",
+          "transition_type": "no_failure_to_failure"
+        }
+      ],
+      "rationale": "Qualifying regression has no existing family match, so governance recommends creating `regression-insight-fixture-hallucination`.",
+      "selected_case_count": 3,
+      "signal": {
+        "improvement_score": 0.0,
+        "net_score": -0.5,
+        "regression_score": 0.5,
+        "severity": 0.5,
+        "top_drivers": [
+          {
+            "case_ids": [
+              "case-alpha-001",
+              "case-delta-002"
+            ],
+            "delta": 0.25,
+            "direction": "regression",
+            "driver_rank": 0,
+            "failure_type": "hallucination"
+          },
+          {
+            "case_ids": [
+              "case-beta-001",
+              "case-beta-002"
+            ],
+            "delta": 0.25,
+            "direction": "regression",
+            "driver_rank": 1,
+            "failure_type": "reasoning"
+          }
+        ],
+        "verdict": "regression"
+      }
+    },
+    "improvement_score": 0.0,
+    "net_score": -0.5,
+    "portfolio_item": null,
+    "regression_score": 0.5,
+    "report_id": "compare_66f669a9_to_df4f8650_1094b97e",
+    "severity": 0.5,
+    "signal_verdict": "regression",
+    "status": "regressed",
+    "top_drivers": [
+      {
+        "case_ids": [
+          "case-alpha-001",
+          "case-delta-002"
+        ],
+        "delta": 0.25,
+        "direction": "regression",
+        "driver_rank": 0,
+        "failure_type": "hallucination"
+      },
+      {
+        "case_ids": [
+          "case-beta-001",
+          "case-beta-002"
+        ],
+        "delta": 0.25,
+        "direction": "regression",
+        "driver_rank": 1,
+        "failure_type": "reasoning"
+      }
+    ]
+  },
+  {
+    "baseline_run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+    "candidate_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+    "compatible": true,
+    "created_at": "2026-04-02T09:31:00Z",
+    "dataset": "insight-fixture-v1",
+    "governance_recommendation": {
+      "action": "create",
+      "cluster_context": [
+        {
+          "cluster_id": "cd_4933581a246ff990",
+          "cluster_kind": "comparison_delta",
+          "datasets": [
+            "insight-fixture-v1"
+          ],
+          "failure_types": [
+            "instruction_following"
+          ],
+          "first_seen_at": "2026-04-02T09:31:00Z",
+          "label": "instruction_following \u00b7 failure to no failure",
+          "last_seen_at": "2026-04-02T09:33:00Z",
+          "models": [
+            "baseline-model\u2192candidate-model",
+            "baseline-model\u2192stable-model"
+          ],
+          "occurrence_count": 2,
+          "recent_severity": 0.75,
+          "representative_evidence": [
+            {
+              "case_id": "case-gamma-001",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_8349ec56_1865e407:case-gamma-001",
+              "prompt_id": "case-gamma-001",
+              "report_id": "compare_98587f75_to_8349ec56_1865e407",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            },
+            {
+              "case_id": "case-gamma-001",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-gamma-001",
+              "prompt_id": "case-gamma-001",
+              "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            }
+          ],
+          "scope_count": 2,
+          "summary": "instruction_following failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+          "transition_types": [
+            "failure_to_no_failure"
+          ]
+        },
+        {
+          "cluster_id": "cd_c06605707385d758",
+          "cluster_kind": "comparison_delta",
+          "datasets": [
+            "insight-fixture-v1"
+          ],
+          "failure_types": [
+            "reasoning"
+          ],
+          "first_seen_at": "2026-04-02T09:31:00Z",
+          "label": "reasoning \u00b7 failure to no failure",
+          "last_seen_at": "2026-04-02T09:33:00Z",
+          "models": [
+            "baseline-model\u2192candidate-model",
+            "baseline-model\u2192stable-model"
+          ],
+          "occurrence_count": 2,
+          "recent_severity": 0.75,
+          "representative_evidence": [
+            {
+              "case_id": "case-beta-002",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_8349ec56_1865e407:case-beta-002",
+              "prompt_id": "case-beta-002",
+              "report_id": "compare_98587f75_to_8349ec56_1865e407",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            },
+            {
+              "case_id": "case-beta-002",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-beta-002",
+              "prompt_id": "case-beta-002",
+              "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            }
+          ],
+          "scope_count": 2,
+          "summary": "reasoning failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+          "transition_types": [
+            "failure_to_no_failure"
+          ]
+        },
+        {
+          "cluster_id": "cd_c0713f74bce5b393",
+          "cluster_kind": "comparison_delta",
+          "datasets": [
+            "insight-fixture-v1"
+          ],
+          "failure_types": [
+            "hallucination"
+          ],
+          "first_seen_at": "2026-04-02T09:31:00Z",
+          "label": "hallucination \u00b7 failure to no failure",
+          "last_seen_at": "2026-04-02T09:33:00Z",
+          "models": [
+            "baseline-model\u2192candidate-model",
+            "baseline-model\u2192stable-model"
+          ],
+          "occurrence_count": 2,
+          "recent_severity": 0.75,
+          "representative_evidence": [
+            {
+              "case_id": "case-alpha-001",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_8349ec56_1865e407:case-alpha-001",
+              "prompt_id": "case-alpha-001",
+              "report_id": "compare_98587f75_to_8349ec56_1865e407",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            },
+            {
+              "case_id": "case-alpha-001",
+              "kind": "comparison_case",
+              "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-alpha-001",
+              "prompt_id": "case-alpha-001",
+              "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+              "run_id": null,
+              "section": "transitions",
+              "transition_type": "failure_to_no_failure"
+            }
+          ],
+          "scope_count": 2,
+          "summary": "hallucination failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+          "transition_types": [
+            "failure_to_no_failure"
+          ]
+        }
+      ],
+      "comparison_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+      "escalation": {
+        "family_health_label": null,
+        "reason": "severity=0.125, recent_regressions=2, recurring_clusters=3",
+        "recent_regression_count": 2,
+        "recurring_cluster_count": 3,
+        "score": 0.295,
+        "severity_band": "moderate",
+        "status": "elevated"
+      },
+      "evidence_case_ids": [
+        "case-delta-001"
+      ],
+      "history_context": {
+        "candidate_run_trend": {
+          "delta": null,
+          "first_value": 0.5,
+          "label": "insufficient_history",
+          "last_value": 0.5,
+          "sample_count": 1,
+          "volatility": null,
+          "volatility_label": "insufficient_history"
+        },
+        "comparison_trend": {
+          "delta": 0.625,
+          "first_value": 0.125,
+          "label": "degrading",
+          "last_value": 0.75,
+          "sample_count": 3,
+          "volatility": 0.9375,
+          "volatility_label": "high"
+        },
+        "family_health": null,
+        "recent_comparison_count": 3,
+        "recent_comparisons": [
+          {
+            "baseline_model": "baseline-model",
+            "baseline_run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+            "candidate_model": "candidate-model",
+            "candidate_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+            "compatible": true,
+            "created_at": "2026-04-02T09:31:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.25,
+            "net_score": 0.125,
+            "regression_score": 0.125,
+            "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+            "severity": 0.125,
+            "signal_verdict": "regression",
+            "status": "improved",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 0,
+                "failure_type": "reasoning"
+              }
+            ]
+          },
+          {
+            "baseline_model": "candidate-model",
+            "baseline_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+            "candidate_model": "noisy-model",
+            "candidate_run_id": "20260402_092000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_noisy_model_seed_13_e8a28c49",
+            "compatible": true,
+            "created_at": "2026-04-02T09:32:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.0,
+            "net_score": -0.5,
+            "regression_score": 0.5,
+            "report_id": "compare_66f669a9_to_df4f8650_1094b97e",
+            "severity": 0.5,
+            "signal_verdict": "regression",
+            "status": "regressed",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-alpha-001",
+                  "case-delta-002"
+                ],
+                "delta": 0.25,
+                "direction": "regression",
+                "driver_rank": 0,
+                "failure_type": "hallucination"
+              },
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": 0.25,
+                "direction": "regression",
+                "driver_rank": 1,
+                "failure_type": "reasoning"
+              }
+            ]
+          },
+          {
+            "baseline_model": "baseline-model",
+            "baseline_run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+            "candidate_model": "stable-model",
+            "candidate_run_id": "20260402_093000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_stable_model_seed_13_f3aee19c",
+            "compatible": true,
+            "created_at": "2026-04-02T09:33:00Z",
+            "dataset": "insight-fixture-v1",
+            "improvement_score": 0.75,
+            "net_score": 0.75,
+            "regression_score": 0.0,
+            "report_id": "compare_98587f75_to_8349ec56_1865e407",
+            "severity": 0.75,
+            "signal_verdict": "improvement",
+            "status": "improved",
+            "top_drivers": [
+              {
+                "case_ids": [
+                  "case-alpha-001",
+                  "case-alpha-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 0,
+                "failure_type": "hallucination"
+              },
+              {
+                "case_ids": [
+                  "case-gamma-001",
+                  "case-gamma-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 1,
+                "failure_type": "instruction_following"
+              },
+              {
+                "case_ids": [
+                  "case-beta-001",
+                  "case-beta-002"
+                ],
+                "delta": -0.25,
+                "direction": "improvement",
+                "driver_rank": 2,
+                "failure_type": "reasoning"
+              }
+            ]
+          }
+        ],
+        "recent_regression_count": 2,
+        "recurring_clusters": [
+          {
+            "cluster_id": "cd_4933581a246ff990",
+            "cluster_kind": "comparison_delta",
+            "datasets": [
+              "insight-fixture-v1"
+            ],
+            "failure_types": [
+              "instruction_following"
+            ],
+            "first_seen_at": "2026-04-02T09:31:00Z",
+            "label": "instruction_following \u00b7 failure to no failure",
+            "last_seen_at": "2026-04-02T09:33:00Z",
+            "models": [
+              "baseline-model\u2192candidate-model",
+              "baseline-model\u2192stable-model"
+            ],
+            "occurrence_count": 2,
+            "recent_severity": 0.75,
+            "representative_evidence": [
+              {
+                "case_id": "case-gamma-001",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_8349ec56_1865e407:case-gamma-001",
+                "prompt_id": "case-gamma-001",
+                "report_id": "compare_98587f75_to_8349ec56_1865e407",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              },
+              {
+                "case_id": "case-gamma-001",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-gamma-001",
+                "prompt_id": "case-gamma-001",
+                "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              }
+            ],
+            "scope_count": 2,
+            "summary": "instruction_following failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+            "transition_types": [
+              "failure_to_no_failure"
+            ]
+          },
+          {
+            "cluster_id": "cd_c06605707385d758",
+            "cluster_kind": "comparison_delta",
+            "datasets": [
+              "insight-fixture-v1"
+            ],
+            "failure_types": [
+              "reasoning"
+            ],
+            "first_seen_at": "2026-04-02T09:31:00Z",
+            "label": "reasoning \u00b7 failure to no failure",
+            "last_seen_at": "2026-04-02T09:33:00Z",
+            "models": [
+              "baseline-model\u2192candidate-model",
+              "baseline-model\u2192stable-model"
+            ],
+            "occurrence_count": 2,
+            "recent_severity": 0.75,
+            "representative_evidence": [
+              {
+                "case_id": "case-beta-002",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_8349ec56_1865e407:case-beta-002",
+                "prompt_id": "case-beta-002",
+                "report_id": "compare_98587f75_to_8349ec56_1865e407",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              },
+              {
+                "case_id": "case-beta-002",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-beta-002",
+                "prompt_id": "case-beta-002",
+                "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              }
+            ],
+            "scope_count": 2,
+            "summary": "reasoning failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+            "transition_types": [
+              "failure_to_no_failure"
+            ]
+          },
+          {
+            "cluster_id": "cd_c0713f74bce5b393",
+            "cluster_kind": "comparison_delta",
+            "datasets": [
+              "insight-fixture-v1"
+            ],
+            "failure_types": [
+              "hallucination"
+            ],
+            "first_seen_at": "2026-04-02T09:31:00Z",
+            "label": "hallucination \u00b7 failure to no failure",
+            "last_seen_at": "2026-04-02T09:33:00Z",
+            "models": [
+              "baseline-model\u2192candidate-model",
+              "baseline-model\u2192stable-model"
+            ],
+            "occurrence_count": 2,
+            "recent_severity": 0.75,
+            "representative_evidence": [
+              {
+                "case_id": "case-alpha-001",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_8349ec56_1865e407:case-alpha-001",
+                "prompt_id": "case-alpha-001",
+                "report_id": "compare_98587f75_to_8349ec56_1865e407",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              },
+              {
+                "case_id": "case-alpha-001",
+                "kind": "comparison_case",
+                "label": "compare_98587f75_to_66f669a9_9a5ddb75:case-alpha-001",
+                "prompt_id": "case-alpha-001",
+                "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+                "run_id": null,
+                "section": "transitions",
+                "transition_type": "failure_to_no_failure"
+              }
+            ],
+            "scope_count": 2,
+            "summary": "hallucination failure to no failure recurred 2 times across 2 saved comparisons in insight-fixture-v1.",
+            "transition_types": [
+              "failure_to_no_failure"
+            ]
+          }
+        ],
+        "recurring_failures": [
+          {
+            "comparison_ids": [
+              "compare_98587f75_to_66f669a9_9a5ddb75",
+              "compare_66f669a9_to_df4f8650_1094b97e"
+            ],
+            "failure_type": "reasoning",
+            "latest_delta": 0.25,
+            "occurrences": 2
+          }
+        ],
+        "scope_kind": "dataset",
+        "scope_value": "insight-fixture-v1"
+      },
+      "lifecycle_recommendation": {
+        "action": "keep",
+        "evaluation_run_count": null,
+        "family_id": "regression-insight-fixture-general",
+        "health_condition": "keepable",
+        "latest_dataset_id": null,
+        "primary_failure_type": null,
+        "projected_case_count": 1,
+        "rationale": "Family `regression-insight-fixture-general` does not exist yet, so lifecycle management stays neutral until the first immutable version is created.",
+        "recent_fail_rate": null,
+        "related_family_ids": [],
+        "source_dataset_id": null,
+        "target_family_id": null,
+        "version_count": null
+      },
+      "matched_family": {
+        "cap_reached": false,
+        "current_case_count": 0,
+        "duplicate_case_count": 0,
+        "duplicate_ratio": 0.0,
+        "duplicate_ratio_exceeded": false,
+        "exists": false,
+        "family_case_cap": 200,
+        "family_id": "regression-insight-fixture-general",
+        "latest_dataset_id": null,
+        "match_kind": "suggested_new",
+        "projected_case_count": 1,
+        "proposed_addition_count": 1,
+        "version_count": 0
+      },
+      "policy": {
+        "failure_type": null,
+        "family_case_cap": 200,
+        "family_id": null,
+        "max_duplicate_ratio": 0.6,
+        "minimum_severity": 0.05,
+        "recurrence_threshold": 2,
+        "recurrence_window": 5,
+        "strategy": "exact_suggested_family_then_health_guards",
+        "top_n": 10
+      },
+      "policy_rule": "new_family_required",
+      "preview_cases": [
+        {
+          "case_id": "harvest-ac7468e9e1cf93f9",
+          "driver_failure_type": "hallucination",
+          "driver_rank": null,
+          "prompt": "Fixture delta 1. Summarize the excerpt using source excerpt and audit log only.",
+          "prompt_id": "case-delta-001",
+          "source_case_id": "case-delta-001",
+          "source_report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+          "source_run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+          "transition_type": "no_failure_to_failure"
+        }
+      ],
+      "rationale": "Qualifying regression has no existing family match, so governance recommends creating `regression-insight-fixture-general`. Primary recurring cluster `cd_4933581a246ff990` (instruction_following \u00b7 failure to no failure) spans 2 saved artifacts.",
+      "selected_case_count": 1,
+      "signal": {
+        "improvement_score": 0.25,
+        "net_score": 0.125,
+        "regression_score": 0.125,
+        "severity": 0.125,
+        "top_drivers": [
+          {
+            "case_ids": [
+              "case-beta-001",
+              "case-beta-002"
+            ],
+            "delta": -0.25,
+            "direction": "improvement",
+            "driver_rank": 0,
+            "failure_type": "reasoning"
+          }
+        ],
+        "verdict": "regression"
+      }
+    },
+    "improvement_score": 0.25,
+    "net_score": 0.125,
+    "portfolio_item": null,
+    "regression_score": 0.125,
+    "report_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+    "severity": 0.125,
+    "signal_verdict": "regression",
+    "status": "improved",
+    "top_drivers": [
+      {
+        "case_ids": [
+          "case-beta-001",
+          "case-beta-002"
+        ],
+        "delta": -0.25,
+        "direction": "improvement",
+        "driver_rank": 0,
+        "failure_type": "reasoning"
+      }
+    ]
+  }
+]
