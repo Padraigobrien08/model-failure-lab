@@ -1,38 +1,65 @@
-# CI and Governance Gates
+# CI and governance gates
 
-This document describes how to run reliability checks in CI and locally.
+How to fail a build on a regression, and how to get the build green again.
 
-## Baseline CI Commands
+## One gate contract
 
-Current CI workflow runs:
+`compare --gate`, `regressions gate`, and the operator console's gate screen all call
+`evaluate_gate_conditions` (`governance/gates.py`). They block on the same four conditions,
+in this order, first hit wins:
 
-- `python3 -m pytest -q`
-- `python3 -m ruff check src tests`
-- `python3 -m pip install .`
-- CLI smoke flow (`demo`, `datasets list`, `run`, `report`, `index validate`)
+| Condition | Block reason |
+|---|---|
+| The runs are not comparable | `runs are not comparable` |
+| The signal verdict is a regression | `signal verdict: regression` |
+| Execution success or classification coverage dropped | `execution success regressed by -12.5%` |
+| The candidate dropped cases the baseline failed | `candidate dropped 2 baseline failing case(s): …` |
 
-## Regression Gate Mode
+The last three are fail-closed: a candidate cannot pass by erroring, by failing to classify,
+or by deleting the cases it broke.
 
-Use gate mode to evaluate whether current saved comparison signals should block a release.
+Only the second is a *regression*. The console colours the other three amber, not red — see
+`frontend/DESIGN.md`.
+
+## Gating a build
+
+The simplest form gates one comparison and exits non-zero on a block:
 
 ```bash
+failure-lab compare <baseline-run> <candidate-run> --gate
+```
+
+`--format markdown` renders a PR-ready verdict table from the same command. The repo ships a
+composite GitHub Action (`action.yml`) that wraps both and writes the verdict to the job
+summary:
+
+```yaml
+- uses: Padraigobrien08/model-failure-lab@main
+  with:
+    baseline: eval/runs/baseline
+    candidate: eval/runs/candidate
+```
+
+To gate on every recent comparison in a workspace rather than one pair, use the governance
+gate. It reads the derived index, so rebuild it first:
+
+```bash
+failure-lab index rebuild
 failure-lab regressions gate --strict-exit
 ```
 
-- Exit code `0`: gate passes
-- Exit code `2`: gate blocked (when `--strict-exit` is set)
+- Exit `0`: nothing blocks.
+- Exit `2`: at least one comparison blocks (only with `--strict-exit`).
 
-## Policy-as-code
+## Policy as code
 
-You can load policy values from a YAML file:
-
-```bash
-failure-lab regressions gate --policy-file .failure_lab/policy.yaml --strict-exit
-```
-
-Example policy file:
+`regressions gate` discovers a committed policy file automatically — `governance/policy.yml`,
+then `.yaml`, then `.json` — and falls back to built-in defaults. `--policy-file` overrides
+the discovery. Whichever applies is reported as `policy_source`, on the CLI and in the
+console, so no screen can claim "built-in defaults" over a policy that is actually in force.
 
 ```yaml
+# governance/policy.yml
 minimum_severity: 0.05
 top_n: 10
 failure_type: null
@@ -44,37 +71,62 @@ recurrence_threshold: 2
 strategy: exact_suggested_family_then_health_guards
 ```
 
-## Waivers
+The severity floor governs dataset-governance decisions — whether to create or evolve a
+family — and never whether CI turns green. The gate contract above is the only thing that
+decides that.
 
-Waivers allow temporary exceptions by comparison ID.
+## Waivers: getting a red gate green again
+
+The gate evaluates every recent comparison in the workspace and blocks fail-closed, so one
+accidental cross-dataset `compare` leaves it red until you say why that should not count.
+A waiver records the reason, which deleting the report artifact would not.
 
 ```bash
-failure-lab regressions gate --waivers .failure_lab/waivers.json --strict-exit
+failure-lab regressions waive <comparison-id> \
+  --reason "support-assistant v2 regression, fix tracked in JIRA-123" \
+  --owner padraig \
+  --expires-at 2027-01-01T00:00:00Z
 ```
 
-Example waiver file:
+That writes `governance/waivers.yml` — the file the gate discovers — sorted by comparison id
+so two people waiving different comparisons do not produce a reordering diff:
 
-```json
-{
-  "waivers": [
-    {
-      "comparison_id": "report_20260427_123000_candidate_vs_baseline",
-      "reason": "Known issue under active remediation",
-      "owner": "ml-platform",
-      "expires_at": "2026-12-31T23:59:59Z"
-    }
-  ]
-}
+```yaml
+waivers:
+- comparison_id: compare_8ba8496a_to_dda18a0e_66320e7c
+  reason: support-assistant v2 regression, fix tracked in JIRA-123
+  owner: padraig
+  expires_at: '2027-01-01T00:00:00Z'
 ```
 
-Expired waivers are treated as inactive.
+`--remove` drops one, so the comparison blocks again. `--expires-at` must be in the future:
+a waiver that is inactive the moment it lands looks like it worked and changes nothing.
+Expired waivers are inactive, and the console shows them as expired rather than hiding them.
 
-## PR Reliability Comment
+`--waivers <path>` on `regressions gate` overrides the discovery for a one-off run.
 
-Generate markdown suitable for PR discussion:
+Retiring a dataset family (`dataset lifecycle-apply --action retire`) also stops its
+comparisons blocking, and surfaces through this same waiver channel with a stated reason
+rather than silently un-blocking.
+
+## PR reliability comment
 
 ```bash
 failure-lab regressions pr-comment --baseline-run <run-id> --candidate-run <run-id>
 ```
 
-This outputs a concise reliability diff and top signal drivers.
+Outputs a concise reliability diff and top signal drivers, suitable for a PR comment.
+
+## What this repo's own CI runs
+
+`.github/workflows/production.yml` — the workflow the README badge points at:
+
+- `ruff check .` and `pytest -q` on Python 3.11 and 3.12
+- a consumer-install job: build the wheel, assert it ships no legacy module, install it into
+  a clean environment, and run the README quickstart plus `examples/regression_demo/run.sh`
+- the composite action, dogfooded against the bundled regression demo — including an
+  assertion that the gate actually *fails the job*, not merely that it detects the regression
+- the frontend: typecheck, vitest (with the engine installed, so the bridge tests run rather
+  than skip), and the production build
+
+`ci.yml` is the legacy/full benchmark suite and is not part of the supported path.

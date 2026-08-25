@@ -65,7 +65,9 @@ function GateBanner({ gate }: { gate: GateResponse }) {
         <div className="mt-1.5 font-mono text-[11.5px] text-muted-ink">
           {blockReasons.length > 0 ? blockReasons.join(" · ") : policyRule}
         </div>
-        <div className="mt-2.5 font-mono text-[11.5px] text-ink">{gateRemedy(hasRegression)}</div>
+        <div className="mt-2.5 break-all font-mono text-[11.5px] text-ink">
+          {gateRemedy(hasRegression, blockingRows[0]?.comparisonId)}
+        </div>
       </div>
     );
   }

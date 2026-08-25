@@ -105,3 +105,23 @@ def test_readme_does_not_promise_a_pypi_install_that_predates_the_docs() -> None
         "the intro must state that the PyPI release lags the source tree; drop this "
         "assertion in the same commit that publishes a matching release"
     )
+
+
+def test_the_readme_does_not_promise_failure_types_the_classifier_cannot_emit() -> None:
+    """The plain-English table describes what `run` labels. It has to be the real list.
+
+    It used to end "…, bad format…", and `format` is one of four taxonomy types no
+    registered classifier emits -- so the one sentence a new reader uses to understand the
+    output named a label they would never see.
+    """
+
+    from model_failure_lab.classifiers.heuristic import HEURISTIC_V1_EMITTED_FAILURE_TYPES
+
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
+    run_row = next(line for line in readme.splitlines() if line.startswith("| **run** |"))
+    for unreachable in {"retrieval", "safety", "format", "tool_use"}:
+        assert f"`{unreachable}`" not in run_row, (
+            f"the README's run row names '{unreachable}', which no classifier emits"
+        )
+    for emitted in HEURISTIC_V1_EMITTED_FAILURE_TYPES:
+        assert f"`{emitted}`" in run_row, f"the README's run row omits '{emitted}'"

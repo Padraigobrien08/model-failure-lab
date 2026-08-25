@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -441,3 +442,142 @@ def _is_future_timestamp(value: str, *, now: datetime) -> bool:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed >= now
+
+
+# --------------------------------------------------------------------------------------
+# Writing waivers: the gate has to be exitable from inside the tool.
+# --------------------------------------------------------------------------------------
+#
+# The gate blocks on fail-closed conditions as well as regressions, and it evaluates every
+# recent comparison in the workspace -- so one accidental cross-dataset `compare` leaves a
+# permanently red gate. There was no command to delete, prune or dismiss a saved
+# comparison, and the only escape was to hand-author `governance/waivers.yml` from a
+# description in the docs, or to `rm -rf` a report directory outside the tool.
+#
+# A waiver is the right primitive -- it records *why* a comparison stopped blocking, which
+# deleting the artifact does not -- so the fix is to make writing one a command rather than
+# a documentation exercise.
+
+
+@dataclass(slots=True, frozen=True)
+class WaiverWriteResult:
+    """What `regressions waive` did, so the CLI can print a receipt."""
+
+    path: Path
+    comparison_id: str
+    #: `created`, `updated`, `removed`, or `absent` (asked to remove one that was not there).
+    action: str
+    waivers: tuple[GateWaiver, ...]
+
+
+def _waiver_file_path(root: str | Path | None) -> Path:
+    """The conventional waiver file, whether or not it exists yet."""
+
+    existing = default_waiver_path(root)
+    if existing is not None:
+        return existing
+    return project_root(root) / DEFAULT_WAIVER_FILENAMES[0]
+
+
+def _render_waivers(waivers: Sequence[GateWaiver]) -> str:
+    rows = [
+        {
+            key: value
+            for key, value in (
+                ("comparison_id", waiver.comparison_id),
+                ("reason", waiver.reason),
+                ("owner", waiver.owner),
+                ("expires_at", waiver.expires_at),
+            )
+            if value is not None
+        }
+        # Sorted by id: the file is committed, so two people waiving different comparisons
+        # must not produce a reordering diff.
+        for waiver in sorted(waivers, key=lambda entry: entry.comparison_id)
+    ]
+    return yaml.safe_dump({"waivers": rows}, sort_keys=False, default_flow_style=False)
+
+
+def upsert_waiver(
+    comparison_id: str,
+    *,
+    reason: str,
+    root: str | Path | None = None,
+    owner: str | None = None,
+    expires_at: str | None = None,
+) -> WaiverWriteResult:
+    """Add or replace one waiver in the workspace's conventional waiver file."""
+
+    if not comparison_id.strip():
+        raise ValueError("comparison_id must be a non-empty string")
+    if not reason.strip():
+        raise ValueError(
+            "a waiver must record why the comparison stops blocking; pass --reason"
+        )
+    if expires_at is not None and not _is_future_timestamp(
+        expires_at, now=datetime.now(tz=timezone.utc)
+    ):
+        raise ValueError(
+            f"--expires-at {expires_at!r} is not a future UTC timestamp, so the waiver "
+            "would be inactive the moment it was written"
+        )
+
+    path = _waiver_file_path(root)
+    existing = _load_waivers(root=root, waiver_path=path if path.exists() else None)
+    action = "updated" if comparison_id in existing else "created"
+    existing[comparison_id] = GateWaiver(
+        comparison_id=comparison_id,
+        reason=reason,
+        owner=owner,
+        expires_at=expires_at,
+        active=True,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_render_waivers(list(existing.values())), encoding="utf-8")
+    return WaiverWriteResult(
+        path=path,
+        comparison_id=comparison_id,
+        action=action,
+        waivers=tuple(sorted(existing.values(), key=lambda entry: entry.comparison_id)),
+    )
+
+
+def remove_waiver(
+    comparison_id: str,
+    *,
+    root: str | Path | None = None,
+) -> WaiverWriteResult:
+    """Drop one waiver, so a comparison starts blocking again."""
+
+    path = _waiver_file_path(root)
+    existing = _load_waivers(root=root, waiver_path=path if path.exists() else None)
+    if comparison_id not in existing:
+        return WaiverWriteResult(
+            path=path,
+            comparison_id=comparison_id,
+            action="absent",
+            waivers=tuple(sorted(existing.values(), key=lambda entry: entry.comparison_id)),
+        )
+    del existing[comparison_id]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_render_waivers(list(existing.values())), encoding="utf-8")
+    return WaiverWriteResult(
+        path=path,
+        comparison_id=comparison_id,
+        action="removed",
+        waivers=tuple(sorted(existing.values(), key=lambda entry: entry.comparison_id)),
+    )
+
+
+def list_waivers(*, root: str | Path | None = None) -> tuple[GateWaiver, ...]:
+    """Every waiver in the workspace's conventional file, active or expired."""
+
+    path = default_waiver_path(root)
+    if path is None:
+        return ()
+    return tuple(
+        sorted(
+            _load_waivers(root=root, waiver_path=path).values(),
+            key=lambda entry: entry.comparison_id,
+        )
+    )

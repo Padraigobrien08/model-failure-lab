@@ -132,9 +132,18 @@ describe("gateSummary", () => {
 });
 
 describe("gateRemedy", () => {
-  it("names the waiver path the engine discovers, in both branches", () => {
+  it("offers a command that exists, in both branches", () => {
     for (const hasRegression of [true, false]) {
-      expect(gateRemedy(hasRegression)).toContain("governance/waivers.yml");
+      const remedy = gateRemedy(hasRegression, "cmp_1");
+      expect(remedy).toContain("failure-lab regressions waive cmp_1");
+      expect(remedy).toContain("--reason");
+      // The old copy pointed at `--waivers waivers.yml`, a path nothing discovers, and at
+      // the time no command wrote a waiver at all.
+      expect(remedy).not.toContain("--waivers waivers.yml");
     }
+  });
+
+  it("falls back to a placeholder when no comparison is named", () => {
+    expect(gateRemedy(false)).toContain("<comparison-id>");
   });
 });

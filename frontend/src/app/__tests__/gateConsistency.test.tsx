@@ -85,12 +85,14 @@ describe("gate agreement across surfaces", () => {
     }
   });
 
-  it("the gate remedy names the waiver file the engine actually discovers", () => {
+  it("the gate remedy is a command that exists, naming the blocking comparison", () => {
     renderApp(["/gate"], { initialGateState: buildGateState("fail-closed") });
 
-    // `--waivers waivers.yml` resolved to nothing; DEFAULT_WAIVER_FILENAMES is
-    // governance/waivers.yml.
-    expect(screen.getByText(/governance\/waivers\.yml/)).toBeInTheDocument();
+    // The old copy said `--waivers waivers.yml`: a path nothing discovers, offered as the
+    // only way out at a time when no command wrote a waiver at all.
+    expect(
+      screen.getByText(new RegExp(`failure-lab regressions waive ${REPORT_ID}`)),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/--waivers waivers\.yml/)).not.toBeInTheDocument();
   });
 

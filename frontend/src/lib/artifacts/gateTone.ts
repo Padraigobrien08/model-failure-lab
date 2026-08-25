@@ -77,13 +77,15 @@ export function gateSummary(gate: GateResponse): GateSummary {
 /**
  * Remedy line for a blocked gate.
  *
- * The waiver path is the conventional one `gates.py:DEFAULT_WAIVER_FILENAMES` actually
- * discovers. The screen used to print `--waivers waivers.yml`, which resolves to nothing:
- * a reader who pasted it got "file not found" from the one command the console offered
- * them as a way out.
+ * Both halves are commands a reader can paste. The screen used to print
+ * `--waivers waivers.yml`, which resolves to nothing -- and at the time there was no
+ * command that wrote a waiver at all, so the console's only offered way out was to
+ * hand-author YAML from a description in the docs.
  */
-export function gateRemedy(hasRegression: boolean): string {
+export function gateRemedy(hasRegression: boolean, comparisonId?: string): string {
+  const target = comparisonId ?? "<comparison-id>";
+  const waive = `failure-lab regressions waive ${target} --reason "..."`;
   return hasRegression
-    ? "harvest it: failure-lab regressions apply · or waive it in governance/waivers.yml"
-    : "rerun on comparable artifacts · or waive it in governance/waivers.yml";
+    ? `harvest it: failure-lab regressions apply · or waive it: ${waive}`
+    : `rerun on comparable artifacts · or waive it: ${waive}`;
 }

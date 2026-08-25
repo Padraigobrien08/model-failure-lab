@@ -113,7 +113,7 @@ Four commands, four plain ideas:
 
 | Command | In plain English |
 |---|---|
-| **run** | Send a set of prompts through a model and record what came back, labelling each answer as a pass or a kind of failure (hallucination, wrong fact, missing citation, bad format…). |
+| **run** | Send a set of prompts through a model and record what came back, labelling each answer as a pass or a kind of failure. The bundled classifier detects four: `reasoning` (wrong fact or bad inference), `instruction_following` (ignored a constraint or dropped a citation), `hallucination` (ungrounded claim), and `no_failure`. |
 | **compare** | Diff two runs (e.g. old model vs new model) and report what got **worse** and what got **better**. |
 | **harvest** | Collect the cases that regressed into a small dataset file — the bugs, captured as test cases. |
 | **promote** | Save that harvested dataset as a permanent, versioned test you can re-run forever. |

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
 from model_failure_lab.analysis import build_query_insight_report, explain_comparison_report
+from model_failure_lab.classifiers.heuristic import HEURISTIC_V1_EMITTED_FAILURE_TYPES
 from model_failure_lab.clusters import (
     FailureClusterDetail,
     FailureClusterSummary,
@@ -51,6 +52,7 @@ from model_failure_lab.governance import (
     PortfolioPlanSaveResult,
     RootCauseSummary,
     SavedPortfolioPlan,
+    WaiverWriteResult,
     apply_dataset_actions,
     apply_dataset_lifecycle_action,
     apply_saved_portfolio_plan_action,
@@ -74,10 +76,12 @@ from model_failure_lab.governance import (
     load_governance_policy_from_file,
     preflight_saved_portfolio_plan,
     recommend_dataset_action,
+    remove_waiver,
     review_dataset_actions,
     review_dataset_lifecycle,
     summarize_recurring_root_causes,
     upsert_baseline,
+    upsert_waiver,
 )
 from model_failure_lab.harvest import (
     harvest_artifact_cases,
@@ -1162,6 +1166,43 @@ def build_parser() -> argparse.ArgumentParser:
     regressions_gate_parser.add_argument("--strict-exit", action="store_true")
     regressions_gate_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_gate_parser.set_defaults(handler=_handle_regressions_gate)
+    regressions_waive_parser = regressions_subparsers.add_parser(
+        "waive",
+        help="Record why one comparison stops blocking the gate (governance/waivers.yml).",
+        description=(
+            "Write a waiver into the workspace's conventional waiver file. The gate blocks "
+            "on fail-closed conditions as well as regressions and evaluates every recent "
+            "comparison, so one accidental cross-dataset compare leaves a permanently red "
+            "gate; this is the supported way out. A waiver records the reason, which "
+            "deleting the artifact would not."
+        ),
+    )
+    regressions_waive_parser.add_argument("comparison_id")
+    regressions_waive_parser.add_argument(
+        "--reason",
+        help="Why this comparison stops blocking. Required unless --remove.",
+    )
+    regressions_waive_parser.add_argument("--owner", help="Who is accountable for the waiver.")
+    regressions_waive_parser.add_argument(
+        "--expires-at",
+        dest="expires_at",
+        help="UTC ISO-8601 timestamp after which the waiver is inactive, e.g. 2027-01-01T00:00:00Z.",
+    )
+    regressions_waive_parser.add_argument(
+        "--remove",
+        action="store_true",
+        help="Drop the waiver instead, so the comparison blocks the gate again.",
+    )
+    regressions_waive_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    regressions_waive_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_waive_parser.set_defaults(handler=_handle_regressions_waive)
     regressions_patterns_parser = regressions_subparsers.add_parser(
         "patterns",
         help="Summarize recurring root-cause patterns from saved clusters.",
@@ -2071,6 +2112,51 @@ def _handle_regressions_gate(args: argparse.Namespace) -> int:
     if result.blocked and args.strict_exit:
         return 2
     return 0
+
+
+def _handle_regressions_waive(args: argparse.Namespace) -> int:
+    root = _normalized_root(args.root)
+    if args.remove:
+        result = remove_waiver(args.comparison_id, root=root)
+    else:
+        if not args.reason:
+            raise ValueError(
+                "a waiver must record why the comparison stops blocking; pass --reason "
+                "(or --remove to drop an existing waiver)"
+            )
+        result = upsert_waiver(
+            args.comparison_id,
+            reason=args.reason,
+            root=root,
+            owner=args.owner,
+            expires_at=args.expires_at,
+        )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "comparison_id": result.comparison_id,
+                    "action": result.action,
+                    "path": str(result.path),
+                    "waivers": [waiver.to_payload() for waiver in result.waivers],
+                }
+            )
+        )
+    else:
+        print(_render_waiver_write(result))
+    return 0
+
+
+def _render_waiver_write(result: WaiverWriteResult) -> str:
+    lines = ["Failure Lab Waiver", f"Comparison: {result.comparison_id}"]
+    if result.action == "absent":
+        lines.append("No waiver was recorded for this comparison; nothing to remove.")
+        return "\n".join(lines)
+    lines.append(f"Action: {result.action}")
+    lines.append(f"File: {result.path}")
+    lines.append(f"Active waivers: {len(result.waivers)}")
+    lines.append("Re-check the gate with: failure-lab regressions gate --strict-exit")
+    return "\n".join(lines)
 
 
 def _handle_regressions_patterns(args: argparse.Namespace) -> int:
@@ -4204,12 +4290,43 @@ def _render_run_summary(
     dataset_scope = execution.run.config.get("dataset_scope")
     if isinstance(dataset_scope, str):
         lines.insert(6, f"Dataset scope: {dataset_scope}")
+    unreachable = _unreachable_target_failure_type(dataset, execution.classifier_id)
+    if unreachable is not None:
+        # `rag-failures-v1` declares `target_failure_type: retrieval`, and `heuristic_v1`
+        # -- the only registered classifier -- cannot emit it. The run then reports
+        # `hallucination` and `instruction_following` for retrieval probes, and nothing on
+        # screen explained why the type the dataset exists to find never appeared.
+        lines.append(
+            f"Note: this dataset targets '{unreachable}', which the "
+            f"{execution.classifier_id} classifier cannot emit "
+            f"(it emits: {', '.join(sorted(HEURISTIC_V1_EMITTED_FAILURE_TYPES))}). "
+            "Its failures are still classified, under the types this classifier detects."
+        )
     if execution.status == "completed_with_errors":
         lines.append("Warning: run completed with per-case errors.")
         first_error = next((case.error for case in execution.case_results if case.error), None)
         if first_error is not None:
             lines.append(f"First error: {first_error.stage}: {first_error.message}")
     return "\n".join(lines)
+
+
+def _unreachable_target_failure_type(
+    dataset: FailureDataset,
+    classifier_id: str,
+) -> str | None:
+    """The dataset's declared target type, when the active classifier cannot emit it.
+
+    Only `heuristic_v1` is registered and it declares its own emitted subset, so this is a
+    lookup rather than a classifier-capability protocol. Give a second classifier its own
+    declared set before generalizing this.
+    """
+
+    if classifier_id != "heuristic_v1":
+        return None
+    target = dataset.metadata.get("target_failure_type")
+    if not isinstance(target, str) or not target:
+        return None
+    return None if target in HEURISTIC_V1_EMITTED_FAILURE_TYPES else target
 
 
 def _render_report_summary(
