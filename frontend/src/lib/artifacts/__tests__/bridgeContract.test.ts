@@ -24,8 +24,10 @@ import {
   validateDatasetDraftsResponse,
   validateDatasetFamiliesResponse,
   validateGateResponse,
+  validateHistorySnapshotResponse,
 } from "@/lib/artifacts/extended";
 import {
+  validateArtifactDatasetVersions,
   validateComparisonInventory,
   validateRunInventory,
 } from "@/lib/artifacts/load";
@@ -67,6 +69,8 @@ const CONTRACTS: Array<{ name: string; validate: (payload: unknown) => unknown }
   { name: "dataset-families", validate: validateDatasetFamiliesResponse },
   { name: "dataset-drafts", validate: validateDatasetDraftsResponse },
   { name: "baselines", validate: validateBaselinesResponse },
+  { name: "dataset-versions", validate: validateArtifactDatasetVersions },
+  { name: "history", validate: validateHistorySnapshotResponse },
 ];
 
 describe("bridge payload contract", () => {

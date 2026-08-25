@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": false,
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -16,8 +17,15 @@
     "paths": {
       "@/*": ["src/*"]
     },
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  // One project, three file sets: the console (`src`), the dev-server artifact bridge
+  // (`server`), and the build configuration.
+  //
+  // These were two projects joined by a reference, which stopped working once `server/`
+  // became real application code: `vite.config.ts` imports the bridge, and the bridge's
+  // tests import the console's own validators, so every arrangement left one file owned by
+  // a project that could not see the other. Splitting the config was buying nothing --
+  // both halves need the same strictness and the same `@/*` paths.
+  "include": ["src", "server", "vite.config.ts", "vitest.config.ts", "tailwind.config.ts"]
 }

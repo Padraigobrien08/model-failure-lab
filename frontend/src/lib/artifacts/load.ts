@@ -1718,7 +1718,13 @@ function requireArtifactDatasetVersionRecords(
   });
 }
 
-function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatasetVersionsResponse {
+/**
+ * Exported so `bridgeContract.test.ts` can run it over real `query_bridge.py` output --
+ * the golden fixtures are the only thing that catches a producer-side rename.
+ */
+export function validateArtifactDatasetVersions(
+  payload: unknown,
+): ArtifactDatasetVersionsResponse {
   const data = requireObject(payload, "dataset_versions");
   const familyId = requireString(data.family_id, "dataset_versions.family_id");
   const versions = requireArtifactDatasetVersionRecords(
@@ -2385,7 +2391,7 @@ export async function loadArtifactDatasetVersions(
     throw new Error(message);
   }
   const payload = await response.json();
-  return requireArtifactDatasetVersionsResponse(payload);
+  return validateArtifactDatasetVersions(payload);
 }
 
 export function validateArtifactOverview(payload: unknown): ArtifactOverview {

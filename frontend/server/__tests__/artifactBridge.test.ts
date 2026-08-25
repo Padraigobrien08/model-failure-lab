@@ -26,6 +26,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
+import {
+  validateComparisonDetail,
+  validateRunDetail,
+} from "../../src/lib/artifacts/load";
 import { failureLabArtifactsPlugin } from "../artifactBridge";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -395,6 +399,34 @@ describe("TypeScript-composed detail payloads", () => {
     const payload = body as { metrics: { failureRate: number | null } };
     expect(payload.metrics.failureRate).toBe(0.5);
   });
+
+  /**
+   * These two endpoints are the ones `tests/fixtures/bridge/*.json` does not pin.
+   *
+   * The golden-fixture contract deferred them to "the console's own page tests" -- but
+   * those feed `factories.ts`, the mirror-of-the-reader fixtures the golden files exist to
+   * escape. And these payloads are not produced by `query_bridge.py` at all: they are
+   * composed here in TypeScript from `run.json` / `results.json` / `report_details.json`,
+   * so the contract that can drift is the Python *writer* against this reader, which
+   * nothing pinned from either side.
+   *
+   * Running the real validators over real bridge output closes it: a renamed field in the
+   * engine's artifacts fails here.
+   */
+  it.runIf(pythonReady)("run-detail satisfies the console's own validator", async () => {
+    const { body } = await call("/__failure_lab__/artifacts/run-detail.json?runId=baseline");
+    expect(() => validateRunDetail(body)).not.toThrow();
+  });
+
+  it.runIf(pythonReady)(
+    "comparison-detail satisfies the console's own validator",
+    async () => {
+      const { body } = await call(
+        `/__failure_lab__/artifacts/comparison-detail.json?reportId=${COMPARISON_ID}`,
+      );
+      expect(() => validateComparisonDetail(body)).not.toThrow();
+    },
+  );
 
   it.runIf(pythonReady)("comparison-detail agrees with the engine's own verdict", async () => {
     const { status, body } = await call(
