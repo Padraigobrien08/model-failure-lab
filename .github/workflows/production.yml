@@ -52,10 +52,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      # No `package:` -- exercise the default install path a consumer gets.
       - name: Gate passes on a non-regressing candidate
         uses: ./
         with:
-          package: "."
           baseline: examples/regression_demo/runs/baseline
           candidate: examples/regression_demo/runs/baseline
           root: ${{ runner.temp }}/gate-pass
@@ -64,7 +64,6 @@ jobs:
         id: regression
         uses: ./
         with:
-          package: "."
           baseline: examples/regression_demo/runs/baseline
           candidate: examples/regression_demo/runs/candidate
           root: ${{ runner.temp }}/gate-fail
@@ -72,6 +71,25 @@ jobs:
 
       - name: Assert the regression was detected
         run: test "${{ steps.regression.outputs.verdict }}" = "regression"
+
+      # The README promises "the job fails on a regression". Detection was dogfooded but
+      # blocking never was: the step above runs with gate:false. Assert the failing exit
+      # code, which is the contract consumers actually depend on.
+      - name: Gate blocks the demo regression
+        id: blocking
+        continue-on-error: true
+        uses: ./
+        with:
+          baseline: examples/regression_demo/runs/baseline
+          candidate: examples/regression_demo/runs/candidate
+          root: ${{ runner.temp }}/gate-block
+
+      - name: Assert the gate failed the job
+        run: |
+          if [ "${{ steps.blocking.outcome }}" != "failure" ]; then
+            echo "::error::the gate did not fail the job on a known regression"
+            exit 1
+          fi
 
   frontend:
     name: frontend (typecheck + vitest + build)

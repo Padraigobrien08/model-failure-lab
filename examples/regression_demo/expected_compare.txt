@@ -10,6 +10,10 @@ Signal scores: regression=50.0% improvement=0.0% severity=50.0%
 Failure rate delta: +50.0%
 Coverage delta: 0.0%
 Case changes: regressions=4
+Artifacts:
+- reports/compare_8ba8496a_to_dda18a0e_66320e7c/report.json
+- reports/compare_8ba8496a_to_dda18a0e_66320e7c/report_details.json
+
 Failure Lab Signal Summary
 Report ID: compare_8ba8496a_to_dda18a0e_66320e7c
 Verdict: regression

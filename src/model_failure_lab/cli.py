@@ -422,6 +422,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Inspect deterministic duplicate groups inside one harvested draft dataset pack.",
     )
     dataset_review_parser.add_argument("draft_path", type=Path)
+    dataset_review_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Resolve a relative draft path against this artifact root instead of the current "
+            "working directory. Every other command in the loop accepts --root; review did "
+            "not, so the review step docs/harvest-replay.md prescribes could not be run "
+            "against a workspace that was not the CWD."
+        ),
+    )
     dataset_review_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_review_parser.set_defaults(handler=_handle_dataset_review)
 
@@ -1706,8 +1716,16 @@ def _handle_datasets_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_draft_path(draft_path: Path, *, root: Path | None) -> Path:
+    """Resolve a draft pack path, honoring --root for relative paths."""
+
+    if root is None or draft_path.is_absolute():
+        return draft_path
+    return Path(_normalized_root(root)) / draft_path
+
+
 def _handle_dataset_review(args: argparse.Namespace) -> int:
-    review = review_harvest_dataset(args.draft_path)
+    review = review_harvest_dataset(_resolve_draft_path(args.draft_path, root=args.root))
     if args.as_json:
         payload = {
             "dataset_id": review.dataset.dataset_id,
