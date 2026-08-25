@@ -7,6 +7,106 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
+## [0.12.0] - 2026-08-25
+
+A second external-audit pass, this time through three lenses (a skim, a pre-merge review, and an
+adversarial critique). Every finding here was reproduced by executing the tool, not by reading it.
+Two carry **behavior changes** — see Changed.
+
+### Fixed
+- **Two screens gave opposite answers about the same comparison.** The comparison detail
+  short-circuited an `incompatible` verdict to "CI gate: not evaluated" *before* it read its gate
+  row — so the comparison that was the sole reason CI failed reported, on its own page, that the
+  gate had not been evaluated on it. Meanwhile `ConsoleShell` painted the rail chip red on any
+  block, so a fail-closed "runs are not comparable" showed a red FAIL badge 100px from an amber
+  banner describing the same state. `frontend/src/lib/artifacts/gateTone.ts` is now the only place
+  that decides, and `gateConsistency.test.tsx` asserts agreement across surfaces rather than
+  correctness of one. "not evaluated" now means exactly one thing: this comparison is not in the
+  gate's window.
+- **"Immutable" had a one-line bypass.** Deleting `metadata.integrity` from a curated pack restored
+  every pre-digest behavior: a pack with two of its four cases removed loaded silently and
+  `index validate` reported ok. `lifecycle: "curated"` distinguishes the cases — only
+  `dataset promote` and `dataset evolve` set it, and both stamp a digest — so a curated pack with a
+  missing *or* wrong digest is now a reported finding, with the path and a re-stamp command.
+- **The wheel shipped the legacy ML stack that `pyproject.toml` said it excluded.** The exclude list
+  missed `utils`, `tracking`, `artifact_index` and `config`, and `reporting` was one package holding
+  both surfaces, so setuptools could exclude it whole or not at all. Nineteen of the wheel's 94
+  Python files imported torch / pandas / numpy / scikit-learn / matplotlib and raised ImportError
+  for anyone who installed the package. The legacy reporting modules moved to `reporting.legacy`;
+  the wheel is 67 files and `test_wheel_excludes_legacy.py` walks the built package set to keep it
+  that way.
+- **A deliberate 404 branch in the bridge was unreachable.** Both detail handlers classified by
+  searching `bridgeErrorMessage`'s *return* value for "ENOENT", and that function always returns its
+  sanitized fallback, so every missing run answered 500. A crafted artifact id answered 500 too,
+  making a rejected path traversal indistinguishable from a crash; it is a 400 now, as is a
+  malformed POST body.
+- **The bridge answered requests addressed to any host.** It runs ahead of Vite's own
+  `allowedHosts` check — it has to, or the SPA fallback claims `/__failure_lab__/*.json` — so an
+  arbitrary `Host` was served, and a DNS-rebinding page reaching it on 127.0.0.1 is *genuinely*
+  same-origin, which makes the CSRF check pass by construction. The bridge now checks for itself.
+- **A nullable bridge payload was typed non-null**, so a legacy comparison artifact whose signal
+  lives only in `report_details.json` would have thrown a TypeError instead of reaching the explicit
+  fail-safe two lines below it. Found by turning on `strict` for the Node-side TypeScript.
+- **A failed harvest left an orphan reservation.** The bridge reserves its output name with
+  `O_CREAT|O_EXCL` so two console tabs cannot collide; a harvest that then failed left a zero-byte
+  pack behind, which the drafts listing skips, so they accumulated invisibly and pushed each real
+  harvest's name to `-2`, `-3`, `-4`.
+- **The console printed a remedy that did not work.** The gate offered `--waivers waivers.yml`, a
+  path nothing discovers, at a time when no command wrote a waiver at all. The Datasets empty state
+  printed `failure-lab harvest --report <comparison>`, which is missing the required `--out`.
+- **The comparison heading was a constant.** `Baseline → candidate` was hardcoded regardless of the
+  run ids; it only looked right because the bundled demo's runs carry those names.
+  `frontend/README.md` says the console never invents data.
+- Dead references: the feature-request template linked `docs/roadmap.md` (absent), `MANIFEST.in`
+  cited `docs/release-checklist.md` (it is `docs/release.md`), and `docs/code-map.md` pointed
+  contributors at `ci.yml` rather than the workflow that gates the supported path.
+
+### Added
+- **`failure-lab regressions waive <comparison-id> --reason "…"`.** The gate blocks fail-closed and
+  evaluates every recent comparison, so one accidental cross-dataset `compare` left it permanently
+  red — with no command to delete, prune or dismiss a saved comparison, and no command to write a
+  waiver either. It writes the file the gate discovers, sorted by comparison id; `--remove` drops
+  one; an `--expires-at` in the past is refused at write time.
+- **`run` says when a dataset targets a failure type the classifier cannot emit.** `heuristic_v1`
+  emits four of the taxonomy's eight, and `rag-failures-v1` ships targeting `retrieval` — one of the
+  four it cannot produce — so a run over it reported `hallucination` and `instruction_following`
+  with nothing explaining why the type the dataset exists to find never appeared.
+- **The dev-server bridge has tests.** It was 2,342 lines inside `vite.config.ts`, the largest file
+  in the frontend and the only one no test could import. It is now `frontend/server/artifactBridge.ts`
+  and `server/__tests__/artifactBridge.test.ts` drives it over real HTTP: 42 tests across the guards,
+  the status codes, and the two payloads composed in TypeScript rather than by the engine.
+- **A consumer-install CI job.** `production` installs with `pip install -e .[dev]`, which is not the
+  path a user takes — and that difference has already shipped one packaging bug. CI now builds the
+  wheel, asserts it ships no legacy module, installs it clean, and runs the README quickstart and
+  `examples/regression_demo/run.sh`, the headline command that had never been executed in CI.
+- A dark-theme screenshot, `docs/screens/gate-dark.png`. The console ships two committed themes and
+  the docs only ever showed one.
+
+### Changed
+- **`index validate` exits `2`, not `1`, on a tampered dataset.** Two is its documented
+  "contracts do not hold" code; the tampered pack used to escape the rebuild as an unhandled
+  exception, which a CI script cannot distinguish from the command itself crashing.
+- **`index validate` now fails on a curated pack carrying no content digest.** Packs promoted before
+  digests existed are affected: confirm the cases are the ones you promoted, then re-stamp with
+  `failure-lab dataset promote <path> --dataset-id <id> --force`. Loading such a pack still works —
+  only the command whose job is answering "do my contracts hold" reports it.
+- Importing a legacy reporting symbol from an installed wheel raises an `AttributeError` naming the
+  surface and pointing at `docs/legacy.md`, instead of a bare `ModuleNotFoundError`.
+- `npm run build` runs one typecheck instead of two; the two TypeScript projects are now one.
+- `docs/ci-governance.md` rewritten. It described a CI smoke flow the workflow does not run, pointed
+  policy and waivers at `.failure_lab/` (the derived index directory, which `.gitignore` excludes)
+  while discovery looks in `governance/`, and predated `compare --gate` entirely.
+- The README's comparison table drops the "Local?" column — promptfoo, DeepEval and Ragas are all
+  local — and names the actual differentiator instead: the comparison refuses to score itself when
+  the comparison is unsound. Its plain-English `run` row named "bad format", a failure type no
+  classifier emits.
+
+### Removed
+- `scripts/sync_react_ui_manifest.py` and its test. They served the manifest the pre-console React
+  debugger consumed; nothing in `frontend/` has read it since the rewrite.
+- `frontend/components.json` (a shadcn config for a console with no shadcn components) and the
+  unused `class-variance-authority` dependency.
+
 ## [0.11.0] - 2026-08-25
 
 A consumer-honesty release, from an external audit of `0.10.1`. Every change here is something a

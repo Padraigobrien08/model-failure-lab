@@ -12,7 +12,7 @@ This is the runbook for cutting a public OSS release. It covers versioning/tag s
 ## Current release state: nothing since `0.1.0` is published
 
 **PyPI holds exactly one release of `model-failure-lab`: `0.1.0`, uploaded 2026-04-27.** Neither
-`0.9.0`, `0.10.0`, `0.10.1`, nor `0.11.0` was ever published — verify with
+`0.9.0`, `0.10.0`, `0.10.1`, `0.11.0`, nor `0.12.0` was ever published — verify with
 `curl -s https://pypi.org/pypi/model-failure-lab/json | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['releases']))"`.
 
 Consequences, which the README and `action.yml` are written around until this changes:
@@ -26,9 +26,11 @@ Consequences, which the README and `action.yml` are written around until this ch
 
 ### Publishing the current tree
 
-`0.11.0` is the current tree: the regression-gate and dev-server-bridge hardening from `0.10.1`,
-plus the gate-contract unification, dataset-integrity guarantees and consumer-honesty fixes that
-followed (see the CHANGELOG). Publishing it is what ships all of that to anyone not cloning.
+`0.12.0` is the current tree: everything through the `0.11.0` consumer-honesty pass, plus the
+three-lens audit remediation that followed — one gate answer on every surface, an immutability
+claim that cannot be deleted, a tested dev-server bridge, and a wheel that ships only the
+supported workflow (see the CHANGELOG). Publishing it is what ships all of that to anyone not
+cloning.
 
 Before tagging: bump the version in `pyproject.toml` and `src/model_failure_lab/__init__.py`, add the
 matching `CHANGELOG.md` entry, and confirm `make check` and the frontend build are green.
@@ -40,7 +42,7 @@ That test exists to keep the README honest while the gap is open, not forever.
 
 ## Public versioning policy
 
-**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.11.0`.
+**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.12.0`.
 
 Pre-1.0 semantics (also in the README): patch = fixes/docs, minor = CLI-compatible additions,
 breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
@@ -48,12 +50,19 @@ breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
 ### ⚠️ Existing tags conflict with the public version
 
 The repository currently carries **25 internal milestone tags**, `v1.0` → `v5.3` (created
-2026-03-20 → 2026-04-06). These are internal development phase markers, **not** public releases. They
-conflict with a `v0.9.0` public release in two ways:
+2026-03-20 → 2026-04-06). These are internal development phase markers, **not** public releases.
 
-1. GitHub shows the highest semver tag (`v5.3`) as the "latest release," which directly contradicts a
-   `0.9.0` package on PyPI and a v0.1 announcement.
-2. A new visitor cannot tell which tags (if any) are real releases.
+The original worry here — that GitHub would show `v5.3` as the "latest release" — is no longer
+true, and was worth checking rather than repeating: real GitHub Releases exist for `v0.9.0` and
+`v0.10.0`, and GitHub marks the newest *Release*, not the highest tag. Verify before acting:
+
+```bash
+gh release list
+git tag -l
+```
+
+What remains is the real problem: **a new visitor cannot tell which of the 25 tags are releases**,
+and the tags outnumber the releases 12 to 1.
 
 ### Recommended tag cleanup strategy
 
@@ -84,11 +93,24 @@ git push origin --delete v1.0 v1.1 ... v5.3
 **Then, in either case, cut the public release** (substitute the version being released):
 
 ```bash
-git tag -a v0.11.0 -m "Gate contract unification and dataset integrity"
-git push origin v0.11.0
+git tag -a v0.12.0 -m "One gate answer everywhere, a checked wheel, a tested bridge"
+git push origin v0.12.0
 ```
 
 > Until a maintainer performs the cleanup, **do not** create a GitHub Release from any `vX.Y` tag.
+
+### The published `v0.10.0` notes contain claims the tree has since disproved
+
+`v0.10.0` is still the newest GitHub Release, and its notes assert three things that were not true
+at that tag: that red means regression on every screen (four screens broke it — `3a32c92`), that
+promoted dataset families are immutable (nothing checked it — `f135d73`), and that "the legacy
+manifest stack … [is] deleted" (`scripts/sync_react_ui_manifest.py` survived until `0.12.0`). It
+also states a test count two releases stale.
+
+Nothing in the repo pins release-note claims the way `test_documented_output_is_real.py` pins the
+README, which is why they drifted unnoticed while the README did not. **When cutting the next
+release, add a one-line errata to `v0.10.0` pointing at the release that fixed each claim** —
+a superseded release page is still the first thing a visitor reads.
 
 ## TestPyPI dry run (do this before real PyPI)
 
