@@ -183,7 +183,7 @@ export function RunHarvestDialog({
         <div className="flex items-center gap-2 border-t border-line px-6 py-3.5">
           <span className="mr-auto font-mono text-[11px] text-muted-ink">
             {result
-              ? `${result.outputPath} · immutable once promoted`
+              ? `${result.outputPath} · draft · promote to version it`
               : "writes datasets/harvested/<draft-id>.json · deterministic write · no network"}
           </span>
           {result ? (

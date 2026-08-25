@@ -140,7 +140,7 @@ function DraftsSection({ navigate }: { navigate: (to: string) => void }) {
           </table>
           <div className="font-mono text-[11px] text-muted-ink">
             promote: failure-lab dataset promote datasets/harvested/&lt;draft-id&gt;.json ·
-            immutable once promoted
+            records a content digest · promoting onto an existing version is refused
           </div>
         </>
       )}

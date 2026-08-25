@@ -9,6 +9,7 @@ from pathlib import Path
 from model_failure_lab.schemas import PayloadValidationError, PromptCase
 
 from .contracts import FailureDataset
+from .integrity import verify_content_digest
 
 _SEGMENT_PATTERN = re.compile(r"[^a-z0-9]+")
 
@@ -21,11 +22,18 @@ def _normalize_dataset_id(value: str) -> str:
 
 
 def load_dataset(path: str | Path) -> FailureDataset:
-    """Load one dataset JSON file into the normalized dataset contract."""
+    """Load one dataset JSON file into the normalized dataset contract.
+
+    A promoted pack carries a content digest; loading verifies it, so a dataset edited after
+    promotion fails loudly here instead of quietly changing what a "permanent regression
+    test" tests. Packs written before digests existed carry none and load unchanged.
+    """
 
     source_path = Path(path)
     raw_payload = json.loads(source_path.read_text(encoding="utf-8"))
-    return parse_dataset_payload(raw_payload, fallback_dataset_id=source_path.stem)
+    dataset = parse_dataset_payload(raw_payload, fallback_dataset_id=source_path.stem)
+    verify_content_digest(dataset, source=str(source_path))
+    return dataset
 
 
 def parse_dataset_payload(

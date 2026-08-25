@@ -444,6 +444,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional output path for the curated dataset JSON file.",
     )
+    dataset_promote_parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Replace an existing curated dataset of the same id. Promotion refuses by "
+            "default: a promoted version is immutable, so new cases belong in the next "
+            "version (`dataset evolve`) rather than on top of the old one."
+        ),
+    )
     dataset_promote_parser.set_defaults(handler=_handle_dataset_promote)
 
     dataset_versions_parser = dataset_subparsers.add_parser(
@@ -1730,6 +1739,7 @@ def _handle_dataset_promote(args: argparse.Namespace) -> int:
         dataset_id=args.dataset_id,
         root=_normalized_root(args.root),
         output_path=args.out,
+        force=args.force,
     )
     print(_render_dataset_promotion(summary))
     return 0

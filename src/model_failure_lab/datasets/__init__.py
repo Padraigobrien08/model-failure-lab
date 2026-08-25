@@ -24,6 +24,13 @@ from .evolution import (
     preview_regression_pack,
     suggest_dataset_family_id,
 )
+from .integrity import (
+    DatasetIntegrityError,
+    compute_content_digest,
+    integrity_payload,
+    recorded_content_digest,
+    verify_content_digest,
+)
 from .load import load_dataset, parse_dataset_payload
 from .local import LocalDatasetSummary, available_local_datasets
 
@@ -58,6 +65,7 @@ def load_demo_dataset() -> FailureDataset:
 
 __all__ = [
     "BundledDatasetSummary",
+    "DatasetIntegrityError",
     "FailureDataset",
     "DatasetEvolutionSummary",
     "DatasetVersionRecord",
@@ -69,16 +77,20 @@ __all__ = [
     "available_bundled_datasets",
     "available_bundled_dataset_ids",
     "available_local_datasets",
+    "compute_content_digest",
     "demo_dataset_path",
     "describe_bundled_dataset",
     "evolve_dataset_family",
     "generate_regression_pack",
     "has_bundled_dataset",
+    "integrity_payload",
     "list_dataset_versions",
     "load_dataset",
     "load_bundled_dataset",
     "load_demo_dataset",
     "parse_dataset_payload",
     "preview_regression_pack",
+    "recorded_content_digest",
     "suggest_dataset_family_id",
+    "verify_content_digest",
 ]
