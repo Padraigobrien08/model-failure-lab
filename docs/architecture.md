@@ -156,7 +156,7 @@ compute deterministic dataclasses, write artifacts back, print a summary.
 | Anthropic API | `adapters/anthropic_adapter.py` (imports `anthropic`) | `--model anthropic:*`; needs `[anthropic]` extra + API key |
 | OpenAI API | `adapters/openai_adapter.py` (imports `openai`) | OpenAI model names; needs `[openai]` extra + API key |
 | Ollama (local) | `adapters/ollama_adapter.py` | `--model ollama:*`; needs local Ollama runtime |
-| React UI | static artifacts via `FAILURE_LAB_ARTIFACT_ROOT`; `scripts/run_react_ui.py` shells out to `npm` | UI usage |
+| Operator console | saved artifacts via `FAILURE_LAB_ARTIFACT_ROOT`, read by `frontend/server/artifactBridge.ts` (which shells into `scripts/query_bridge.py`) | UI usage |
 | WILDS / CivilComments | `data/civilcomments.py`, `wilds` package | Legacy benchmark only |
 
 > API keys: read from environment by the respective SDKs. The repo does not vendor a secrets loader;

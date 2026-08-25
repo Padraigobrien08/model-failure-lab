@@ -675,3 +675,62 @@ def _write_saved_run(
     )
     write_run_artifacts(execution, root=root)
     return execution.run.run_id
+
+
+def test_a_candidate_that_only_adds_cases_stays_comparable(tmp_path) -> None:
+    """The guard is per shared case, and that granularity is the point.
+
+    `docs/artifact-model.md` used to present the run-level
+    `metadata.dataset_content_digest` as the dataset-content guarantee. It is recorded
+    provenance that no command reads -- and wiring it in as the guard would be wrong, not
+    just redundant: it would refuse two runs over *any* differing dataset content, including
+    a candidate that legitimately added cases, which the shared-scope comparison handles.
+    The doc now credits `_prompt_content_fingerprint`, so this pins the distinction.
+    """
+
+    adapter_id = "unit-fingerprint-adapter"
+    classifier_id = "unit-fingerprint-classifier"
+    register_model(adapter_id, ComparisonAdapter)
+    register_classifier(classifier_id, ComparisonClassifier())
+    shared = PromptCase(id="case-001", prompt="shared question")
+
+    baseline_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(dataset_id="fingerprint-v1", cases=(shared,)),
+        model="baseline-model",
+        seed=43,
+        suffix_minutes=0,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+    extended_run_id = _write_saved_run(
+        tmp_path,
+        dataset=FailureDataset(
+            dataset_id="fingerprint-v1",
+            cases=(shared, PromptCase(id="case-002", prompt="a new question")),
+        ),
+        model="candidate-model",
+        seed=44,
+        suffix_minutes=1,
+        adapter_id=adapter_id,
+        classifier_id=classifier_id,
+    )
+
+    built = build_comparison_report(
+        load_saved_run_artifacts(baseline_run_id, root=tmp_path),
+        load_saved_run_artifacts(extended_run_id, root=tmp_path),
+        now=datetime(2026, 3, 30, 12, 50, 0, tzinfo=timezone.utc),
+    )
+
+    # The run-level digests differ -- the datasets are not the same content ...
+    baseline_digest = load_saved_run_artifacts(baseline_run_id, root=tmp_path).run.metadata[
+        "dataset_content_digest"
+    ]
+    extended_digest = load_saved_run_artifacts(extended_run_id, root=tmp_path).run.metadata[
+        "dataset_content_digest"
+    ]
+    assert baseline_digest != extended_digest
+    # ... and the comparison is still sound, on the case they share.
+    assert built.report.comparison["compatible"] is True
+    assert built.report.comparison["shared_case_count"] == 1
+    assert built.report.comparison["candidate_only_case_count"] == 1
