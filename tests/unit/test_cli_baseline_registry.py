@@ -24,7 +24,11 @@ def test_baselines_set_rejects_unknown_run(tmp_path: Path, capsys) -> None:
         ["baselines", "--root", str(tmp_path), "set", "--name", "x", "--run", "nope"]
     )
     assert exit_code == 1
-    assert "No such file" in capsys.readouterr().err
+    # The old assertion matched the raw OS "No such file" text. The message now names the
+    # run and what to do about it, which is the contract worth pinning.
+    error = capsys.readouterr().err
+    assert "'nope' is not saved in this workspace" in error
+    assert "--root" in error
 
 
 def test_baselines_set_backfills_model_and_dataset_from_run(tmp_path: Path, capsys) -> None:

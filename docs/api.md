@@ -1,6 +1,9 @@
 # API Documentation
 
-> Baseline audit, generated 2026-06-29.
+> The CLI surface table below is pinned to `cli.py` by
+> `tests/unit/test_cli_surface_documented.py` — a command added without a row here fails the
+> suite. It drifted silently before that test existed: `init` and `baselines` shipped
+> undocumented.
 
 ## Service boundaries
 
@@ -13,7 +16,7 @@ that is the integration boundary between commands and between the CLI and the Re
 
 Entry points (all equivalent): `failure-lab`, `model-failure-lab`, `python3 -m model_failure_lab`
 (`pyproject.toml [project.scripts]`, `__main__.py`). Implemented in `src/model_failure_lab/cli.py`
-(13 top-level commands, 44 `_handle_*` handlers).
+(15 top-level commands, 45 `_handle_*` handlers).
 
 | Top-level command | Subcommands | Purpose |
 |---|---|---|
@@ -21,6 +24,7 @@ Entry points (all equivalent): `failure-lab`, `model-failure-lab`, `python3 -m m
 | `report` | — | Build a compact report from one saved run |
 | `compare` | — | Compare two saved runs (baseline → candidate) |
 | `demo` | — | Deterministic demo flow emitting normal artifacts |
+| `init` | — | Scaffold a starter prompt dataset in the active workspace |
 | `datasets` | `list` | Inspect bundled datasets |
 | `dataset` | `review`, `promote`, `versions`, `families`, `lifecycle-review`, `lifecycle-apply`, `portfolio`, `planning-units`, `plan-create`, `plans`, `plan-show`, `plan-preflight`, `plan-execute`, `executions`, `execution-show`, `follow-ups`, `follow-up-show`, `follow-up-link`, `follow-up-attest`, `plan-promote`, `evolve` | Curated dataset lifecycle, evolution, portfolio planning/execution |
 | `index` | `rebuild`, `validate` | Manage the derived SQLite query index |
@@ -28,11 +32,19 @@ Entry points (all equivalent): `failure-lab`, `model-failure-lab`, `python3 -m m
 | `history` | — | Run / comparison / dataset-family history |
 | `clusters` | — | List recurring failure clusters |
 | `cluster` | `show`, `history` | Inspect one cluster |
-| `regressions` | `generate`, `recommend`, `review`, `apply`, `gate`, `patterns` | Governance over comparison signals |
+| `regressions` | `generate`, `recommend`, `review`, `apply`, `gate`, `patterns`, `pr-comment` | Governance over comparison signals |
+| `baselines` | `list`, `set` | Shared baseline registry entries |
 | `harvest` | — | Harvest saved cases into a draft dataset pack |
 
 > Subcommand lists are read from `argparse --help` output and `cli.py`. The `dataset` group is the
 > largest surface (governance/portfolio lifecycle).
+>
+> **Scope note.** The README calls `run` / `compare` / `harvest` / `promote` the whole core loop,
+> and that is accurate: `index`/`query`/`clusters`/`history` are the search layer, `regressions`
+> and `baselines` are the CI-gate layer, and the `dataset` group's twelve
+> `plan-*` / `execution*` / `follow-up-*` subcommands are a portfolio-planning and
+> outcome-attestation surface that the supported loop never requires. They are documented here
+> because they exist and are reachable, not because a new user needs them.
 
 ### Verified example (`demo`)
 
