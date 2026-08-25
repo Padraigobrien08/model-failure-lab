@@ -224,26 +224,36 @@ workspace's saved JSON artifacts:
 FAILURE_LAB_ARTIFACT_ROOT=/path/to/your/workspace npm --prefix frontend run dev
 ```
 
-More screenshots in [`docs/screens/`](docs/screens/).
+More screenshots — including the dark theme — in [`docs/screens/`](docs/screens/).
 
 ## How it compares
 
 There are excellent tools in this space; they solve overlapping but different problems. This table is
 meant to be factual, not a claim of superiority — pick what fits your workflow.
 
-| Tool | Primary strength | Hosted? | Local? | Main focus |
-|---|---|---|---|---|
-| **LangSmith** | Polished UI for tracing, datasets, and evals | Yes (SaaS) | No | Observability + evaluation platform |
-| **promptfoo** | Great DX for config-driven prompt evals & red-teaming | Optional | Yes | Prompt/LLM testing & security |
-| **DeepEval** | Pytest-style assertions with many model-graded metrics | Optional | Yes | LLM unit-testing & metrics |
-| **Ragas** | Research-backed RAG metrics (faithfulness, context recall…) | No | Yes | RAG evaluation metrics |
-| **Model Failure Lab** | Git-native baseline-vs-candidate regression tracking; turns regressions into permanent datasets | No | Yes | Regression detection & failure-to-test workflow |
+| Tool | Primary strength | Hosted? | Main focus |
+|---|---|---|---|
+| **LangSmith** | Polished UI for tracing, datasets, and evals | Yes (SaaS) | Observability + evaluation platform |
+| **promptfoo** | Great DX for config-driven prompt evals & red-teaming | Optional | Prompt/LLM testing & security |
+| **DeepEval** | Pytest-style assertions with many model-graded metrics | Optional | LLM unit-testing & metrics |
+| **Ragas** | Research-backed RAG metrics (faithfulness, context recall…) | No | RAG evaluation metrics |
+| **Model Failure Lab** | Git-native baseline-vs-candidate regression tracking; turns regressions into permanent datasets | No | Regression detection & failure-to-test workflow |
+
+Running locally is not a differentiator — promptfoo, DeepEval and Ragas all do. The thing that is
+actually unusual here is narrower, and it is the reason the tool exists:
+
+> **The comparison refuses to score itself when the comparison is unsound.** Different datasets, no
+> shared cases, or one prompt rewritten under a stable case id, and you get `incompatible` rather
+> than a number. A candidate that errors instead of answering, or that deletes the cases it broke,
+> fails the gate rather than passing it. A verdict you cannot trust is worse than no verdict, so the
+> tool declines to produce one.
 
 Honest limitations: Model Failure Lab is pre-1.0, ships fewer built-in metrics than DeepEval/Ragas,
-has no hosted UI, and is Python/CLI-only. If you want a managed dashboard (LangSmith), a large metric
+has no hosted UI, and is Python/CLI-only. Its bundled classifier is deterministic and narrow — four
+failure types, no model-graded scoring. If you want a managed dashboard (LangSmith), a large metric
 library (DeepEval), deep RAG metrics (Ragas), or red-teaming (promptfoo), reach for those. Reach for
-Model Failure Lab when you want **local, git-tracked, version-to-version regression history** and a
-loop that converts failures into durable tests.
+Model Failure Lab when you want **git-tracked, version-to-version regression history you can trust**
+and a loop that converts failures into durable tests.
 
 ## Advanced
 
