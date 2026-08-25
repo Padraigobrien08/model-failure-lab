@@ -27,14 +27,14 @@ def test_reporting_package_import_stays_light() -> None:
 
 @pytest.mark.legacy
 def test_reporting_package_keeps_representative_exports_reachable() -> None:
-    # ``reporting.bundle`` pulls in the legacy ML stack (pandas); this assertion
+    # ``reporting.legacy.bundle`` pulls in the legacy ML stack (pandas); this assertion
     # only applies when that optional stack is installed and cleanly importable.
     _purge_modules("model_failure_lab.reporting")
 
     reporting = importlib.import_module("model_failure_lab.reporting")
     core = importlib.import_module("model_failure_lab.reporting.core")
     compare = importlib.import_module("model_failure_lab.reporting.compare")
-    bundle = importlib.import_module("model_failure_lab.reporting.bundle")
+    bundle = importlib.import_module("model_failure_lab.reporting.legacy.bundle")
 
     assert reporting.build_run_report is core.build_run_report
     assert reporting.build_comparison_report is compare.build_comparison_report

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from model_failure_lab.reporting.robustness import (
+from model_failure_lab.reporting.legacy.robustness import (
     build_final_robustness_summary,
     build_promotion_audit,
 )

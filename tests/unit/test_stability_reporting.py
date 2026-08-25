@@ -9,7 +9,7 @@ from model_failure_lab.reporting import (
     build_mitigation_stability_table,
     build_stability_summary,
 )
-from model_failure_lab.reporting.discovery import ReportCandidate
+from model_failure_lab.reporting.legacy.discovery import ReportCandidate
 
 
 def _candidate(
