@@ -1,0 +1,30 @@
+{
+  "all": [
+    "error_cleared",
+    "error_stage_changed",
+    "failure_to_no_failure",
+    "failure_type_swap",
+    "new_error",
+    "no_failure_to_failure"
+  ],
+  "churn": [
+    "error_stage_changed",
+    "failure_type_swap"
+  ],
+  "improvement": [
+    "error_cleared",
+    "failure_to_no_failure"
+  ],
+  "order": [
+    "failure_to_no_failure",
+    "no_failure_to_failure",
+    "failure_type_swap",
+    "error_cleared",
+    "new_error",
+    "error_stage_changed"
+  ],
+  "regression": [
+    "new_error",
+    "no_failure_to_failure"
+  ]
+}

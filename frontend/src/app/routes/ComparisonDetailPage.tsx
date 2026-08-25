@@ -17,6 +17,13 @@ import {
   truncateRunId,
 } from "@/components/console/primitives";
 import { loadComparisonDetail } from "@/lib/artifacts/load";
+import {
+  IMPROVEMENT_TRANSITIONS,
+  REGRESSION_TRANSITIONS,
+  TRANSITION_ORDER,
+  type TransitionTone,
+  transitionTone,
+} from "@/lib/artifacts/transitions";
 import type {
   ComparisonCaseDeltaRecord,
   ComparisonDetail,
@@ -28,26 +35,8 @@ type DetailState =
   | { status: "ready"; detail: ComparisonDetail; message: null }
   | { status: "incompatible"; detail: null; message: string };
 
-export const REGRESSION_TRANSITIONS = new Set([
-  "no_failure_to_failure",
-  "new_error",
-  "error_stage_changed",
-]);
-export const IMPROVEMENT_TRANSITIONS = new Set(["failure_to_no_failure", "error_cleared"]);
-
-const TRANSITION_ORDER = [
-  "no_failure_to_failure",
-  "new_error",
-  "error_stage_changed",
-  "failure_type_swap",
-  "error_cleared",
-  "failure_to_no_failure",
-];
-
-export function transitionGroupTone(transitionType: string): "bad" | "good" | "neutral" {
-  if (REGRESSION_TRANSITIONS.has(transitionType)) return "bad";
-  if (IMPROVEMENT_TRANSITIONS.has(transitionType)) return "good";
-  return "neutral";
+export function transitionGroupTone(transitionType: string): TransitionTone {
+  return transitionTone(transitionType);
 }
 
 export function caseSideLabel(
@@ -338,7 +327,14 @@ export function ComparisonDetailPage() {
                         <span
                           className={cn(
                             "font-heading text-[30px] font-semibold leading-none",
-                            gateRow.blocked ? "text-bad" : "text-good",
+                            !gateRow.blocked
+                              ? "text-good"
+                              : verdict === "regression"
+                                ? "text-bad"
+                                : // Blocked without a regression verdict (not comparable,
+                                  // coverage dropped, failing cases deleted) is degraded,
+                                  // not a regression.
+                                  "text-warn",
                           )}
                         >
                           {gateRow.blocked ? "FAIL" : "PASS"}

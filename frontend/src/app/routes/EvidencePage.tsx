@@ -2,11 +2,7 @@ import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import {
-  IMPROVEMENT_TRANSITIONS,
-  REGRESSION_TRANSITIONS,
-  caseSideLabel,
-} from "@/app/routes/ComparisonDetailPage";
+import { caseSideLabel } from "@/app/routes/ComparisonDetailPage";
 import { HarvestDialog } from "@/components/console/HarvestDialog";
 import {
   ConsoleButton,
@@ -16,6 +12,10 @@ import {
   StatusChip,
   truncateRunId,
 } from "@/components/console/primitives";
+import {
+  IMPROVEMENT_TRANSITIONS,
+  REGRESSION_TRANSITIONS,
+} from "@/lib/artifacts/transitions";
 import { loadComparisonDetail, loadRunDetail } from "@/lib/artifacts/load";
 import type {
   ComparisonCaseDeltaRecord,
@@ -151,7 +151,7 @@ function CasePane({
         ) : record?.outputText ? (
           <div className="whitespace-pre-wrap">{record.outputText}</div>
         ) : record?.error ? (
-          <div className="rounded-tok border border-bad-line bg-bad-panel px-3 py-2.5 font-mono text-[12px] text-bad">
+          <div className="rounded-tok border border-line bg-warn-bg px-3 py-2.5 font-mono text-[12px] text-warn">
             {record.error.stage} error · {record.error.type}
             <br />
             {record.error.message}

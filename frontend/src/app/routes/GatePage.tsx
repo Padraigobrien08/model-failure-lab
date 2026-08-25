@@ -43,13 +43,30 @@ function GateBanner({ gate }: { gate: GateResponse }) {
   const blockReasons = Array.from(
     new Set(blockingRows.map((row) => row.blockReason).filter((reason): reason is string => !!reason)),
   );
+  // The gate blocks on a regression verdict OR on a fail-closed condition (runs not
+  // comparable, coverage dropped, the candidate deleted its failing cases). Only the first
+  // is a regression, and DESIGN.md reserves red for regression alone -- so a FAIL with no
+  // regression among its reasons reads as degraded, not as a regression that did not happen.
+  const hasRegression = blockingRows.some((row) => row.verdict === "regression");
   if (gate.blocked) {
     return (
-      <div className="rounded-tok border border-bad-line border-l-[3px] border-l-bad bg-bad-panel p-[20px_22px]">
-        <StatusChip tone="bad-strong" uppercase>
+      <div
+        className={cn(
+          "rounded-tok border p-[20px_22px] border-l-[3px]",
+          hasRegression
+            ? "border-bad-line border-l-bad bg-bad-panel"
+            : "border-line border-l-warn bg-warn-bg",
+        )}
+      >
+        <StatusChip tone={hasRegression ? "bad-strong" : "warn"} uppercase>
           FAIL
         </StatusChip>
-        <div className="mt-2 font-heading text-[26px] font-semibold leading-[1.15] text-bad-head">
+        <div
+          className={cn(
+            "mt-2 font-heading text-[26px] font-semibold leading-[1.15]",
+            hasRegression ? "text-bad-head" : "text-warn",
+          )}
+        >
           {blockingCount} {blockingCount === 1 ? "comparison blocks" : "comparisons block"} the
           gate.
         </div>
@@ -57,8 +74,9 @@ function GateBanner({ gate }: { gate: GateResponse }) {
           {blockReasons.length > 0 ? blockReasons.join(" · ") : policyRule}
         </div>
         <div className="mt-2.5 font-mono text-[11.5px] text-ink">
-          harvest the regression: failure-lab regressions apply · or waive it: failure-lab
-          regressions gate --waivers waivers.yml
+          {hasRegression
+            ? "harvest the regression: failure-lab regressions apply · or waive it: failure-lab regressions gate --waivers waivers.yml"
+            : "rerun on comparable artifacts · or waive it: failure-lab regressions gate --waivers waivers.yml"}
         </div>
       </div>
     );
@@ -217,7 +235,11 @@ export function GatePage() {
                         <td
                           className={cn(
                             "px-2 py-[9px] text-right",
-                            row.blocked ? "font-semibold text-bad" : "text-muted-ink",
+                            row.blocked && row.verdict === "regression"
+                              ? "font-semibold text-bad"
+                              : row.blocked
+                                ? "font-semibold text-warn"
+                                : "text-muted-ink",
                           )}
                         >
                           {formatScore(row.severity)}
@@ -226,7 +248,15 @@ export function GatePage() {
                           {row.policyRule}
                         </td>
                         <td className="px-2 py-[9px]">
-                          <StatusChip tone={row.blocked ? "bad" : "neutral"}>
+                          <StatusChip
+                            tone={
+                              row.blocked
+                                ? row.verdict === "regression"
+                                  ? "bad"
+                                  : "warn"
+                                : "neutral"
+                            }
+                          >
                             {row.blocked ? "blocked" : "clear"}
                           </StatusChip>
                         </td>
