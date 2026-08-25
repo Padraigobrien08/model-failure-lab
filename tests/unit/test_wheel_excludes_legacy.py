@@ -17,10 +17,10 @@ exclude entry -- fails here rather than in a user's virtualenv.
 
 from __future__ import annotations
 
+import fnmatch
 import re
+import tomllib
 from pathlib import Path
-
-from setuptools.discovery import FlatLayoutPackageFinder, PackageFinder
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -38,22 +38,31 @@ LEGACY_LAYOUT_IMPORT = re.compile(r"model_failure_lab\.(utils|tracking)\b")
 
 
 def _wheel_packages() -> list[str]:
-    """The package list setuptools resolves from `[tool.setuptools.packages.find]`."""
+    """The package list `[tool.setuptools.packages.find]` resolves to.
 
-    import tomllib
+    Resolved by walking `src/` and applying the include/exclude globs the way setuptools
+    does, rather than importing `setuptools.discovery`: setuptools is a build-time tool and
+    is not in the `dev` extra, nor in a stock Python 3.12 virtualenv, so importing it made
+    this module fail to collect on 3.12 while passing on 3.11. The wheel *itself* is checked
+    by the `consumer-install` CI job; this is the fast local guard.
+    """
 
     config = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     find = config["tool"]["setuptools"]["packages"]["find"]
-    finder = (
-        PackageFinder if find.get("where") else FlatLayoutPackageFinder
-    )  # pragma: no cover - config is fixed
-    return sorted(
-        finder.find(
-            where=str(SRC_ROOT),
-            exclude=tuple(find.get("exclude", ())),
-            include=tuple(find.get("include", ("*",))),
-        )
-    )
+    include = tuple(find.get("include", ("*",)))
+    exclude = tuple(find.get("exclude", ()))
+
+    names = []
+    for init in SRC_ROOT.rglob("__init__.py"):
+        name = ".".join(init.parent.relative_to(SRC_ROOT).parts)
+        if not name:
+            continue
+        if not any(fnmatch.fnmatchcase(name, pattern) for pattern in include):
+            continue
+        if any(fnmatch.fnmatchcase(name, pattern) for pattern in exclude):
+            continue
+        names.append(name)
+    return sorted(names)
 
 
 def _shipped_modules() -> list[Path]:
