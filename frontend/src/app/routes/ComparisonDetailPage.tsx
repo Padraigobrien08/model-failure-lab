@@ -16,6 +16,7 @@ import {
   formatSignedScore,
   truncateRunId,
 } from "@/components/console/primitives";
+import { gateRowTone } from "@/lib/artifacts/gateTone";
 import { loadComparisonDetail } from "@/lib/artifacts/load";
 import {
   IMPROVEMENT_TRANSITIONS,
@@ -308,28 +309,21 @@ export function ComparisonDetailPage() {
                 <div className="w-px self-stretch bg-line" />
                 <div className="flex w-[190px] flex-none flex-col gap-2">
                   <SectionLabel className="text-[9.5px] tracking-[0.16em]">CI gate</SectionLabel>
-                  {verdict === "incompatible" ? (
-                    <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-heading text-[22px] font-semibold leading-none text-muted-ink">
-                          not evaluated
-                        </span>
-                      </div>
-                      <div className="font-mono text-[10.5px] leading-normal text-muted-ink">
-                        signal discarded · incompatible_signal
-                        <br />
-                        rerun on a shared dataset to gate
-                      </div>
-                    </>
-                  ) : gateRow ? (
+                  {/* An `incompatible` verdict used to short-circuit to "not evaluated"
+                      here, before the gate row was ever read -- so a comparison that was
+                      the sole reason CI failed reported, on its own page, that the gate
+                      had not been evaluated on it. The gate row is the answer whenever
+                      one exists; "not evaluated" means exactly one thing now, which is
+                      that this comparison is not in the gate's window. */}
+                  {gateRow ? (
                     <>
                       <div className="flex items-baseline gap-2">
                         <span
                           className={cn(
                             "font-heading text-[30px] font-semibold leading-none",
-                            !gateRow.blocked
+                            gateRowTone(gateRow) === "good"
                               ? "text-good"
-                              : verdict === "regression"
+                              : gateRowTone(gateRow) === "bad"
                                 ? "text-bad"
                                 : // Blocked without a regression verdict (not comparable,
                                   // coverage dropped, failing cases deleted) is degraded,
@@ -353,6 +347,12 @@ export function ComparisonDetailPage() {
                             <br />
                           </>
                         ) : null}
+                        {verdict === "incompatible" ? (
+                          <>
+                            rerun on a shared dataset to gate
+                            <br />
+                          </>
+                        ) : null}
                         policy: {gateRow.policyRule}
                         <br />
                         {gateRow.waiver
@@ -366,6 +366,12 @@ export function ComparisonDetailPage() {
                     <div className="font-mono text-[10.5px] leading-normal text-muted-ink">
                       not evaluated
                       <br />
+                      {verdict === "incompatible" ? (
+                        <>
+                          signal discarded · incompatible_signal
+                          <br />
+                        </>
+                      ) : null}
                       run: failure-lab regressions gate
                     </div>
                   )}

@@ -6,6 +6,12 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from model_failure_lab.datasets.integrity import (
+    DatasetIntegrityError,
+    audit_dataset_directory,
+)
+from model_failure_lab.storage.layout import datasets_root
+
 from .builder import QUERY_INDEX_SCHEMA_VERSION, query_index_path, rebuild_query_index
 
 REQUIRED_INDEX_TABLES = (
@@ -54,11 +60,28 @@ def validate_artifact_contracts(*, root: str | Path | None = None) -> ArtifactCo
     # rather than trusting a possibly-current derived index. A malformed run,
     # report, or comparison artifact raises here and is reported as a contract
     # error instead of silently passing.
+    # The integrity sweep runs first and is the single reporter for dataset-integrity
+    # problems: it answers "can I still prove the curated packs are the ones that were
+    # promoted", which is a different question from the builder's "can I read these
+    # artifacts", and it catches the case a load cannot -- a pack whose digest was deleted
+    # reads perfectly.
+    integrity_errors = [
+        finding.message() for finding in audit_dataset_directory(datasets_root(root=root))
+    ]
+
     ingestion_errors: list[str] = []
     try:
         rebuild_query_index(root=root)
+    except DatasetIntegrityError as exc:
+        # A tampered pack used to escape as an unhandled exception, so `index validate`
+        # crashed with exit 1 instead of reporting a contract error with its documented
+        # exit 2. Only report it here when the sweep did not already name it -- a pack
+        # outside `datasets/` can still fail the load.
+        if not integrity_errors:
+            ingestion_errors.append(f"dataset integrity: {exc}")
     except (ValueError, KeyError) as exc:
         ingestion_errors.append(f"artifact contract violation: {exc}")
+    ingestion_errors = integrity_errors + ingestion_errors
 
     index_path = query_index_path(root=root)
     if not index_path.exists():

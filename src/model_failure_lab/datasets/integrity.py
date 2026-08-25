@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard
@@ -29,6 +31,7 @@ INTEGRITY_METADATA_KEY = "integrity"
 CONTENT_DIGEST_KEY = "content_digest"
 DIGEST_ALGORITHM = "sha256"
 _DIGEST_LENGTH = 16
+CURATED_LIFECYCLE = "curated"
 
 
 class DatasetIntegrityError(Exception):
@@ -103,3 +106,100 @@ def verify_content_digest(dataset: FailureDataset, *, source: str | None = None)
         "Restore the promoted version from source control, or promote the change as a new "
         "version with `failure-lab dataset evolve`."
     )
+
+
+# --------------------------------------------------------------------------------------
+# Workspace audit: a curated pack that cannot be checked is a finding, not a pass.
+# --------------------------------------------------------------------------------------
+#
+# Grandfathering unstamped packs keeps upgrades working, but it also made the guarantee
+# trivially removable: deleting `metadata.integrity` from a tampered pack restored every
+# pre-digest behavior exactly -- `run` loaded two of four cases and exited 0, and
+# `index validate` reported `ok`. Nothing distinguished "written before digests existed"
+# from "digest deleted".
+#
+# `lifecycle: "curated"` does distinguish it enough to matter: only `dataset promote` and
+# `dataset evolve` set it, and both have stamped a digest since the feature landed. So a
+# curated pack with no digest is either a pre-digest pack or a stripped one, and in both
+# cases the honest answer to "is this immutable?" is "I cannot tell" -- which is a finding
+# for the command whose whole job is answering that question, not a silent pass.
+#
+# Loading stays permissive (an old workspace must keep working); `index validate` reports.
+
+
+@dataclass(slots=True, frozen=True)
+class DatasetIntegrityFinding:
+    """One dataset whose immutability could not be confirmed."""
+
+    path: Path
+    dataset_id: str
+    #: `mismatch` = cases changed under a recorded digest. `unstamped` = curated, no digest.
+    kind: str
+    detail: str
+
+    def message(self) -> str:
+        return f"dataset integrity: {self.detail}"
+
+
+def dataset_integrity_status(dataset: FailureDataset) -> str:
+    """`verified`, `mismatch`, `unstamped`, or `unmanaged` (not a curated pack)."""
+
+    recorded = recorded_content_digest(dataset)
+    if recorded is None:
+        return "unstamped" if dataset.lifecycle == CURATED_LIFECYCLE else "unmanaged"
+    return "verified" if compute_content_digest(dataset) == recorded else "mismatch"
+
+
+def audit_dataset_directory(directory: Path) -> tuple[DatasetIntegrityFinding, ...]:
+    """Report every curated pack in `directory` whose digest is missing or wrong.
+
+    Unreadable and malformed files are skipped: the index builder already reports those as
+    contract violations, and reporting them twice would bury the integrity answer.
+    """
+
+    from .load import parse_dataset_payload
+
+    findings: list[DatasetIntegrityFinding] = []
+    if not directory.is_dir():
+        return ()
+    for path in sorted(directory.glob("*.json")):
+        try:
+            dataset = parse_dataset_payload(
+                json.loads(path.read_text(encoding="utf-8")),
+                fallback_dataset_id=path.stem,
+            )
+        except Exception:  # noqa: BLE001 - malformed packs are the index builder's report
+            continue
+        status = dataset_integrity_status(dataset)
+        if status == "mismatch":
+            findings.append(
+                DatasetIntegrityFinding(
+                    path=path,
+                    dataset_id=dataset.dataset_id,
+                    kind="mismatch",
+                    detail=(
+                        f"'{dataset.dataset_id}' ({path}) was modified after promotion: "
+                        f"recorded {recorded_content_digest(dataset)}, "
+                        f"actual {compute_content_digest(dataset)}. Restore the promoted "
+                        "version from source control, or promote the change as a new "
+                        "version with `failure-lab dataset evolve`."
+                    ),
+                )
+            )
+        elif status == "unstamped":
+            findings.append(
+                DatasetIntegrityFinding(
+                    path=path,
+                    dataset_id=dataset.dataset_id,
+                    kind="unstamped",
+                    detail=(
+                        f"curated dataset '{dataset.dataset_id}' ({path}) carries no content "
+                        "digest, so its immutability cannot be checked -- it either predates "
+                        "digest stamping or had `metadata.integrity` removed. Confirm the "
+                        "cases are the ones you promoted, then re-stamp with "
+                        f"`failure-lab dataset promote {path} "
+                        f"--dataset-id {dataset.dataset_id} --force`."
+                    ),
+                )
+            )
+    return tuple(findings)

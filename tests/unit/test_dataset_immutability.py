@@ -144,7 +144,11 @@ def test_index_validate_rejects_a_tampered_dataset(
     assert main(["index", "validate", "--root", str(root)]) == 0
 
     _tamper(dataset_path)
-    assert main(["index", "validate", "--root", str(root)]) == 1
+    # Exit 2 is `index validate`'s documented "contracts do not hold" code
+    # (docs/api.md, docs/ci-governance.md). A tampered pack used to escape the rebuild as
+    # an unhandled exception and exit 1 -- indistinguishable, to a CI script, from the
+    # command itself crashing.
+    assert main(["index", "validate", "--root", str(root)]) == 2
 
 
 def test_promote_refuses_to_overwrite_an_existing_version(
@@ -243,3 +247,127 @@ def test_digest_ignores_provenance_but_tracks_case_content(tmp_path: Path) -> No
     assert compute_content_digest(parse_dataset_payload(edited)) != original
     dropped = {**base, "cases": []}
     assert compute_content_digest(parse_dataset_payload(dropped)) != original
+
+
+# ---------------------------------------------------------------------------------------
+# Removing the digest was the bypass: it restored every pre-digest behavior exactly.
+# ---------------------------------------------------------------------------------------
+#
+# Grandfathering unstamped packs is right for loading -- an old workspace must keep working
+# -- but it also meant deleting `metadata.integrity` made a tampered pack load silently with
+# two of its four cases while `index validate` still exited 0. `lifecycle: "curated"` is the
+# discriminator: only `dataset promote` and `dataset evolve` set it, and both stamp a digest,
+# so a curated pack with no digest is a pack whose immutability cannot be checked.
+
+
+def _strip_integrity(dataset_path: Path) -> None:
+    payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    payload["metadata"].pop("integrity", None)
+    dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def test_index_validate_rejects_a_curated_pack_whose_digest_was_removed(
+    promoted_workspace: tuple[Path, Path],
+) -> None:
+    root, dataset_path = promoted_workspace
+    payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    payload["cases"] = payload["cases"][:2]
+    dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _strip_integrity(dataset_path)
+
+    # Before: exit 0 and "ok". The tamper was invisible once the digest went with it.
+    assert main(["index", "validate", "--root", str(root)]) == 2
+
+
+def test_the_unstamped_finding_names_the_pack_and_a_command_that_re_stamps_it(
+    promoted_workspace: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, dataset_path = promoted_workspace
+    _strip_integrity(dataset_path)
+
+    assert main(["index", "validate", "--root", str(root)]) == 2
+    output = capsys.readouterr().out
+    assert DATASET_ID in output
+    assert str(dataset_path) in output
+    # DESIGN.md's rule for errors, applied to the CLI: say what failed, which file, and what
+    # to run. A remedy the reader cannot paste is not a remedy.
+    assert "--force" in output
+    assert "failure-lab dataset promote" in output
+
+
+def test_re_stamping_clears_the_finding(promoted_workspace: tuple[Path, Path]) -> None:
+    root, dataset_path = promoted_workspace
+    _strip_integrity(dataset_path)
+    assert main(["index", "validate", "--root", str(root)]) == 2
+
+    assert (
+        main(
+            [
+                "dataset",
+                "promote",
+                str(dataset_path),
+                "--dataset-id",
+                DATASET_ID,
+                "--root",
+                str(root),
+                "--force",
+            ]
+        )
+        == 0
+    )
+    assert main(["index", "validate", "--root", str(root)]) == 0
+
+
+def test_an_unstamped_pack_that_was_never_promoted_is_not_a_finding(tmp_path: Path) -> None:
+    # A hand-authored prompt pack has no lifecycle and makes no immutability claim, so it
+    # must not be dragged into the curated-pack audit.
+    root = tmp_path / "workspace"
+    (root / "datasets").mkdir(parents=True)
+    (root / "datasets" / "mine.json").write_text(
+        json.dumps(
+            {
+                "dataset_id": "mine-v1",
+                "name": "Mine",
+                "cases": [{"id": "case-1", "prompt": "hello"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["index", "validate", "--root", str(root)]) == 0
+
+
+def test_audit_classifies_each_pack_state(tmp_path: Path) -> None:
+    from model_failure_lab.datasets import parse_dataset_payload
+    from model_failure_lab.datasets.integrity import (
+        audit_dataset_directory,
+        dataset_integrity_status,
+        integrity_payload,
+    )
+
+    base = {
+        "dataset_id": "state-v1",
+        "name": "State",
+        "lifecycle": "curated",
+        "cases": [{"id": "case-1", "prompt": "hello"}],
+    }
+    stamped = {**base, "metadata": {"integrity": integrity_payload(parse_dataset_payload(base))}}
+
+    assert dataset_integrity_status(parse_dataset_payload(stamped)) == "verified"
+    assert dataset_integrity_status(parse_dataset_payload(base)) == "unstamped"
+    assert dataset_integrity_status(parse_dataset_payload({**base, "lifecycle": None})) == (
+        "unmanaged"
+    )
+    tampered = {**stamped, "cases": [{"id": "case-1", "prompt": "goodbye"}]}
+    assert dataset_integrity_status(parse_dataset_payload(tampered)) == "mismatch"
+
+    directory = tmp_path / "datasets"
+    directory.mkdir()
+    (directory / "ok.json").write_text(json.dumps(stamped), encoding="utf-8")
+    (directory / "bare.json").write_text(json.dumps(base), encoding="utf-8")
+    (directory / "broken.json").write_text("{not json", encoding="utf-8")
+
+    findings = audit_dataset_directory(directory)
+    # The malformed file is the index builder's finding to report, not this one's.
+    assert [finding.kind for finding in findings] == ["unstamped"]
+    assert findings[0].path.name == "bare.json"

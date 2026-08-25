@@ -15,6 +15,7 @@ import {
 } from "@/components/console/primitives";
 import type { BaselinesResponse, GateResponse } from "@/lib/artifacts/extended";
 import { loadBaselines } from "@/lib/artifacts/extended";
+import { gateRemedy, gateRowTone, gateSummary } from "@/lib/artifacts/gateTone";
 import { cn } from "@/lib/utils";
 
 const GATE_COMMAND = "run: failure-lab regressions gate";
@@ -34,20 +35,11 @@ function GateBanner({ gate }: { gate: GateResponse }) {
       </div>
     );
   }
-  const blockingRows = gate.rows.filter((row) => row.blocked);
+  // One source of truth for "is this red or amber", shared with the rail chip and the
+  // comparison detail's CI-gate tile (`lib/artifacts/gateTone.ts`).
+  const { blockingRows, hasRegression, blockReasons } = gateSummary(gate);
   const blockingCount = blockingRows.length;
   const policyRule = blockingRows[0]?.policyRule ?? gate.rows[0].policyRule;
-  // The engine's own block reasons, verbatim. Showing the policy rule alone hid the
-  // non-verdict reasons CI fails on (incompatible runs, coverage drops, dropped failing
-  // cases), so the screen could not explain a FAIL that the CLI explained fully.
-  const blockReasons = Array.from(
-    new Set(blockingRows.map((row) => row.blockReason).filter((reason): reason is string => !!reason)),
-  );
-  // The gate blocks on a regression verdict OR on a fail-closed condition (runs not
-  // comparable, coverage dropped, the candidate deleted its failing cases). Only the first
-  // is a regression, and DESIGN.md reserves red for regression alone -- so a FAIL with no
-  // regression among its reasons reads as degraded, not as a regression that did not happen.
-  const hasRegression = blockingRows.some((row) => row.verdict === "regression");
   if (gate.blocked) {
     return (
       <div
@@ -73,11 +65,7 @@ function GateBanner({ gate }: { gate: GateResponse }) {
         <div className="mt-1.5 font-mono text-[11.5px] text-muted-ink">
           {blockReasons.length > 0 ? blockReasons.join(" · ") : policyRule}
         </div>
-        <div className="mt-2.5 font-mono text-[11.5px] text-ink">
-          {hasRegression
-            ? "harvest the regression: failure-lab regressions apply · or waive it: failure-lab regressions gate --waivers waivers.yml"
-            : "rerun on comparable artifacts · or waive it: failure-lab regressions gate --waivers waivers.yml"}
-        </div>
+        <div className="mt-2.5 font-mono text-[11.5px] text-ink">{gateRemedy(hasRegression)}</div>
       </div>
     );
   }
@@ -235,11 +223,11 @@ export function GatePage() {
                         <td
                           className={cn(
                             "px-2 py-[9px] text-right",
-                            row.blocked && row.verdict === "regression"
-                              ? "font-semibold text-bad"
-                              : row.blocked
-                                ? "font-semibold text-warn"
-                                : "text-muted-ink",
+                            row.blocked
+                              ? gateRowTone(row) === "bad"
+                                ? "font-semibold text-bad"
+                                : "font-semibold text-warn"
+                              : "text-muted-ink",
                           )}
                         >
                           {formatScore(row.severity)}
@@ -248,15 +236,7 @@ export function GatePage() {
                           {row.policyRule}
                         </td>
                         <td className="px-2 py-[9px]">
-                          <StatusChip
-                            tone={
-                              row.blocked
-                                ? row.verdict === "regression"
-                                  ? "bad"
-                                  : "warn"
-                                : "neutral"
-                            }
-                          >
+                          <StatusChip tone={row.blocked ? gateRowTone(row) : "neutral"}>
                             {row.blocked ? "blocked" : "clear"}
                           </StatusChip>
                         </td>
