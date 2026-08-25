@@ -227,7 +227,11 @@ export function RunDetailPage() {
           >
             ← runs
           </button>
-          <h1 className="mt-1.5 font-mono text-[22px] font-semibold leading-[1.1] text-ink">
+          {/* Run ids are long, unbreakable monospace strings. Without `break-all` the H1
+              overflowed its flex box and painted underneath the header actions on every real
+              run id. DESIGN.md keeps run ids in their raw form in a primary position, so wrap
+              rather than truncate. */}
+          <h1 className="mt-1.5 break-all font-mono text-[22px] font-semibold leading-[1.1] text-ink">
             {run.runId}
           </h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-ink">
