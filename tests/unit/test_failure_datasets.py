@@ -173,3 +173,32 @@ def test_load_demo_dataset_surfaces_packaged_install_error_when_asset_is_missing
     assert "bundled demo dataset asset `demo_dataset.json`" in message.lower()
     assert "installed `model-failure-lab` package" in message
     assert str(missing_path) not in message
+
+
+def test_parse_dataset_payload_round_trips_explicit_nulls_in_source_and_metadata() -> None:
+    """A null inside `source`/`metadata` is valid JSON and must survive a round trip.
+
+    `_optional_json_mapping` tested the wrong variable for null, so a top-level null in
+    either mapping was rejected as unserializable while a nested one was accepted. A
+    harvested pack that records "this draft has no comparison id" explicitly -- rather than
+    by omitting the key -- was therefore unloadable.
+    """
+
+    payload = {
+        "dataset_id": "null-source-v1",
+        "name": "Null Source",
+        "cases": [{"id": "case-1", "prompt": "hello"}],
+        "source": {
+            "type": "artifact_harvest",
+            "comparison_report_id": None,
+            "filters": {"report_id": None},
+        },
+        "metadata": {"harvest": {"selected_case_count": 1}, "owner": None},
+    }
+
+    dataset = parse_dataset_payload(payload)
+
+    assert dataset.source["comparison_report_id"] is None
+    assert dataset.metadata["owner"] is None
+    # And the value survives serialization, so the artifact is stable across a rewrite.
+    assert parse_dataset_payload(dataset.to_payload()).source["comparison_report_id"] is None

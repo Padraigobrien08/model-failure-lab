@@ -1,0 +1,69 @@
+{
+  "blocked": true,
+  "filters": {
+    "baseline_run_id": null,
+    "candidate_run_id": null,
+    "dataset": null,
+    "failure_type": null,
+    "last_n": null,
+    "limit": 20,
+    "model": null,
+    "report_id": null,
+    "since": null,
+    "until": null
+  },
+  "policy": {
+    "failure_type": null,
+    "family_case_cap": 200,
+    "family_id": null,
+    "max_duplicate_ratio": 0.6,
+    "minimum_severity": 0.05,
+    "recurrence_threshold": 2,
+    "recurrence_window": 5,
+    "strategy": "exact_suggested_family_then_health_guards",
+    "top_n": 10
+  },
+  "policy_source": "default",
+  "rows": [
+    {
+      "action": "ignore",
+      "block_reason": null,
+      "blocked": false,
+      "comparison_id": "compare_98587f75_to_8349ec56_1865e407",
+      "policy_rule": "non_regression_signal",
+      "severity": 0.75,
+      "verdict": "improvement",
+      "waived": false,
+      "waiver": null
+    },
+    {
+      "action": "create",
+      "block_reason": "signal verdict: regression",
+      "blocked": true,
+      "comparison_id": "compare_66f669a9_to_df4f8650_1094b97e",
+      "policy_rule": "new_family_required",
+      "severity": 0.5,
+      "verdict": "regression",
+      "waived": false,
+      "waiver": null
+    },
+    {
+      "action": "create",
+      "block_reason": "signal verdict: regression",
+      "blocked": true,
+      "comparison_id": "compare_98587f75_to_66f669a9_9a5ddb75",
+      "policy_rule": "new_family_required",
+      "severity": 0.125,
+      "verdict": "regression",
+      "waived": false,
+      "waiver": null
+    }
+  ],
+  "source": {
+    "label": "Configured artifact store",
+    "path": "{WORKSPACE}",
+    "reportsPath": "{WORKSPACE}/reports",
+    "runsPath": "{WORKSPACE}/runs"
+  },
+  "waiver_source": null
+}

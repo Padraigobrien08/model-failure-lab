@@ -1,6 +1,7 @@
 import path from "node:path";
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { promisify } from "node:util";
 import { defineConfig, type Plugin } from "vite";
@@ -316,6 +317,22 @@ function failureLabArtifactsPlugin(): Plugin {
     return JSON.parse(stdout) as T;
   }
 
+  /**
+   * A client-safe message for a failed bridge call.
+   *
+   * `execFile` rejects with the whole command line in `error.message`, which the handlers
+   * then returned in the 500 body -- leaking the absolute repo path, the absolute artifact
+   * root, and every argument to whatever page made the request. The detail is written to the
+   * dev server's own stderr, where the developer can see it, and the client gets a stable
+   * message naming the endpoint that failed.
+   */
+  function bridgeErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof Error) {
+      process.stderr.write(`[failure-lab] ${fallback}: ${error.message}\n`);
+    }
+    return fallback;
+  }
+
   async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
     const chunks: Buffer[] = [];
     for await (const chunk of req) {
@@ -555,7 +572,7 @@ function failureLabArtifactsPlugin(): Plugin {
           status: readRunStatus(resultsPayload, runPayload),
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
+        const message = bridgeErrorMessage(error, "unknown error");
         issues.push(`run ${entry.name} could not be indexed: ${message}`);
       }
     }
@@ -615,7 +632,7 @@ function failureLabArtifactsPlugin(): Plugin {
       try {
         reportPayload = await readJsonRecord(reportPath, `${entry.name}.report`);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
+        const message = bridgeErrorMessage(error, "unknown error");
         issues.push(`report ${entry.name} could not be read: ${message}`);
         continue;
       }
@@ -693,7 +710,7 @@ function failureLabArtifactsPlugin(): Plugin {
           })),
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
+        const message = bridgeErrorMessage(error, "unknown error");
         issues.push(`comparison ${entry.name} could not be indexed: ${message}`);
       }
     }
@@ -1617,7 +1634,7 @@ function failureLabArtifactsPlugin(): Plugin {
           source: sourcePayload(artifactSource),
           runs: { count: 0, ids: [] },
           comparisons: { count: 0, ids: [] },
-          issues: [error instanceof Error ? error.message : "artifact overview failed"],
+          issues: [bridgeErrorMessage(error, "artifact overview failed")],
           message: "The artifact source could not be scanned.",
         }),
       );
@@ -1646,7 +1663,7 @@ function failureLabArtifactsPlugin(): Plugin {
         JSON.stringify({
           source: sourcePayload(artifactSource),
           runs: [],
-          issues: [error instanceof Error ? error.message : "run inventory failed"],
+          issues: [bridgeErrorMessage(error, "run inventory failed")],
         }),
       );
     }
@@ -1670,8 +1687,7 @@ function failureLabArtifactsPlugin(): Plugin {
         }),
       );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "comparison inventory failed";
+      const message = bridgeErrorMessage(error, "comparison inventory failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(
@@ -1730,7 +1746,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "artifact query failed";
+      const message = bridgeErrorMessage(error, "artifact query failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -1797,7 +1813,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "artifact harvest failed";
+      const message = bridgeErrorMessage(error, "artifact harvest failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -1848,7 +1864,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "regression pack generation failed";
+      const message = bridgeErrorMessage(error, "regression pack generation failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -1900,7 +1916,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "dataset evolution failed";
+      const message = bridgeErrorMessage(error, "dataset evolution failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -1926,7 +1942,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "dataset versions failed";
+      const message = bridgeErrorMessage(error, "dataset versions failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -1943,7 +1959,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "dataset families failed";
+      const message = bridgeErrorMessage(error, "dataset families failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -1960,7 +1976,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "dataset drafts failed";
+      const message = bridgeErrorMessage(error, "dataset drafts failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -1977,7 +1993,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "baselines failed";
+      const message = bridgeErrorMessage(error, "baselines failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -1994,7 +2010,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "regression gate failed";
+      const message = bridgeErrorMessage(error, "regression gate failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -2039,7 +2055,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "history snapshot failed";
+      const message = bridgeErrorMessage(error, "history snapshot failed");
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ message }));
@@ -2073,7 +2089,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "cluster detail failed";
+      const message = bridgeErrorMessage(error, "cluster detail failed");
       const statusCode = message.includes("cluster not found") ? 404 : 500;
       res.statusCode = statusCode;
       res.setHeader("Content-Type", "application/json");
@@ -2112,7 +2128,7 @@ function failureLabArtifactsPlugin(): Plugin {
         }),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "comparison detail failed";
+      const message = bridgeErrorMessage(error, "comparison detail failed");
       const statusCode =
         message.includes("ENOENT") ||
         message.includes("no such file") ||
@@ -2148,7 +2164,7 @@ function failureLabArtifactsPlugin(): Plugin {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "run detail failed";
+      const message = bridgeErrorMessage(error, "run detail failed");
       const statusCode =
         message.includes("ENOENT") || message.includes("no such file")
           ? 404
@@ -2288,7 +2304,32 @@ function failureLabArtifactsPlugin(): Plugin {
   };
 }
 
+/**
+ * The console's version label, read from the package's own metadata at build time.
+ *
+ * It used to be a hardcoded string in ConsoleShell.tsx, which drifted immediately: the shell
+ * said v0.10.0 while pyproject said 0.10.1 and the README screenshots said v0.9.0. A tool
+ * whose product is artifact provenance should not misreport its own version.
+ */
+function resolvePackageVersion(): string {
+  const pyproject = path.resolve(__dirname, "..", "pyproject.toml");
+  try {
+    const match = fsSync
+      .readFileSync(pyproject, "utf-8")
+      .match(/^\s*version\s*=\s*"([^"]+)"/m);
+    if (match) {
+      return match[1];
+    }
+  } catch {
+    // Fall through: a missing pyproject means the console is running outside a checkout.
+  }
+  return "unknown";
+}
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(resolvePackageVersion()),
+  },
   plugins: [react(), failureLabArtifactsPlugin()],
   resolve: {
     alias: {

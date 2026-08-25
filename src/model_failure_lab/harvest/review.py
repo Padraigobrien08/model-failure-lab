@@ -10,9 +10,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from model_failure_lab.datasets import FailureDataset, load_dataset
+from model_failure_lab.datasets.integrity import INTEGRITY_METADATA_KEY, integrity_payload
 from model_failure_lab.schemas import PromptCase
 from model_failure_lab.storage import write_json
 from model_failure_lab.storage.layout import dataset_file, project_root
+
+
+class DatasetPromotionConflictError(Exception):
+    """Promotion would overwrite an existing curated dataset version."""
 
 _SEGMENT_PATTERN = re.compile(r"[^a-z0-9]+")
 
@@ -71,6 +76,7 @@ def promote_harvest_dataset(
     root: str | Path | None = None,
     output_path: str | Path | None = None,
     now: datetime | None = None,
+    force: bool = False,
 ) -> HarvestPromotionSummary:
     review = review_harvest_dataset(draft_path)
     normalized_dataset_id = _normalize_dataset_id(dataset_id)
@@ -118,6 +124,17 @@ def promote_harvest_dataset(
     source_payload["draft_dataset_id"] = review.dataset.dataset_id
     source_payload["draft_path"] = str(review.draft_path)
 
+    # A promoted version is immutable, so promoting onto an existing one is refused rather
+    # than silently overwriting it. Promote used to clobber the previous version and exit 0,
+    # which made "immutable" a label rather than a guarantee.
+    if target_path.exists() and not force:
+        raise DatasetPromotionConflictError(
+            f"dataset '{normalized_dataset_id}' already exists at {target_path}. A promoted "
+            "version is immutable: add the new cases as the next version with "
+            f"`failure-lab dataset evolve {normalized_dataset_id}`, promote under a new "
+            "--dataset-id, or pass --force to replace it deliberately."
+        )
+
     promoted_dataset = FailureDataset(
         dataset_id=normalized_dataset_id,
         name=_titleize_dataset_id(normalized_dataset_id),
@@ -128,6 +145,21 @@ def promote_harvest_dataset(
         source=source_payload,
         cases=tuple(curated_cases),
         metadata={**review.dataset.metadata, "harvest": harvest_metadata},
+    )
+    # Stamp the content digest so a later edit to the promoted file is detectable on load.
+    promoted_dataset = FailureDataset(
+        dataset_id=promoted_dataset.dataset_id,
+        name=promoted_dataset.name,
+        description=promoted_dataset.description,
+        version=promoted_dataset.version,
+        created_at=promoted_dataset.created_at,
+        lifecycle=promoted_dataset.lifecycle,
+        source=promoted_dataset.source,
+        cases=promoted_dataset.cases,
+        metadata={
+            **promoted_dataset.metadata,
+            INTEGRITY_METADATA_KEY: integrity_payload(promoted_dataset),
+        },
     )
     write_json(target_path, promoted_dataset.to_payload())
     return HarvestPromotionSummary(

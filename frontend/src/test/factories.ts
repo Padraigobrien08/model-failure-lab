@@ -347,6 +347,7 @@ export function buildGateState(
       blocked,
       waived: false,
       waiver: null,
+      blockReason: blocked ? "signal verdict: regression" : null,
     },
     {
       comparisonId: "cmp_waived_002",
@@ -356,6 +357,7 @@ export function buildGateState(
       policyRule: "severity_above_threshold",
       blocked: false,
       waived: true,
+      blockReason: "signal verdict: regression",
       waiver: {
         comparisonId: "cmp_waived_002",
         reason: "known flake",

@@ -57,6 +57,7 @@ export type GateDecisionRow = {
   blocked: boolean;
   waived: boolean;
   waiver: GateWaiver | null;
+  blockReason: string | null;
 };
 
 export type GateResponse = {
@@ -86,6 +87,28 @@ function requireString(value: unknown, field: string): string {
     throw new Error(`${field} must be a non-empty string`);
   }
   return value;
+}
+
+function requirePresentString(
+  data: Record<string, unknown>,
+  key: string,
+  field: string,
+): string {
+  if (!(key in data)) {
+    throw new Error(`${field} is required`);
+  }
+  return requireString(data[key], field);
+}
+
+function requirePresentStringOrNull(
+  data: Record<string, unknown>,
+  key: string,
+  field: string,
+): string | null {
+  if (!(key in data)) {
+    throw new Error(`${field} is required (use null when absent)`);
+  }
+  return requireStringOrNull(data[key], field);
 }
 
 function requireStringArray(value: unknown, field: string): string[] {
@@ -226,6 +249,9 @@ function requireGateDecisionRows(value: unknown, field: string): GateDecisionRow
         row.waiver == null
           ? null
           : requireGateWaiver(row.waiver, `${field}[${index}].waiver`),
+      // Why the gate blocks, straight from the engine. The console renders this instead
+      // of deriving its own explanation, so it always says what CI said.
+      blockReason: requireStringOrNull(row.block_reason, `${field}[${index}].block_reason`),
     };
   });
 }
@@ -263,8 +289,12 @@ export function validateGateResponse(payload: unknown): GateResponse {
     source: requireSource(data.source, "gate.source"),
     blocked: requireBoolean(data.blocked, "gate.blocked"),
     policy: requireGovernancePolicy(data.policy, "gate.policy"),
-    policySource: requireStringOrNull(data.policy_source, "gate.policy_source") ?? "default",
-    waiverSource: requireStringOrNull(data.waiver_source, "gate.waiver_source"),
+    // Fail closed, not open. Defaulting a missing `policy_source` to "default" let the
+    // gate screen claim "built-in defaults / waivers: none" while a committed
+    // governance/policy.yml was in force. The provenance must be present or the payload
+    // is rejected -- the console is not allowed to guess which policy CI used.
+    policySource: requirePresentString(data, "policy_source", "gate.policy_source"),
+    waiverSource: requirePresentStringOrNull(data, "waiver_source", "gate.waiver_source"),
     rows: requireGateDecisionRows(data.rows, "gate.rows"),
   };
 }

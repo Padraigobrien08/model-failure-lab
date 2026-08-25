@@ -6,6 +6,7 @@ from .pipeline import (
     infer_harvest_mode,
 )
 from .review import (
+    DatasetPromotionConflictError,
     HarvestPromotionSummary,
     HarvestReviewSummary,
     promote_harvest_dataset,
@@ -13,6 +14,7 @@ from .review import (
 )
 
 __all__ = [
+    "DatasetPromotionConflictError",
     "HarvestDraftSummary",
     "HarvestPromotionSummary",
     "HarvestReviewSummary",

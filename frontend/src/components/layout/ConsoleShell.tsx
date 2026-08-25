@@ -7,7 +7,7 @@ import type { ChipTone } from "@/components/console/primitives";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION = "v0.10.0 · local";
+const APP_VERSION = `v${__APP_VERSION__} · local`;
 
 function navCount(context: AppRouteContext, path: string): string | null {
   const overview = context.artifactOverview;
@@ -32,7 +32,10 @@ function contractHealth(context: AppRouteContext): { tone: ChipTone; label: stri
     case "empty":
       return { tone: "warn", label: "no artifacts" };
     case "incompatible":
-      return { tone: "bad", label: "contract issues" };
+      // DESIGN.md: red means regression, "never for delete, validation, or emphasis". A
+      // contract problem is a validation state, and this chip is visible on every screen --
+      // red here made a workspace that simply failed to load look like a regression.
+      return { tone: "warn", label: "contract issues" };
     default:
       return { tone: "neutral", label: "loading" };
   }

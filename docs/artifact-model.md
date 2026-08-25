@@ -28,10 +28,21 @@ in shape rather than byte-reproducible across two identical runs:
 
 - Run ID: `<YYYYMMDD_HHMMSS_us>_<dataset-slug>_<model>_<classifier>_<model>_seed_<n>_<sha256[:8]>`,
   e.g. `20260824_083526_830993_reasoning_failures_v1_demo_heuristic_v1_demo_seed_13_aac85ca2`. The
-  trailing digest is content-derived; the leading timestamp is wall-clock.
+  leading timestamp is wall-clock. The trailing digest is **configuration**-derived — it covers
+  `dataset_id : adapter_id : classifier_id : model : run_seed : run_config`
+  (`runner/identity.py`), and deliberately **not** the dataset's cases. Two runs over materially
+  different versions of the same dataset ID therefore share the same digest.
+  Dataset *content* provenance is recorded separately, as `metadata.dataset_content_digest` on
+  the run, and a promoted dataset carries its own `metadata.integrity.content_digest` (see
+  [Datasets](#datasets) below).
 - Single-run report ID: `<run-id>_report`.
-- Comparison report ID: `compare_<baseline-digest>_to_<candidate-digest>_<content-digest>` — a pure
-  content hash, so re-comparing the same two runs is idempotent.
+- Comparison report ID: `compare_<baseline-digest>_to_<candidate-digest>_<pair-digest>` — derived
+  purely from the **two run IDs** (`reporting/compare.py:build_comparison_report_id`), not from
+  the comparison's content. Re-comparing the same two runs is therefore idempotent, which is the
+  useful property; the caveat is that editing a run in place and re-comparing writes to the same
+  comparison ID, replacing the previous verdict. Run IDs produced by `failure-lab run` are
+  timestamped and effectively unique, so this only bites hand-authored run IDs (as in
+  `examples/regression_demo/`).
 
 Artifact **content** (outputs, classifications, metrics, deltas) is deterministic given the fixed
 run seed; artifact **identity** and `created_at` are point-in-time. For real (non-`demo`) adapters,
@@ -61,6 +72,35 @@ live under `datasets/harvested/`.
 }
 ```
 
+### Integrity of a promoted version
+
+`dataset promote` and `dataset evolve` stamp a content digest into the pack they write:
+
+```json
+"metadata": {
+  "integrity": { "algorithm": "sha256", "content_digest": "72ce1d4735123776", "case_count": 4 }
+}
+```
+
+The digest covers the dataset's `dataset_id`, `version`, and its ordered cases — each case's
+`id`, `prompt`, sorted `tags`, and `expectations`. It deliberately **excludes** `created_at`,
+`source`, and `metadata`, so re-stamping provenance does not invalidate a pack whose cases are
+unchanged.
+
+`load_dataset` verifies the digest, which is what makes "immutable" checkable rather than
+decorative:
+
+- editing a promoted pack makes every consumer fail loudly — `failure-lab run` exits 1 and
+  `failure-lab index validate` exits 1, naming the file and both digests;
+- `dataset promote` **refuses** to write over an existing curated dataset; add the new cases as
+  the next version with `dataset evolve`, promote under a different `--dataset-id`, or pass
+  `--force` to replace it deliberately;
+- packs written before digests existed carry none and load unchanged — only a *mismatch* is an
+  error, so upgrading does not invalidate an existing workspace.
+
+Drafts under `datasets/harvested/` are not versioned and carry no digest; they are meant to be
+reviewed and promoted.
+
 ## Runs
 
 Each run writes `runs/<run-id>/` with `run.json` and `results.json`.
@@ -77,6 +117,7 @@ Each run writes `runs/<run-id>/` with `run.json` and `results.json`.
   "metadata": {
     "adapter_id": "demo",
     "classifier_id": "heuristic_v1",
+    "dataset_content_digest": "9f3dea421e145876",
     "dataset_version": "1",
     "error_count": 0,
     "run_seed": 13,

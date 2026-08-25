@@ -11,9 +11,14 @@ It runs entirely on your machine — no account, no cloud, no API keys to get st
 the whole thing work in **under two minutes, fully offline**:
 
 ```bash
-pip install model-failure-lab
-bash examples/regression_demo/run.sh      # from a clone — see a real regression caught
+git clone https://github.com/Padraigobrien08/model-failure-lab && cd model-failure-lab
+pip install .
+bash examples/regression_demo/run.sh      # see a real regression caught
 ```
+
+> **Install from source for now.** The PyPI release is behind the source tree — `pip install
+> model-failure-lab` currently gets `0.1.0`, which predates `init`, `compare --gate`, `--html`
+> export and the `openai-compat` adapter. Clone until the badge below reads `0.11.0`.
 
 [![Production CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml/badge.svg)](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml)
 [![PyPI](https://img.shields.io/pypi/v/model-failure-lab)](https://pypi.org/project/model-failure-lab/)
@@ -55,22 +60,40 @@ breaks 4 of 8 cases**. No model, key, or network needed.
 > demo is always available as `failure-lab demo`.
 
 ```bash
-failure-lab compare examples/regression_demo/runs/baseline examples/regression_demo/runs/candidate
+failure-lab compare examples/regression_demo/runs/baseline examples/regression_demo/runs/candidate --summary
 ```
 
-Real output:
+Output, verbatim:
 
 ```text
 Failure Lab Compare
+Baseline: baseline
+Candidate: candidate
+Report ID: compare_8ba8496a_to_dda18a0e_66320e7c
 Status: regressed
-Failure rate delta: +50.0%
-Case changes: regressions=4
+Compatible: True
+Shared coverage: shared=8 baseline_only=0 candidate_only=0
 Signal verdict: regression
+Signal scores: regression=50.0% improvement=0.0% severity=50.0%
+Failure rate delta: +50.0%
+Coverage delta: 0.0%
+Case changes: regressions=4
+Artifacts:
+- reports/compare_8ba8496a_to_dda18a0e_66320e7c/report.json
+- reports/compare_8ba8496a_to_dda18a0e_66320e7c/report_details.json
+
+Failure Lab Signal Summary
+Report ID: compare_8ba8496a_to_dda18a0e_66320e7c
+Verdict: regression
+Scores: regression=50.0% improvement=0.0% severity=50.0% net=-50.0%
 Top drivers:
 - instruction_following +25.0% (regression) evidence=citation-latency, format-json
-- hallucination         +12.5% (regression) evidence=grounding-warranty
-- reasoning             +12.5% (regression) evidence=factual-apollo
+- hallucination +12.5% (regression) evidence=grounding-warranty
+- reasoning +12.5% (regression) evidence=factual-apollo
 ```
+
+(`Artifacts:` lists absolute paths; they are shortened here. Everything else is exactly what the
+command prints. Drop `--summary` for the verdict without the driver breakdown.)
 
 It pinpoints the regressions: a **hallucinated** warranty, a **dropped citation**, a **wrong fact**
 (1969 → 1971), and a **format** break (ignored the JSON instruction). Then turn those failures into a
@@ -103,11 +126,7 @@ pass/fail CI gates). You can ignore them until you need them; the four above are
 
 ## Install
 
-```bash
-pip install model-failure-lab
-```
-
-From a clone:
+From a clone (the current recommendation — see the note in the intro):
 
 ```bash
 git clone https://github.com/Padraigobrien08/model-failure-lab
@@ -115,12 +134,18 @@ cd model-failure-lab
 make install            # equivalent to: python3 -m pip install .
 ```
 
+From PyPI, once the published version catches up with this tree (check the badge above):
+
+```bash
+pip install model-failure-lab
+```
+
 This installs the `failure-lab` command (also available as `model-failure-lab`, or
 `python3 -m model_failure_lab`). The import name in Python is `model_failure_lab`.
 
 ### Optional extras
 
-| Extra | From a clone | From the published package | Adds |
+| Extra | From a clone | From the published package (once released) | Adds |
 |---|---|---|---|
 | Anthropic | `python3 -m pip install '.[anthropic]'` | `model-failure-lab[anthropic]` | `--model anthropic:<model>` |
 | OpenAI | `python3 -m pip install '.[openai]'` | `model-failure-lab[openai]` | OpenAI model names |
@@ -252,7 +277,7 @@ The production CLI is dependency-isolated from the optional research/ML stack: r
 
 ## Project status
 
-Pre-1.0 (`0.10.1`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
+Pre-1.0 (`0.11.0`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
 = CLI or artifact-schema changes. The DistilBERT/CivilComments benchmark stack under `[legacy]` is
 retained for reference and is not part of the supported workflow (`docs/legacy.md`).
 

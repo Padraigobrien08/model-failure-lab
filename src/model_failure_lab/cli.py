@@ -36,6 +36,7 @@ from model_failure_lab.governance import (
     DatasetLifecycleAlert,
     DatasetPlanningUnit,
     DatasetPortfolioItem,
+    GateConditions,
     GateDecision,
     GovernanceApplyResult,
     GovernancePolicy,
@@ -56,6 +57,7 @@ from model_failure_lab.governance import (
     attest_portfolio_execution_outcome,
     build_pr_reliability_comment,
     create_saved_portfolio_plan,
+    evaluate_gate_conditions,
     evaluate_regression_gate,
     execute_saved_portfolio_plan,
     get_portfolio_execution_outcome,
@@ -420,6 +422,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Inspect deterministic duplicate groups inside one harvested draft dataset pack.",
     )
     dataset_review_parser.add_argument("draft_path", type=Path)
+    dataset_review_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Resolve a relative draft path against this artifact root instead of the current "
+            "working directory. Every other command in the loop accepts --root; review did "
+            "not, so the review step docs/harvest-replay.md prescribes could not be run "
+            "against a workspace that was not the CWD."
+        ),
+    )
     dataset_review_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_review_parser.set_defaults(handler=_handle_dataset_review)
 
@@ -441,6 +453,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--out",
         type=Path,
         help="Optional output path for the curated dataset JSON file.",
+    )
+    dataset_promote_parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Replace an existing curated dataset of the same id. Promotion refuses by "
+            "default: a promoted version is immutable, so new cases belong in the next "
+            "version (`dataset evolve`) rather than on top of the old one."
+        ),
     )
     dataset_promote_parser.set_defaults(handler=_handle_dataset_promote)
 
@@ -1695,8 +1716,16 @@ def _handle_datasets_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_draft_path(draft_path: Path, *, root: Path | None) -> Path:
+    """Resolve a draft pack path, honoring --root for relative paths."""
+
+    if root is None or draft_path.is_absolute():
+        return draft_path
+    return Path(_normalized_root(root)) / draft_path
+
+
 def _handle_dataset_review(args: argparse.Namespace) -> int:
-    review = review_harvest_dataset(args.draft_path)
+    review = review_harvest_dataset(_resolve_draft_path(args.draft_path, root=args.root))
     if args.as_json:
         payload = {
             "dataset_id": review.dataset.dataset_id,
@@ -1728,6 +1757,7 @@ def _handle_dataset_promote(args: argparse.Namespace) -> int:
         dataset_id=args.dataset_id,
         root=_normalized_root(args.root),
         output_path=args.out,
+        force=args.force,
     )
     print(_render_dataset_promotion(summary))
     return 0
@@ -4308,33 +4338,33 @@ def _render_compare_summary(
 
 
 def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str]:
-    """Deterministic CI gate contract: exit 1 on regression or incompatible runs."""
+    """Deterministic CI gate contract, shared with `regressions gate` and the console.
+
+    The decision itself lives in `governance.gates.evaluate_gate_conditions`; this only
+    adapts the in-memory report into that contract's inputs and formats the verdict line.
+    Keeping one implementation is what stops the console from showing PASS on a comparison
+    that fails CI.
+    """
     signal = _comparison_signal_payload(report, details)
-    verdict = signal.get("verdict", "unknown")
-    if report.comparison.get("compatible") is False:
-        return 1, "Gate: FAIL (runs are not comparable)"
-    if verdict == "regression":
-        return 1, f"Gate: FAIL (signal verdict: {verdict})"
-    # Defense in depth: the signal verdict already folds in the execution-success
-    # delta, but the gate is the last line before CI turns green, so it fails closed
-    # on any drop in the candidate's ability to run or classify -- a candidate cannot
-    # pass simply by erroring on (or failing to classify) cases the baseline handled.
+    verdict = str(signal.get("verdict", "unknown"))
     delta = report.metrics.get("delta", {}) if isinstance(report.metrics, dict) else {}
-    for label, key in (
-        ("execution success", "execution_success_rate"),
-        ("classification coverage", "classification_coverage"),
-    ):
-        value = delta.get(key)
-        if isinstance(value, (int, float)) and value < 0:
-            return 1, f"Gate: FAIL ({label} regressed by {_format_signed_rate(value)})"
-    dropped_failures = _dropped_baseline_failure_ids(details)
-    if dropped_failures:
-        preview = ", ".join(dropped_failures[:3])
-        return 1, (
-            f"Gate: FAIL (candidate dropped {len(dropped_failures)} baseline failing "
-            f"case(s): {preview})"
-        )
+    conditions = GateConditions(
+        verdict=verdict,
+        compatible=report.comparison.get("compatible") is not False,
+        execution_success_delta=_gate_float(delta.get("execution_success_rate")),
+        classification_coverage_delta=_gate_float(delta.get("classification_coverage")),
+        dropped_baseline_failure_case_ids=tuple(_dropped_baseline_failure_ids(details)),
+    )
+    block_reason = evaluate_gate_conditions(conditions)
+    if block_reason is not None:
+        return 1, f"Gate: FAIL ({block_reason})"
     return 0, f"Gate: PASS (signal verdict: {verdict})"
+
+
+def _gate_float(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
 
 
 def _dropped_baseline_failure_ids(details: dict[str, object]) -> list[str]:

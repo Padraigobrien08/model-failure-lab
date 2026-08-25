@@ -1,0 +1,22 @@
+{
+  "families": [
+    {
+      "case_count": 3,
+      "family_id": "insight-fixture-regressions",
+      "health_label": "unevaluated",
+      "latest_created_at": "2026-04-02T09:30:00Z",
+      "latest_dataset_id": "insight-fixture-regressions-v1",
+      "latest_version_tag": "v1",
+      "primary_failure_type": "hallucination",
+      "recent_fail_rate": null,
+      "source_dataset_id": "insight-fixture-v1",
+      "version_count": 1
+    }
+  ],
+  "source": {
+    "label": "Configured artifact store",
+    "path": "{WORKSPACE}",
+    "reportsPath": "{WORKSPACE}/reports",
+    "runsPath": "{WORKSPACE}/runs"
+  }
+}

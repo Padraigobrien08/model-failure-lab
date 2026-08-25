@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from model_failure_lab.adapters import ModelRequest, resolve_model
 from model_failure_lab.classifiers import ClassifierInput, resolve_classifier
 from model_failure_lab.datasets import FailureDataset
+from model_failure_lab.datasets.integrity import compute_content_digest
 from model_failure_lab.schemas import JsonValue, Run
 
 from .contracts import (
@@ -164,6 +165,12 @@ def execute_dataset_run(
         "error_count": sum(1 for case in case_results if case.error is not None),
         "dataset_name": dataset.name,
         "dataset_version": dataset.version,
+        # Content provenance for the dataset this run executed. The run id's digest covers
+        # the run's *configuration* (dataset id, adapter, classifier, model, seed, config) --
+        # not the dataset's cases -- so two runs over materially different versions of the
+        # same dataset id share a digest. Recording the content digest here makes the
+        # difference visible in the artifact without changing the id contract.
+        "dataset_content_digest": compute_content_digest(dataset),
     }
     if dataset.description is not None:
         run_metadata["dataset_description"] = dataset.description

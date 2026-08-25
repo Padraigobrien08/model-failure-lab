@@ -1,0 +1,46 @@
+[
+  {
+    "attempted_case_count": 8,
+    "classification_coverage": 1.0,
+    "created_at": "2026-04-02T09:30:00Z",
+    "dataset": "insight-fixture-v1",
+    "execution_error_count": 0,
+    "failure_rate": 0.0,
+    "model": "stable-model",
+    "run_id": "20260402_093000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_stable_model_seed_13_f3aee19c",
+    "status": "completed"
+  },
+  {
+    "attempted_case_count": 8,
+    "classification_coverage": 1.0,
+    "created_at": "2026-04-02T09:20:00Z",
+    "dataset": "insight-fixture-v1",
+    "execution_error_count": 0,
+    "failure_rate": 1.0,
+    "model": "noisy-model",
+    "run_id": "20260402_092000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_noisy_model_seed_13_e8a28c49",
+    "status": "completed"
+  },
+  {
+    "attempted_case_count": 8,
+    "classification_coverage": 1.0,
+    "created_at": "2026-04-02T09:10:00Z",
+    "dataset": "insight-fixture-v1",
+    "execution_error_count": 0,
+    "failure_rate": 0.5,
+    "model": "candidate-model",
+    "run_id": "20260402_091000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_candidate_model_seed_13_5f109466",
+    "status": "completed"
+  },
+  {
+    "attempted_case_count": 8,
+    "classification_coverage": 1.0,
+    "created_at": "2026-04-02T09:00:00Z",
+    "dataset": "insight-fixture-v1",
+    "execution_error_count": 0,
+    "failure_rate": 0.75,
+    "model": "baseline-model",
+    "run_id": "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23",
+    "status": "completed"
+  }
+]

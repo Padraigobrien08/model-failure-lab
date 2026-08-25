@@ -7,6 +7,96 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
+## [0.11.0] - 2026-08-25
+
+A consumer-honesty release, from an external audit of `0.10.1`. Every change here is something a
+reader, CLI user, or CI job could observe. Three carry **behavior changes** — see Changed.
+
+`0.10.1` was never published to PyPI, so nobody is upgrading *from* it; the migration notes below
+apply to anyone tracking `main` or the source tree.
+
+### Fixed
+- **The gate had three contracts, and the console could show PASS on a comparison that failed CI.**
+  `compare --gate` blocked on five conditions (incompatible runs, regression verdict,
+  execution-success drop, classification-coverage drop, dropped baseline failing cases);
+  `regressions gate` and the operator console's `gate` endpoint blocked on the verdict alone. A
+  candidate that simply deleted the cases it broke failed CI and showed a green PASS in the console.
+  There is now one implementation, `governance.gates.evaluate_gate_conditions`, that every surface
+  calls, and each gate decision carries a `block_reason` the console renders verbatim
+  (`test_gate_surface_agreement.py`).
+- **The gate screen always claimed "policy: built-in defaults · waivers: none."** The bridge's
+  `gate` handler hand-picked its response fields and dropped `policy_source` / `waiver_source`, and
+  the validator defaulted the absence rather than rejecting it — so the console denied a committed
+  `governance/policy.yml` while displaying its values two rows below.
+- **The console counted `error_stage_changed` as a regression; the engine does not.** A comparison
+  whose only change was an error moving stage rendered a NEUTRAL banner and a green PASS directly
+  above a red, regression-tinted transition group. The transition sets moved to
+  `frontend/src/lib/artifacts/transitions.ts` and are pinned to the engine's constants from both
+  sides (`tests/fixtures/contract/transitions.json`).
+- **Red meant regression, except in five places.** The always-visible "contract issues" rail chip
+  and four execution/write error boxes were red; DESIGN.md reserves red for regression and forbids
+  it for validation. They are now amber. `expectationVerdictTone` tested for `"match"`/`"mismatch"`,
+  values `schemas/taxonomy.py` has never emitted, so every expectation chip on the run detail
+  rendered neutral and an `unexpected_failure` looked identical to a `no_failure_as_expected`.
+- **`pip install model-failure-lab` gets `0.1.0`**, which predates `init`, `compare --gate`,
+  `--html` and `openai-compat`. The README now leads with the clone install and says so, and
+  `docs/release.md` records the real publish state instead of a `0.10.0` PyPI release that never
+  existed.
+- **The advertised GitHub Action could not install itself.** `action.yml` defaulted to
+  `model-failure-lab>=0.10.1`, which pip cannot resolve, so `uses: …@main` failed for every
+  consumer. It installs from its own checkout by default now, and CI dogfoods that path plus the
+  failing exit code the README promises.
+- **The README's "Real output" was spliced from two commands**, seven lines short, with re-padded
+  driver rows and a `Top drivers:` section that `compare` does not print. It is now verbatim
+  `compare --summary`, pinned by `test_documented_output_is_real.py`, as is
+  `examples/regression_demo/expected_compare.txt` — committed as expected output and never checked.
+- **Concurrent harvests overwrote each other**, each reporting a successful write. Output-name
+  reservation is now atomic.
+- **The dev-server bridge returned the absolute repo path and full argv** in 500 bodies. The detail
+  goes to the server's stderr; the client gets a stable message.
+- **`docs/api.md` had drifted**: `init`, `baselines` and `regressions pr-comment` shipped
+  undocumented and the command counts were two releases stale. A test now walks the real argparse
+  tree.
+- `_optional_json_mapping` rejected top-level nulls in a dataset's `source`/`metadata` because it
+  tested the mapping instead of the field, making an explicit "no comparison id" unloadable.
+- CLI-harvested drafts recorded no `origin` / `comparison_report_id`, so the console's Datasets
+  screen showed a blank source for them while console-created drafts showed both.
+- `dataset review` was the only command in the loop without `--root`.
+- The run-detail H1 overflowed its box and painted under the header actions on every real run id.
+- Re-reading a run absent from the workspace raised a bare `No such file or directory`; it now
+  explains that comparisons made from run paths outside a workspace record only the run id.
+- Deleted `docs/product-screens.md`, which claimed no screenshots existed while sitting beside four
+  and linked to a file removed months ago, and the tracked empty `frontend/.claude-launch-note`.
+
+### Added
+- **Dataset content digests.** `dataset promote` and `dataset evolve` stamp
+  `metadata.integrity.content_digest` over a pack's id, version and ordered cases (excluding
+  provenance, so re-stamping metadata is not tampering). `load_dataset` verifies it, so editing a
+  promoted pack now fails at every consumer: `failure-lab run` exits 1 and `index validate` exits 1,
+  naming the file and both digests. Previously a promoted pack could lose three of its four cases
+  undetected while `index validate` reported `ok`.
+- Runs record `metadata.dataset_content_digest`, so a run's artifact says which dataset *content* it
+  executed. The run id's digest never covered that and still does not.
+- `dataset promote --force`, `dataset review --root`.
+- A golden bridge-payload contract (`tests/fixtures/bridge/`) pinned from both sides, closing the
+  circularity that let the `gate` drift ship: the console's validators were tested only against
+  fixtures written to match the validators.
+- `upsert_baseline(now=…)`, matching the clock-injection seam every other artifact writer has.
+
+### Changed
+- **`dataset promote` refuses to overwrite an existing curated dataset.** It used to replace the
+  version silently and exit 0, which is what made "immutable" a label rather than a guarantee.
+  *Migration:* add new cases as the next version with `dataset evolve`, promote under a different
+  `--dataset-id`, or pass `--force`.
+- **`regressions gate` and the console `gate` endpoint now block on the same five conditions as
+  `compare --gate`.** *Migration:* a job that passed while `compare --gate` failed on the same
+  artifacts will now fail — that disagreement was the bug. Waive a known-acceptable comparison in
+  `governance/waivers.yml`.
+- **`action.yml` installs from the action's own checkout by default** (`package: ""`). *Migration:*
+  pass `package: model-failure-lab==<version>` to pin a PyPI release instead.
+- The console reads its version from `pyproject.toml` at build time; it was a hardcoded string that
+  had already drifted. Screenshots in `docs/screens/` recaptured.
+
 ## [0.10.1] - 2026-08-24
 
 Fixes shipped after `0.10.0`. This is the first release to include the dev-server bridge and

@@ -9,19 +9,38 @@ This is the runbook for cutting a public OSS release. It covers versioning/tag s
 > yourself. Do not upload to real PyPI until the TestPyPI dry run passes and a maintainer has
 > confirmed it is safe.
 
-## Current release: 0.10.1 (security patch)
+## Current release state: nothing since `0.1.0` is published
 
-`0.10.1` is the first release to include the regression-gate and dev-server-bridge hardening (see the
-CHANGELOG). The `0.10.0` tag on PyPI predates those fixes, so cutting and publishing `0.10.1` is what
-actually ships the hardening to consumers. The composite action (`action.yml`) already floors the
-installed package at `>=0.10.1`; that floor only takes effect once `0.10.1` is on PyPI.
+**PyPI holds exactly one release of `model-failure-lab`: `0.1.0`, uploaded 2026-04-27.** Neither
+`0.9.0`, `0.10.0`, `0.10.1`, nor `0.11.0` was ever published — verify with
+`curl -s https://pypi.org/pypi/model-failure-lab/json | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['releases']))"`.
+
+Consequences, which the README and `action.yml` are written around until this changes:
+
+- `pip install model-failure-lab` gets `0.1.0`, which predates `init`, `compare --gate`,
+  `--html` export and the `openai-compat` adapter. The README therefore leads with the clone
+  install and says so; `tests/unit/test_documented_output_is_real.py` asserts it keeps saying so.
+- The composite action defaults to installing from **its own checkout**, not from PyPI, so
+  `uses: Padraigobrien08/model-failure-lab@main` works with no release. Its earlier default of
+  `model-failure-lab>=0.10.1` could not resolve at all.
+
+### Publishing the current tree
+
+`0.11.0` is the current tree: the regression-gate and dev-server-bridge hardening from `0.10.1`,
+plus the gate-contract unification, dataset-integrity guarantees and consumer-honesty fixes that
+followed (see the CHANGELOG). Publishing it is what ships all of that to anyone not cloning.
 
 Before tagging: bump the version in `pyproject.toml` and `src/model_failure_lab/__init__.py`, add the
 matching `CHANGELOG.md` entry, and confirm `make check` and the frontend build are green.
 
+**After the release lands, in the same follow-up commit:** restore the PyPI-first install block in the
+README, drop the "Install from source for now" note, and delete
+`test_documented_output_is_real.py::test_readme_does_not_promise_a_pypi_install_that_predates_the_docs`.
+That test exists to keep the README honest while the gap is open, not forever.
+
 ## Public versioning policy
 
-**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.10.1`.
+**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.11.0`.
 
 Pre-1.0 semantics (also in the README): patch = fixes/docs, minor = CLI-compatible additions,
 breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
@@ -65,8 +84,8 @@ git push origin --delete v1.0 v1.1 ... v5.3
 **Then, in either case, cut the public release** (substitute the version being released):
 
 ```bash
-git tag -a v0.10.1 -m "Gate and dev-server-bridge hardening"
-git push origin v0.10.1
+git tag -a v0.11.0 -m "Gate contract unification and dataset integrity"
+git push origin v0.11.0
 ```
 
 > Until a maintainer performs the cleanup, **do not** create a GitHub Release from any `vX.Y` tag.

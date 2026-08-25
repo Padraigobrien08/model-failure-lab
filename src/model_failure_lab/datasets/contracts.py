@@ -40,11 +40,14 @@ def _optional_json_mapping(payload: Mapping[str, object], key: str) -> dict[str,
     for field_key, field_value in value.items():
         if not isinstance(field_key, str):
             raise PayloadValidationError(f"{key} keys must be strings")
-        if value is None or isinstance(field_value, (str, int, float, bool)):
+        # The null check used to test `value` (the mapping, already known non-None here)
+        # instead of `field_value`, so a top-level null inside `source` or `metadata` was
+        # rejected as unserializable -- even though nested nulls were accepted and JSON
+        # allows them everywhere. That made a dataset pack recording "no comparison id"
+        # explicitly unloadable.
+        if field_value is None or isinstance(field_value, (str, int, float, bool)):
             metadata[field_key] = field_value
-        elif isinstance(field_value, list):
-            metadata[field_key] = field_value
-        elif isinstance(field_value, dict):
+        elif isinstance(field_value, (list, dict)):
             metadata[field_key] = field_value
         else:
             raise PayloadValidationError(f"{key}.{field_key} must be JSON-serializable")

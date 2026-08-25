@@ -6,6 +6,9 @@ import os
 import sys
 from pathlib import Path
 
+# Bound the name-reservation loop so a pathological workspace cannot spin forever.
+_MAX_HARVEST_NAME_ATTEMPTS = 1000
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
@@ -383,12 +386,14 @@ def main(argv: list[str] | None = None) -> int:
             "baselines": [entry.to_payload() for entry in list_baselines(root=root)],
         }
     elif args.command == "gate":
+        # Emit the gate result whole rather than hand-picking fields. Hand-picking
+        # previously dropped `policy_source` and `waiver_source`, so the console showed
+        # "built-in defaults / waivers: none" while a committed governance/policy.yml was
+        # in force -- the exact contradiction the console is meant to prevent.
         result = evaluate_regression_gate(root=root)
         payload = {
             "source": build_source_descriptor(root),
-            "blocked": result.blocked,
-            "policy": result.policy.to_payload(),
-            "rows": [row.to_payload() for row in result.rows],
+            **result.to_payload(),
         }
     elif args.command == "comparison-clusters":
         rows = list_clusters_for_comparison(
@@ -569,12 +574,26 @@ def _default_harvest_output_path(
         )
     )
     harvested_dir = root / "datasets" / "harvested"
-    candidate = harvested_dir / f"{stem}.json"
-    suffix = 2
-    while candidate.exists():
-        candidate = harvested_dir / f"{stem}-{suffix}.json"
-        suffix += 1
-    return os.path.relpath(candidate, root)
+    harvested_dir.mkdir(parents=True, exist_ok=True)
+    # Reserve the name by creating the file, rather than checking whether it exists and
+    # returning. Two concurrent harvests -- two console tabs, or a double-clicked Harvest
+    # button -- both passed the `exists()` check, both got the same path, and one silently
+    # overwrote the other while the console showed two successful write receipts.
+    # O_CREAT|O_EXCL makes the check and the claim a single atomic operation.
+    suffix = 1
+    while True:
+        candidate = harvested_dir / (f"{stem}.json" if suffix == 1 else f"{stem}-{suffix}.json")
+        try:
+            os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644))
+        except FileExistsError:
+            suffix += 1
+            if suffix > _MAX_HARVEST_NAME_ATTEMPTS:
+                raise RuntimeError(
+                    f"could not reserve a harvest output name for '{stem}' after "
+                    f"{_MAX_HARVEST_NAME_ATTEMPTS} attempts"
+                ) from None
+            continue
+        return os.path.relpath(candidate, root)
 
 
 def _slugify(value: str) -> str:

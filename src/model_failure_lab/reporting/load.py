@@ -37,7 +37,20 @@ class SavedRunArtifacts:
 def load_saved_run_artifacts(run_id: str, *, root: str | Path | None = None) -> SavedRunArtifacts:
     """Load one saved run plus its per-case results from deterministic local storage."""
 
-    run_payload = read_json(run_file(run_id, root=root))
+    run_path = run_file(run_id, root=root)
+    if not run_path.is_file():
+        # `compare <path-a> <path-b>` accepts run directories anywhere on disk but records
+        # only the run *ids* in the comparison. Anything that later re-reads the runs --
+        # harvest, evidence, cluster detail -- looks for them under the workspace and finds
+        # nothing. A bare "No such file or directory" left the operator with no idea why.
+        raise FileNotFoundError(
+            f"run {run_id!r} is not saved in this workspace (expected {run_path}). "
+            "Point --root at the workspace that holds it, or copy the run directory under "
+            "runs/ -- a comparison made from run paths outside a workspace records only the "
+            "run id, so its cases cannot be re-read here."
+        )
+
+    run_payload = read_json(run_path)
     results_payload = read_json(results_file(run_id, root=root))
     run = Run.from_payload(run_payload)
 

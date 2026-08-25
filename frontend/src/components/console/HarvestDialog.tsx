@@ -323,7 +323,7 @@ export function HarvestDialog({
                 </div>
               </div>
               {error ? (
-                <div className="rounded-tok border border-bad-line bg-bad-panel px-3 py-2.5 font-mono text-[11.5px] text-bad">
+                <div className="rounded-tok border border-line bg-warn-bg px-3 py-2.5 font-mono text-[11.5px] text-warn">
                   {error}
                   <br />
                   run: failure-lab dataset evolve {familyId} --comparison {reportId}
@@ -375,8 +375,13 @@ export function HarvestDialog({
 
         <div className="flex items-center gap-2 border-t border-line px-6 py-3.5">
           <span className="mr-auto font-mono text-[11px] text-muted-ink">
+            {/* "immutable" is now a checked claim, not a label: a curated version records a
+                content digest that `load_dataset` verifies, and `dataset promote` refuses to
+                overwrite one. A draft has neither, so it must not claim either. */}
             {result
-              ? `${result.response.outputPath} · immutable`
+              ? `${result.response.outputPath}${
+                  mode === "evolve" ? " · curated version · digest recorded" : " · draft"
+                }`
               : `writes datasets/${
                   mode === "evolve" && matched
                     ? `${familyId}-v${(matched.versionCount ?? 0) + 1}`

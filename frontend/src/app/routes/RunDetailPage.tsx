@@ -41,9 +41,21 @@ function lensCaseIds(detail: RunDetail, lens: RunCaseLensKey): string[] {
   }
 }
 
+/**
+ * Tone for one expectation verdict.
+ *
+ * The values come from `schemas/taxonomy.py:EXPECTATION_VERDICTS` --
+ * `matched_expected`, `unexpected_failure`, `missed_expected`, `no_failure_as_expected`.
+ * This function used to test for "match"/"mismatch", which the engine has never emitted, so
+ * every chip fell through to neutral and an `unexpected_failure` looked exactly like a
+ * `no_failure_as_expected`.
+ *
+ * A run detail has no baseline, so nothing on this screen can be a regression: an unmet
+ * expectation is `warn` (degraded), never `bad`. Red is reserved for regression.
+ */
 function expectationVerdictTone(verdict: string | null): ChipTone {
-  if (verdict === "match") return "good";
-  if (verdict === "mismatch") return "bad";
+  if (verdict === "matched_expected" || verdict === "no_failure_as_expected") return "good";
+  if (verdict === "unexpected_failure" || verdict === "missed_expected") return "warn";
   return "neutral";
 }
 
@@ -215,7 +227,11 @@ export function RunDetailPage() {
           >
             ← runs
           </button>
-          <h1 className="mt-1.5 font-mono text-[22px] font-semibold leading-[1.1] text-ink">
+          {/* Run ids are long, unbreakable monospace strings. Without `break-all` the H1
+              overflowed its flex box and painted underneath the header actions on every real
+              run id. DESIGN.md keeps run ids in their raw form in a primary position, so wrap
+              rather than truncate. */}
+          <h1 className="mt-1.5 break-all font-mono text-[22px] font-semibold leading-[1.1] text-ink">
             {run.runId}
           </h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-ink">
@@ -503,7 +519,7 @@ export function RunDetailPage() {
                 {selectedCase.error ? (
                   <>
                     <SectionLabel className="mt-4">Error</SectionLabel>
-                    <div className="mt-1 rounded-tok border border-bad-line bg-bad-panel p-3 font-mono text-[11.5px] leading-relaxed text-ink">
+                    <div className="mt-1 rounded-tok border border-line bg-warn-bg p-3 font-mono text-[11.5px] leading-relaxed text-ink">
                       <div>stage {selectedCase.error.stage}</div>
                       <div>type {selectedCase.error.type}</div>
                       <div className="mt-1">{selectedCase.error.message}</div>
