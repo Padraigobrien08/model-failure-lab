@@ -214,8 +214,19 @@ export function ComparisonDetailPage() {
           >
             ← comparisons / {reportId}
           </Link>
-          <h1 className="mt-2 font-heading text-[28px] font-semibold leading-[1.1]">
-            Baseline → candidate
+          {/* The two runs, not the words "Baseline → candidate".
+              frontend/README.md: the console "never invents data: every number on screen
+              traces to a JSON artifact". This heading was a constant, so a comparison
+              between two timestamped runs was titled as though one were named `baseline`
+              -- it only ever looked right because the bundled demo's runs happen to carry
+              those names. Truncated per DESIGN.md (`truncateRunId`); the full ids are on
+              the provenance line at the foot of the page. */}
+          <h1 className="mt-2 break-all font-mono text-[22px] font-semibold leading-[1.15] text-ink">
+            {detail
+              ? `${truncateRunId(detail.comparison.baselineRunId)} → ${truncateRunId(
+                  detail.comparison.candidateRunId,
+                )}`
+              : reportId}
           </h1>
         </div>
         <div className="flex flex-none gap-2">
