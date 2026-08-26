@@ -14,7 +14,8 @@ alphabetical order shown here.
 datasets/            # canonical + promoted dataset packs, and harvested/ drafts
 runs/<run-id>/       # run.json + results.json
 reports/<report-id>/ # report.json + report_details.json (single-run AND comparison reports)
-governance/          # baseline registry, lifecycle_actions/, portfolio_plans/, waivers.yml
+governance/          # policy.yml, waivers.yml, baselines.json, promotions.json,
+                     #   lifecycle_actions/, portfolio_plans/
 .failure_lab/        # derived SQLite index (rebuildable; not a source artifact)
 ```
 
@@ -41,7 +42,8 @@ in shape rather than byte-reproducible across two identical runs:
   stable id cannot be silently compared across. That check is finer-grained than the
   run-level digest, which is why the digest stayed a provenance record rather than becoming a
   gate. Separately, a promoted dataset carries its own `metadata.integrity.content_digest`,
-  which *is* verified on load (see [Datasets](#datasets) below).
+  which *is* verified on load, and whose promotion is recorded outside the pack in
+  `governance/promotions.json` (see [Datasets](#datasets) below).
 - Single-run report ID: `<run-id>_report`.
 - Comparison report ID: `compare_<baseline-digest>_to_<candidate-digest>_<pair-digest>` — derived
   purely from the **two run IDs** (`reporting/compare.py:build_comparison_report_id`), not from

@@ -569,6 +569,28 @@ def remove_waiver(
     )
 
 
+def resolve_waiver(
+    comparison_id: str,
+    *,
+    root: str | Path | None = None,
+    waiver_path: str | Path | None = None,
+) -> GateWaiver | None:
+    """One comparison's waiver, active or expired, or None when it has none.
+
+    Every gate surface resolves waivers through this. `compare --gate` used to skip the
+    lookup entirely, so a waiver honoured by `regressions gate` and by the console was
+    ignored by the surface `action.yml` wraps -- a green console over a red build.
+
+    An expired waiver is returned rather than swallowed, so a caller can say "expired"
+    instead of behaving as though the file were empty.
+    """
+
+    resolved = waiver_path if waiver_path is not None else default_waiver_path(root)
+    if resolved is None:
+        return None
+    return _load_waivers(root=root, waiver_path=resolved).get(comparison_id)
+
+
 def list_waivers(*, root: str | Path | None = None) -> tuple[GateWaiver, ...]:
     """Every waiver in the workspace's conventional file, active or expired."""
 

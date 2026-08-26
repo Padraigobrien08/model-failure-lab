@@ -33,6 +33,7 @@ from .gates import (
     load_gate_conditions,
     load_governance_policy_from_file,
     remove_waiver,
+    resolve_waiver,
     upsert_waiver,
 )
 from .intelligence import RootCauseSummary, summarize_recurring_root_causes
@@ -175,6 +176,7 @@ __all__ = [
     "preflight_saved_portfolio_plan",
     "recommend_dataset_action",
     "remove_waiver",
+    "resolve_waiver",
     "review_dataset_actions",
     "review_dataset_lifecycle",
     "summarize_portfolio_outcomes_for_family",

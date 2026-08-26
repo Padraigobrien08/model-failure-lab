@@ -36,6 +36,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
 const DEMO_RUNS = path.join(REPO_ROOT, "examples", "regression_demo", "runs");
 const COMPARISON_ID = "compare_8ba8496a_to_dda18a0e_66320e7c";
+/** Pinned so the tests can present it; the server otherwise mints one per start. */
+const WRITE_TOKEN = "test-write-token";
 
 type Middleware = (
   req: IncomingMessage,
@@ -47,7 +49,11 @@ async function mountBridge(
   artifactRoot: string,
 ): Promise<{ server: http.Server; origin: string }> {
   const handlers: Middleware[] = [];
-  const plugin = failureLabArtifactsPlugin({ repoRoot: REPO_ROOT, artifactRoot });
+  const plugin = failureLabArtifactsPlugin({
+    repoRoot: REPO_ROOT,
+    artifactRoot,
+    writeToken: WRITE_TOKEN,
+  });
   // The plugin registers the same middleware on both the dev and the preview server; the
   // shim below is the smallest thing that satisfies the shape it expects.
   const configureServer = plugin.configureServer as unknown as (s: {
@@ -343,29 +349,98 @@ describe("write endpoints", () => {
     expect(status).toBe(403);
   });
 
-  it.each(WRITE_PATHS)("%s admits a genuine same-origin POST past the CSRF check", async (writePath) => {
+  it.each(WRITE_PATHS)(
+    "%s admits a POST from the page it served, past both guards",
+    async (writePath) => {
+      const { status } = await call(writePath, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: origin,
+          "Sec-Fetch-Site": "same-origin",
+          "X-Failure-Lab-Write-Token": WRITE_TOKEN,
+        },
+        body: "{}",
+      });
+      // Past both guards: the request is now rejected on its *contents* (400/500), never 403.
+      expect(status).not.toBe(403);
+    },
+  );
+
+  it.each(WRITE_PATHS)(
+    "%s rejects a header-less POST, which is what --host exposes",
+    async (writePath) => {
+      // The same-origin check admits a caller that sends neither Origin nor
+      // Sec-Fetch-Site, on the grounds that it is the local developer. Under `--host` that
+      // is any machine on the network with curl. The token is what they cannot produce.
+      const { status, body } = await call(writePath, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "cases" }),
+      });
+      expect(status).toBe(403);
+      expect(body).toMatchObject({ message: expect.stringContaining("write token") });
+    },
+  );
+
+  it.each(WRITE_PATHS)("%s rejects a wrong token", async (writePath) => {
     const { status } = await call(writePath, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Origin: origin,
-        "Sec-Fetch-Site": "same-origin",
+        "X-Failure-Lab-Write-Token": "not-the-token",
       },
       body: "{}",
     });
-    // Past the guard: the request is now rejected on its *contents* (400/500), never 403.
-    expect(status).not.toBe(403);
+    expect(status).toBe(403);
   });
 
   it("rejects a body that is not a JSON object", async () => {
     for (const body of ["", "[]", "null", "not json"]) {
       const { status } = await call(WRITE_PATHS[0], {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Failure-Lab-Write-Token": WRITE_TOKEN,
+        },
         body,
       });
       expect(status, `body ${JSON.stringify(body)}`).toBe(400);
     }
+  });
+
+  it("serves the token to the page, and only to the page", () => {
+    // `transformIndexHtml` injects it as a meta tag, so a script that loaded the page can
+    // read it and a request from outside the browser cannot.
+    const plugin = failureLabArtifactsPlugin({
+      repoRoot: REPO_ROOT,
+      artifactRoot: workspace,
+      writeToken: WRITE_TOKEN,
+    });
+    const transform = plugin.transformIndexHtml as unknown as () => {
+      tag: string;
+      attrs: Record<string, string>;
+    }[];
+    expect(transform()).toEqual([
+      {
+        tag: "meta",
+        attrs: { name: "failure-lab-write-token", content: WRITE_TOKEN },
+        injectTo: "head",
+      },
+    ]);
+  });
+
+  it("mints a different token per server start when none is supplied", () => {
+    const read = () => {
+      const plugin = failureLabArtifactsPlugin({ repoRoot: REPO_ROOT, artifactRoot: workspace });
+      const transform = plugin.transformIndexHtml as unknown as () => {
+        attrs: Record<string, string>;
+      }[];
+      return transform()[0].attrs.content;
+    };
+    const first = read();
+    expect(first).toHaveLength(48);
+    expect(read()).not.toBe(first);
   });
 });
 

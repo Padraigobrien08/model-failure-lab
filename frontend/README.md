@@ -53,7 +53,9 @@ State that matters is URL-addressable (`q`, `dataset`, `model`, `status`, `mode`
 `caseId`, `transition`, `lens`, `clusterId`), so a CI link can deep-link into a failing case.
 Writes are limited to the three deterministic dataset endpoints (harvest draft, regression
 pack, evolve); everything else is read-only. The bridge is a localhost development surface:
-it answers only for loopback hosts, and its write endpoints require a same-origin POST.
+it answers only for loopback hosts, and its write endpoints require both a same-origin POST
+and the write token the server injects into the page it served — so `--host` does not hand
+the network a way to write into your workspace.
 
 ## Commands
 

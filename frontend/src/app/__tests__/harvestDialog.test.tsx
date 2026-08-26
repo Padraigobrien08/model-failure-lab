@@ -101,8 +101,11 @@ describe("HarvestDialog", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Harvest regressions" });
     await waitFor(() => expect(dialog).toHaveTextContent("family is capped"));
+    // `--from-comparison`, which is what the CLI actually accepts. This asserted the
+    // string the dialog printed rather than a command that runs, so it passed while the
+    // fallback it advertises exited 2.
     expect(dialog).toHaveTextContent(
-      `run: failure-lab dataset evolve ${FAMILY_ID} --comparison ${REPORT_ID}`,
+      `run: failure-lab dataset evolve ${FAMILY_ID} --from-comparison ${REPORT_ID}`,
     );
   });
 

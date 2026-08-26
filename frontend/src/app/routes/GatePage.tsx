@@ -116,7 +116,7 @@ function BaselinesSection({ navigate }: { navigate: (to: string) => void }) {
       ) : state.status === "failed" || state.data.baselines.length === 0 ? (
         <div className="rounded-tok border border-line bg-panel px-4 py-3 font-mono text-[11.5px] text-muted-ink">
           no baselines registered · .failure_lab/baseline_registry.json · run: failure-lab
-          baselines set &lt;name&gt; --run &lt;run-id&gt;
+          baselines set --name &lt;name&gt; --run &lt;run-id&gt;
         </div>
       ) : (
         <table className="w-full border-collapse text-[13.5px]">

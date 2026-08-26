@@ -77,6 +77,7 @@ from model_failure_lab.governance import (
     preflight_saved_portfolio_plan,
     recommend_dataset_action,
     remove_waiver,
+    resolve_waiver,
     review_dataset_actions,
     review_dataset_lifecycle,
     summarize_recurring_root_causes,
@@ -107,6 +108,7 @@ from model_failure_lab.storage import (
     RUN_FILENAME,
     dataset_file,
     read_json,
+    report_file,
     write_json,
 )
 
@@ -161,22 +163,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog=CANONICAL_COMMAND,
-        description=(
-            "Run structured failure analysis on local prompt datasets and inspect the resulting "
-            "run, report, and comparison artifacts."
-        ),
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"%(prog)s {_package_version()}",
-        help="Print the installed package version and exit.",
-    )
-    subparsers = parser.add_subparsers(dest="command")
-
+def _add_run_parser(subparsers: argparse._SubParsersAction) -> None:
     run_parser = subparsers.add_parser(
         "run",
         help="Execute one dataset through the failure-analysis engine.",
@@ -237,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run_parser.set_defaults(handler=_handle_run)
 
+
+def _add_report_parser(subparsers: argparse._SubParsersAction) -> None:
     report_parser = subparsers.add_parser(
         "report",
         help="Build a compact report from one saved run.",
@@ -263,6 +252,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     report_parser.set_defaults(handler=_handle_report)
 
+
+def _add_compare_parser(subparsers: argparse._SubParsersAction) -> None:
     compare_parser = subparsers.add_parser(
         "compare",
         help="Compare two saved runs as baseline -> candidate.",
@@ -320,8 +311,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--gate",
         action="store_true",
         help=(
-            "CI gate mode: exit 1 when the comparison signal verdict is a regression "
-            "(or the runs are incompatible), exit 0 otherwise."
+            "CI gate mode: exit 1 when this comparison blocks (regression verdict, "
+            "incomparable runs, a coverage or execution drop, or dropped baseline failing "
+            "cases), exit 0 otherwise. Honours an active waiver from "
+            "governance/waivers.yml, like `regressions gate` and the console do."
+        ),
+    )
+    compare_parser.add_argument(
+        "--waivers",
+        type=Path,
+        help=(
+            "Waiver file to consult for --gate. Defaults to the conventional "
+            "governance/waivers.* discovered under the artifact root."
         ),
     )
     compare_parser.add_argument(
@@ -343,6 +344,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_analysis_arguments(compare_parser, verb="explain")
     compare_parser.set_defaults(handler=_handle_compare)
 
+
+def _add_demo_parser(subparsers: argparse._SubParsersAction) -> None:
     demo_parser = subparsers.add_parser(
         "demo",
         help="Run the bundled deterministic demo flow and emit normal artifacts.",
@@ -357,6 +360,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     demo_parser.set_defaults(handler=_handle_demo)
 
+
+def _add_init_parser(subparsers: argparse._SubParsersAction) -> None:
     init_parser = subparsers.add_parser(
         "init",
         help="Scaffold a starter prompt dataset in the active workspace.",
@@ -395,6 +400,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     init_parser.set_defaults(handler=_handle_init)
 
+
+def _add_datasets_parser(subparsers: argparse._SubParsersAction) -> None:
     datasets_parser = subparsers.add_parser(
         "datasets",
         help="Inspect bundled datasets available by canonical ID.",
@@ -415,6 +422,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     datasets_list_parser.set_defaults(handler=_handle_datasets_list)
 
+
+def _add_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
     dataset_parser = subparsers.add_parser(
         "dataset",
         help="Review or promote harvested dataset packs.",
@@ -868,6 +877,8 @@ def build_parser() -> argparse.ArgumentParser:
     dataset_evolve_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_evolve_parser.set_defaults(handler=_handle_dataset_evolve)
 
+
+def _add_index_parser(subparsers: argparse._SubParsersAction) -> None:
     index_parser = subparsers.add_parser(
         "index",
         help="Manage the derived local query index over saved artifacts.",
@@ -904,6 +915,8 @@ def build_parser() -> argparse.ArgumentParser:
     index_validate_parser.add_argument("--json", action="store_true", dest="as_json")
     index_validate_parser.set_defaults(handler=_handle_index_validate)
 
+
+def _add_query_parser(subparsers: argparse._SubParsersAction) -> None:
     query_parser = subparsers.add_parser(
         "query",
         help="Run structured cross-run queries over the derived local index.",
@@ -933,6 +946,8 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--json", action="store_true", dest="as_json")
     query_parser.set_defaults(handler=_handle_query)
 
+
+def _add_history_parser(subparsers: argparse._SubParsersAction) -> None:
     history_parser = subparsers.add_parser(
         "history",
         help="Inspect deterministic run, comparison, or dataset-family history over local artifacts.",
@@ -953,6 +968,8 @@ def build_parser() -> argparse.ArgumentParser:
     history_parser.add_argument("--json", action="store_true", dest="as_json")
     history_parser.set_defaults(handler=_handle_history)
 
+
+def _add_clusters_parser(subparsers: argparse._SubParsersAction) -> None:
     clusters_parser = subparsers.add_parser(
         "clusters",
         help="List deterministic recurring failure clusters over saved local artifacts.",
@@ -992,6 +1009,8 @@ def build_parser() -> argparse.ArgumentParser:
     clusters_parser.add_argument("--json", action="store_true", dest="as_json")
     clusters_parser.set_defaults(handler=_handle_clusters)
 
+
+def _add_cluster_parser(subparsers: argparse._SubParsersAction) -> None:
     cluster_parser = subparsers.add_parser(
         "cluster",
         help="Inspect one deterministic recurring cluster in detail.",
@@ -1032,6 +1051,8 @@ def build_parser() -> argparse.ArgumentParser:
     cluster_history_parser.add_argument("--json", action="store_true", dest="as_json")
     cluster_history_parser.set_defaults(handler=_handle_cluster_history)
 
+
+def _add_regressions_parser(subparsers: argparse._SubParsersAction) -> None:
     regressions_parser = subparsers.add_parser(
         "regressions",
         help="List recent saved comparison signals ordered by severity.",
@@ -1234,6 +1255,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     regressions_pr_comment_parser.set_defaults(handler=_handle_regressions_pr_comment)
 
+
+def _add_baselines_parser(subparsers: argparse._SubParsersAction) -> None:
     baselines_parser = subparsers.add_parser(
         "baselines",
         help="Manage shared baseline registry entries.",
@@ -1251,12 +1274,18 @@ def build_parser() -> argparse.ArgumentParser:
         "list",
         help="List shared baseline registry entries.",
     )
+    # Also on the subcommands. `--root` sits on the `baselines` parent for historical
+    # reasons, so `baselines set --name x --root .` -- the placement every other command in
+    # this CLI uses -- died on "unrecognized arguments" with no hint that the flag simply
+    # had to move earlier.
+    _add_root_argument(baselines_list_parser)
     baselines_list_parser.add_argument("--json", action="store_true", dest="as_json")
     baselines_list_parser.set_defaults(handler=_handle_baselines_list)
     baselines_set_parser = baselines_subparsers.add_parser(
         "set",
         help="Create or update a shared baseline registry entry.",
     )
+    _add_root_argument(baselines_set_parser)
     baselines_set_parser.add_argument("--name", required=True)
     baselines_set_parser.add_argument("--run", required=True, dest="run_id")
     baselines_set_parser.add_argument("--model")
@@ -1266,6 +1295,8 @@ def build_parser() -> argparse.ArgumentParser:
     baselines_set_parser.add_argument("--json", action="store_true", dest="as_json")
     baselines_set_parser.set_defaults(handler=_handle_baselines_set)
 
+
+def _add_harvest_parser(subparsers: argparse._SubParsersAction) -> None:
     harvest_parser = subparsers.add_parser(
         "harvest",
         help="Harvest saved artifact cases into a draft dataset pack.",
@@ -1307,6 +1338,39 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write the harvested draft dataset pack to this JSON path.",
     )
     harvest_parser.set_defaults(handler=_handle_harvest)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=CANONICAL_COMMAND,
+        description=(
+            "Run structured failure analysis on local prompt datasets and inspect the resulting "
+            "run, report, and comparison artifacts."
+        ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {_package_version()}",
+        help="Print the installed package version and exit.",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    _add_run_parser(subparsers)
+    _add_report_parser(subparsers)
+    _add_compare_parser(subparsers)
+    _add_demo_parser(subparsers)
+    _add_init_parser(subparsers)
+    _add_datasets_parser(subparsers)
+    _add_dataset_parser(subparsers)
+    _add_index_parser(subparsers)
+    _add_query_parser(subparsers)
+    _add_history_parser(subparsers)
+    _add_clusters_parser(subparsers)
+    _add_cluster_parser(subparsers)
+    _add_regressions_parser(subparsers)
+    _add_baselines_parser(subparsers)
+    _add_harvest_parser(subparsers)
 
     return parser
 
@@ -1424,6 +1488,25 @@ def _build_governance_policy(args: argparse.Namespace) -> GovernancePolicy:
         max_duplicate_ratio=args.max_duplicate_ratio,
         recurrence_window=args.recurrence_window,
         recurrence_threshold=args.recurrence_threshold,
+    )
+
+
+def _add_root_argument(parser: argparse.ArgumentParser) -> None:
+    """Add `--root` to a subcommand that already inherits one from its parent parser.
+
+    `default=SUPPRESS` matters: a plain `default=None` writes the attribute during
+    subparser parsing and clobbers whatever the parent already stored, so
+    `baselines --root X list` would silently fall back to the current directory.
+    """
+
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=argparse.SUPPRESS,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
 
 
@@ -1571,7 +1654,12 @@ def _handle_compare(args: argparse.Namespace) -> int:
     gate_exit_code = 0
     gate_line: str | None = None
     if args.gate:
-        gate_exit_code, gate_line = _evaluate_compare_gate(built.report, built.details)
+        gate_exit_code, gate_line = _evaluate_compare_gate(
+            built.report,
+            built.details,
+            root=root,
+            waiver_path=args.waivers,
+        )
 
     if args.output_format == "markdown":
         markdown = _render_compare_markdown(built.report, built.details, gate_line=gate_line)
@@ -2131,6 +2219,16 @@ def _handle_regressions_waive(args: argparse.Namespace) -> int:
             owner=args.owner,
             expires_at=args.expires_at,
         )
+        # A typo'd id used to get a confident "Action: created" and an instruction to
+        # re-check the gate, which then stayed red with nothing connecting the two. Waiving
+        # ahead of a rerun is legitimate, so this warns rather than refuses.
+        if not _comparison_exists(args.comparison_id, root=root):
+            print(
+                f"Warning: no saved comparison '{args.comparison_id}' in this workspace, so "
+                "this waiver matches nothing yet. Check the id with "
+                "`failure-lab regressions --json`, or rerun the comparison.",
+                file=sys.stderr,
+            )
     if args.as_json:
         print(
             _render_json_payload(
@@ -2145,6 +2243,15 @@ def _handle_regressions_waive(args: argparse.Namespace) -> int:
     else:
         print(_render_waiver_write(result))
     return 0
+
+
+def _comparison_exists(comparison_id: str, *, root: Path | None) -> bool:
+    """Is this id a comparison the workspace has actually saved?"""
+
+    try:
+        return report_file(comparison_id, root=root).exists()
+    except (OSError, ValueError):  # pragma: no cover - a malformed id is not a crash
+        return False
 
 
 def _render_waiver_write(result: WaiverWriteResult) -> str:
@@ -4454,13 +4561,27 @@ def _render_compare_summary(
     return "\n".join(lines)
 
 
-def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str]:
+def _evaluate_compare_gate(
+    report,
+    details: dict[str, object],
+    *,
+    root: Path | None = None,
+    waiver_path: Path | None = None,
+) -> tuple[int, str]:
     """Deterministic CI gate contract, shared with `regressions gate` and the console.
 
     The decision itself lives in `governance.gates.evaluate_gate_conditions`; this only
     adapts the in-memory report into that contract's inputs and formats the verdict line.
     Keeping one implementation is what stops the console from showing PASS on a comparison
     that fails CI.
+
+    Waivers are resolved here too, and that is not cosmetic. `regressions gate` and the
+    console's gate endpoint both honour `governance/waivers.yml`; this surface did not, and
+    it is the one `action.yml` wraps and the README tells you to put in CI. So writing a
+    waiver -- which the console prints as its own remedy -- turned the console green and
+    left the build red with nothing on screen connecting the two. That is the console-green
+    / CI-red split the single gate contract exists to prevent, one layer up from the
+    conditions it unified.
     """
     signal = _comparison_signal_payload(report, details)
     verdict = str(signal.get("verdict", "unknown"))
@@ -4473,9 +4594,24 @@ def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str
         dropped_baseline_failure_case_ids=tuple(_dropped_baseline_failure_ids(details)),
     )
     block_reason = evaluate_gate_conditions(conditions)
-    if block_reason is not None:
-        return 1, f"Gate: FAIL ({block_reason})"
-    return 0, f"Gate: PASS (signal verdict: {verdict})"
+    if block_reason is None:
+        return 0, f"Gate: PASS (signal verdict: {verdict})"
+
+    waiver = resolve_waiver(
+        str(report.report_id),
+        root=root,
+        waiver_path=waiver_path,
+    )
+    if waiver is not None and waiver.active:
+        owner = f" by {waiver.owner}" if waiver.owner else ""
+        return 0, f"Gate: PASS (waived{owner}: {waiver.reason}) [would block: {block_reason}]"
+    if waiver is not None:
+        # Present but expired. Say so, rather than letting the operator wonder why the
+        # waiver they can see in the file did nothing.
+        return 1, (
+            f"Gate: FAIL ({block_reason}); waiver expired {waiver.expires_at}"
+        )
+    return 1, f"Gate: FAIL ({block_reason})"
 
 
 def _gate_float(value: object) -> float | None:

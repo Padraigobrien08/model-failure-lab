@@ -102,7 +102,17 @@ def __getattr__(name: str) -> object:
         # `reporting.legacy` is excluded from the wheel (see pyproject), so on an installed
         # package these names resolve to nothing. Say which surface the caller reached for
         # rather than leaving them with a bare module path.
-        if module_name.startswith(".legacy"):
+        #
+        # Only when the *package* is what is missing. The overwhelmingly common cause of a
+        # ModuleNotFoundError here is a third-party import inside the legacy module -- a
+        # checkout without the `[legacy]` extra -- and reporting that as "not shipped in
+        # the installed package" replaced a correct, actionable error ("No module named
+        # 'matplotlib'") with a false one. `exc.name` separates the two exactly.
+        missing = exc.name or ""
+        legacy_package = f"{__name__}.legacy"
+        if module_name.startswith(".legacy") and (
+            missing == legacy_package or missing.startswith(f"{legacy_package}.")
+        ):
             raise AttributeError(
                 f"'{name}' belongs to the legacy benchmark reporting surface, which is not "
                 "shipped in the installed package (see docs/legacy.md). Work from a source "

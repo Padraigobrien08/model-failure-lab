@@ -19,10 +19,15 @@ CANDIDATE = str(DEMO_RUNS / "candidate")
 
 @dataclass
 class _FakeReport:
-    """Minimal stand-in exposing the two attributes the gate reads."""
+    """Minimal stand-in exposing the attributes the gate reads.
+
+    `report_id` is one of them now: the gate resolves a waiver for this comparison, the way
+    `regressions gate` and the console already did.
+    """
 
     comparison: dict = field(default_factory=dict)
     metrics: dict = field(default_factory=dict)
+    report_id: str = "compare_fake_to_fake_00000000"
 
 
 def _report_with(*, verdict: str, delta: dict) -> _FakeReport:

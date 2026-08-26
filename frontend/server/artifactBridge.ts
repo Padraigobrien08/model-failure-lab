@@ -13,6 +13,7 @@
  * `__dirname` so a test can point the bridge at a fixture workspace.
  */
 
+import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -298,11 +299,23 @@ export type ArtifactBridgeOptions = {
    * Needed only when the server is reached under a real hostname.
    */
   allowedHosts?: string[];
+  /** Fixed write token, for tests. Otherwise minted per server start. */
+  writeToken?: string;
 };
 
 export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugin {
   const repoRoot = options.repoRoot;
   const allowedHosts = new Set(options.allowedHosts ?? []);
+  /**
+   * Minted per server start and injected into the page as a meta tag.
+   *
+   * The same-origin check below deliberately admits a request that sends neither `Origin`
+   * nor `Sec-Fetch-Site`, because a browser always sends at least one and a header-less
+   * caller "is the local developer". Under `--host` that reasoning fails: anyone on the
+   * network can curl a header-less POST at the write endpoints. Only something that loaded
+   * the page can read this token, and curl from another machine did not load the page.
+   */
+  const writeToken = options.writeToken ?? randomBytes(24).toString("hex");
   const artifactSource = resolveArtifactSource(repoRoot);
   const queryBridgePath = path.join(repoRoot, "scripts", "query_bridge.py");
 
@@ -414,6 +427,30 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
       throw new BadRequestError("request body must be a JSON object");
     }
     return payload as Record<string, unknown>;
+  }
+
+  /**
+   * Does this request carry the token the page was served with?
+   *
+   * Checked in addition to the same-origin rule, never instead of it: a cross-site page
+   * cannot read the token, and a LAN client cannot either.
+   */
+  function hasWriteToken(req: IncomingMessage): boolean {
+    const header = req.headers["x-failure-lab-write-token"];
+    const provided = Array.isArray(header) ? header[0] : header;
+    return typeof provided === "string" && provided === writeToken;
+  }
+
+  function rejectMissingWriteToken(res: ServerResponse): void {
+    res.statusCode = 403;
+    res.setHeader("Content-Type", "application/json");
+    res.end(
+      JSON.stringify({
+        message:
+          "missing or invalid write token. Writes are only accepted from the console page " +
+          "this server served; a request from outside it cannot read the token.",
+      }),
+    );
   }
 
   function isSameOriginWrite(req: IncomingMessage): boolean {
@@ -1901,6 +1938,10 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
       rejectCrossOriginWrite(res);
       return;
     }
+    if (!hasWriteToken(req)) {
+      rejectMissingWriteToken(res);
+      return;
+    }
 
     try {
       const body = await readJsonBody(req);
@@ -1965,6 +2006,10 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
       rejectCrossOriginWrite(res);
       return;
     }
+    if (!hasWriteToken(req)) {
+      rejectMissingWriteToken(res);
+      return;
+    }
 
     try {
       const body = await readJsonBody(req);
@@ -2011,6 +2056,10 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
     }
     if (!isSameOriginWrite(req)) {
       rejectCrossOriginWrite(res);
+      return;
+    }
+    if (!hasWriteToken(req)) {
+      rejectMissingWriteToken(res);
       return;
     }
 
@@ -2395,6 +2444,15 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
 
   return {
     name: "failure-lab-artifacts",
+    transformIndexHtml() {
+      return [
+        {
+          tag: "meta",
+          attrs: { name: "failure-lab-write-token", content: writeToken },
+          injectTo: "head",
+        },
+      ];
+    },
     configureServer(server: {
       middlewares: {
         use: (

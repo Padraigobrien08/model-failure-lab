@@ -59,8 +59,25 @@ jobs:
       - name: Build and install the wheel
         run: |
           python -m pip install --quiet build
-          python -m build --wheel --outdir dist
+          python -m build --outdir dist
           python -m pip install --quiet dist/*.whl
+
+      - name: The sdist carries the walkthrough the README points at
+        # The README says `examples/regression_demo/` "ships in the source tree (clone, or an
+        # unpacked sdist)". The wheel deliberately excludes it, so the sdist is the only
+        # artifact that claim rests on -- and nothing built it.
+        run: |
+          python - <<'PY'
+          import glob, tarfile
+          sdist = sorted(glob.glob("dist/*.tar.gz"))[-1]
+          with tarfile.open(sdist) as archive:
+              names = archive.getnames()
+          demo = [n for n in names if "examples/regression_demo/" in n]
+          assert any(n.endswith("run.sh") for n in demo), f"no run.sh in {sdist}"
+          assert any(n.endswith("dataset.json") for n in demo), f"no dataset.json in {sdist}"
+          assert len(demo) >= 8, f"only {len(demo)} demo files in {sdist}: {demo}"
+          print(f"{sdist}: {len(demo)} walkthrough files")
+          PY
 
       - name: The wheel ships no legacy module
         # The packaging claim, checked against the artifact rather than the config.

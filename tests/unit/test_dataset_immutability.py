@@ -371,3 +371,112 @@ def test_audit_classifies_each_pack_state(tmp_path: Path) -> None:
     # The malformed file is the index builder's finding to report, not this one's.
     assert [finding.kind for finding in findings] == ["unstamped"]
     assert findings[0].path.name == "bare.json"
+
+
+# ---------------------------------------------------------------------------------------
+# A witness that does not live inside the artifact it witnesses.
+# ---------------------------------------------------------------------------------------
+#
+# Stamping `metadata.integrity` catches an edit. Gating on `lifecycle: "curated"` catches
+# deleting the stamp. Deleting *both* defeated them, and no scheme keyed on the pack's own
+# fields can do better -- a self-consistent file has nothing to contradict.
+#
+# `governance/promotions.json` records outside the pack that a dataset id was promoted and
+# what its digest was. Now a stripped pack is a disagreement between two files, and the
+# second one is committed.
+
+
+def _strip_curation(dataset_path: Path) -> None:
+    payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    payload["metadata"].pop("integrity", None)
+    payload.pop("lifecycle", None)
+    dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def test_promotion_is_recorded_outside_the_promoted_file(
+    promoted_workspace: tuple[Path, Path],
+) -> None:
+    root, dataset_path = promoted_workspace
+    ledger = json.loads((root / "governance" / "promotions.json").read_text(encoding="utf-8"))
+
+    entry = next(row for row in ledger["promotions"] if row["dataset_id"] == DATASET_ID)
+    promoted = json.loads(dataset_path.read_text(encoding="utf-8"))
+    assert entry["content_digest"] == promoted["metadata"]["integrity"]["content_digest"]
+    assert entry["case_count"] == len(promoted["cases"])
+    # governance/, not .failure_lab/: it is a record of something a human did.
+    assert entry["path"] == f"datasets/{DATASET_ID}.json"
+
+
+def test_stripping_both_the_digest_and_the_lifecycle_no_longer_hides_a_tamper(
+    promoted_workspace: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, dataset_path = promoted_workspace
+    payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    payload["cases"] = payload["cases"][:2]
+    dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _strip_curation(dataset_path)
+
+    assert main(["index", "validate", "--root", str(root)]) == 2
+    output = capsys.readouterr().out
+    assert "was promoted on" in output
+    assert "no integrity block and is not marked curated" in output
+
+
+def test_re_stamping_the_digest_after_a_tamper_is_caught(
+    promoted_workspace: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The self-consistent lie: edit the cases, then recompute the digest so the pack agrees
+    # with itself. Only a record kept elsewhere can still object.
+    from model_failure_lab.datasets import parse_dataset_payload
+    from model_failure_lab.datasets.integrity import integrity_payload
+
+    root, dataset_path = promoted_workspace
+    payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    payload["cases"] = payload["cases"][:2]
+    payload["metadata"]["integrity"] = integrity_payload(parse_dataset_payload(payload))
+    dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    assert main(["index", "validate", "--root", str(root)]) == 2
+    assert "was promoted with" in capsys.readouterr().out
+
+
+def test_a_deliberate_re_promotion_updates_the_ledger_and_clears_the_finding(
+    promoted_workspace: tuple[Path, Path],
+) -> None:
+    root, dataset_path = promoted_workspace
+    payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    payload["cases"] = payload["cases"][:2]
+    dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _strip_curation(dataset_path)
+    assert main(["index", "validate", "--root", str(root)]) == 2
+
+    # `--force` is the deliberate act, and it re-records the promotion.
+    assert (
+        main(
+            [
+                "dataset",
+                "promote",
+                str(dataset_path),
+                "--dataset-id",
+                DATASET_ID,
+                "--root",
+                str(root),
+                "--force",
+            ]
+        )
+        == 0
+    )
+    assert main(["index", "validate", "--root", str(root)]) == 0
+
+
+def test_a_pack_nobody_promoted_is_not_dragged_into_the_ledger_check(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    (root / "datasets").mkdir(parents=True)
+    (root / "datasets" / "mine.json").write_text(
+        json.dumps(
+            {"dataset_id": "mine-v1", "name": "Mine", "cases": [{"id": "c1", "prompt": "hi"}]}
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["index", "validate", "--root", str(root)]) == 0

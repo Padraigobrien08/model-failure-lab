@@ -21,6 +21,10 @@ or by deleting the cases it broke.
 Only the second is a *regression*. The console colours the other three amber, not red — see
 `frontend/DESIGN.md`.
 
+An active waiver turns any of them into a PASS, on every surface, and the verdict line names
+what it suppressed: `Gate: PASS (waived by padraig: JIRA-123) [would block: signal verdict:
+regression]`. An expired one is reported as expired rather than ignored.
+
 ## Gating a build
 
 The simplest form gates one comparison and exits non-zero on a block:
@@ -103,7 +107,11 @@ waivers:
 a waiver that is inactive the moment it lands looks like it worked and changes nothing.
 Expired waivers are inactive, and the console shows them as expired rather than hiding them.
 
-`--waivers <path>` on `regressions gate` overrides the discovery for a one-off run.
+`--waivers <path>` overrides the discovery for a one-off run, on `regressions gate` and on
+`compare --gate` alike. All three gate surfaces resolve waivers the same way — a waiver the
+console honours and CI ignores would be a green screen over a red build, so
+`tests/unit/test_gate_surface_parity.py` asks all three the same question and compares their
+answers to each other.
 
 Retiring a dataset family (`dataset lifecycle-apply --action retire`) also stops its
 comparisons blocking, and surfaces through this same waiver channel with a stated reason
@@ -122,8 +130,9 @@ Outputs a concise reliability diff and top signal drivers, suitable for a PR com
 `.github/workflows/production.yml` — the workflow the README badge points at:
 
 - `ruff check .` and `pytest -q` on Python 3.11 and 3.12
-- a consumer-install job: build the wheel, assert it ships no legacy module, install it into
-  a clean environment, and run the README quickstart plus `examples/regression_demo/run.sh`
+- a consumer-install job: build the wheel and the sdist, assert the wheel ships no legacy
+  module and the sdist carries the walkthrough the README points at, install the wheel into a
+  clean environment, and run the README quickstart plus `examples/regression_demo/run.sh`
 - the composite action, dogfooded against the bundled regression demo — including an
   assertion that the gate actually *fails the job*, not merely that it detects the regression
 - the frontend: typecheck, vitest (with the engine installed, so the bridge tests run rather

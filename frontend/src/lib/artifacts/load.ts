@@ -2259,6 +2259,31 @@ export async function loadArtifactQuery(
   return validateArtifactQueryResponse(payload);
 }
 
+/**
+ * Headers for a bridge write.
+ *
+ * The bridge's CSRF defence is a same-origin check, and it trusts a request that sends
+ * neither `Origin` nor `Sec-Fetch-Site` on the grounds that such a caller "is the local
+ * developer". That stops being true under `vite --host` / `vite preview --host`, where any
+ * client on the network can `curl` a header-less POST at the three write endpoints.
+ *
+ * The dev server mints a token at startup and injects it into the page, so only something
+ * that loaded the page can read it. A `curl` from another machine cannot.
+ */
+export function bridgeWriteHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token =
+    typeof document === "undefined"
+      ? null
+      : document
+          .querySelector('meta[name="failure-lab-write-token"]')
+          ?.getAttribute("content");
+  if (token) {
+    headers["X-Failure-Lab-Write-Token"] = token;
+  }
+  return headers;
+}
+
 export async function createArtifactHarvestDraft(
   request: {
     mode: "cases" | "deltas";
@@ -2284,9 +2309,7 @@ export async function createArtifactHarvestDraft(
 ): Promise<ArtifactHarvestResponse> {
   const response = await fetchImpl(ARTIFACT_HARVEST_PATH, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: bridgeWriteHeaders(),
     body: JSON.stringify(request),
   });
   if (!response.ok) {
@@ -2317,9 +2340,7 @@ export async function createArtifactRegressionPack(
 ): Promise<ArtifactRegressionPackResponse> {
   const response = await fetchImpl(ARTIFACT_REGRESSION_PACK_PATH, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: bridgeWriteHeaders(),
     body: JSON.stringify(request),
   });
   if (!response.ok) {
@@ -2350,9 +2371,7 @@ export async function evolveArtifactDataset(
 ): Promise<ArtifactDatasetEvolutionResponse> {
   const response = await fetchImpl(ARTIFACT_DATASET_EVOLVE_PATH, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: bridgeWriteHeaders(),
     body: JSON.stringify(request),
   });
   if (!response.ok) {

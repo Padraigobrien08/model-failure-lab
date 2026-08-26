@@ -150,8 +150,22 @@ def dataset_integrity_status(dataset: FailureDataset) -> str:
     return "verified" if compute_content_digest(dataset) == recorded else "mismatch"
 
 
-def audit_dataset_directory(directory: Path) -> tuple[DatasetIntegrityFinding, ...]:
-    """Report every curated pack in `directory` whose digest is missing or wrong.
+def audit_dataset_directory(
+    directory: Path,
+    *,
+    ledger: dict[str, PromotionRecord] | None = None,
+) -> tuple[DatasetIntegrityFinding, ...]:
+    """Report every promoted pack in `directory` whose digest is missing or wrong.
+
+    Two witnesses, because one inside the file can be deleted along with the marker that
+    made its absence suspicious:
+
+    * the pack's own `metadata.integrity`, gated on `lifecycle: "curated"`, and
+    * `governance/promotions.json`, which records outside the pack that this dataset id was
+      promoted and what its digest was.
+
+    A pack stripped of both its integrity block and its lifecycle is self-consistent, and
+    the ledger is what turns it back into a contradiction.
 
     Unreadable and malformed files are skipped: the index builder already reports those as
     contract violations, and reporting them twice would bury the integrity answer.
@@ -159,6 +173,7 @@ def audit_dataset_directory(directory: Path) -> tuple[DatasetIntegrityFinding, .
 
     from .load import parse_dataset_payload
 
+    ledger = {} if ledger is None else ledger
     findings: list[DatasetIntegrityFinding] = []
     if not directory.is_dir():
         return ()
@@ -171,6 +186,47 @@ def audit_dataset_directory(directory: Path) -> tuple[DatasetIntegrityFinding, .
         except Exception:  # noqa: BLE001 - malformed packs are the index builder's report
             continue
         status = dataset_integrity_status(dataset)
+        recorded = ledger.get(dataset.dataset_id)
+        if status == "unmanaged" and recorded is not None:
+            # The ledger says this id was promoted; the pack no longer admits to being
+            # curated and carries no digest. Exactly the shape of a stripped pack.
+            actual = compute_content_digest(dataset)
+            detail = (
+                f"'{dataset.dataset_id}' ({path}) was promoted on {recorded.promoted_at} "
+                f"with {recorded.case_count} case(s) and digest {recorded.content_digest}, "
+                f"but the file now carries no integrity block and is not marked curated "
+                f"(actual digest {actual}, {len(dataset.cases)} case(s)). Restore it from "
+                "source control, or re-promote it with `--force` if the change is intended."
+            )
+            findings.append(
+                DatasetIntegrityFinding(
+                    path=path,
+                    dataset_id=dataset.dataset_id,
+                    kind="unrecorded",
+                    detail=detail,
+                )
+            )
+            continue
+        if status == "verified" and recorded is not None:
+            actual = compute_content_digest(dataset)
+            if actual != recorded.content_digest:
+                # Self-consistent, but not the pack that was promoted: someone re-stamped
+                # the digest after editing. The ledger is the only thing that still knows.
+                findings.append(
+                    DatasetIntegrityFinding(
+                        path=path,
+                        dataset_id=dataset.dataset_id,
+                        kind="re_stamped",
+                        detail=(
+                            f"'{dataset.dataset_id}' ({path}) carries a valid digest "
+                            f"{actual}, but was promoted with {recorded.content_digest} on "
+                            f"{recorded.promoted_at}. Its cases changed and the digest was "
+                            "recomputed. Restore from source control, or re-promote with "
+                            "`--force` to accept the change."
+                        ),
+                    )
+                )
+            continue
         if status == "mismatch":
             findings.append(
                 DatasetIntegrityFinding(
@@ -203,3 +259,102 @@ def audit_dataset_directory(directory: Path) -> tuple[DatasetIntegrityFinding, .
                 )
             )
     return tuple(findings)
+
+
+# --------------------------------------------------------------------------------------
+# The promotion ledger: a witness that does not live inside the artifact it protects.
+# --------------------------------------------------------------------------------------
+#
+# Stamping `metadata.integrity` catches an edit, and gating on `lifecycle: "curated"`
+# catches deleting the stamp. Neither survives deleting *both*, and no scheme keyed on the
+# pack's own fields ever will -- the witness is inside the thing it is meant to witness.
+#
+# `governance/promotions.json` records, outside the pack, that a dataset id was promoted and
+# what its digest was at the time. A pack whose id is in the ledger must still match; one
+# that has had its integrity block and lifecycle removed is now a *contradiction* between
+# two files rather than a self-consistent lie.
+#
+# It lives in `governance/` for the same reason waivers and baselines do: it is a record of
+# something a human did, it belongs in git, and `make clean` must not touch it.
+
+PROMOTION_LEDGER_PATH = "governance/promotions.json"
+
+
+@dataclass(slots=True, frozen=True)
+class PromotionRecord:
+    """One promotion, as recorded outside the promoted file."""
+
+    dataset_id: str
+    content_digest: str
+    case_count: int
+    promoted_at: str
+    path: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "dataset_id": self.dataset_id,
+            "content_digest": self.content_digest,
+            "case_count": self.case_count,
+            "promoted_at": self.promoted_at,
+            "path": self.path,
+        }
+
+
+def load_promotion_ledger(root: Path) -> dict[str, PromotionRecord]:
+    """Every recorded promotion, keyed by dataset id. Missing or malformed reads as empty."""
+
+    path = root / PROMOTION_LEDGER_PATH
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    rows = payload.get("promotions") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return {}
+    records: dict[str, PromotionRecord] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        dataset_id = row.get("dataset_id")
+        digest = row.get(CONTENT_DIGEST_KEY)
+        if not isinstance(dataset_id, str) or not isinstance(digest, str):
+            continue
+        records[dataset_id] = PromotionRecord(
+            dataset_id=dataset_id,
+            content_digest=digest,
+            case_count=int(row.get("case_count") or 0),
+            promoted_at=str(row.get("promoted_at") or ""),
+            path=str(row.get("path") or ""),
+        )
+    return records
+
+
+def record_promotion(
+    dataset: FailureDataset,
+    *,
+    root: Path,
+    dataset_path: Path,
+    promoted_at: str,
+) -> Path:
+    """Write this promotion into the ledger, replacing any earlier entry for the same id."""
+
+    records = load_promotion_ledger(root)
+    try:
+        relative = dataset_path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        relative = dataset_path.as_posix()
+    records[dataset.dataset_id] = PromotionRecord(
+        dataset_id=dataset.dataset_id,
+        content_digest=compute_content_digest(dataset),
+        case_count=len(dataset.cases),
+        promoted_at=promoted_at,
+        path=relative,
+    )
+    path = root / PROMOTION_LEDGER_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        # Sorted by id: the file is committed, so two promotions must not reorder the diff.
+        "promotions": [records[key].to_payload() for key in sorted(records)]
+    }
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path

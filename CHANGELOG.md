@@ -7,6 +7,78 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
+## [0.13.0] - 2026-08-26
+
+A third audit pass, this one re-run against the `0.12.0` remediation branch. Four of the
+seven findings were defects that remediation introduced, and one is the worst kind this
+project can have: **the `0.12.0` CHANGELOG claimed a fix that was never made.** Every fix
+here is a predicate over the whole surface rather than a correction to one example — that
+is what the previous round got wrong.
+
+### Fixed
+- **A waiver turned the console green and left CI red.** `regressions waive` wrote a waiver
+  that `regressions gate` and the console honoured and `compare --gate` ignored — and
+  `compare --gate` is what `action.yml` wraps and the README puts in CI. Following the
+  console's own printed remedy produced a green gate screen over a red build. All three
+  surfaces resolve waivers through `resolve_waiver` now, and `compare --gate` reports what it
+  suppressed (`Gate: PASS (waived by padraig: …) [would block: …]`) rather than a bare PASS.
+  An expired waiver is named, not silently ignored.
+  `test_gate_surface_parity.py` asks all three the same question and compares their answers
+  **to each other**, so a surface that grows an input nobody else reads fails there.
+- **Six printed remedies did not run** — `harvest --report <comparison>` (missing `--out`),
+  `dataset promote <draft>` in four places (missing `--dataset-id`), `run <dataset>`
+  (positional where the CLI wants `--dataset`), `dataset evolve … --comparison` (the flag is
+  `--from-comparison`), and `baselines set <name>` (`--name`). The `0.12.0` CHANGELOG said
+  the first of those was fixed; the entry was written and the string never touched.
+  `test_console_commands_are_runnable.py` now extracts every `failure-lab …` literal the
+  console prints and parses it against the real argparse tree.
+- **The legacy import error was wrong.** `reporting.__getattr__` turned any
+  `ModuleNotFoundError` into "not shipped in the installed package", so a checkout missing
+  the `[legacy]` extra — what `make install-dev` gives you — got a false message instead of
+  `No module named 'matplotlib'`, and two scripts failed to import. It discriminates on
+  `exc.name` now. The guarding test is deliberately **not** marked `legacy`: the bug only
+  appears when the extra is absent, so a test that needs it is skipped exactly where the
+  bug lives, which is how this shipped green.
+- **The "shared" baseline registry was disposable.** It lived at
+  `.failure_lab/baseline_registry.json` — the derived index directory, which `.gitignore`
+  excludes and `make clean` deletes irrecoverably, since it is not derived. It is
+  `governance/baselines.json` now, with a read-through so an existing workspace keeps its
+  entries. `test_governance_state_is_durable.py` runs the governance surfaces and asserts
+  nothing they wrote lands somewhere `make clean` removes.
+- **`ExplorerPage` kept a private copy of the regression transition set**, through the
+  consolidation that removed the other four — `transitions.test.ts` pins the module, not its
+  use. A degrading *trend* also rendered red, where DESIGN.md assigns amber to degraded
+  state, and two of that function's three substring branches (`worsen`, `rising`) matched
+  nothing the engine emits. `consoleVocabulary.test.tsx` asserts the literals appear in
+  exactly one non-test file.
+- **`regressions waive <typo>` reported `Action: created`** and told you to re-check the
+  gate, which stayed red. It warns when the id names no saved comparison, and still writes —
+  waiving ahead of a rerun is legitimate.
+- **`waived by null`** on the comparison detail, because `--owner` is optional and was
+  interpolated unguarded.
+- `baselines list` / `baselines set` accept `--root` where every other subcommand takes it.
+  It was only on the parent parser, so the usual placement died on "unrecognized arguments".
+
+### Added
+- **The promotion ledger.** `metadata.integrity` catches an edit and `lifecycle: "curated"`
+  catches deleting the stamp, but deleting *both* defeated them, and no witness kept inside
+  the artifact can do better. `governance/promotions.json` records outside the pack that a
+  dataset id was promoted and what its digest was, so a stripped pack is now a disagreement
+  between two committed files. It also catches the re-stamp: editing the cases and
+  recomputing the digest leaves a self-consistent pack that the ledger still contradicts.
+- **A write token on the bridge.** The same-origin check trusts a request that sends neither
+  `Origin` nor `Sec-Fetch-Site`, on the grounds that such a caller is the local developer —
+  which stops being true under `--host`, where any machine on the network can curl a
+  header-less POST at the three write endpoints. The server mints a token per start and
+  injects it into the page; only something that loaded the page can read it.
+- **CI builds and checks the sdist.** The README says the walkthrough "ships in the source
+  tree (clone, or an unpacked sdist)", and the sdist is the only artifact that claim rests
+  on. Nothing built it.
+
+### Changed
+- `build_parser` was 1,164 lines; it is 33, delegating to one `_add_*_parser` per command
+  group. Pure code motion, verified by diffing the resolved argparse tree before and after.
+
 ## [0.12.0] - 2026-08-25
 
 A second external-audit pass, this time through three lenses (a skim, a pre-merge review, and an

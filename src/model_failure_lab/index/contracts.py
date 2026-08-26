@@ -9,8 +9,9 @@ from pathlib import Path
 from model_failure_lab.datasets.integrity import (
     DatasetIntegrityError,
     audit_dataset_directory,
+    load_promotion_ledger,
 )
-from model_failure_lab.storage.layout import datasets_root
+from model_failure_lab.storage.layout import datasets_root, project_root
 
 from .builder import QUERY_INDEX_SCHEMA_VERSION, query_index_path, rebuild_query_index
 
@@ -66,7 +67,11 @@ def validate_artifact_contracts(*, root: str | Path | None = None) -> ArtifactCo
     # artifacts", and it catches the case a load cannot -- a pack whose digest was deleted
     # reads perfectly.
     integrity_errors = [
-        finding.message() for finding in audit_dataset_directory(datasets_root(root=root))
+        finding.message()
+        for finding in audit_dataset_directory(
+            datasets_root(root=root),
+            ledger=load_promotion_ledger(project_root(root)),
+        )
     ]
 
     ingestion_errors: list[str] = []

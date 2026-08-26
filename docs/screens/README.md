@@ -17,5 +17,8 @@ To recapture, point the console at a workspace and take 1440px-wide shots:
 FAILURE_LAB_ARTIFACT_ROOT=/path/to/workspace npm --prefix frontend run dev
 ```
 
-The shell prints the package version, so a screenshot taken from a stale checkout shows it.
-Recapture at release time.
+The shell prints the package version, so a screenshot from a stale checkout shows it. After
+recapturing, write the new version into `CAPTURED_AT` — `test_version_consistency.py` pins
+that file to `pyproject.toml`, because this instruction on its own did not hold: the screens
+were recaptured and the version bumped in the very next commit, and every image shipped a
+release behind.

@@ -368,7 +368,11 @@ export function ComparisonDetailPage() {
                         <br />
                         {gateRow.waiver
                           ? gateRow.waived
-                            ? `waived by ${gateRow.waiver.owner}`
+                            ? // `--owner` is optional, and interpolating it unguarded put
+                              // "waived by null" on the screen.
+                              gateRow.waiver.owner
+                              ? `waived by ${gateRow.waiver.owner}`
+                              : `waived: ${gateRow.waiver.reason}`
                             : "waiver inactive"
                           : "no active waiver"}
                       </div>

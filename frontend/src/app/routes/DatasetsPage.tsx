@@ -139,7 +139,7 @@ function DraftsSection({ navigate }: { navigate: (to: string) => void }) {
             </tbody>
           </table>
           <div className="font-mono text-[11px] text-muted-ink">
-            promote: failure-lab dataset promote datasets/harvested/&lt;draft-id&gt;.json ·
+            promote: failure-lab dataset promote datasets/harvested/&lt;draft-id&gt;.json --dataset-id &lt;id&gt; ·
             records a content digest · promoting onto an existing version is refused
           </div>
         </>
@@ -209,7 +209,7 @@ export function DatasetsPage() {
         ) : families.length === 0 ? (
           <EmptyState
             title="No dataset families."
-            detail="read datasets/ · run: failure-lab harvest --report <comparison> or failure-lab dataset promote <draft>"
+            detail="read datasets/ · run: failure-lab harvest --comparison <comparison> --out datasets/harvested/<name>.json"
           />
         ) : filtered.length === 0 ? (
           <EmptyState

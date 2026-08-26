@@ -60,3 +60,23 @@ def test_console_reads_its_version_rather_than_hardcoding_one() -> None:
     assert not re.search(r'APP_VERSION\s*=\s*"v\d', shell), (
         "the console shell hardcodes a version string again"
     )
+
+
+def test_the_screenshots_were_captured_from_this_version() -> None:
+    """The shell prints the package version, so a stale screenshot shows a stale version.
+
+    `docs/screens/README.md` says "recapture at release time". That rule was written into
+    the docs and broken by the very next commit -- the screens were recaptured, then the
+    version bumped, and every shipped screenshot showed the previous release. Prose does not
+    hold a release checklist together; this does.
+
+    Recapture (see `docs/screens/README.md`), then write the new version into
+    `docs/screens/CAPTURED_AT`.
+    """
+
+    root = Path(__file__).resolve().parents[2]
+    captured = (root / "docs" / "screens" / "CAPTURED_AT").read_text(encoding="utf-8").strip()
+    assert captured == _pyproject_version(), (
+        f"the screenshots were captured from {captured} and pyproject says "
+        f"{_pyproject_version()}. Recapture them, then update docs/screens/CAPTURED_AT."
+    )
