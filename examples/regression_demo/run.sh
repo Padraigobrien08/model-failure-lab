@@ -28,4 +28,5 @@ FL harvest --comparison "$REPORT_ID" --delta regression --out regression-pack.js
 echo
 echo "Done. The 4 regressed cases were written to:"
 echo "  examples/regression_demo/regression-pack.json"
-echo "Promote it to a permanent dataset with: failure-lab dataset promote ..."
+echo "Promote it to a permanent dataset with:"
+echo "  failure-lab dataset promote regression-pack.json --dataset-id reasoning-regressions-v1"

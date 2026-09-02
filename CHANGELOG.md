@@ -7,6 +7,333 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
+## [0.15.0] - 2026-09-02
+
+Round four found seven defects. Six were pre-existing and one was a guarantee the round-three
+report had certified as tested and never was: `compare --gate` passed when a candidate deleted
+the cases it broke. Three rounds of "fix the class, not the instance" worked; what this round
+adds is the next discipline, which is verifying the outcome rather than the mechanism.
+
+### Fixed
+- **`compare --gate` passed when the candidate stopped running the cases it broke** -- exit 0
+  on a real regression, which is the failure this tool exists to prevent. Every metric the
+  gate reads is computed on shared cases, so a case the candidate did not run is invisible to
+  all of them, and deleting the four regressions from the bundled demo turned
+  `Gate: FAIL (signal verdict: regression)` into `Gate: PASS (signal verdict: neutral)` with
+  `baseline_only=4` printed one line above the verdict. A guard for this existed and covered
+  the complement of its own comment: it checked `dropped_baseline_failure_case_ids`, the cases
+  the *baseline* was already failing, while the comment said it stopped "a candidate deleting
+  the cases it broke" -- and cases a candidate broke are by definition cases the baseline
+  passed. It survived four audits because the demo's baseline fails nothing, so the guard could
+  never fire in the one workspace anybody tested it against. The gate now blocks on any case in
+  the baseline and not in the candidate; shrinking a suite deliberately is what waivers are
+  for. `tests/unit/test_gate_surface_agreement.py` covers both directions across all three
+  surfaces, and `tests/unit/test_cli_compare_gate.py` replaces a test that asserted the bug
+  (`..._passes_when_only_passing_baseline_cases_are_dropped`, exit 0) with its inverse.
+- **A run with no report opened as "unknown error" beside a Retry that could never work.**
+  That is the normal state between `failure-lab run` and `failure-lab report`, steps one and
+  two of the documented loop; the inventory lists the run and links to it. The bridge now
+  answers with what failed, the file, and the command --
+  `No report for run <id>.` / `reports/<id>_report/report.json` /
+  `failure-lab report --run <id>` -- which is what `frontend/DESIGN.md` has always required of
+  an error. `frontend/server/__tests__/artifactBridge.test.ts` pins the three fields and
+  checks that following the remedy makes Retry work.
+- **Two printed commands outside the console did not run.** The README's two-minute demo ended
+  on `failure-lab dataset promote ...`, a literal ellipsis, and a promotion conflict answered
+  with `failure-lab dataset evolve <id>`, missing the required `--from-comparison`. Three more
+  prose references that read as runnable commands were reworded.
+  `tests/unit/test_console_commands_are_runnable.py` now reads the **whole repository** rather
+  than three frontend directories -- 27 files, 70 commands, up from 25 -- parsing Python with
+  `ast` so an f-string split across literals rejoins, and building argv with `shlex` so
+  `--reason "…"` is one argument.
+- **`_suppress_inherited_defaults` raised on a divergent redeclaration**, and `main` builds the
+  parser before anything else, so one bad subcommand answered `failure-lab --help` with a
+  traceback. Divergences are recorded and asserted empty by
+  `tests/unit/test_cli_option_inheritance.py`; a developer error belongs in a failing test.
+- **The `cli.py` ratchet failed the build when `cli.py` improved.** Shrinking the file by 400
+  lines, or splitting its largest function, tripped the staleness check that existed to stop
+  the ceiling drifting. Slack is now a warning that names the number to lower.
+  `tests/unit/test_cli_stays_navigable.py`.
+- The `0.14.0` notes said `--root` "and every other inherited flag resolve identically wherever
+  they are written"; `regressions pr-comment` marks two of its options required, so the outer
+  placement is rejected -- and the branch's own test output said so in two `SKIPPED` lines. The
+  same entry counted 56 collisions across seven `regressions` subcommands where the tree had
+  **58** across **eight**. Both corrected. `tests/unit/test_changelog_cites_its_evidence.py`.
+
+### Added
+- **`failure-lab init` writes the workspace's `.gitignore`.** Two releases were spent moving
+  state out of the derived index and into `governance/` on the reasoning that a ledger or a
+  waiver is only a witness if it is committed, and the command whose job is setting up a
+  workspace said none of it: `git init && git add -A` committed a binary SQLite index the docs
+  call disposable. An existing file is never overwritten.
+  `tests/unit/test_governance_state_is_durable.py`.
+- **A black-box suite that attacks the gate without importing the engine.**
+  `tests/unit/test_gate_resists_a_motivated_operator.py` corrupts a workspace the way a person
+  under deadline pressure would -- delete the cases that broke, run half the suite, pad with
+  easy passes, relabel failures -- and asserts CI still goes red. It imports only `main` and
+  reads only exit codes, because every other test here compares the product to itself, which is
+  how a gate that passed on a deleted regression stayed green through four audits. Two attacks
+  it does *not* stop are listed with reasons, and the suite fails if either starts being caught,
+  so the boundary cannot quietly move in either direction.
+
+### Changed
+- **The console's guards now assert that something is said, not only that what is said is
+  right.** Every `EmptyState` must name a command, relay a loader message, offer the control
+  that clears the filter, or -- for an empty state, not a failure -- name the path that came
+  back empty (`frontend/src/app/__tests__/emptyStatesOfferANextStep.test.tsx`). Release-note
+  bullets are required to cite a test by *section* rather than by backticks, since dropping the
+  backticks was a one-keystroke exemption, and `docs/release.md` is checked for totality claims
+  (`tests/unit/test_changelog_cites_its_evidence.py`).
+- `DERIVED_INDEX_DIRNAME` moved to `storage/layout.py`, where the rest of the workspace layout
+  is decided; `index` re-exports it as `QUERY_INDEX_DIRNAME`, and
+  `tests/unit/test_governance_state_is_durable.py` reads it from there, so a broken re-export
+  fails rather than silently widening what the durability check exempts.
+
+## [0.14.0] - 2026-09-02
+
+Round four. All three round-three findings are closed, and all three were defects the
+round-three remediation introduced. That report named the pattern exactly: **the remediation
+identifies the class and then fixes the instance.** So every fix here is applied to the whole
+tree rather than the example that was reported, each ships with a predicate that fails when
+the fix is removed, and each was checked for other callers before this entry was written.
+Two of those predicates found defects the audit had not.
+
+### Fixed
+- **`failure-lab regressions --root W gate --strict-exit` exited 0 against a workspace it
+  never read** -- a green CI build for a directory the gate never opened, which is the exact
+  failure this tool exists to prevent. `argparse` parses a subcommand into a fresh namespace
+  and copies every attribute onto the outer one, so an option a subcommand redeclares writes
+  its *default* over the value the parent parsed. The CLI's own `--help` advertises the
+  placement that broke (`usage: failure-lab regressions [-h] [--root ROOT] ...`).
+  `0.13.0` fixed this by hand for `baselines` and left **58** other collisions: every filter
+  flag -- `--model`, `--limit`, `--json`, `--since` and eight more -- on all eight
+  `regressions` subcommands. `build_parser` now calls `_suppress_inherited_defaults` over the
+  assembled tree, which cannot be forgotten by the next subcommand somebody adds, and refuses
+  rather than papers over a redeclaration whose type or default diverges from its parent's.
+  `test_cli_option_inheritance.py` walks the tree, parses every collision with the option in
+  the outer position, and checks the gate's exit code from both placements; it reports 119
+  failures with the fix removed.
+- **`dataset evolve` wrote no ledger entry, so the immutability bypass survived on evolved
+  dataset versions.** `governance/promotions.json` was added in `0.13.0` to close the
+  strip-both-keys bypass by recording a promotion outside the pack it protects, and it was
+  wired into `dataset promote` only. Both commands write `lifecycle: curated` packs, and
+  `dataset evolve` is the mode the console's harvest dialog offers first: stripping
+  `metadata.integrity` and `lifecycle` from an evolved pack left `index validate` at exit 0
+  with four cases silently reduced to one. Both writers now go through
+  `datasets.integrity.write_curated_dataset`, which stamps the digest, writes the file and
+  records the ledger entry in one call -- so a third writer cannot pick up two of the three.
+  The `0.13.0` note that "a stripped pack is now a disagreement between two committed files"
+  is true for both paths as of this release. `test_dataset_immutability.py` runs the three
+  tamper attacks against packs from each writer in turn.
+- **The gate screen sent operators to the pre-`0.13.0` baseline registry.** Its empty state
+  named `.failure_lab/baseline_registry.json` for a full release after the registry moved to
+  `governance/baselines.json` -- pointing at the one directory that release had just finished
+  explaining a shared registry must not be in, because `make clean` deletes it. Found by
+  reading a screenshot, which is not a method. `test_console_names_real_paths.py` resolves
+  every workspace path the console prints against `storage/layout.py` and the engine's path
+  constants, and separately refuses any screen that sends an operator into the derived index.
+- **`dataset promote` ignored `--root` for a relative draft path**, so
+  `failure-lab --root W dataset promote datasets/harvested/x.json` -- the shape the console
+  prints -- read the draft from the current directory. `_resolve_draft_path` already existed
+  for this and was called by `dataset review` and not by `dataset promote`: the same
+  one-of-two mistake as the two above, found by the predicate written for the second one
+  rather than by the audit. `test_governance_state_is_durable.py` now drives every
+  decision-recording command, `dataset promote` among them, against a workspace elsewhere.
+
+### Changed
+- **`test_governance_state_is_durable.py` covers every command that records a decision**, not
+  the two it happened to be written for, and it diffs file *contents* rather than filenames --
+  a name-only diff reported the second writer of an append-only ledger as writing nothing,
+  which would have hidden the `dataset evolve` bug above. It also asserts the converse: every
+  such command must leave a record under `governance/`, so a curated pack written without a
+  ledger entry fails there.
+- **`_add_dataset_parser` (453 lines, 21 subcommands) and `_add_regressions_parser` (202)
+  are split by concern.** The `dataset` group is now five builders, one of which holds the
+  twelve `plan-*` / `execution*` / `follow-up-*` subcommands `docs/api.md` says the supported
+  loop never requires -- putting that scope split in the code and not only in the docs. Pure
+  motion: the resolved argparse tree and all 1,201 lines of `--help` output across the whole
+  command tree are byte-identical to `0.13.0`. The largest function in `cli.py` went from 453
+  lines to 162, and `test_cli_stays_navigable.py` ratchets both that number and the file's
+  total so the next round cannot quietly give it back.
+- **A CHANGELOG entry that names a command or a module must cite a test that proves it.**
+  Three releases running, this file overstated a guarantee -- the manifest stack that was
+  "deleted", the remedy that was "fixed", the pack that was "a disagreement between two
+  committed files" -- because each entry was written from the fix rather than from the
+  surface. `test_changelog_cites_its_evidence.py` enforces the citation on the entry for the
+  version in `pyproject.toml`.
+
+## [0.13.0] - 2026-08-26
+
+A third audit pass, this one re-run against the `0.12.0` remediation branch. Four of the
+seven findings were defects that remediation introduced, and one is the worst kind this
+project can have: **the `0.12.0` CHANGELOG claimed a fix that was never made.** Every fix
+here is a predicate over the whole surface rather than a correction to one example — that
+is what the previous round got wrong.
+
+### Fixed
+- **A waiver turned the console green and left CI red.** `regressions waive` wrote a waiver
+  that `regressions gate` and the console honoured and `compare --gate` ignored — and
+  `compare --gate` is what `action.yml` wraps and the README puts in CI. Following the
+  console's own printed remedy produced a green gate screen over a red build. All three
+  surfaces resolve waivers through `resolve_waiver` now, and `compare --gate` reports what it
+  suppressed (`Gate: PASS (waived by padraig: …) [would block: …]`) rather than a bare PASS.
+  An expired waiver is named, not silently ignored.
+  `test_gate_surface_parity.py` asks all three the same question and compares their answers
+  **to each other**, so a surface that grows an input nobody else reads fails there.
+- **Six printed remedies did not run** — `harvest --report <comparison>` (missing `--out`),
+  `dataset promote <draft>` in four places (missing `--dataset-id`), `run <dataset>`
+  (positional where the CLI wants `--dataset`), `dataset evolve … --comparison` (the flag is
+  `--from-comparison`), and `baselines set <name>` (`--name`). The `0.12.0` CHANGELOG said
+  the first of those was fixed; the entry was written and the string never touched.
+  `test_console_commands_are_runnable.py` now extracts every `failure-lab …` literal the
+  console prints and parses it against the real argparse tree.
+- **The legacy import error was wrong.** `reporting.__getattr__` turned any
+  `ModuleNotFoundError` into "not shipped in the installed package", so a checkout missing
+  the `[legacy]` extra — what `make install-dev` gives you — got a false message instead of
+  `No module named 'matplotlib'`, and two scripts failed to import. It discriminates on
+  `exc.name` now. The guarding test is deliberately **not** marked `legacy`: the bug only
+  appears when the extra is absent, so a test that needs it is skipped exactly where the
+  bug lives, which is how this shipped green.
+- **The "shared" baseline registry was disposable.** It lived at
+  `.failure_lab/baseline_registry.json` — the derived index directory, which `.gitignore`
+  excludes and `make clean` deletes irrecoverably, since it is not derived. It is
+  `governance/baselines.json` now, with a read-through so an existing workspace keeps its
+  entries. `test_governance_state_is_durable.py` runs the governance surfaces and asserts
+  nothing they wrote lands somewhere `make clean` removes.
+- **`ExplorerPage` kept a private copy of the regression transition set**, through the
+  consolidation that removed the other four — `transitions.test.ts` pins the module, not its
+  use. A degrading *trend* also rendered red, where DESIGN.md assigns amber to degraded
+  state, and two of that function's three substring branches (`worsen`, `rising`) matched
+  nothing the engine emits. `consoleVocabulary.test.tsx` asserts the literals appear in
+  exactly one non-test file.
+- **`regressions waive <typo>` reported `Action: created`** and told you to re-check the
+  gate, which stayed red. It warns when the id names no saved comparison, and still writes —
+  waiving ahead of a rerun is legitimate.
+- **`waived by null`** on the comparison detail, because `--owner` is optional and was
+  interpolated unguarded.
+- `baselines list` / `baselines set` accept `--root` where every other subcommand takes it.
+  It was only on the parent parser, so the usual placement died on "unrecognized arguments".
+
+### Added
+- **The promotion ledger.** `metadata.integrity` catches an edit and `lifecycle: "curated"`
+  catches deleting the stamp, but deleting *both* defeated them, and no witness kept inside
+  the artifact can do better. `governance/promotions.json` records outside the pack that a
+  dataset id was promoted and what its digest was, so a stripped pack is now a disagreement
+  between two committed files. It also catches the re-stamp: editing the cases and
+  recomputing the digest leaves a self-consistent pack that the ledger still contradicts.
+- **A write token on the bridge.** The same-origin check trusts a request that sends neither
+  `Origin` nor `Sec-Fetch-Site`, on the grounds that such a caller is the local developer —
+  which stops being true under `--host`, where any machine on the network can curl a
+  header-less POST at the three write endpoints. The server mints a token per start and
+  injects it into the page; only something that loaded the page can read it.
+- **CI builds and checks the sdist.** The README says the walkthrough "ships in the source
+  tree (clone, or an unpacked sdist)", and the sdist is the only artifact that claim rests
+  on. Nothing built it.
+
+### Changed
+- `build_parser` was 1,164 lines; it is 33, delegating to one `_add_*_parser` per command
+  group. Pure code motion, verified by diffing the resolved argparse tree before and after.
+
+## [0.12.0] - 2026-08-25
+
+A second external-audit pass, this time through three lenses (a skim, a pre-merge review, and an
+adversarial critique). Every finding here was reproduced by executing the tool, not by reading it.
+Two carry **behavior changes** — see Changed.
+
+### Fixed
+- **Two screens gave opposite answers about the same comparison.** The comparison detail
+  short-circuited an `incompatible` verdict to "CI gate: not evaluated" *before* it read its gate
+  row — so the comparison that was the sole reason CI failed reported, on its own page, that the
+  gate had not been evaluated on it. Meanwhile `ConsoleShell` painted the rail chip red on any
+  block, so a fail-closed "runs are not comparable" showed a red FAIL badge 100px from an amber
+  banner describing the same state. `frontend/src/lib/artifacts/gateTone.ts` is now the only place
+  that decides, and `gateConsistency.test.tsx` asserts agreement across surfaces rather than
+  correctness of one. "not evaluated" now means exactly one thing: this comparison is not in the
+  gate's window.
+- **"Immutable" had a one-line bypass.** Deleting `metadata.integrity` from a curated pack restored
+  every pre-digest behavior: a pack with two of its four cases removed loaded silently and
+  `index validate` reported ok. `lifecycle: "curated"` distinguishes the cases — only
+  `dataset promote` and `dataset evolve` set it, and both stamp a digest — so a curated pack with a
+  missing *or* wrong digest is now a reported finding, with the path and a re-stamp command.
+- **The wheel shipped the legacy ML stack that `pyproject.toml` said it excluded.** The exclude list
+  missed `utils`, `tracking`, `artifact_index` and `config`, and `reporting` was one package holding
+  both surfaces, so setuptools could exclude it whole or not at all. Nineteen of the wheel's 94
+  Python files imported torch / pandas / numpy / scikit-learn / matplotlib and raised ImportError
+  for anyone who installed the package. The legacy reporting modules moved to `reporting.legacy`;
+  the wheel is 67 files and `test_wheel_excludes_legacy.py` walks the built package set to keep it
+  that way.
+- **A deliberate 404 branch in the bridge was unreachable.** Both detail handlers classified by
+  searching `bridgeErrorMessage`'s *return* value for "ENOENT", and that function always returns its
+  sanitized fallback, so every missing run answered 500. A crafted artifact id answered 500 too,
+  making a rejected path traversal indistinguishable from a crash; it is a 400 now, as is a
+  malformed POST body.
+- **The bridge answered requests addressed to any host.** It runs ahead of Vite's own
+  `allowedHosts` check — it has to, or the SPA fallback claims `/__failure_lab__/*.json` — so an
+  arbitrary `Host` was served, and a DNS-rebinding page reaching it on 127.0.0.1 is *genuinely*
+  same-origin, which makes the CSRF check pass by construction. The bridge now checks for itself.
+- **A nullable bridge payload was typed non-null**, so a legacy comparison artifact whose signal
+  lives only in `report_details.json` would have thrown a TypeError instead of reaching the explicit
+  fail-safe two lines below it. Found by turning on `strict` for the Node-side TypeScript.
+- **A failed harvest left an orphan reservation.** The bridge reserves its output name with
+  `O_CREAT|O_EXCL` so two console tabs cannot collide; a harvest that then failed left a zero-byte
+  pack behind, which the drafts listing skips, so they accumulated invisibly and pushed each real
+  harvest's name to `-2`, `-3`, `-4`.
+- **The console printed a remedy that did not work.** The gate offered `--waivers waivers.yml`, a
+  path nothing discovers, at a time when no command wrote a waiver at all. The Datasets empty state
+  printed `failure-lab harvest --report <comparison>`, which is missing the required `--out`.
+- **The comparison heading was a constant.** `Baseline → candidate` was hardcoded regardless of the
+  run ids; it only looked right because the bundled demo's runs carry those names.
+  `frontend/README.md` says the console never invents data.
+- Dead references: the feature-request template linked `docs/roadmap.md` (absent), `MANIFEST.in`
+  cited `docs/release-checklist.md` (it is `docs/release.md`), and `docs/code-map.md` pointed
+  contributors at `ci.yml` rather than the workflow that gates the supported path.
+
+### Added
+- **`failure-lab regressions waive <comparison-id> --reason "…"`.** The gate blocks fail-closed and
+  evaluates every recent comparison, so one accidental cross-dataset `compare` left it permanently
+  red — with no command to delete, prune or dismiss a saved comparison, and no command to write a
+  waiver either. It writes the file the gate discovers, sorted by comparison id; `--remove` drops
+  one; an `--expires-at` in the past is refused at write time.
+- **`run` says when a dataset targets a failure type the classifier cannot emit.** `heuristic_v1`
+  emits four of the taxonomy's eight, and `rag-failures-v1` ships targeting `retrieval` — one of the
+  four it cannot produce — so a run over it reported `hallucination` and `instruction_following`
+  with nothing explaining why the type the dataset exists to find never appeared.
+- **The dev-server bridge has tests.** It was 2,342 lines inside `vite.config.ts`, the largest file
+  in the frontend and the only one no test could import. It is now `frontend/server/artifactBridge.ts`
+  and `server/__tests__/artifactBridge.test.ts` drives it over real HTTP: 42 tests across the guards,
+  the status codes, and the two payloads composed in TypeScript rather than by the engine.
+- **A consumer-install CI job.** `production` installs with `pip install -e .[dev]`, which is not the
+  path a user takes — and that difference has already shipped one packaging bug. CI now builds the
+  wheel, asserts it ships no legacy module, installs it clean, and runs the README quickstart and
+  `examples/regression_demo/run.sh`, the headline command that had never been executed in CI.
+- A dark-theme screenshot, `docs/screens/gate-dark.png`. The console ships two committed themes and
+  the docs only ever showed one.
+
+### Changed
+- **`index validate` exits `2`, not `1`, on a tampered dataset.** Two is its documented
+  "contracts do not hold" code; the tampered pack used to escape the rebuild as an unhandled
+  exception, which a CI script cannot distinguish from the command itself crashing.
+- **`index validate` now fails on a curated pack carrying no content digest.** Packs promoted before
+  digests existed are affected: confirm the cases are the ones you promoted, then re-stamp with
+  `failure-lab dataset promote <path> --dataset-id <id> --force`. Loading such a pack still works —
+  only the command whose job is answering "do my contracts hold" reports it.
+- Importing a legacy reporting symbol from an installed wheel raises an `AttributeError` naming the
+  surface and pointing at `docs/legacy.md`, instead of a bare `ModuleNotFoundError`.
+- `npm run build` runs one typecheck instead of two; the two TypeScript projects are now one.
+- `docs/ci-governance.md` rewritten. It described a CI smoke flow the workflow does not run, pointed
+  policy and waivers at `.failure_lab/` (the derived index directory, which `.gitignore` excludes)
+  while discovery looks in `governance/`, and predated `compare --gate` entirely.
+- The README's comparison table drops the "Local?" column — promptfoo, DeepEval and Ragas are all
+  local — and names the actual differentiator instead: the comparison refuses to score itself when
+  the comparison is unsound. Its plain-English `run` row named "bad format", a failure type no
+  classifier emits.
+
+### Removed
+- `scripts/sync_react_ui_manifest.py` and its test. They served the manifest the pre-console React
+  debugger consumed; nothing in `frontend/` has read it since the rewrite.
+- `frontend/components.json` (a shadcn config for a console with no shadcn components) and the
+  unused `class-variance-authority` dependency.
+
 ## [0.11.0] - 2026-08-25
 
 A consumer-honesty release, from an external audit of `0.10.1`. Every change here is something a

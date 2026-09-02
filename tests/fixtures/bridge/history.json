@@ -1,0 +1,65 @@
+{
+  "comparison_history": [],
+  "comparison_trend": null,
+  "dataset_health": {
+    "evaluation_run_count": 0,
+    "family_id": "insight-fixture-regressions",
+    "health_label": "unevaluated",
+    "latest_created_at": "2026-04-02T09:30:00Z",
+    "latest_dataset_id": "insight-fixture-regressions-v1",
+    "latest_version_tag": "v1",
+    "previous_fail_rate": null,
+    "primary_failure_type": "hallucination",
+    "recent_fail_rate": null,
+    "source_dataset_id": "insight-fixture-v1",
+    "trend": {
+      "delta": null,
+      "first_value": null,
+      "label": "insufficient_history",
+      "last_value": null,
+      "sample_count": 0,
+      "volatility": null,
+      "volatility_label": "insufficient_history"
+    },
+    "version_count": 1
+  },
+  "dataset_versions": [
+    {
+      "average_failure_rate": null,
+      "case_count": 3,
+      "created_at": "2026-04-02T09:30:00Z",
+      "dataset_id": "insight-fixture-regressions-v1",
+      "family_id": "insight-fixture-regressions",
+      "latest_run_at": null,
+      "parent_dataset_id": null,
+      "primary_failure_type": "hallucination",
+      "run_count": 0,
+      "severity": 0.5,
+      "signal_verdict": "regression",
+      "source_comparison_id": "compare_66f669a9_to_df4f8650_1094b97e",
+      "source_dataset_id": "insight-fixture-v1",
+      "version_number": 1,
+      "version_tag": "v1"
+    }
+  ],
+  "recurring_clusters": [],
+  "recurring_failures": [],
+  "run_history": [],
+  "run_trend": {
+    "delta": null,
+    "first_value": null,
+    "label": "insufficient_history",
+    "last_value": null,
+    "sample_count": 0,
+    "volatility": null,
+    "volatility_label": "insufficient_history"
+  },
+  "scope_kind": "family",
+  "scope_value": "insight-fixture-regressions",
+  "source": {
+    "label": "Configured artifact store",
+    "path": "{WORKSPACE}",
+    "reportsPath": "{WORKSPACE}/reports",
+    "runsPath": "{WORKSPACE}/runs"
+  }
+}

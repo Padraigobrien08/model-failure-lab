@@ -35,6 +35,7 @@ import type {
   ArtifactQueryMode,
   ArtifactQueryResponse,
 } from "@/lib/artifacts/types";
+import { transitionTone } from "@/lib/artifacts/transitions";
 import { cn } from "@/lib/utils";
 
 const QUERY_LIMIT = 200;
@@ -82,16 +83,18 @@ function verdictTone(verdict: string): ChipTone {
 }
 
 function trendToneClass(label: string): string {
-  const normalized = label.toLowerCase();
-  if (
-    normalized.includes("degrad") ||
-    normalized.includes("worsen") ||
-    normalized.includes("rising")
-  ) {
-    return "text-bad";
+  // `history.py` emits exactly three labels. Substring-matching English prose tested for
+  // "worsen" and "rising", which it never emits, and painted "degrading" red -- but
+  // DESIGN.md reserves red for regression and assigns amber to degraded state. A trend is
+  // a direction over time, not a verdict on a candidate.
+  switch (label) {
+    case "improving":
+      return "text-good";
+    case "degrading":
+      return "text-warn";
+    default:
+      return "text-ink";
   }
-  if (normalized.includes("improv")) return "text-good";
-  return "text-ink";
 }
 
 function TrendCard({ label, trend }: { label: string; trend: ArtifactMetricTrend | null }) {
@@ -121,13 +124,18 @@ function TrendCard({ label, trend }: { label: string; trend: ArtifactMetricTrend
 }
 
 function transitionToneClass(transitionType: string): string {
-  if (transitionType === "no_failure_to_failure" || transitionType === "new_error") {
-    return "text-bad";
+  // Via `transitions.ts`, not a private copy. That module exists so the console cannot hold
+  // its own opinion about what a regression is, and it is pinned to the engine's constants
+  // from both sides -- but the pin covers the module, not its use, so this screen kept a
+  // hardcoded duplicate through the consolidation that removed the other four.
+  switch (transitionTone(transitionType)) {
+    case "bad":
+      return "text-bad";
+    case "good":
+      return "text-good";
+    default:
+      return "text-muted-ink";
   }
-  if (transitionType === "failure_to_no_failure" || transitionType === "error_cleared") {
-    return "text-good";
-  }
-  return "text-muted-ink";
 }
 
 function evidencePath(ref: {

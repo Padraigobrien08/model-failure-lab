@@ -37,6 +37,11 @@ A quick guide for contributors to find the right files fast.
   - `src/model_failure_lab/harvest/pipeline.py`
   - `src/model_failure_lab/harvest/review.py`
   - `src/model_failure_lab/datasets/evolution.py`
+  - `src/model_failure_lab/datasets/integrity.py` (promoted-pack content digests)
+
+- **Change how the gate is rendered**
+  - `src/model_failure_lab/governance/gates.py` (`evaluate_gate_conditions` — the contract)
+  - `frontend/src/lib/artifacts/gateTone.ts` (the one place the console picks red/amber/green)
 
 ## Test map
 
@@ -55,7 +60,7 @@ A quick guide for contributors to find the right files fast.
 
 ## Operational files
 
-- CI workflow: `.github/workflows/ci.yml`
+- CI workflow: `.github/workflows/production.yml` (the supported path; `ci.yml` is the legacy/full suite)
 - Packaging metadata: `pyproject.toml`
 - Shortcut commands: `Makefile`
 
@@ -64,5 +69,5 @@ A quick guide for contributors to find the right files fast.
 - Screens: `frontend/src/app/routes/` (one file per route)
 - Shell + primitives: `frontend/src/components/layout/ConsoleShell.tsx`, `frontend/src/components/console/`
 - Artifact contract layer: `frontend/src/lib/artifacts/{load,extended,types}.ts`
-- Dev-server bridge: `frontend/vite.config.ts` → `scripts/query_bridge.py`
+- Dev-server bridge: `frontend/server/artifactBridge.ts` → `scripts/query_bridge.py`
 - Design rules: `frontend/DESIGN.md` · architecture: `frontend/README.md`

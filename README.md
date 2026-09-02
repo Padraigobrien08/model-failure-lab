@@ -18,7 +18,7 @@ bash examples/regression_demo/run.sh      # see a real regression caught
 
 > **Install from source for now.** The PyPI release is behind the source tree — `pip install
 > model-failure-lab` currently gets `0.1.0`, which predates `init`, `compare --gate`, `--html`
-> export and the `openai-compat` adapter. Clone until the badge below reads `0.11.0`.
+> export and the `openai-compat` adapter. Clone until the badge below reads `0.15.0`.
 
 [![Production CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml/badge.svg)](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml)
 [![PyPI](https://img.shields.io/pypi/v/model-failure-lab)](https://pypi.org/project/model-failure-lab/)
@@ -113,7 +113,7 @@ Four commands, four plain ideas:
 
 | Command | In plain English |
 |---|---|
-| **run** | Send a set of prompts through a model and record what came back, labelling each answer as a pass or a kind of failure (hallucination, wrong fact, missing citation, bad format…). |
+| **run** | Send a set of prompts through a model and record what came back, labelling each answer as a pass or a kind of failure. The bundled classifier detects four: `reasoning` (wrong fact or bad inference), `instruction_following` (ignored a constraint or dropped a citation), `hallucination` (ungrounded claim), and `no_failure`. |
 | **compare** | Diff two runs (e.g. old model vs new model) and report what got **worse** and what got **better**. |
 | **harvest** | Collect the cases that regressed into a small dataset file — the bugs, captured as test cases. |
 | **promote** | Save that harvested dataset as a permanent, versioned test you can re-run forever. |
@@ -224,26 +224,36 @@ workspace's saved JSON artifacts:
 FAILURE_LAB_ARTIFACT_ROOT=/path/to/your/workspace npm --prefix frontend run dev
 ```
 
-More screenshots in [`docs/screens/`](docs/screens/).
+More screenshots — including the dark theme — in [`docs/screens/`](docs/screens/).
 
 ## How it compares
 
 There are excellent tools in this space; they solve overlapping but different problems. This table is
 meant to be factual, not a claim of superiority — pick what fits your workflow.
 
-| Tool | Primary strength | Hosted? | Local? | Main focus |
-|---|---|---|---|---|
-| **LangSmith** | Polished UI for tracing, datasets, and evals | Yes (SaaS) | No | Observability + evaluation platform |
-| **promptfoo** | Great DX for config-driven prompt evals & red-teaming | Optional | Yes | Prompt/LLM testing & security |
-| **DeepEval** | Pytest-style assertions with many model-graded metrics | Optional | Yes | LLM unit-testing & metrics |
-| **Ragas** | Research-backed RAG metrics (faithfulness, context recall…) | No | Yes | RAG evaluation metrics |
-| **Model Failure Lab** | Git-native baseline-vs-candidate regression tracking; turns regressions into permanent datasets | No | Yes | Regression detection & failure-to-test workflow |
+| Tool | Primary strength | Hosted? | Main focus |
+|---|---|---|---|
+| **LangSmith** | Polished UI for tracing, datasets, and evals | Yes (SaaS) | Observability + evaluation platform |
+| **promptfoo** | Great DX for config-driven prompt evals & red-teaming | Optional | Prompt/LLM testing & security |
+| **DeepEval** | Pytest-style assertions with many model-graded metrics | Optional | LLM unit-testing & metrics |
+| **Ragas** | Research-backed RAG metrics (faithfulness, context recall…) | No | RAG evaluation metrics |
+| **Model Failure Lab** | Git-native baseline-vs-candidate regression tracking; turns regressions into permanent datasets | No | Regression detection & failure-to-test workflow |
+
+Running locally is not a differentiator — promptfoo, DeepEval and Ragas all do. The thing that is
+actually unusual here is narrower, and it is the reason the tool exists:
+
+> **The comparison refuses to score itself when the comparison is unsound.** Different datasets, no
+> shared cases, or one prompt rewritten under a stable case id, and you get `incompatible` rather
+> than a number. A candidate that errors instead of answering, or that deletes the cases it broke,
+> fails the gate rather than passing it. A verdict you cannot trust is worse than no verdict, so the
+> tool declines to produce one.
 
 Honest limitations: Model Failure Lab is pre-1.0, ships fewer built-in metrics than DeepEval/Ragas,
-has no hosted UI, and is Python/CLI-only. If you want a managed dashboard (LangSmith), a large metric
+has no hosted UI, and is Python/CLI-only. Its bundled classifier is deterministic and narrow — four
+failure types, no model-graded scoring. If you want a managed dashboard (LangSmith), a large metric
 library (DeepEval), deep RAG metrics (Ragas), or red-teaming (promptfoo), reach for those. Reach for
-Model Failure Lab when you want **local, git-tracked, version-to-version regression history** and a
-loop that converts failures into durable tests.
+Model Failure Lab when you want **git-tracked, version-to-version regression history you can trust**
+and a loop that converts failures into durable tests.
 
 ## Advanced
 
@@ -277,7 +287,7 @@ The production CLI is dependency-isolated from the optional research/ML stack: r
 
 ## Project status
 
-Pre-1.0 (`0.11.0`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
+Pre-1.0 (`0.15.0`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
 = CLI or artifact-schema changes. The DistilBERT/CivilComments benchmark stack under `[legacy]` is
 retained for reference and is not part of the supported workflow (`docs/legacy.md`).
 

@@ -17,7 +17,7 @@ import {
 } from "@/components/console/primitives";
 import type { ChipTone } from "@/components/console/primitives";
 import { RunHarvestDialog } from "@/components/console/RunHarvestDialog";
-import { loadRunDetail } from "@/lib/artifacts/load";
+import { ArtifactRequestError, loadRunDetail } from "@/lib/artifacts/load";
 import type {
   RunCaseLensKey,
   RunCaseRecord,
@@ -107,6 +107,9 @@ export function RunDetailPage() {
             status: "incompatible",
             detail: null,
             message: error instanceof Error ? error.message : String(error),
+            artifactPath:
+              error instanceof ArtifactRequestError ? error.artifactPath : undefined,
+            remedy: error instanceof ArtifactRequestError ? error.remedy : undefined,
           });
         }
       });
@@ -200,8 +203,21 @@ export function RunDetailPage() {
         </header>
         <div className="flex-1 overflow-auto px-7 pb-[22px]">
           <EmptyState
-            title="Run detail failed to load."
-            detail={state.status === "incompatible" ? state.message : "unknown error"}
+            title={
+              state.status === "incompatible" ? state.message : "Run detail failed to load."
+            }
+            detail={
+              <>
+                {state.status === "incompatible" && state.artifactPath ? (
+                  <div>{state.artifactPath}</div>
+                ) : null}
+                {state.status === "incompatible" && state.remedy ? (
+                  <div className="mt-1 text-ink">run: {state.remedy}</div>
+                ) : (
+                  <div>{runId}</div>
+                )}
+              </>
+            }
             action={
               <ConsoleButton onClick={() => setReloadToken((token) => token + 1)}>
                 Retry

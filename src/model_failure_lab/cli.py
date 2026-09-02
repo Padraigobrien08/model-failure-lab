@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
 from model_failure_lab.analysis import build_query_insight_report, explain_comparison_report
+from model_failure_lab.classifiers.heuristic import HEURISTIC_V1_EMITTED_FAILURE_TYPES
 from model_failure_lab.clusters import (
     FailureClusterDetail,
     FailureClusterSummary,
@@ -51,6 +52,7 @@ from model_failure_lab.governance import (
     PortfolioPlanSaveResult,
     RootCauseSummary,
     SavedPortfolioPlan,
+    WaiverWriteResult,
     apply_dataset_actions,
     apply_dataset_lifecycle_action,
     apply_saved_portfolio_plan_action,
@@ -74,10 +76,13 @@ from model_failure_lab.governance import (
     load_governance_policy_from_file,
     preflight_saved_portfolio_plan,
     recommend_dataset_action,
+    remove_waiver,
+    resolve_waiver,
     review_dataset_actions,
     review_dataset_lifecycle,
     summarize_recurring_root_causes,
     upsert_baseline,
+    upsert_waiver,
 )
 from model_failure_lab.harvest import (
     harvest_artifact_cases,
@@ -86,6 +91,7 @@ from model_failure_lab.harvest import (
 )
 from model_failure_lab.history import HistorySnapshot, query_history_snapshot
 from model_failure_lab.index import (
+    QUERY_INDEX_DIRNAME,
     ArtifactContractValidation,
     QueryFilters,
     aggregate_case_query,
@@ -103,7 +109,9 @@ from model_failure_lab.storage import (
     RUN_FILENAME,
     dataset_file,
     read_json,
+    report_file,
     write_json,
+    write_workspace_gitignore,
 )
 
 if TYPE_CHECKING:
@@ -157,22 +165,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog=CANONICAL_COMMAND,
-        description=(
-            "Run structured failure analysis on local prompt datasets and inspect the resulting "
-            "run, report, and comparison artifacts."
-        ),
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"%(prog)s {_package_version()}",
-        help="Print the installed package version and exit.",
-    )
-    subparsers = parser.add_subparsers(dest="command")
-
+def _add_run_parser(subparsers: argparse._SubParsersAction) -> None:
     run_parser = subparsers.add_parser(
         "run",
         help="Execute one dataset through the failure-analysis engine.",
@@ -233,6 +226,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run_parser.set_defaults(handler=_handle_run)
 
+
+def _add_report_parser(subparsers: argparse._SubParsersAction) -> None:
     report_parser = subparsers.add_parser(
         "report",
         help="Build a compact report from one saved run.",
@@ -259,6 +254,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     report_parser.set_defaults(handler=_handle_report)
 
+
+def _add_compare_parser(subparsers: argparse._SubParsersAction) -> None:
     compare_parser = subparsers.add_parser(
         "compare",
         help="Compare two saved runs as baseline -> candidate.",
@@ -279,7 +276,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--baseline-name",
         help=(
             "Resolve the baseline run from the shared baseline registry by name "
-            "(see `failure-lab baselines set`). Mutually exclusive with the positional "
+            "(see the `baselines set` command). Mutually exclusive with the positional "
             "baseline."
         ),
     )
@@ -316,8 +313,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--gate",
         action="store_true",
         help=(
-            "CI gate mode: exit 1 when the comparison signal verdict is a regression "
-            "(or the runs are incompatible), exit 0 otherwise."
+            "CI gate mode: exit 1 when this comparison blocks (regression verdict, "
+            "incomparable runs, a coverage or execution drop, or dropped baseline failing "
+            "cases), exit 0 otherwise. Honours an active waiver from "
+            "governance/waivers.yml, like `regressions gate` and the console do."
+        ),
+    )
+    compare_parser.add_argument(
+        "--waivers",
+        type=Path,
+        help=(
+            "Waiver file to consult for --gate. Defaults to the conventional "
+            "governance/waivers.* discovered under the artifact root."
         ),
     )
     compare_parser.add_argument(
@@ -339,6 +346,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_analysis_arguments(compare_parser, verb="explain")
     compare_parser.set_defaults(handler=_handle_compare)
 
+
+def _add_demo_parser(subparsers: argparse._SubParsersAction) -> None:
     demo_parser = subparsers.add_parser(
         "demo",
         help="Run the bundled deterministic demo flow and emit normal artifacts.",
@@ -353,6 +362,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     demo_parser.set_defaults(handler=_handle_demo)
 
+
+def _add_init_parser(subparsers: argparse._SubParsersAction) -> None:
     init_parser = subparsers.add_parser(
         "init",
         help="Scaffold a starter prompt dataset in the active workspace.",
@@ -391,6 +402,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     init_parser.set_defaults(handler=_handle_init)
 
+
+def _add_datasets_parser(subparsers: argparse._SubParsersAction) -> None:
     datasets_parser = subparsers.add_parser(
         "datasets",
         help="Inspect bundled datasets available by canonical ID.",
@@ -411,11 +424,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     datasets_list_parser.set_defaults(handler=_handle_datasets_list)
 
+
+def _add_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
+    """The `dataset` group: 21 subcommands across three unrelated concerns.
+
+    Split by concern rather than left as one 453-line function. The builders run in the
+    order the subcommands were written, which is the order `--help` lists them, so this is
+    pure motion -- checked by diffing the resolved argparse tree and all 22 `--help`
+    outputs before and after.
+    """
+
     dataset_parser = subparsers.add_parser(
         "dataset",
         help="Review or promote harvested dataset packs.",
     )
     dataset_subparsers = dataset_parser.add_subparsers(dest="dataset_command")
+
+    _add_dataset_pack_parsers(dataset_subparsers)
+    _add_dataset_lifecycle_parsers(dataset_subparsers)
+    _add_dataset_plan_parsers(dataset_subparsers)
+    _add_dataset_outcome_parsers(dataset_subparsers)
+    _add_dataset_evolution_parser(dataset_subparsers)
+
+
+def _add_dataset_pack_parsers(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`review`, `promote`, `versions`, `families` -- the harvested-pack surface."""
 
     dataset_review_parser = dataset_subparsers.add_parser(
         "review",
@@ -496,6 +529,10 @@ def build_parser() -> argparse.ArgumentParser:
     dataset_families_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_families_parser.set_defaults(handler=_handle_dataset_families)
 
+
+def _add_dataset_lifecycle_parsers(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`lifecycle-review`, `lifecycle-apply`, `portfolio` -- family-level governance."""
+
     dataset_lifecycle_review_parser = dataset_subparsers.add_parser(
         "lifecycle-review",
         help="Review deterministic lifecycle recommendations for dataset families.",
@@ -553,6 +590,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_portfolio_filter_arguments(dataset_portfolio_parser)
     dataset_portfolio_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_portfolio_parser.set_defaults(handler=_handle_dataset_portfolio)
+
+
+def _add_dataset_plan_parsers(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`planning-units` and `plan-create` .. `plan-execute` -- building a plan.
+
+    This and `_add_dataset_outcome_parsers` are the twelve subcommands `docs/api.md` says
+    the supported `run -> compare -> harvest -> promote` loop never requires. Grouping
+    them puts that scope split in the code, not only in the documentation.
+    """
 
     dataset_planning_units_parser = dataset_subparsers.add_parser(
         "planning-units",
@@ -679,6 +725,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dataset_plan_execute_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_plan_execute_parser.set_defaults(handler=_handle_dataset_plan_execute)
+
+
+def _add_dataset_outcome_parsers(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`executions`, `follow-up-*`, `plan-promote` -- recording what a plan produced."""
 
     dataset_executions_parser = dataset_subparsers.add_parser(
         "executions",
@@ -840,6 +890,10 @@ def build_parser() -> argparse.ArgumentParser:
     dataset_plan_promote_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_plan_promote_parser.set_defaults(handler=_handle_dataset_plan_promote)
 
+
+def _add_dataset_evolution_parser(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`evolve` -- the second writer of an immutable curated version."""
+
     dataset_evolve_parser = dataset_subparsers.add_parser(
         "evolve",
         help="Create the next immutable dataset version from one saved comparison signal.",
@@ -864,6 +918,9 @@ def build_parser() -> argparse.ArgumentParser:
     dataset_evolve_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_evolve_parser.set_defaults(handler=_handle_dataset_evolve)
 
+
+
+def _add_index_parser(subparsers: argparse._SubParsersAction) -> None:
     index_parser = subparsers.add_parser(
         "index",
         help="Manage the derived local query index over saved artifacts.",
@@ -900,6 +957,8 @@ def build_parser() -> argparse.ArgumentParser:
     index_validate_parser.add_argument("--json", action="store_true", dest="as_json")
     index_validate_parser.set_defaults(handler=_handle_index_validate)
 
+
+def _add_query_parser(subparsers: argparse._SubParsersAction) -> None:
     query_parser = subparsers.add_parser(
         "query",
         help="Run structured cross-run queries over the derived local index.",
@@ -929,6 +988,8 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--json", action="store_true", dest="as_json")
     query_parser.set_defaults(handler=_handle_query)
 
+
+def _add_history_parser(subparsers: argparse._SubParsersAction) -> None:
     history_parser = subparsers.add_parser(
         "history",
         help="Inspect deterministic run, comparison, or dataset-family history over local artifacts.",
@@ -949,6 +1010,8 @@ def build_parser() -> argparse.ArgumentParser:
     history_parser.add_argument("--json", action="store_true", dest="as_json")
     history_parser.set_defaults(handler=_handle_history)
 
+
+def _add_clusters_parser(subparsers: argparse._SubParsersAction) -> None:
     clusters_parser = subparsers.add_parser(
         "clusters",
         help="List deterministic recurring failure clusters over saved local artifacts.",
@@ -988,6 +1051,8 @@ def build_parser() -> argparse.ArgumentParser:
     clusters_parser.add_argument("--json", action="store_true", dest="as_json")
     clusters_parser.set_defaults(handler=_handle_clusters)
 
+
+def _add_cluster_parser(subparsers: argparse._SubParsersAction) -> None:
     cluster_parser = subparsers.add_parser(
         "cluster",
         help="Inspect one deterministic recurring cluster in detail.",
@@ -1028,6 +1093,15 @@ def build_parser() -> argparse.ArgumentParser:
     cluster_history_parser.add_argument("--json", action="store_true", dest="as_json")
     cluster_history_parser.set_defaults(handler=_handle_cluster_history)
 
+
+def _add_regressions_parser(subparsers: argparse._SubParsersAction) -> None:
+    """The `regressions` group.
+
+    Every filter declared here is redeclared by each subcommand so that both placements
+    parse; `build_parser` then calls `_suppress_inherited_defaults`, without which the
+    inner copy's default overwrites the value the outer one parsed.
+    """
+
     regressions_parser = subparsers.add_parser(
         "regressions",
         help="List recent saved comparison signals ordered by severity.",
@@ -1058,6 +1132,13 @@ def build_parser() -> argparse.ArgumentParser:
     regressions_parser.add_argument("--limit", type=int, default=10)
     regressions_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_parser.set_defaults(handler=_handle_regressions)
+
+    _add_regressions_signal_parsers(regressions_subparsers)
+    _add_regressions_gate_parsers(regressions_subparsers)
+
+
+def _add_regressions_signal_parsers(regressions_subparsers: argparse._SubParsersAction) -> None:
+    """`generate`, `recommend`, `review`, `apply` -- turning signals into decisions."""
 
     regressions_generate_parser = regressions_subparsers.add_parser(
         "generate",
@@ -1143,6 +1224,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     regressions_apply_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_apply_parser.set_defaults(handler=_handle_regressions_apply)
+
+
+def _add_regressions_gate_parsers(regressions_subparsers: argparse._SubParsersAction) -> None:
+    """`gate`, `waive`, `patterns`, `pr-comment` -- what CI reads, and what suppresses it."""
+
     regressions_gate_parser = regressions_subparsers.add_parser(
         "gate",
         help="Evaluate policy-as-code regression gate and optional waivers.",
@@ -1162,6 +1248,43 @@ def build_parser() -> argparse.ArgumentParser:
     regressions_gate_parser.add_argument("--strict-exit", action="store_true")
     regressions_gate_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_gate_parser.set_defaults(handler=_handle_regressions_gate)
+    regressions_waive_parser = regressions_subparsers.add_parser(
+        "waive",
+        help="Record why one comparison stops blocking the gate (governance/waivers.yml).",
+        description=(
+            "Write a waiver into the workspace's conventional waiver file. The gate blocks "
+            "on fail-closed conditions as well as regressions and evaluates every recent "
+            "comparison, so one accidental cross-dataset compare leaves a permanently red "
+            "gate; this is the supported way out. A waiver records the reason, which "
+            "deleting the artifact would not."
+        ),
+    )
+    regressions_waive_parser.add_argument("comparison_id")
+    regressions_waive_parser.add_argument(
+        "--reason",
+        help="Why this comparison stops blocking. Required unless --remove.",
+    )
+    regressions_waive_parser.add_argument("--owner", help="Who is accountable for the waiver.")
+    regressions_waive_parser.add_argument(
+        "--expires-at",
+        dest="expires_at",
+        help="UTC ISO-8601 timestamp after which the waiver is inactive, e.g. 2027-01-01T00:00:00Z.",
+    )
+    regressions_waive_parser.add_argument(
+        "--remove",
+        action="store_true",
+        help="Drop the waiver instead, so the comparison blocks the gate again.",
+    )
+    regressions_waive_parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
+    )
+    regressions_waive_parser.add_argument("--json", action="store_true", dest="as_json")
+    regressions_waive_parser.set_defaults(handler=_handle_regressions_waive)
     regressions_patterns_parser = regressions_subparsers.add_parser(
         "patterns",
         help="Summarize recurring root-cause patterns from saved clusters.",
@@ -1193,6 +1316,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     regressions_pr_comment_parser.set_defaults(handler=_handle_regressions_pr_comment)
 
+
+
+def _add_baselines_parser(subparsers: argparse._SubParsersAction) -> None:
     baselines_parser = subparsers.add_parser(
         "baselines",
         help="Manage shared baseline registry entries.",
@@ -1210,12 +1336,18 @@ def build_parser() -> argparse.ArgumentParser:
         "list",
         help="List shared baseline registry entries.",
     )
+    # Also on the subcommands. `--root` sits on the `baselines` parent for historical
+    # reasons, so `baselines set --name x --root .` -- the placement every other command in
+    # this CLI uses -- died on "unrecognized arguments" with no hint that the flag simply
+    # had to move earlier.
+    _add_root_argument(baselines_list_parser)
     baselines_list_parser.add_argument("--json", action="store_true", dest="as_json")
     baselines_list_parser.set_defaults(handler=_handle_baselines_list)
     baselines_set_parser = baselines_subparsers.add_parser(
         "set",
         help="Create or update a shared baseline registry entry.",
     )
+    _add_root_argument(baselines_set_parser)
     baselines_set_parser.add_argument("--name", required=True)
     baselines_set_parser.add_argument("--run", required=True, dest="run_id")
     baselines_set_parser.add_argument("--model")
@@ -1225,6 +1357,8 @@ def build_parser() -> argparse.ArgumentParser:
     baselines_set_parser.add_argument("--json", action="store_true", dest="as_json")
     baselines_set_parser.set_defaults(handler=_handle_baselines_set)
 
+
+def _add_harvest_parser(subparsers: argparse._SubParsersAction) -> None:
     harvest_parser = subparsers.add_parser(
         "harvest",
         help="Harvest saved artifact cases into a draft dataset pack.",
@@ -1267,7 +1401,112 @@ def build_parser() -> argparse.ArgumentParser:
     )
     harvest_parser.set_defaults(handler=_handle_harvest)
 
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=CANONICAL_COMMAND,
+        description=(
+            "Run structured failure analysis on local prompt datasets and inspect the resulting "
+            "run, report, and comparison artifacts."
+        ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {_package_version()}",
+        help="Print the installed package version and exit.",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    _add_run_parser(subparsers)
+    _add_report_parser(subparsers)
+    _add_compare_parser(subparsers)
+    _add_demo_parser(subparsers)
+    _add_init_parser(subparsers)
+    _add_datasets_parser(subparsers)
+    _add_dataset_parser(subparsers)
+    _add_index_parser(subparsers)
+    _add_query_parser(subparsers)
+    _add_history_parser(subparsers)
+    _add_clusters_parser(subparsers)
+    _add_cluster_parser(subparsers)
+    _add_regressions_parser(subparsers)
+    _add_baselines_parser(subparsers)
+    _add_harvest_parser(subparsers)
+
+    _suppress_inherited_defaults(parser)
+
     return parser
+
+
+#: Subcommand options that redeclare a parent's option with different behaviour. Appended
+#: to while the parser tree is built and asserted empty by
+#: `tests/unit/test_cli_option_inheritance.py`; a developer mistake should fail a test, not
+#: every invocation of the CLI.
+INHERITED_OPTION_DIVERGENCES: list[str] = []
+
+
+def _suppress_inherited_defaults(
+    parser: argparse.ArgumentParser,
+    _ancestors: tuple[dict[str, argparse.Action], ...] = (),
+) -> None:
+    """Stop a subcommand's option defaults from overwriting the same option on its parent.
+
+    `argparse` parses a subcommand into a fresh namespace and then copies every attribute
+    of it onto the outer one. An option a subcommand redeclares therefore writes its
+    *default* over whatever the parent already parsed, so `regressions --root X gate`
+    silently evaluated the current directory -- and `--strict-exit` reported a clean pass
+    for a workspace it never read. `SUPPRESS` keeps the attribute out of the subcommand's
+    namespace unless it was actually given, which makes both placements mean the same
+    thing. Placing an option before the subcommand is the shape the CLI's own `--help`
+    advertises (`usage: failure-lab regressions [-h] [--root ROOT] ...`), so it has to work.
+
+    This runs over the assembled tree rather than at each `add_argument` call on purpose.
+    The per-site version of this fix shipped in 0.13.0 for `baselines` and left 56 other
+    collisions across `regressions` -- every filter flag, not just `--root`. A rule applied
+    to the finished tree cannot be forgotten by the next subcommand somebody adds;
+    `tests/unit/test_cli_option_inheritance.py` asserts the tree comes out clean.
+
+    Where the two declarations disagree on type or default, suppression makes the parent's
+    default win, which is a behaviour change rather than a fix. That case is recorded in
+    `INHERITED_OPTION_DIVERGENCES` and asserted empty by the predicate test -- it is not
+    raised. Raising happened during `build_parser`, which `main` calls before anything
+    else, so a mistake in one subcommand answered `failure-lab --help` with a traceback.
+    A developer error belongs in a failing test, not in every user's terminal.
+    """
+
+    declared: dict[str, argparse.Action] = {}
+    subactions: list[argparse._SubParsersAction] = []
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            subactions.append(action)
+            continue
+        for option in action.option_strings:
+            declared[option] = action
+
+    for option, action in declared.items():
+        inherited = next(
+            (scope[option] for scope in reversed(_ancestors) if option in scope), None
+        )
+        if inherited is None or action.default is argparse.SUPPRESS:
+            continue
+        if (
+            action.dest != inherited.dest
+            or type(action) is not type(inherited)
+            or action.type is not inherited.type
+            or action.default != inherited.default
+        ):
+            INHERITED_OPTION_DIVERGENCES.append(
+                f"{parser.prog}: {option} redeclares its parent's option with different "
+                f"behaviour (dest/type/default), so the parent's default now wins. Give it "
+                f"a distinct name, or make the two declarations agree."
+            )
+        action.default = argparse.SUPPRESS
+
+    scopes = (*_ancestors, declared)
+    for subaction in subactions:
+        for subparser in subaction.choices.values():
+            _suppress_inherited_defaults(subparser, scopes)
 
 
 def _add_signal_filter_arguments(parser: argparse.ArgumentParser) -> None:
@@ -1383,6 +1622,24 @@ def _build_governance_policy(args: argparse.Namespace) -> GovernancePolicy:
         max_duplicate_ratio=args.max_duplicate_ratio,
         recurrence_window=args.recurrence_window,
         recurrence_threshold=args.recurrence_threshold,
+    )
+
+
+def _add_root_argument(parser: argparse.ArgumentParser) -> None:
+    """Add `--root` to a subcommand that also inherits one from its parent parser.
+
+    The `SUPPRESS` that makes both placements work is applied by
+    `_suppress_inherited_defaults` once the whole tree exists, not here -- see that
+    function for why per-site fixes do not hold.
+    """
+
+    parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Override the artifact root for this invocation. Defaults to the current working "
+            "directory."
+        ),
     )
 
 
@@ -1530,7 +1787,12 @@ def _handle_compare(args: argparse.Namespace) -> int:
     gate_exit_code = 0
     gate_line: str | None = None
     if args.gate:
-        gate_exit_code, gate_line = _evaluate_compare_gate(built.report, built.details)
+        gate_exit_code, gate_line = _evaluate_compare_gate(
+            built.report,
+            built.details,
+            root=root,
+            waiver_path=args.waivers,
+        )
 
     if args.output_format == "markdown":
         markdown = _render_compare_markdown(built.report, built.details, gate_line=gate_line)
@@ -1694,11 +1956,20 @@ def _handle_init(args: argparse.Namespace) -> int:
             f"dataset already exists: {dataset_path}. Re-run with --force to overwrite."
         )
     write_json(dataset_path, dataset.to_payload())
+    gitignore_path, gitignore_written = write_workspace_gitignore(root)
     lines = [
         "Failure Lab Init",
         f"Dataset ID: {dataset.dataset_id}",
         f"Cases: {len(dataset.cases)}",
         f"Dataset written to: {dataset_path}",
+    ]
+    if gitignore_written:
+        lines.append(f"Workspace .gitignore written to: {gitignore_path}")
+        lines.append(
+            "  Commit datasets/ and governance/ -- they are the record. "
+            f"{QUERY_INDEX_DIRNAME}/ is derived and rebuildable."
+        )
+    lines += [
         "",
         "Next steps:",
         f"1. Edit the prompts in {dataset_path}",
@@ -1717,7 +1988,13 @@ def _handle_datasets_list(args: argparse.Namespace) -> int:
 
 
 def _resolve_draft_path(draft_path: Path, *, root: Path | None) -> Path:
-    """Resolve a draft pack path, honoring --root for relative paths."""
+    """Resolve a draft pack path, honoring --root for relative paths.
+
+    Every command that takes a draft path must call this. `dataset review` did and
+    `dataset promote` did not, so `--root W dataset promote datasets/harvested/x.json`
+    -- the shape the console prints -- read the draft from the current directory and
+    failed, or worse, promoted a same-named draft from the wrong workspace.
+    """
 
     if root is None or draft_path.is_absolute():
         return draft_path
@@ -1753,7 +2030,7 @@ def _handle_dataset_review(args: argparse.Namespace) -> int:
 
 def _handle_dataset_promote(args: argparse.Namespace) -> int:
     summary = promote_harvest_dataset(
-        args.draft_path,
+        _resolve_draft_path(args.draft_path, root=args.root),
         dataset_id=args.dataset_id,
         root=_normalized_root(args.root),
         output_path=args.out,
@@ -2071,6 +2348,70 @@ def _handle_regressions_gate(args: argparse.Namespace) -> int:
     if result.blocked and args.strict_exit:
         return 2
     return 0
+
+
+def _handle_regressions_waive(args: argparse.Namespace) -> int:
+    root = _normalized_root(args.root)
+    if args.remove:
+        result = remove_waiver(args.comparison_id, root=root)
+    else:
+        if not args.reason:
+            raise ValueError(
+                "a waiver must record why the comparison stops blocking; pass --reason "
+                "(or --remove to drop an existing waiver)"
+            )
+        result = upsert_waiver(
+            args.comparison_id,
+            reason=args.reason,
+            root=root,
+            owner=args.owner,
+            expires_at=args.expires_at,
+        )
+        # A typo'd id used to get a confident "Action: created" and an instruction to
+        # re-check the gate, which then stayed red with nothing connecting the two. Waiving
+        # ahead of a rerun is legitimate, so this warns rather than refuses.
+        if not _comparison_exists(args.comparison_id, root=root):
+            print(
+                f"Warning: no saved comparison '{args.comparison_id}' in this workspace, so "
+                "this waiver matches nothing yet. Check the id with "
+                "`failure-lab regressions --json`, or rerun the comparison.",
+                file=sys.stderr,
+            )
+    if args.as_json:
+        print(
+            _render_json_payload(
+                {
+                    "comparison_id": result.comparison_id,
+                    "action": result.action,
+                    "path": str(result.path),
+                    "waivers": [waiver.to_payload() for waiver in result.waivers],
+                }
+            )
+        )
+    else:
+        print(_render_waiver_write(result))
+    return 0
+
+
+def _comparison_exists(comparison_id: str, *, root: Path | None) -> bool:
+    """Is this id a comparison the workspace has actually saved?"""
+
+    try:
+        return report_file(comparison_id, root=root).exists()
+    except (OSError, ValueError):  # pragma: no cover - a malformed id is not a crash
+        return False
+
+
+def _render_waiver_write(result: WaiverWriteResult) -> str:
+    lines = ["Failure Lab Waiver", f"Comparison: {result.comparison_id}"]
+    if result.action == "absent":
+        lines.append("No waiver was recorded for this comparison; nothing to remove.")
+        return "\n".join(lines)
+    lines.append(f"Action: {result.action}")
+    lines.append(f"File: {result.path}")
+    lines.append(f"Active waivers: {len(result.waivers)}")
+    lines.append("Re-check the gate with: failure-lab regressions gate --strict-exit")
+    return "\n".join(lines)
 
 
 def _handle_regressions_patterns(args: argparse.Namespace) -> int:
@@ -4204,12 +4545,43 @@ def _render_run_summary(
     dataset_scope = execution.run.config.get("dataset_scope")
     if isinstance(dataset_scope, str):
         lines.insert(6, f"Dataset scope: {dataset_scope}")
+    unreachable = _unreachable_target_failure_type(dataset, execution.classifier_id)
+    if unreachable is not None:
+        # `rag-failures-v1` declares `target_failure_type: retrieval`, and `heuristic_v1`
+        # -- the only registered classifier -- cannot emit it. The run then reports
+        # `hallucination` and `instruction_following` for retrieval probes, and nothing on
+        # screen explained why the type the dataset exists to find never appeared.
+        lines.append(
+            f"Note: this dataset targets '{unreachable}', which the "
+            f"{execution.classifier_id} classifier cannot emit "
+            f"(it emits: {', '.join(sorted(HEURISTIC_V1_EMITTED_FAILURE_TYPES))}). "
+            "Its failures are still classified, under the types this classifier detects."
+        )
     if execution.status == "completed_with_errors":
         lines.append("Warning: run completed with per-case errors.")
         first_error = next((case.error for case in execution.case_results if case.error), None)
         if first_error is not None:
             lines.append(f"First error: {first_error.stage}: {first_error.message}")
     return "\n".join(lines)
+
+
+def _unreachable_target_failure_type(
+    dataset: FailureDataset,
+    classifier_id: str,
+) -> str | None:
+    """The dataset's declared target type, when the active classifier cannot emit it.
+
+    Only `heuristic_v1` is registered and it declares its own emitted subset, so this is a
+    lookup rather than a classifier-capability protocol. Give a second classifier its own
+    declared set before generalizing this.
+    """
+
+    if classifier_id != "heuristic_v1":
+        return None
+    target = dataset.metadata.get("target_failure_type")
+    if not isinstance(target, str) or not target:
+        return None
+    return None if target in HEURISTIC_V1_EMITTED_FAILURE_TYPES else target
 
 
 def _render_report_summary(
@@ -4337,13 +4709,27 @@ def _render_compare_summary(
     return "\n".join(lines)
 
 
-def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str]:
+def _evaluate_compare_gate(
+    report,
+    details: dict[str, object],
+    *,
+    root: Path | None = None,
+    waiver_path: Path | None = None,
+) -> tuple[int, str]:
     """Deterministic CI gate contract, shared with `regressions gate` and the console.
 
     The decision itself lives in `governance.gates.evaluate_gate_conditions`; this only
     adapts the in-memory report into that contract's inputs and formats the verdict line.
     Keeping one implementation is what stops the console from showing PASS on a comparison
     that fails CI.
+
+    Waivers are resolved here too, and that is not cosmetic. `regressions gate` and the
+    console's gate endpoint both honour `governance/waivers.yml`; this surface did not, and
+    it is the one `action.yml` wraps and the README tells you to put in CI. So writing a
+    waiver -- which the console prints as its own remedy -- turned the console green and
+    left the build red with nothing on screen connecting the two. That is the console-green
+    / CI-red split the single gate contract exists to prevent, one layer up from the
+    conditions it unified.
     """
     signal = _comparison_signal_payload(report, details)
     verdict = str(signal.get("verdict", "unknown"))
@@ -4353,12 +4739,30 @@ def _evaluate_compare_gate(report, details: dict[str, object]) -> tuple[int, str
         compatible=report.comparison.get("compatible") is not False,
         execution_success_delta=_gate_float(delta.get("execution_success_rate")),
         classification_coverage_delta=_gate_float(delta.get("classification_coverage")),
-        dropped_baseline_failure_case_ids=tuple(_dropped_baseline_failure_ids(details)),
+        dropped_case_ids=_detail_case_ids(details, "baseline_only_case_ids"),
+        dropped_baseline_failure_case_ids=_detail_case_ids(
+            details, "dropped_baseline_failure_case_ids"
+        ),
     )
     block_reason = evaluate_gate_conditions(conditions)
-    if block_reason is not None:
-        return 1, f"Gate: FAIL ({block_reason})"
-    return 0, f"Gate: PASS (signal verdict: {verdict})"
+    if block_reason is None:
+        return 0, f"Gate: PASS (signal verdict: {verdict})"
+
+    waiver = resolve_waiver(
+        str(report.report_id),
+        root=root,
+        waiver_path=waiver_path,
+    )
+    if waiver is not None and waiver.active:
+        owner = f" by {waiver.owner}" if waiver.owner else ""
+        return 0, f"Gate: PASS (waived{owner}: {waiver.reason}) [would block: {block_reason}]"
+    if waiver is not None:
+        # Present but expired. Say so, rather than letting the operator wonder why the
+        # waiver they can see in the file did nothing.
+        return 1, (
+            f"Gate: FAIL ({block_reason}); waiver expired {waiver.expires_at}"
+        )
+    return 1, f"Gate: FAIL ({block_reason})"
 
 
 def _gate_float(value: object) -> float | None:
@@ -4367,19 +4771,13 @@ def _gate_float(value: object) -> float | None:
     return float(value)
 
 
-def _dropped_baseline_failure_ids(details: dict[str, object]) -> list[str]:
-    """Baseline cases that were failing and are absent from the candidate.
+def _detail_case_ids(details: dict[str, object], key: str) -> tuple[str, ...]:
+    """One of the comparison detail artifact's case-id lists, sorted and type-checked."""
 
-    Removing failing cases from the candidate hides them from the shared-scope verdict
-    math, so a candidate could pass simply by deleting the cases it broke. The comparison
-    records these ids in `dropped_baseline_failure_case_ids` (dropping passing cases is
-    benign and is not recorded).
-    """
-
-    dropped = details.get("dropped_baseline_failure_case_ids")
-    if not isinstance(dropped, list):
-        return []
-    return sorted(value for value in dropped if isinstance(value, str))
+    value = details.get(key)
+    if not isinstance(value, list):
+        return ()
+    return tuple(sorted(item for item in value if isinstance(item, str)))
 
 
 def _render_compare_markdown(report, details: dict[str, object], *, gate_line: str | None) -> str:

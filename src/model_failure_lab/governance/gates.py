@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,9 +67,9 @@ def default_policy_path(root: str | Path | None = None) -> Path | None:
 # `compare --gate`, `regressions gate` and the operator console's `gate` endpoint must
 # reach the same PASS/FAIL on the same artifacts, or the console can show green while CI
 # shows red. They previously did not: `compare --gate` applied five checks while the
-# governance gate applied only the verdict, so a candidate that deleted the cases it
-# broke -- or two runs that were not comparable at all -- failed CI and passed the
-# console. `evaluate_gate_conditions` is now the only place that decision is made.
+# governance gate applied only the verdict, so a candidate that skipped cases -- or two
+# runs that were not comparable at all -- failed CI and passed the console.
+# `evaluate_gate_conditions` is now the only place that decision is made.
 #
 # Checks are ordered most-fundamental first, and the first hit wins so the reported
 # reason is stable and deterministic.
@@ -87,6 +88,10 @@ class GateConditions:
     compatible: bool
     execution_success_delta: float | None = None
     classification_coverage_delta: float | None = None
+    #: Cases the baseline ran and the candidate did not -- the whole set, not a subset.
+    dropped_case_ids: tuple[str, ...] = ()
+    #: The subset of those the baseline was already failing. Reported for a clearer block
+    #: reason; `dropped_case_ids` is what the gate decides on.
     dropped_baseline_failure_case_ids: tuple[str, ...] = ()
 
 
@@ -107,12 +112,36 @@ def evaluate_gate_conditions(conditions: GateConditions) -> str | None:
     ):
         if value is not None and value < 0:
             return f"{label} regressed by {_format_signed_rate(value)}"
-    # Removing failing cases from the candidate hides them from the shared-scope verdict
-    # math, so a candidate could otherwise pass simply by deleting the cases it broke.
-    dropped = conditions.dropped_baseline_failure_case_ids
+    # Every metric above is computed on shared cases only, so a case the candidate did not
+    # run is invisible to all of them. That makes "stop running it" the cheapest way to
+    # turn this gate green, and it is what a person under deadline pressure actually does:
+    # retire the awkward case, rerun, ship.
+    #
+    # An earlier version of this check looked at `dropped_baseline_failure_case_ids` -- the
+    # cases the *baseline* was already failing -- while its comment claimed to stop "a
+    # candidate deleting the cases it broke". Cases a candidate broke are by definition
+    # cases the baseline passed, so the check covered the exact complement of its stated
+    # purpose, and deleting the four regressions from the bundled demo turned
+    # `Gate: FAIL (signal verdict: regression)` into `Gate: PASS`, exit 0. It survived four
+    # audits because the demo's baseline fails nothing, so the guard could never fire in
+    # the one workspace anybody tested it against.
+    #
+    # So the rule is the whole set: any case in the baseline and not in the candidate is a
+    # hole in the comparison, and a comparison with a hole in it does not get to say PASS.
+    # Shrinking a dataset on purpose is legitimate, and the way to record that is a waiver,
+    # which is a decision with a name on it.
+    dropped = conditions.dropped_case_ids
     if dropped:
         preview = ", ".join(dropped[:3])
-        return f"candidate dropped {len(dropped)} baseline failing case(s): {preview}"
+        more = "" if len(dropped) <= 3 else f", +{len(dropped) - 3} more"
+        already_failing = len(conditions.dropped_baseline_failure_case_ids)
+        detail = (
+            f" ({already_failing} already failing in the baseline)" if already_failing else ""
+        )
+        return (
+            f"candidate did not run {len(dropped)} case(s) the baseline ran{detail}: "
+            f"{preview}{more}"
+        )
     return None
 
 
@@ -142,19 +171,22 @@ def load_gate_conditions(comparison_id: str, *, root: str | Path | None = None) 
     delta = metrics.get("delta") if isinstance(metrics, dict) else None
     delta = delta if isinstance(delta, dict) else {}
 
-    dropped = details.get("dropped_baseline_failure_case_ids") if details is not None else None
-    dropped_ids = (
-        tuple(sorted(value for value in dropped if isinstance(value, str)))
-        if isinstance(dropped, list)
-        else ()
-    )
+    def _ids(key: str) -> tuple[str, ...]:
+        value = details.get(key) if details is not None else None
+        if not isinstance(value, list):
+            return ()
+        return tuple(sorted(item for item in value if isinstance(item, str)))
+
+    dropped_ids = _ids("baseline_only_case_ids")
+    dropped_failing_ids = _ids("dropped_baseline_failure_case_ids")
 
     return GateConditions(
         verdict=str(signal.get("verdict", "unknown")),
         compatible=comparison.get("compatible") is not False,
         execution_success_delta=_float_or_none(delta.get("execution_success_rate")),
         classification_coverage_delta=_float_or_none(delta.get("classification_coverage")),
-        dropped_baseline_failure_case_ids=dropped_ids,
+        dropped_case_ids=dropped_ids,
+        dropped_baseline_failure_case_ids=dropped_failing_ids,
     )
 
 
@@ -441,3 +473,164 @@ def _is_future_timestamp(value: str, *, now: datetime) -> bool:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed >= now
+
+
+# --------------------------------------------------------------------------------------
+# Writing waivers: the gate has to be exitable from inside the tool.
+# --------------------------------------------------------------------------------------
+#
+# The gate blocks on fail-closed conditions as well as regressions, and it evaluates every
+# recent comparison in the workspace -- so one accidental cross-dataset `compare` leaves a
+# permanently red gate. There was no command to delete, prune or dismiss a saved
+# comparison, and the only escape was to hand-author `governance/waivers.yml` from a
+# description in the docs, or to `rm -rf` a report directory outside the tool.
+#
+# A waiver is the right primitive -- it records *why* a comparison stopped blocking, which
+# deleting the artifact does not -- so the fix is to make writing one a command rather than
+# a documentation exercise.
+
+
+@dataclass(slots=True, frozen=True)
+class WaiverWriteResult:
+    """What `regressions waive` did, so the CLI can print a receipt."""
+
+    path: Path
+    comparison_id: str
+    #: `created`, `updated`, `removed`, or `absent` (asked to remove one that was not there).
+    action: str
+    waivers: tuple[GateWaiver, ...]
+
+
+def _waiver_file_path(root: str | Path | None) -> Path:
+    """The conventional waiver file, whether or not it exists yet."""
+
+    existing = default_waiver_path(root)
+    if existing is not None:
+        return existing
+    return project_root(root) / DEFAULT_WAIVER_FILENAMES[0]
+
+
+def _render_waivers(waivers: Sequence[GateWaiver]) -> str:
+    rows = [
+        {
+            key: value
+            for key, value in (
+                ("comparison_id", waiver.comparison_id),
+                ("reason", waiver.reason),
+                ("owner", waiver.owner),
+                ("expires_at", waiver.expires_at),
+            )
+            if value is not None
+        }
+        # Sorted by id: the file is committed, so two people waiving different comparisons
+        # must not produce a reordering diff.
+        for waiver in sorted(waivers, key=lambda entry: entry.comparison_id)
+    ]
+    return yaml.safe_dump({"waivers": rows}, sort_keys=False, default_flow_style=False)
+
+
+def upsert_waiver(
+    comparison_id: str,
+    *,
+    reason: str,
+    root: str | Path | None = None,
+    owner: str | None = None,
+    expires_at: str | None = None,
+) -> WaiverWriteResult:
+    """Add or replace one waiver in the workspace's conventional waiver file."""
+
+    if not comparison_id.strip():
+        raise ValueError("comparison_id must be a non-empty string")
+    if not reason.strip():
+        raise ValueError(
+            "a waiver must record why the comparison stops blocking; pass --reason"
+        )
+    if expires_at is not None and not _is_future_timestamp(
+        expires_at, now=datetime.now(tz=timezone.utc)
+    ):
+        raise ValueError(
+            f"--expires-at {expires_at!r} is not a future UTC timestamp, so the waiver "
+            "would be inactive the moment it was written"
+        )
+
+    path = _waiver_file_path(root)
+    existing = _load_waivers(root=root, waiver_path=path if path.exists() else None)
+    action = "updated" if comparison_id in existing else "created"
+    existing[comparison_id] = GateWaiver(
+        comparison_id=comparison_id,
+        reason=reason,
+        owner=owner,
+        expires_at=expires_at,
+        active=True,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_render_waivers(list(existing.values())), encoding="utf-8")
+    return WaiverWriteResult(
+        path=path,
+        comparison_id=comparison_id,
+        action=action,
+        waivers=tuple(sorted(existing.values(), key=lambda entry: entry.comparison_id)),
+    )
+
+
+def remove_waiver(
+    comparison_id: str,
+    *,
+    root: str | Path | None = None,
+) -> WaiverWriteResult:
+    """Drop one waiver, so a comparison starts blocking again."""
+
+    path = _waiver_file_path(root)
+    existing = _load_waivers(root=root, waiver_path=path if path.exists() else None)
+    if comparison_id not in existing:
+        return WaiverWriteResult(
+            path=path,
+            comparison_id=comparison_id,
+            action="absent",
+            waivers=tuple(sorted(existing.values(), key=lambda entry: entry.comparison_id)),
+        )
+    del existing[comparison_id]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_render_waivers(list(existing.values())), encoding="utf-8")
+    return WaiverWriteResult(
+        path=path,
+        comparison_id=comparison_id,
+        action="removed",
+        waivers=tuple(sorted(existing.values(), key=lambda entry: entry.comparison_id)),
+    )
+
+
+def resolve_waiver(
+    comparison_id: str,
+    *,
+    root: str | Path | None = None,
+    waiver_path: str | Path | None = None,
+) -> GateWaiver | None:
+    """One comparison's waiver, active or expired, or None when it has none.
+
+    Every gate surface resolves waivers through this. `compare --gate` used to skip the
+    lookup entirely, so a waiver honoured by `regressions gate` and by the console was
+    ignored by the surface `action.yml` wraps -- a green console over a red build.
+
+    An expired waiver is returned rather than swallowed, so a caller can say "expired"
+    instead of behaving as though the file were empty.
+    """
+
+    resolved = waiver_path if waiver_path is not None else default_waiver_path(root)
+    if resolved is None:
+        return None
+    return _load_waivers(root=root, waiver_path=resolved).get(comparison_id)
+
+
+def list_waivers(*, root: str | Path | None = None) -> tuple[GateWaiver, ...]:
+    """Every waiver in the workspace's conventional file, active or expired."""
+
+    path = default_waiver_path(root)
+    if path is None:
+        return ()
+    return tuple(
+        sorted(
+            _load_waivers(root=root, waiver_path=path).values(),
+            key=lambda entry: entry.comparison_id,
+        )
+    )

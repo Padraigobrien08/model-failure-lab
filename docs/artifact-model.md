@@ -14,7 +14,8 @@ alphabetical order shown here.
 datasets/            # canonical + promoted dataset packs, and harvested/ drafts
 runs/<run-id>/       # run.json + results.json
 reports/<report-id>/ # report.json + report_details.json (single-run AND comparison reports)
-governance/          # baseline registry, lifecycle_actions/, portfolio_plans/, waivers.yml
+governance/          # policy.yml, waivers.yml, baselines.json, promotions.json,
+                     #   lifecycle_actions/, portfolio_plans/
 .failure_lab/        # derived SQLite index (rebuildable; not a source artifact)
 ```
 
@@ -33,8 +34,16 @@ in shape rather than byte-reproducible across two identical runs:
   (`runner/identity.py`), and deliberately **not** the dataset's cases. Two runs over materially
   different versions of the same dataset ID therefore share the same digest.
   Dataset *content* provenance is recorded separately, as `metadata.dataset_content_digest` on
-  the run, and a promoted dataset carries its own `metadata.integrity.content_digest` (see
-  [Datasets](#datasets) below).
+  the run. It is **recorded, not enforced** — no command reads it, and nothing about it makes
+  two runs comparable or not. What actually refuses an unsound comparison is a per-case
+  content fingerprint computed at compare time
+  (`reporting/compare.py:_prompt_content_fingerprint`): two runs sharing a case id whose
+  prompt, tags or expectations differ are `incompatible_cases`, so a dataset mutated under a
+  stable id cannot be silently compared across. That check is finer-grained than the
+  run-level digest, which is why the digest stayed a provenance record rather than becoming a
+  gate. Separately, a promoted dataset carries its own `metadata.integrity.content_digest`,
+  which *is* verified on load, and whose promotion is recorded outside the pack in
+  `governance/promotions.json` (see [Datasets](#datasets) below).
 - Single-run report ID: `<run-id>_report`.
 - Comparison report ID: `compare_<baseline-digest>_to_<candidate-digest>_<pair-digest>` — derived
   purely from the **two run IDs** (`reporting/compare.py:build_comparison_report_id`), not from

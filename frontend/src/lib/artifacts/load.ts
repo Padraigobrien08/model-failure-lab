@@ -1718,7 +1718,13 @@ function requireArtifactDatasetVersionRecords(
   });
 }
 
-function requireArtifactDatasetVersionsResponse(payload: unknown): ArtifactDatasetVersionsResponse {
+/**
+ * Exported so `bridgeContract.test.ts` can run it over real `query_bridge.py` output --
+ * the golden fixtures are the only thing that catches a producer-side rename.
+ */
+export function validateArtifactDatasetVersions(
+  payload: unknown,
+): ArtifactDatasetVersionsResponse {
   const data = requireObject(payload, "dataset_versions");
   const familyId = requireString(data.family_id, "dataset_versions.family_id");
   const versions = requireArtifactDatasetVersionRecords(
@@ -2253,6 +2259,31 @@ export async function loadArtifactQuery(
   return validateArtifactQueryResponse(payload);
 }
 
+/**
+ * Headers for a bridge write.
+ *
+ * The bridge's CSRF defence is a same-origin check, and it trusts a request that sends
+ * neither `Origin` nor `Sec-Fetch-Site` on the grounds that such a caller "is the local
+ * developer". That stops being true under `vite --host` / `vite preview --host`, where any
+ * client on the network can `curl` a header-less POST at the three write endpoints.
+ *
+ * The dev server mints a token at startup and injects it into the page, so only something
+ * that loaded the page can read it. A `curl` from another machine cannot.
+ */
+export function bridgeWriteHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token =
+    typeof document === "undefined"
+      ? null
+      : document
+          .querySelector('meta[name="failure-lab-write-token"]')
+          ?.getAttribute("content");
+  if (token) {
+    headers["X-Failure-Lab-Write-Token"] = token;
+  }
+  return headers;
+}
+
 export async function createArtifactHarvestDraft(
   request: {
     mode: "cases" | "deltas";
@@ -2278,9 +2309,7 @@ export async function createArtifactHarvestDraft(
 ): Promise<ArtifactHarvestResponse> {
   const response = await fetchImpl(ARTIFACT_HARVEST_PATH, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: bridgeWriteHeaders(),
     body: JSON.stringify(request),
   });
   if (!response.ok) {
@@ -2311,9 +2340,7 @@ export async function createArtifactRegressionPack(
 ): Promise<ArtifactRegressionPackResponse> {
   const response = await fetchImpl(ARTIFACT_REGRESSION_PACK_PATH, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: bridgeWriteHeaders(),
     body: JSON.stringify(request),
   });
   if (!response.ok) {
@@ -2344,9 +2371,7 @@ export async function evolveArtifactDataset(
 ): Promise<ArtifactDatasetEvolutionResponse> {
   const response = await fetchImpl(ARTIFACT_DATASET_EVOLVE_PATH, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: bridgeWriteHeaders(),
     body: JSON.stringify(request),
   });
   if (!response.ok) {
@@ -2385,7 +2410,7 @@ export async function loadArtifactDatasetVersions(
     throw new Error(message);
   }
   const payload = await response.json();
-  return requireArtifactDatasetVersionsResponse(payload);
+  return validateArtifactDatasetVersions(payload);
 }
 
 export function validateArtifactOverview(payload: unknown): ArtifactOverview {
@@ -2974,12 +2999,10 @@ export async function loadComparisonDetail(
   }
 
   if (!response.ok) {
-    const data = payload as Record<string, unknown> | null;
-    const message =
-      data !== null && typeof data.message === "string"
-        ? data.message
-        : `comparison detail request failed with status ${response.status}`;
-    throw new Error(message);
+    throw actionableError(
+      payload,
+      `comparison detail request failed with status ${response.status}`,
+    );
   }
 
   return validateComparisonDetail(payload);
@@ -3047,6 +3070,34 @@ export function validateRunDetail(payload: unknown): RunDetail {
   };
 }
 
+/**
+ * An error the screen can act on: the sentence, the file, and the command that fixes it.
+ *
+ * The bridge answers a missing artifact with `{ message, path, remedy }`; keeping the last
+ * two as fields rather than folding them into the sentence is what lets a screen render
+ * the command as a command. Before this, a run with no report reached the operator as
+ * "run detail failed" beside a Retry button that re-fetched the same 404 forever.
+ */
+export class ArtifactRequestError extends Error {
+  constructor(
+    message: string,
+    readonly artifactPath?: string,
+    readonly remedy?: string,
+  ) {
+    super(message);
+    this.name = "ArtifactRequestError";
+  }
+}
+
+function actionableError(payload: unknown, fallback: string): ArtifactRequestError {
+  const data = payload as Record<string, unknown> | null;
+  const message =
+    data !== null && typeof data.message === "string" ? data.message : fallback;
+  const artifactPath = data !== null && typeof data.path === "string" ? data.path : undefined;
+  const remedy = data !== null && typeof data.remedy === "string" ? data.remedy : undefined;
+  return new ArtifactRequestError(message, artifactPath, remedy);
+}
+
 export async function loadRunDetail(
   runId: string,
   fetchImpl: typeof fetch = fetch,
@@ -3064,12 +3115,7 @@ export async function loadRunDetail(
   }
 
   if (!response.ok) {
-    const data = payload as Record<string, unknown> | null;
-    const message =
-      data !== null && typeof data.message === "string"
-        ? data.message
-        : `run detail request failed with status ${response.status}`;
-    throw new Error(message);
+    throw actionableError(payload, `run detail request failed with status ${response.status}`);
   }
 
   return validateRunDetail(payload);

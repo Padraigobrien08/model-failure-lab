@@ -57,7 +57,11 @@ describe("dataset drafts section", () => {
     const sourceLink = await screen.findByRole("button", { name: /…_001|cmp_001/ });
     await userEvent.click(sourceLink);
     await waitFor(() => {
-      expect(screen.getByText("Baseline → candidate")).toBeInTheDocument();
+      // The heading names the two runs, so landing on the right comparison is what this
+      // asserts -- a constant heading would have passed for any comparison at all.
+      expect(
+        screen.getByRole("heading", { level: 1, name: "…_base_001 → …_cand_002" }),
+      ).toBeInTheDocument();
     });
   });
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "model-failure-lab"
-version = "0.11.0"
+version = "0.15.0"
 description = "Local-first evaluation and failure-analysis toolkit for LLM and RAG systems."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -77,6 +77,14 @@ where = ["src"]
 # The legacy research surfaces (see docs/legacy.md) are kept in the source tree for
 # reference but excluded from wheels: `pip install model-failure-lab` ships only the
 # supported run -> report -> compare -> harvest workflow.
+#
+# That was a claim, not a fact, until 0.12.0: `utils`, `tracking`, `artifact_index` and
+# `config` were never listed, and `reporting` was a single package holding both surfaces,
+# so setuptools could exclude it whole or not at all. Nineteen modules importing torch /
+# pandas / numpy / scikit-learn / matplotlib shipped in the wheel and raised ImportError
+# on use. The legacy reporting modules now live in `reporting.legacy`, which is a package
+# and can be excluded; `tests/unit/test_wheel_excludes_legacy.py` asserts the whole list
+# stays true by walking the built package set.
 exclude = [
   "model_failure_lab.models",
   "model_failure_lab.models.*",
@@ -92,6 +100,16 @@ exclude = [
   "model_failure_lab.data.*",
   "model_failure_lab.runners",
   "model_failure_lab.runners.*",
+  "model_failure_lab.reporting.legacy",
+  "model_failure_lab.reporting.legacy.*",
+  "model_failure_lab.artifact_index",
+  "model_failure_lab.artifact_index.*",
+  "model_failure_lab.config",
+  "model_failure_lab.config.*",
+  "model_failure_lab.tracking",
+  "model_failure_lab.tracking.*",
+  "model_failure_lab.utils",
+  "model_failure_lab.utils.*",
 ]
 
 [tool.pytest.ini_options]

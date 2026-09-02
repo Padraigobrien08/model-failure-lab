@@ -138,7 +138,7 @@ export function RunHarvestDialog({
               <span className="font-semibold">{result.selectedCaseCount} cases</span> · lifecycle{" "}
               {result.lifecycle ?? "draft"}
               <br />
-              promote: failure-lab dataset promote {result.outputPath}
+              promote: failure-lab dataset promote {result.outputPath} --dataset-id &lt;id&gt;
             </div>
           </div>
         ) : (
@@ -174,7 +174,7 @@ export function RunHarvestDialog({
               <div className="rounded-tok border border-line bg-warn-bg px-3 py-2.5 font-mono text-[11.5px] text-warn">
                 {error}
                 <br />
-                run: failure-lab harvest --run {runId}
+                run: failure-lab harvest --run {runId} --out datasets/harvested/&lt;name&gt;.json
               </div>
             ) : null}
           </div>

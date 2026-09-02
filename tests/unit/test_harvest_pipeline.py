@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from model_failure_lab.cli import main
@@ -233,3 +234,47 @@ def test_dataset_review_and_promote_cli_surface_integrates_with_local_catalog_an
     assert "hallucination-regression-pack-v1" in list_output
     assert run_exit == 0
     assert "Failure Lab Run" in run_output
+
+
+def test_a_failed_bridge_harvest_leaves_no_orphan_reservation(tmp_path) -> None:
+    """The name is reserved by creating the file, so a failure must release it.
+
+    `_default_harvest_output_path` uses `O_CREAT|O_EXCL` to make check-and-claim atomic
+    against two console tabs harvesting at once. The cost is that a harvest which then
+    fails -- most often because the filters matched nothing -- left a zero-byte pack
+    behind. `_list_dataset_drafts` skips unparseable files, so those never appeared in the
+    console and accumulated silently, each one pushing the next real harvest's name to
+    `-2`, `-3`, `-4`.
+    """
+
+    import subprocess
+    import sys
+
+    project_root = Path(__file__).resolve().parents[2]
+    bridge = project_root / "scripts" / "query_bridge.py"
+    workspace = tmp_path / "workspace"
+    (workspace / "runs").mkdir(parents=True)
+
+    for _ in range(3):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(bridge),
+                "harvest",
+                "--root",
+                str(workspace),
+                "--mode",
+                "cases",
+                "--failure-type",
+                "safety",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=project_root,
+            env={**os.environ, "PYTHONPATH": str(project_root / "src")},
+        )
+        assert completed.returncode != 0, "a harvest matching nothing should fail"
+
+    harvested = workspace / "datasets" / "harvested"
+    leftovers = sorted(path.name for path in harvested.glob("*")) if harvested.is_dir() else []
+    assert leftovers == [], f"failed harvests left reservations behind: {leftovers}"

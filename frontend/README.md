@@ -18,9 +18,13 @@ vite dev/preview server ──▶ scripts/query_bridge.py ──▶ model_failur
 React app (src/)              JSON over stdout               │ governance/ .failure_lab/
 ```
 
-- **`vite.config.ts`** hosts the artifact middleware: each `/__failure_lab__/artifacts/*.json`
-  endpoint shells into `scripts/query_bridge.py` against `FAILURE_LAB_ARTIFACT_ROOT` (default:
-  repo root). The same middleware is registered for `vite preview`, so the built app works too.
+- **`server/artifactBridge.ts`** is the artifact bridge: each
+  `/__failure_lab__/artifacts/*.json` endpoint shells into `scripts/query_bridge.py` against
+  `FAILURE_LAB_ARTIFACT_ROOT` (default: repo root), and `comparison-detail` / `run-detail`
+  are composed here from the saved artifacts. It checks the request's `Host` and, for the
+  three write endpoints, requires a same-origin POST. `vite.config.ts` mounts it on both the
+  dev and the preview server, so the built app works too.
+  `server/__tests__/artifactBridge.test.ts` drives it over real HTTP.
 - **`src/lib/artifacts/`** is the typed contract layer: `load.ts` + `extended.ts` validate
   every payload field-by-field and throw with a field path on drift. UI code never touches
   raw JSON.
@@ -48,13 +52,16 @@ React app (src/)              JSON over stdout               │ governance/ .fa
 State that matters is URL-addressable (`q`, `dataset`, `model`, `status`, `mode`, `section`,
 `caseId`, `transition`, `lens`, `clusterId`), so a CI link can deep-link into a failing case.
 Writes are limited to the three deterministic dataset endpoints (harvest draft, regression
-pack, evolve); everything else is read-only.
+pack, evolve); everything else is read-only. The bridge is a localhost development surface:
+it answers only for loopback hosts, and its write endpoints require both a same-origin POST
+and the write token the server injects into the page it served — so `--host` does not hand
+the network a way to write into your workspace.
 
 ## Commands
 
 ```bash
 npm --prefix frontend run dev        # dev server (port 5174)
-npm --prefix frontend run build      # typecheck (app + node configs) + vite build
+npm --prefix frontend run build      # typecheck + vite build
 npm --prefix frontend test           # vitest
 npm --prefix frontend run smoke:real-artifacts   # end-to-end against a real workspace
 ```

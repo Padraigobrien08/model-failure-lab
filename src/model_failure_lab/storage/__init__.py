@@ -2,6 +2,7 @@
 
 from .json_artifacts import read_json, write_json
 from .layout import (
+    DERIVED_INDEX_DIRNAME,
     REPORT_DETAILS_FILENAME,
     REPORT_FILENAME,
     RESULTS_FILENAME,
@@ -26,9 +27,11 @@ from .layout import (
     run_directory,
     run_file,
     runs_root,
+    write_workspace_gitignore,
 )
 
 __all__ = [
+    "DERIVED_INDEX_DIRNAME",
     "REPORT_FILENAME",
     "REPORT_DETAILS_FILENAME",
     "RESULTS_FILENAME",
@@ -55,4 +58,5 @@ __all__ = [
     "run_file",
     "runs_root",
     "write_json",
+    "write_workspace_gitignore",
 ]

@@ -3,7 +3,7 @@
 `compare --gate`, `failure-lab regressions gate` and the operator console's read-only
 `gate` endpoint are three entry points to one decision. They previously were not: the
 compare gate applied five checks (incompatible runs, regression verdict, execution-success
-drop, classification-coverage drop, dropped baseline failing cases) while the governance
+drop, classification-coverage drop, cases the candidate stopped running) while the governance
 gate applied only the verdict. A candidate that deleted the cases it broke, or two runs
 that were not comparable at all, therefore failed CI and showed a green PASS in the
 console -- exactly the contradiction the console is supposed to make impossible.
@@ -57,6 +57,46 @@ def _workspace_dropping_failing_cases(root: Path) -> Path:
     return root
 
 
+def _workspace_dropping_the_cases_the_candidate_broke(root: Path) -> Path:
+    """The other direction, and the one that matters.
+
+    The fixture above deletes cases the *baseline* was already failing. A real regression
+    is the opposite: the baseline passes a case and the candidate breaks it. Hiding *that*
+    means deleting a case the baseline passed -- which for four audits was not checked by
+    anything, because the only fixture exercising dropped cases used a baseline that fails
+    four of eight, so the covered direction always fired first.
+
+    Baseline = the demo baseline, which fails nothing. Candidate = the demo candidate with
+    the four cases it broke removed. Every metric the gate reads is computed on the four
+    shared cases, all of which are clean, so without a check on dropped cases this reads as
+    `Gate: PASS (signal verdict: neutral)`.
+    """
+
+    _copy_run(DEMO_RUNS / "baseline", root / "runs" / "base", run_id="base")
+    _copy_run(DEMO_RUNS / "candidate", root / "runs" / "cand", run_id="cand")
+
+    baseline_results = json.loads(
+        (root / "runs" / "base" / "results.json").read_text(encoding="utf-8")
+    )
+    assert all(
+        (case.get("classification") or {}).get("failure_type") == "no_failure"
+        for case in baseline_results["cases"]
+    ), "fixture requires a baseline that fails nothing, or it tests the other direction"
+
+    results_path = root / "runs" / "cand" / "results.json"
+    results = json.loads(results_path.read_text(encoding="utf-8"))
+    broke = {
+        case["case_id"]
+        for case in results["cases"]
+        if (case.get("classification") or {}).get("failure_type") != "no_failure"
+    }
+    assert broke, "fixture must have cases the candidate broke"
+    results["cases"] = [case for case in results["cases"] if case["case_id"] not in broke]
+    results["total_cases"] = len(results["cases"])
+    results_path.write_text(json.dumps(results, indent=1, sort_keys=True))
+    return root
+
+
 def _workspace_with_incompatible_runs(root: Path) -> Path:
     """Two runs over entirely different datasets, so nothing is comparable."""
 
@@ -90,10 +130,17 @@ def _governance_gate(root: Path):
 @pytest.mark.parametrize(
     ("build_workspace", "expected_reason_fragment"),
     [
-        (_workspace_dropping_failing_cases, "dropped 4 baseline failing case(s)"),
+        (
+            _workspace_dropping_failing_cases,
+            "did not run 4 case(s) the baseline ran (4 already failing in the baseline)",
+        ),
+        (
+            _workspace_dropping_the_cases_the_candidate_broke,
+            "did not run 4 case(s) the baseline ran",
+        ),
         (_workspace_with_incompatible_runs, "runs are not comparable"),
     ],
-    ids=["dropped_failing_cases", "incompatible_runs"],
+    ids=["dropped_failing_cases", "dropped_the_cases_it_broke", "incompatible_runs"],
 )
 def test_every_gate_surface_blocks_the_same_comparison(
     tmp_path: Path,

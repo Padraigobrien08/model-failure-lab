@@ -233,7 +233,7 @@ export function DatasetFamilyPage() {
             <SectionLabel>Versions</SectionLabel>
             {versions.length === 0 ? (
               <div className="font-mono text-[11px] text-muted-ink">
-                none recorded · read datasets/ · run: failure-lab dataset promote &lt;draft&gt;
+                none recorded · read datasets/ · run: failure-lab dataset promote &lt;draft&gt; --dataset-id &lt;id&gt;
               </div>
             ) : (
               <table className="w-full border-collapse text-[13.5px]">

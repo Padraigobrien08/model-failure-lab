@@ -22,8 +22,9 @@ inputs:
       pip requirement to install. Empty (the default) installs from this action's
       own checkout, so the gate always matches the ref you pinned -- `@main`, a
       tag, or a SHA -- and needs no PyPI release. Set it to a requirement such as
-      `model-failure-lab>=0.11.0` to install from PyPI instead; do not pin below
-      `0.11.0`, the first version where every gate surface shares one contract.
+      `model-failure-lab>=0.13.0` to install from PyPI instead; do not pin below
+      `0.13.0`, the first version where every gate surface -- including this action's
+      `compare --gate` -- reaches the same verdict and honours the same waivers.
     required: false
     default: ""
   gate:
@@ -47,7 +48,7 @@ runs:
       run: |
         # Default to this action's own checkout. Defaulting to a PyPI requirement made the
         # action fail for every consumer whenever the published version lagged the tree --
-        # `pip install "model-failure-lab>=0.11.0"` cannot resolve until that is released.
+        # `pip install "model-failure-lab>=0.13.0"` cannot resolve until that is released.
         if [ -z "$PACKAGE" ]; then
           python -m pip install --quiet "$ACTION_PATH"
         else

@@ -197,7 +197,7 @@ export function RunsPage() {
         ) : runs.length === 0 ? (
           <EmptyState
             title="No saved runs."
-            detail={`read ${runsPath} · run: failure-lab run <dataset> --model <model>`}
+            detail={`read ${runsPath} · run: failure-lab run --dataset <dataset> --model <model>`}
           />
         ) : filtered.length === 0 ? (
           <EmptyState

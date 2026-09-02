@@ -110,7 +110,7 @@ describe("RunsPage", () => {
 
     expect(screen.getByText("No saved runs.")).toBeInTheDocument();
     expect(
-      screen.getByText("read runs/ · run: failure-lab run <dataset> --model <model>"),
+      screen.getByText("read runs/ · run: failure-lab run --dataset <dataset> --model <model>"),
     ).toBeInTheDocument();
   });
 });

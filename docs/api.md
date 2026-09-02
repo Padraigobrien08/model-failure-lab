@@ -16,7 +16,7 @@ that is the integration boundary between commands and between the CLI and the Re
 
 Entry points (all equivalent): `failure-lab`, `model-failure-lab`, `python3 -m model_failure_lab`
 (`pyproject.toml [project.scripts]`, `__main__.py`). Implemented in `src/model_failure_lab/cli.py`
-(15 top-level commands, 45 `_handle_*` handlers).
+(15 top-level commands, 46 `_handle_*` handlers).
 
 | Top-level command | Subcommands | Purpose |
 |---|---|---|
@@ -32,7 +32,7 @@ Entry points (all equivalent): `failure-lab`, `model-failure-lab`, `python3 -m m
 | `history` | — | Run / comparison / dataset-family history |
 | `clusters` | — | List recurring failure clusters |
 | `cluster` | `show`, `history` | Inspect one cluster |
-| `regressions` | `generate`, `recommend`, `review`, `apply`, `gate`, `patterns`, `pr-comment` | Governance over comparison signals |
+| `regressions` | `generate`, `recommend`, `review`, `apply`, `gate`, `waive`, `patterns`, `pr-comment` | Governance over comparison signals; `waive` records why one comparison stops blocking (`docs/ci-governance.md`) |
 | `baselines` | `list`, `set` | Shared baseline registry entries |
 | `harvest` | — | Harvest saved cases into a draft dataset pack |
 

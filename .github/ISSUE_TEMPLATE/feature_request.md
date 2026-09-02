@@ -17,9 +17,9 @@ What you'd like to see.
 ## Why it fits the project
 
 Model Failure Lab focuses on **local, git-native LLM/RAG regression testing** (run → compare →
-harvest → promote). Please note how this serves that workflow. Requests outside that scope (hosted
-dashboards, large metric libraries, red-teaming, training, etc.) are tracked as out of scope in
-[`docs/roadmap.md`](../../docs/roadmap.md) → "Explicitly Not Planned".
+harvest → promote). Please note how this serves that workflow. Hosted dashboards, large metric
+libraries, red-teaming and training are out of scope on purpose — see "How it compares" in the
+[README](../../README.md#how-it-compares), which names the tools that do cover them.
 
 ## Could it be a plugin?
 

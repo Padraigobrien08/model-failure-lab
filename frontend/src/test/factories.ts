@@ -333,10 +333,45 @@ export function buildDatasetFamiliesState(
 // ---------------------------------------------------------------------------
 
 export function buildGateState(
-  variant: "blocked" | "clear" = "blocked",
+  /**
+   * `fail-closed` is a gate that blocks with no regression among its reasons -- runs that
+   * are not comparable, a coverage drop, a candidate that deleted its failing cases. It is
+   * a distinct state from `blocked`, because DESIGN.md reserves red for regression alone.
+   */
+  variant: "blocked" | "clear" | "fail-closed" = "blocked",
   rowOverrides: Partial<GateDecisionRow>[] = [],
 ): GateState {
-  const blocked = variant === "blocked";
+  const blocked = variant !== "clear";
+  if (variant === "fail-closed") {
+    const failClosedRows: GateDecisionRow[] = [
+      {
+        comparisonId: REPORT_ID,
+        verdict: "incompatible",
+        action: "ignore",
+        severity: 0,
+        policyRule: "incompatible_signal",
+        blocked: true,
+        waived: false,
+        waiver: null,
+        blockReason: "runs are not comparable",
+      },
+    ];
+    rowOverrides.forEach((override, index) => {
+      failClosedRows[index] = { ...failClosedRows[index], ...override };
+    });
+    return {
+      status: "ready",
+      data: {
+        source: SOURCE,
+        blocked: true,
+        policy: buildGovernancePolicy(),
+        policySource: "default",
+        waiverSource: null,
+        rows: failClosedRows,
+      },
+      message: null,
+    };
+  }
   const rows: GateDecisionRow[] = [
     {
       comparisonId: REPORT_ID,
@@ -389,6 +424,8 @@ type ComparisonDetailWireOverrides = {
   signal?: ComparisonSignal;
   governanceRecommendation?: Record<string, unknown> | null;
   deltaFailureRate?: number | null;
+  /** Merged over the `comparison` block -- e.g. `{ compatible: false, reason: "dataset_mismatch" }`. */
+  comparison?: Record<string, unknown>;
 };
 
 export function buildComparisonDetail(
@@ -431,6 +468,7 @@ export function buildComparisonDetail(
       reason: null,
       comparisonMode: "shared_cases",
       metricsComputedOn: "shared",
+      ...overrides.comparison,
     },
     signal: overrides.signal ?? buildSignal(),
     metrics: {

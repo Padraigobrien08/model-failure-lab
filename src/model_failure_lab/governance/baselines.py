@@ -11,7 +11,19 @@ from model_failure_lab.schemas import JsonValue
 from model_failure_lab.storage import read_json, write_json
 from model_failure_lab.storage.layout import project_root
 
-BASELINE_REGISTRY_PATH = ".failure_lab/baseline_registry.json"
+#: Where the registry is written. `governance/` is the workspace's committed home for
+#: policy, waivers, lifecycle actions and portfolio plans, and this belongs with them.
+#:
+#: It used to live at `.failure_lab/baseline_registry.json` -- the derived query-index
+#: directory, which `.gitignore` excludes and `make clean` deletes. A registry the tool
+#: calls *shared* was therefore never committed, invisible to every collaborator, and
+#: destroyed irrecoverably by the project's own cleanup target: it is not derived, so no
+#: `index rebuild` brings it back. `docs/artifact-model.md` had always said `governance/`.
+BASELINE_REGISTRY_PATH = "governance/baselines.json"
+
+#: Read-only fallback so an existing workspace keeps working. Writes always go to the new
+#: path, so the first `baselines set` after upgrading migrates the registry.
+LEGACY_BASELINE_REGISTRY_PATH = ".failure_lab/baseline_registry.json"
 
 
 @dataclass(slots=True, frozen=True)
@@ -147,8 +159,18 @@ def _registry_path(*, root: str | Path | None) -> Path:
     return project_root(root) / BASELINE_REGISTRY_PATH
 
 
-def _load_registry(*, root: str | Path | None) -> dict[str, object]:
+def _readable_registry_path(*, root: str | Path | None) -> Path:
+    """The path to read from: the new one, falling back to a pre-migration workspace."""
+
     path = _registry_path(root=root)
+    if path.exists():
+        return path
+    legacy = project_root(root) / LEGACY_BASELINE_REGISTRY_PATH
+    return legacy if legacy.exists() else path
+
+
+def _load_registry(*, root: str | Path | None) -> dict[str, object]:
+    path = _readable_registry_path(root=root)
     if not path.exists():
         return {"baselines": []}
     payload = read_json(path)

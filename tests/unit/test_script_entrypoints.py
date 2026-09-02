@@ -19,7 +19,7 @@ from model_failure_lab.config import load_experiment_config
 from model_failure_lab.config.loader import _load_yaml_file
 from model_failure_lab.data import CanonicalDataset, CanonicalSample
 from model_failure_lab.models.export import build_prediction_records
-from model_failure_lab.reporting.discovery import ReportCandidate
+from model_failure_lab.reporting.legacy.discovery import ReportCandidate
 from model_failure_lab.tracking import build_run_metadata, write_metadata
 from model_failure_lab.utils.paths import (
     build_artifact_index_path,

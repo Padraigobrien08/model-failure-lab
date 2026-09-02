@@ -247,13 +247,23 @@ def main(argv: list[str] | None = None) -> int:
             filters=filters,
             comparison_id=args.comparison_id,
         )
-        summary = harvest_artifact_cases(
-            filters=filters,
-            output_path=output_path,
-            root=root,
-            comparison_id=args.comparison_id,
-            mode=args.mode,
-        )
+        try:
+            summary = harvest_artifact_cases(
+                filters=filters,
+                output_path=output_path,
+                root=root,
+                comparison_id=args.comparison_id,
+                mode=args.mode,
+            )
+        except BaseException:
+            # The name was reserved by creating the file (see
+            # `_default_harvest_output_path`), so a harvest that then fails -- most often
+            # because the filters matched nothing -- used to leave a zero-byte pack behind.
+            # `_list_dataset_drafts` skips unparseable files, so they never appeared in the
+            # console and accumulated silently, each one pushing the next real harvest's
+            # name to `-2`, `-3`, `-4`. Release the reservation on the way out.
+            _release_reserved_path(root / output_path)
+            raise
         payload = {
             "source": build_source_descriptor(root),
             "dataset_id": summary.dataset.dataset_id,
@@ -594,6 +604,16 @@ def _default_harvest_output_path(
                 ) from None
             continue
         return os.path.relpath(candidate, root)
+
+
+def _release_reserved_path(path: Path) -> None:
+    """Delete a reserved output path, but only while it is still the empty placeholder."""
+
+    try:
+        if path.is_file() and path.stat().st_size == 0:
+            path.unlink()
+    except OSError:  # pragma: no cover - a workspace we cannot clean is not fatal
+        pass
 
 
 def _slugify(value: str) -> str:

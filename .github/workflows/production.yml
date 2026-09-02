@@ -40,6 +40,79 @@ jobs:
         # script maps to it). There is no top-level `failure_lab` module.
         run: python -c "import model_failure_lab"
 
+  consumer-install:
+    # `production` installs with `pip install -e .[dev]`. That is not the path a user
+    # takes, and the difference has already shipped one bug (6aa4bc3: a wheel exclude glob
+    # swallowed `model_failure_lab.datasets`). This job builds the wheel, installs it into
+    # a clean environment, and runs the two things the README leads with.
+    name: consumer install (wheel + README quickstart)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build and install the wheel
+        run: |
+          python -m pip install --quiet build
+          python -m build --outdir dist
+          python -m pip install --quiet dist/*.whl
+
+      - name: The sdist carries the walkthrough the README points at
+        # The README says `examples/regression_demo/` "ships in the source tree (clone, or an
+        # unpacked sdist)". The wheel deliberately excludes it, so the sdist is the only
+        # artifact that claim rests on -- and nothing built it.
+        run: |
+          python - <<'PY'
+          import glob, tarfile
+          sdist = sorted(glob.glob("dist/*.tar.gz"))[-1]
+          with tarfile.open(sdist) as archive:
+              names = archive.getnames()
+          demo = [n for n in names if "examples/regression_demo/" in n]
+          assert any(n.endswith("run.sh") for n in demo), f"no run.sh in {sdist}"
+          assert any(n.endswith("dataset.json") for n in demo), f"no dataset.json in {sdist}"
+          assert len(demo) >= 8, f"only {len(demo)} demo files in {sdist}: {demo}"
+          print(f"{sdist}: {len(demo)} walkthrough files")
+          PY
+
+      - name: The wheel ships no legacy module
+        # The packaging claim, checked against the artifact rather than the config.
+        run: |
+          python - <<'PY'
+          import glob, re, zipfile
+          heavy = re.compile(
+              r"^\s*(?:from|import)\s+"
+              r"(torch|torchvision|pandas|numpy|sklearn|matplotlib|transformers|wilds|pyarrow|streamlit)\b",
+              re.MULTILINE,
+          )
+          wheel = sorted(glob.glob("dist/*.whl"))[-1]
+          archive = zipfile.ZipFile(wheel)
+          offenders = [
+              name
+              for name in archive.namelist()
+              if name.endswith(".py")
+              and heavy.search(archive.read(name).decode("utf-8", "replace"))
+          ]
+          assert not offenders, f"legacy modules in the wheel: {offenders}"
+          print(f"{wheel}: clean")
+          PY
+
+      - name: README quickstart (offline)
+        # The commands the README opens with, from a clean install.
+        run: |
+          cd "$(mktemp -d)"
+          failure-lab demo
+          failure-lab datasets list
+
+      - name: The bundled regression walkthrough
+        # `bash examples/regression_demo/run.sh` is the README's headline command and was
+        # never executed in CI.
+        run: bash examples/regression_demo/run.sh
+
   regression-gate-action:
     name: regression gate action (dogfood)
     runs-on: ubuntu-latest
@@ -104,6 +177,17 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Python
+        # `server/__tests__/artifactBridge.test.ts` drives the real bridge, which shells
+        # into `scripts/query_bridge.py`. Without an engine those cases skip silently, and
+        # a silently-skipped test is worse than an absent one.
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the engine (for the bridge tests)
+        run: python -m pip install --quiet .
 
       - name: Install dependencies
         run: npm ci --prefix frontend

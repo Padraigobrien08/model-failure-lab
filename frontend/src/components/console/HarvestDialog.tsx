@@ -209,7 +209,7 @@ export function HarvestDialog({
                   suggested family {result.response.suggestedFamilyId} · lifecycle{" "}
                   {result.response.lifecycle ?? "draft"}
                   <br />
-                  promote: failure-lab dataset promote {result.response.outputPath}
+                  promote: failure-lab dataset promote {result.response.outputPath} --dataset-id &lt;id&gt;
                 </>
               )}
             </div>
@@ -326,7 +326,7 @@ export function HarvestDialog({
                 <div className="rounded-tok border border-line bg-warn-bg px-3 py-2.5 font-mono text-[11.5px] text-warn">
                   {error}
                   <br />
-                  run: failure-lab dataset evolve {familyId} --comparison {reportId}
+                  run: failure-lab dataset evolve {familyId} --from-comparison {reportId}
                 </div>
               ) : null}
             </div>

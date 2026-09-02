@@ -44,19 +44,6 @@ FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures" / "bridge"
 BRIDGE = PROJECT_ROOT / "scripts" / "query_bridge.py"
 WORKSPACE_PLACEHOLDER = "{WORKSPACE}"
 
-# One entry per read-only bridge endpoint the console loads on navigation. Endpoints that
-# require a caller-supplied id (comparison-detail, run-detail, dataset-versions, history,
-# cluster-detail) are covered by the console's own page tests; these are the payloads whose
-# shape no test previously pinned at all.
-BRIDGE_COMMANDS: dict[str, list[str]] = {
-    "overview": ["overview"],
-    "runs": ["runs"],
-    "comparisons": ["comparisons"],
-    "gate": ["gate"],
-    "dataset-families": ["dataset-families"],
-    "dataset-drafts": ["dataset-drafts"],
-    "baselines": ["baselines"],
-}
 
 # A regression comparison from the insight fixture, used to seed a harvested draft and an
 # evolved dataset family so the families/drafts endpoints carry real rows instead of [].
@@ -67,6 +54,33 @@ SEED_BASELINE_RUN_ID = (
     "20260402_090000_000000_insight_fixture_v1_insight_fixture_v1"
     "_insight_fixture_classifier_v1_baseline_model_seed_13_9cd76f23"
 )
+
+# One entry per read-only bridge endpoint, including the id-taking ones.
+#
+# This list used to stop at the navigation endpoints and defer the rest to "the console's
+# own page tests" -- which feed `factories.ts`, the mirror-of-the-reader fixtures this file
+# exists to escape. That deferral re-asserted the circularity for five endpoints.
+#
+# `comparison-detail` and `run-detail` are absent for a different reason: they are not
+# produced by this bridge at all. The vite middleware composes them in TypeScript straight
+# from `run.json` / `results.json` / `report_details.json`, so the contract that can drift
+# there is the Python *writer* against that reader.
+# `frontend/server/__tests__/artifactBridge.test.ts` pins both sides of it by running the
+# console's own validators over real bridge output.
+#
+# `cluster-detail` needs a cluster id discovered from a built index, which is not stable
+# enough to pin as a byte-for-byte golden file; the console's explorer test covers its shape.
+BRIDGE_COMMANDS: dict[str, list[str]] = {
+    "overview": ["overview"],
+    "runs": ["runs"],
+    "comparisons": ["comparisons"],
+    "gate": ["gate"],
+    "dataset-families": ["dataset-families"],
+    "dataset-drafts": ["dataset-drafts"],
+    "baselines": ["baselines"],
+    "dataset-versions": ["dataset-versions", "--dataset-family", SEED_FAMILY_ID],
+    "history": ["history", "--family-id", SEED_FAMILY_ID],
+}
 
 
 def _build_workspace(root: Path) -> Path:

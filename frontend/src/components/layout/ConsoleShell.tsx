@@ -4,6 +4,7 @@ import type { AppRouteContext } from "@/app/router";
 import { NAVIGATION_ITEMS } from "@/app/router";
 import { SectionLabel, StatusChip } from "@/components/console/primitives";
 import type { ChipTone } from "@/components/console/primitives";
+import { gateSummary } from "@/lib/artifacts/gateTone";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -45,11 +46,15 @@ function GateNavRow({ context }: { context: AppRouteContext }) {
   const gate = context.gateState;
   let chip: { tone: ChipTone; label: string } | null = null;
   if (gate.status === "ready") {
-    chip = gate.data.rows.length === 0
-      ? { tone: "neutral", label: "NO DATA" }
-      : gate.data.blocked
-        ? { tone: "bad", label: "FAIL" }
-        : { tone: "good", label: "PASS" };
+    // This chip is on screen next to every other gate surface, so it has to agree with
+    // them. It used to be `blocked ? "bad" : "good"`, which painted a fail-closed
+    // "runs are not comparable" red in the rail while the banner beside it -- same state,
+    // same payload -- rendered amber. `gateSummary` is now the only place that decides.
+    const summary = gateSummary(gate.data);
+    chip =
+      summary.label === null
+        ? { tone: "neutral", label: "NO DATA" }
+        : { tone: summary.tone, label: summary.label };
   }
   return (
     <NavLink
