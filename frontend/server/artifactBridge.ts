@@ -286,6 +286,25 @@ type RunDetailPayload = {
  */
 export class BadRequestError extends Error {}
 
+/**
+ * A 404 the operator can act on: what is missing, which file, and the command that makes it.
+ *
+ * `frontend/DESIGN.md` requires exactly these three, and the run-detail 404 carried none of
+ * them -- it said "run detail failed" and offered Retry, for a state whose only remedy is a
+ * CLI command. Carrying `path` and `remedy` as fields rather than prose keeps them out of
+ * the sentence and lets the console render the command as a command.
+ */
+export class BridgeDetailError extends Error {
+  constructor(
+    message: string,
+    readonly artifactPath: string,
+    readonly remedy: string,
+  ) {
+    super(message);
+    this.name = "BridgeDetailError";
+  }
+}
+
 export type ArtifactBridgeOptions = {
   /** Directory holding `scripts/query_bridge.py` and `src/` -- the repository root. */
   repoRoot: string;
@@ -393,7 +412,18 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
    * could never be taken and a missing run answered 500. Classify the real error first,
    * then sanitize.
    */
-  function detailFailure(error: unknown, fallback: string): { status: number; message: string } {
+  function detailFailure(
+    error: unknown,
+    fallback: string,
+  ): { status: number; message: string; path?: string; remedy?: string } {
+    if (error instanceof BridgeDetailError) {
+      return {
+        status: 404,
+        message: error.message,
+        path: error.artifactPath,
+        remedy: error.remedy,
+      };
+    }
     const raw = error instanceof Error ? error.message : String(error);
     if (raw.includes("invalid path segment")) {
       // A crafted id is the caller's mistake, and answering 500 told them the server broke.
@@ -1344,6 +1374,18 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
     });
   }
 
+  async function assertReportExists(reportDir: string, runId: string): Promise<void> {
+    try {
+      await fs.access(path.join(reportDir, REPORT_FILENAME));
+    } catch {
+      throw new BridgeDetailError(
+        `No report for run ${runId}.`,
+        `reports/${runId}_report/report.json`,
+        `failure-lab report --run ${runId}`,
+      );
+    }
+  }
+
   async function collectRunDetail(
     runId: string,
     runsPath: string,
@@ -1357,6 +1399,12 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
       path.join(runDir, RESULTS_FILENAME),
       `${runId}.results`,
     );
+    // A saved run with no report is the normal state between `failure-lab run` and
+    // `failure-lab report` -- step one and step two of the documented loop. The inventory
+    // lists the run and links to this page, so it is reached by clicking, not by accident,
+    // and it used to answer "run detail failed" with a Retry button that could never
+    // succeed. DESIGN.md: errors state what failed and which file, then what to run.
+    await assertReportExists(reportDir, runId);
     const reportPayload = await readJsonRecord(
       path.join(reportDir, REPORT_FILENAME),
       `${runId}.report`,
@@ -2302,10 +2350,10 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
         }),
       );
     } catch (error) {
-      const { status, message } = detailFailure(error, "comparison detail failed");
-      res.statusCode = status;
+      const failure = detailFailure(error, "comparison detail failed");
+      res.statusCode = failure.status;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ message }));
+      res.end(JSON.stringify(failure));
     }
   }
 
@@ -2332,10 +2380,10 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const { status, message } = detailFailure(error, "run detail failed");
-      res.statusCode = status;
+      const failure = detailFailure(error, "run detail failed");
+      res.statusCode = failure.status;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ message }));
+      res.end(JSON.stringify(failure));
     }
   }
 

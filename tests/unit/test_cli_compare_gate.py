@@ -37,21 +37,48 @@ def _report_with(*, verdict: str, delta: dict) -> _FakeReport:
     )
 
 
-def test_gate_fails_when_candidate_drops_baseline_failing_cases() -> None:
-    # Neutral verdict, no execution/coverage drop, but the candidate omitted a baseline
-    # case that was failing -- hiding a regression by removing the broken case.
+def test_gate_fails_when_the_candidate_drops_a_case_the_baseline_was_failing() -> None:
     exit_code, message = _evaluate_compare_gate(
         _report_with(verdict="neutral", delta={}),
-        {"dropped_baseline_failure_case_ids": ["case-broken-1", "case-broken-2"]},
+        {
+            "baseline_only_case_ids": ["case-broken-1", "case-broken-2"],
+            "dropped_baseline_failure_case_ids": ["case-broken-1", "case-broken-2"],
+        },
     )
     assert exit_code == 1
-    assert "dropped 2 baseline failing case(s)" in message
+    assert "did not run 2 case(s)" in message
+    assert "2 already failing in the baseline" in message
 
 
-def test_gate_passes_when_only_passing_baseline_cases_are_dropped() -> None:
+def test_gate_fails_when_the_candidate_drops_a_case_the_baseline_was_passing() -> None:
+    """The case this file previously asserted the opposite of.
+
+    The test it replaces was named `..._passes_when_only_passing_baseline_cases_are_dropped`
+    and asserted exit 0. That is the bug written down as intent: a case the baseline passed
+    and the candidate stopped running is, by definition, a case a regression would have
+    broken. Every metric the gate reads is computed on shared cases only, so deleting the
+    four regressions from the bundled demo produced `Gate: PASS (signal verdict: neutral)`,
+    exit 0 -- with `baseline_only=4` printed one line above the verdict.
+    """
+
     exit_code, message = _evaluate_compare_gate(
         _report_with(verdict="neutral", delta={}),
-        {"dropped_baseline_failure_case_ids": []},
+        {
+            "baseline_only_case_ids": ["case-was-fine-1", "case-was-fine-2"],
+            "dropped_baseline_failure_case_ids": [],
+        },
+    )
+    assert exit_code == 1, message
+    assert "did not run 2 case(s)" in message
+    # Nothing was failing in the baseline, so the parenthetical is omitted rather than
+    # reading "0 already failing".
+    assert "already failing" not in message
+
+
+def test_gate_passes_when_the_candidate_ran_every_baseline_case() -> None:
+    exit_code, message = _evaluate_compare_gate(
+        _report_with(verdict="neutral", delta={}),
+        {"baseline_only_case_ids": [], "dropped_baseline_failure_case_ids": []},
     )
     assert exit_code == 0
     assert "Gate: PASS" in message

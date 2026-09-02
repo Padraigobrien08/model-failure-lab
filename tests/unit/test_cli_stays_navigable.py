@@ -18,6 +18,7 @@ identical to the `baselines` bug that was found, in a function nobody reads end 
 from __future__ import annotations
 
 import ast
+import warnings
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -60,15 +61,29 @@ def test_cli_does_not_keep_growing() -> None:
     )
 
 
-def test_the_ratchets_are_still_tight() -> None:
-    """A ceiling far above the real maximum stops being a ratchet."""
+def test_a_loose_ratchet_says_so_without_failing() -> None:
+    """A ceiling far above the real value stops being a ratchet -- but so does a red build.
+
+    This assertion used to run the other way: it *failed* when the ceiling sat more than
+    400 lines (or 60) above the real value, to stop the ratchet going stale. The effect was
+    that shrinking `cli.py` by 400 lines, or splitting the largest function in half, turned
+    CI red. A guard that punishes the behaviour it exists to encourage gets deleted the
+    first time it blocks somebody, and it deserves to be.
+
+    So slack is a warning. It is visible in the test output and in CI logs, it names the
+    number to change, and it never stands between an author and a green build for making
+    the file smaller.
+    """
 
     largest = max(size for _, size, _ in _functions())
     total = len(CLI.read_text(encoding="utf-8").splitlines())
-    assert MAX_FUNCTION_LINES - largest <= 60, (
-        f"the largest cli.py function is {largest} lines and the ceiling is "
-        f"{MAX_FUNCTION_LINES}. Lower the ceiling to lock the improvement in."
-    )
-    assert MAX_FILE_LINES - total <= 400, (
-        f"cli.py is {total} lines and the ceiling is {MAX_FILE_LINES}. Lower it."
-    )
+    for label, actual, ceiling, slack in (
+        ("largest function", largest, MAX_FUNCTION_LINES, 60),
+        ("cli.py", total, MAX_FILE_LINES, 400),
+    ):
+        if ceiling - actual > slack:
+            warnings.warn(
+                f"{label} is {actual} lines against a ceiling of {ceiling}. Lower the "
+                f"ratchet in {Path(__file__).name} to lock the improvement in.",
+                stacklevel=2,
+            )

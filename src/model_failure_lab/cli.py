@@ -91,6 +91,7 @@ from model_failure_lab.harvest import (
 )
 from model_failure_lab.history import HistorySnapshot, query_history_snapshot
 from model_failure_lab.index import (
+    QUERY_INDEX_DIRNAME,
     ArtifactContractValidation,
     QueryFilters,
     aggregate_case_query,
@@ -110,6 +111,7 @@ from model_failure_lab.storage import (
     read_json,
     report_file,
     write_json,
+    write_workspace_gitignore,
 )
 
 if TYPE_CHECKING:
@@ -274,7 +276,7 @@ def _add_compare_parser(subparsers: argparse._SubParsersAction) -> None:
         "--baseline-name",
         help=(
             "Resolve the baseline run from the shared baseline registry by name "
-            "(see `failure-lab baselines set`). Mutually exclusive with the positional "
+            "(see the `baselines set` command). Mutually exclusive with the positional "
             "baseline."
         ),
     )
@@ -1437,6 +1439,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+#: Subcommand options that redeclare a parent's option with different behaviour. Appended
+#: to while the parser tree is built and asserted empty by
+#: `tests/unit/test_cli_option_inheritance.py`; a developer mistake should fail a test, not
+#: every invocation of the CLI.
+INHERITED_OPTION_DIVERGENCES: list[str] = []
+
+
 def _suppress_inherited_defaults(
     parser: argparse.ArgumentParser,
     _ancestors: tuple[dict[str, argparse.Action], ...] = (),
@@ -1458,9 +1467,12 @@ def _suppress_inherited_defaults(
     to the finished tree cannot be forgotten by the next subcommand somebody adds;
     `tests/unit/test_cli_option_inheritance.py` asserts the tree comes out clean.
 
-    Suppression is only safe where the two declarations agree, so a divergent redeclaration
-    raises instead: the parent's default would silently win, which is a behaviour change and
-    not something to paper over.
+    Where the two declarations disagree on type or default, suppression makes the parent's
+    default win, which is a behaviour change rather than a fix. That case is recorded in
+    `INHERITED_OPTION_DIVERGENCES` and asserted empty by the predicate test -- it is not
+    raised. Raising happened during `build_parser`, which `main` calls before anything
+    else, so a mistake in one subcommand answered `failure-lab --help` with a traceback.
+    A developer error belongs in a failing test, not in every user's terminal.
     """
 
     declared: dict[str, argparse.Action] = {}
@@ -1484,10 +1496,10 @@ def _suppress_inherited_defaults(
             or action.type is not inherited.type
             or action.default != inherited.default
         ):
-            raise AssertionError(
+            INHERITED_OPTION_DIVERGENCES.append(
                 f"{parser.prog}: {option} redeclares its parent's option with different "
-                f"behaviour (dest/type/default), so the parent's value cannot be inherited. "
-                f"Give it a distinct name or make the two declarations agree."
+                f"behaviour (dest/type/default), so the parent's default now wins. Give it "
+                f"a distinct name, or make the two declarations agree."
             )
         action.default = argparse.SUPPRESS
 
@@ -1944,11 +1956,20 @@ def _handle_init(args: argparse.Namespace) -> int:
             f"dataset already exists: {dataset_path}. Re-run with --force to overwrite."
         )
     write_json(dataset_path, dataset.to_payload())
+    gitignore_path, gitignore_written = write_workspace_gitignore(root)
     lines = [
         "Failure Lab Init",
         f"Dataset ID: {dataset.dataset_id}",
         f"Cases: {len(dataset.cases)}",
         f"Dataset written to: {dataset_path}",
+    ]
+    if gitignore_written:
+        lines.append(f"Workspace .gitignore written to: {gitignore_path}")
+        lines.append(
+            "  Commit datasets/ and governance/ -- they are the record. "
+            f"{QUERY_INDEX_DIRNAME}/ is derived and rebuildable."
+        )
+    lines += [
         "",
         "Next steps:",
         f"1. Edit the prompts in {dataset_path}",
@@ -4718,7 +4739,10 @@ def _evaluate_compare_gate(
         compatible=report.comparison.get("compatible") is not False,
         execution_success_delta=_gate_float(delta.get("execution_success_rate")),
         classification_coverage_delta=_gate_float(delta.get("classification_coverage")),
-        dropped_baseline_failure_case_ids=tuple(_dropped_baseline_failure_ids(details)),
+        dropped_case_ids=_detail_case_ids(details, "baseline_only_case_ids"),
+        dropped_baseline_failure_case_ids=_detail_case_ids(
+            details, "dropped_baseline_failure_case_ids"
+        ),
     )
     block_reason = evaluate_gate_conditions(conditions)
     if block_reason is None:
@@ -4747,19 +4771,13 @@ def _gate_float(value: object) -> float | None:
     return float(value)
 
 
-def _dropped_baseline_failure_ids(details: dict[str, object]) -> list[str]:
-    """Baseline cases that were failing and are absent from the candidate.
+def _detail_case_ids(details: dict[str, object], key: str) -> tuple[str, ...]:
+    """One of the comparison detail artifact's case-id lists, sorted and type-checked."""
 
-    Removing failing cases from the candidate hides them from the shared-scope verdict
-    math, so a candidate could pass simply by deleting the cases it broke. The comparison
-    records these ids in `dropped_baseline_failure_case_ids` (dropping passing cases is
-    benign and is not recorded).
-    """
-
-    dropped = details.get("dropped_baseline_failure_case_ids")
-    if not isinstance(dropped, list):
-        return []
-    return sorted(value for value in dropped if isinstance(value, str))
+    value = details.get(key)
+    if not isinstance(value, list):
+        return ()
+    return tuple(sorted(item for item in value if isinstance(item, str)))
 
 
 def _render_compare_markdown(report, details: dict[str, object], *, gate_line: str | None) -> str:

@@ -1170,6 +1170,10 @@ export type RunDetailState =
       status: "incompatible";
       detail: null;
       message: string;
+      /** Workspace-relative artifact the screen could not read, when the bridge named one. */
+      artifactPath?: string;
+      /** The command that produces it. DESIGN.md requires an error to end with one. */
+      remedy?: string;
     };
 
 export const DEFAULT_ARTIFACT_SOURCE: ArtifactSourceDescriptor = {

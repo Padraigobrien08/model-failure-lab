@@ -16,6 +16,7 @@ from model_failure_lab.datasets.load import load_dataset
 from model_failure_lab.reporting.load import load_saved_run_artifacts
 from model_failure_lab.reporting.signals import build_comparison_signal, build_incompatible_signal
 from model_failure_lab.storage.layout import (
+    DERIVED_INDEX_DIRNAME,
     REPORT_DETAILS_FILENAME,
     REPORT_FILENAME,
     RESULTS_FILENAME,
@@ -27,7 +28,7 @@ from model_failure_lab.storage.layout import (
 )
 
 QUERY_INDEX_SCHEMA_VERSION = "query_index_v4"
-QUERY_INDEX_DIRNAME = ".failure_lab"
+QUERY_INDEX_DIRNAME = DERIVED_INDEX_DIRNAME
 QUERY_INDEX_FILENAME = "query_index.sqlite3"
 _PROMPT_NORMALIZE_PATTERN = re.compile(r"[^a-z0-9]+")
 JsonValue: TypeAlias = str | int | float | bool | None | dict[str, object] | list[object]

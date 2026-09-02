@@ -5,6 +5,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+#: The derived query index. Layout, not an index implementation detail: `write_workspace_
+#: gitignore` below and `index/builder.py` both need it, and having each spell it out is how
+#: the two drift. `index` re-exports it as `QUERY_INDEX_DIRNAME`.
+DERIVED_INDEX_DIRNAME = ".failure_lab"
+
 RUN_FILENAME = "run.json"
 RESULTS_FILENAME = "results.json"
 REPORT_FILENAME = "report.json"
@@ -165,3 +170,39 @@ def report_details_file(
     report_id: str, *, root: str | Path | None = None, create: bool = False
 ) -> Path:
     return report_directory(report_id, root=root, create=create) / REPORT_DETAILS_FILENAME
+
+
+def write_workspace_gitignore(root: Path | None) -> tuple[Path, bool]:
+    """Give a new workspace the committed/derived split the tool's guarantees depend on.
+
+    Two releases were spent moving state out of the derived index and into `governance/`,
+    on the reasoning that a promotion ledger or a waiver is only a witness if it is
+    committed -- and `init`, the command whose job is setting up a workspace, wrote nothing
+    that said so. A user running `git init && git add -A` committed a binary SQLite index
+    the docs call disposable, and got no signal that `governance/` is the part that matters.
+
+    Never overwrites: a workspace that already has a `.gitignore` has an owner with
+    opinions, and silently rewriting their file is worse than the problem.
+    """
+
+    target = project_root(root) / ".gitignore"
+    if target.exists():
+        return target, False
+    target.write_text(
+        "\n".join(
+            [
+                "# Written by `failure-lab init`.",
+                "#",
+                "# Commit these -- they are the record, and nothing regenerates them:",
+                "#   datasets/    prompt packs, including immutable promoted versions",
+                "#   governance/  waivers, baselines, and the promotion ledger",
+                "#",
+                "# Everything below is derived from the above and safe to delete.",
+                "",
+                f"{DERIVED_INDEX_DIRNAME}/",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return target, True

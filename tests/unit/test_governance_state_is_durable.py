@@ -228,6 +228,43 @@ def test_governance_state_survives_a_clean(
     assert main(["index", "validate", "--root", str(root)]) == 0
 
 
+def test_init_gives_a_workspace_the_committed_versus_derived_split(tmp_path: Path) -> None:
+    """The distinction two releases were built on, delivered to the place it applies.
+
+    Everything else in this file checks that the *tool* puts decisions in `governance/`.
+    None of it reached a user's workspace: `failure-lab init` wrote a dataset and nothing
+    else, so `git init && git add -A` committed the binary query index the docs call
+    disposable, and nothing said which directory was the record.
+    """
+
+    root = tmp_path / "fresh"
+    root.mkdir()
+    assert main(["init", "--root", str(root)]) == 0
+
+    ignore = (root / ".gitignore").read_text(encoding="utf-8")
+    ignored = {line.strip().rstrip("/") for line in ignore.splitlines() if line.strip()
+               and not line.startswith("#")}
+
+    # The derived index is ignored, and it is named from the engine rather than typed here.
+    assert QUERY_INDEX_DIRNAME in ignored, ignore
+    # Nothing that holds a decision is. This is the assertion that would have caught the
+    # baseline registry living under the derived directory, from the other direction.
+    for committed in ("governance", "datasets"):
+        assert committed not in ignored, (
+            f"`failure-lab init` tells git to ignore {committed}/, which holds state no "
+            f"rebuild recreates. Ignore file:\n{ignore}"
+        )
+
+
+def test_init_never_overwrites_a_workspace_gitignore(tmp_path: Path) -> None:
+    root = tmp_path / "opinionated"
+    root.mkdir()
+    (root / ".gitignore").write_text("# mine\n*.tmp\n", encoding="utf-8")
+
+    assert main(["init", "--root", str(root)]) == 0
+    assert (root / ".gitignore").read_text(encoding="utf-8") == "# mine\n*.tmp\n"
+
+
 def test_governance_state_is_not_gitignored() -> None:
     # A committed home is only committed if git will actually take it.
     for candidate in (

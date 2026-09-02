@@ -7,6 +7,88 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
+## [0.15.0] - 2026-09-02
+
+Round four found seven defects. Six were pre-existing and one was a guarantee the round-three
+report had certified as tested and never was: `compare --gate` passed when a candidate deleted
+the cases it broke. Three rounds of "fix the class, not the instance" worked; what this round
+adds is the next discipline, which is verifying the outcome rather than the mechanism.
+
+### Fixed
+- **`compare --gate` passed when the candidate stopped running the cases it broke** -- exit 0
+  on a real regression, which is the failure this tool exists to prevent. Every metric the
+  gate reads is computed on shared cases, so a case the candidate did not run is invisible to
+  all of them, and deleting the four regressions from the bundled demo turned
+  `Gate: FAIL (signal verdict: regression)` into `Gate: PASS (signal verdict: neutral)` with
+  `baseline_only=4` printed one line above the verdict. A guard for this existed and covered
+  the complement of its own comment: it checked `dropped_baseline_failure_case_ids`, the cases
+  the *baseline* was already failing, while the comment said it stopped "a candidate deleting
+  the cases it broke" -- and cases a candidate broke are by definition cases the baseline
+  passed. It survived four audits because the demo's baseline fails nothing, so the guard could
+  never fire in the one workspace anybody tested it against. The gate now blocks on any case in
+  the baseline and not in the candidate; shrinking a suite deliberately is what waivers are
+  for. `tests/unit/test_gate_surface_agreement.py` covers both directions across all three
+  surfaces, and `tests/unit/test_cli_compare_gate.py` replaces a test that asserted the bug
+  (`..._passes_when_only_passing_baseline_cases_are_dropped`, exit 0) with its inverse.
+- **A run with no report opened as "unknown error" beside a Retry that could never work.**
+  That is the normal state between `failure-lab run` and `failure-lab report`, steps one and
+  two of the documented loop; the inventory lists the run and links to it. The bridge now
+  answers with what failed, the file, and the command --
+  `No report for run <id>.` / `reports/<id>_report/report.json` /
+  `failure-lab report --run <id>` -- which is what `frontend/DESIGN.md` has always required of
+  an error. `frontend/server/__tests__/artifactBridge.test.ts` pins the three fields and
+  checks that following the remedy makes Retry work.
+- **Two printed commands outside the console did not run.** The README's two-minute demo ended
+  on `failure-lab dataset promote ...`, a literal ellipsis, and a promotion conflict answered
+  with `failure-lab dataset evolve <id>`, missing the required `--from-comparison`. Three more
+  prose references that read as runnable commands were reworded.
+  `tests/unit/test_console_commands_are_runnable.py` now reads the **whole repository** rather
+  than three frontend directories -- 27 files, 70 commands, up from 25 -- parsing Python with
+  `ast` so an f-string split across literals rejoins, and building argv with `shlex` so
+  `--reason "…"` is one argument.
+- **`_suppress_inherited_defaults` raised on a divergent redeclaration**, and `main` builds the
+  parser before anything else, so one bad subcommand answered `failure-lab --help` with a
+  traceback. Divergences are recorded and asserted empty by
+  `tests/unit/test_cli_option_inheritance.py`; a developer error belongs in a failing test.
+- **The `cli.py` ratchet failed the build when `cli.py` improved.** Shrinking the file by 400
+  lines, or splitting its largest function, tripped the staleness check that existed to stop
+  the ceiling drifting. Slack is now a warning that names the number to lower.
+  `tests/unit/test_cli_stays_navigable.py`.
+- The `0.14.0` notes said `--root` "and every other inherited flag resolve identically wherever
+  they are written"; `regressions pr-comment` marks two of its options required, so the outer
+  placement is rejected -- and the branch's own test output said so in two `SKIPPED` lines. The
+  same entry counted 56 collisions across seven `regressions` subcommands where the tree had
+  **58** across **eight**. Both corrected. `tests/unit/test_changelog_cites_its_evidence.py`.
+
+### Added
+- **`failure-lab init` writes the workspace's `.gitignore`.** Two releases were spent moving
+  state out of the derived index and into `governance/` on the reasoning that a ledger or a
+  waiver is only a witness if it is committed, and the command whose job is setting up a
+  workspace said none of it: `git init && git add -A` committed a binary SQLite index the docs
+  call disposable. An existing file is never overwritten.
+  `tests/unit/test_governance_state_is_durable.py`.
+- **A black-box suite that attacks the gate without importing the engine.**
+  `tests/unit/test_gate_resists_a_motivated_operator.py` corrupts a workspace the way a person
+  under deadline pressure would -- delete the cases that broke, run half the suite, pad with
+  easy passes, relabel failures -- and asserts CI still goes red. It imports only `main` and
+  reads only exit codes, because every other test here compares the product to itself, which is
+  how a gate that passed on a deleted regression stayed green through four audits. Two attacks
+  it does *not* stop are listed with reasons, and the suite fails if either starts being caught,
+  so the boundary cannot quietly move in either direction.
+
+### Changed
+- **The console's guards now assert that something is said, not only that what is said is
+  right.** Every `EmptyState` must name a command, relay a loader message, offer the control
+  that clears the filter, or -- for an empty state, not a failure -- name the path that came
+  back empty (`frontend/src/app/__tests__/emptyStatesOfferANextStep.test.tsx`). Release-note
+  bullets are required to cite a test by *section* rather than by backticks, since dropping the
+  backticks was a one-keystroke exemption, and `docs/release.md` is checked for totality claims
+  (`tests/unit/test_changelog_cites_its_evidence.py`).
+- `DERIVED_INDEX_DIRNAME` moved to `storage/layout.py`, where the rest of the workspace layout
+  is decided; `index` re-exports it as `QUERY_INDEX_DIRNAME`, and
+  `tests/unit/test_governance_state_is_durable.py` reads it from there, so a broken re-export
+  fails rather than silently widening what the durability check exempts.
+
 ## [0.14.0] - 2026-09-02
 
 Round four. All three round-three findings are closed, and all three were defects the
@@ -23,8 +105,8 @@ Two of those predicates found defects the audit had not.
   and copies every attribute onto the outer one, so an option a subcommand redeclares writes
   its *default* over the value the parent parsed. The CLI's own `--help` advertises the
   placement that broke (`usage: failure-lab regressions [-h] [--root ROOT] ...`).
-  `0.13.0` fixed this by hand for `baselines` and left **56** other collisions: every filter
-  flag -- `--model`, `--limit`, `--json`, `--since` and eight more -- on all seven
+  `0.13.0` fixed this by hand for `baselines` and left **58** other collisions: every filter
+  flag -- `--model`, `--limit`, `--json`, `--since` and eight more -- on all eight
   `regressions` subcommands. `build_parser` now calls `_suppress_inherited_defaults` over the
   assembled tree, which cannot be forgotten by the next subcommand somebody adds, and refuses
   rather than papers over a redeclaration whose type or default diverges from its parent's.

@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pytest
 
-from model_failure_lab.cli import build_parser, main
+from model_failure_lab.cli import INHERITED_OPTION_DIVERGENCES, build_parser, main
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEMO_RUNS = PROJECT_ROOT / "examples" / "regression_demo" / "runs"
@@ -90,6 +90,19 @@ def _resolve(path: str) -> tuple[argparse.ArgumentParser, list[str], argparse.Ar
     for name in path.split():
         leaf = dict(_subparsers(leaf))[name]
     return root, path.split(), leaf
+
+
+def test_no_subcommand_redeclares_an_inherited_option_with_different_behaviour() -> None:
+    """The case suppression cannot fix, reported here rather than at the user's terminal.
+
+    Suppressing a child option whose type or default differs from its parent's makes the
+    parent's default win -- a behaviour change dressed up as a fix. `build_parser` records
+    those instead, because it used to raise, and `main` builds the parser before doing
+    anything else: one bad subcommand answered `failure-lab --help` with a traceback.
+    """
+
+    build_parser()
+    assert INHERITED_OPTION_DIVERGENCES == [], "\n".join(INHERITED_OPTION_DIVERGENCES)
 
 
 def test_the_scan_still_sees_the_options_this_file_exists_for() -> None:

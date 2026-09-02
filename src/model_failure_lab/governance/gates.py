@@ -67,9 +67,9 @@ def default_policy_path(root: str | Path | None = None) -> Path | None:
 # `compare --gate`, `regressions gate` and the operator console's `gate` endpoint must
 # reach the same PASS/FAIL on the same artifacts, or the console can show green while CI
 # shows red. They previously did not: `compare --gate` applied five checks while the
-# governance gate applied only the verdict, so a candidate that deleted the cases it
-# broke -- or two runs that were not comparable at all -- failed CI and passed the
-# console. `evaluate_gate_conditions` is now the only place that decision is made.
+# governance gate applied only the verdict, so a candidate that skipped cases -- or two
+# runs that were not comparable at all -- failed CI and passed the console.
+# `evaluate_gate_conditions` is now the only place that decision is made.
 #
 # Checks are ordered most-fundamental first, and the first hit wins so the reported
 # reason is stable and deterministic.
@@ -88,6 +88,10 @@ class GateConditions:
     compatible: bool
     execution_success_delta: float | None = None
     classification_coverage_delta: float | None = None
+    #: Cases the baseline ran and the candidate did not -- the whole set, not a subset.
+    dropped_case_ids: tuple[str, ...] = ()
+    #: The subset of those the baseline was already failing. Reported for a clearer block
+    #: reason; `dropped_case_ids` is what the gate decides on.
     dropped_baseline_failure_case_ids: tuple[str, ...] = ()
 
 
@@ -108,12 +112,36 @@ def evaluate_gate_conditions(conditions: GateConditions) -> str | None:
     ):
         if value is not None and value < 0:
             return f"{label} regressed by {_format_signed_rate(value)}"
-    # Removing failing cases from the candidate hides them from the shared-scope verdict
-    # math, so a candidate could otherwise pass simply by deleting the cases it broke.
-    dropped = conditions.dropped_baseline_failure_case_ids
+    # Every metric above is computed on shared cases only, so a case the candidate did not
+    # run is invisible to all of them. That makes "stop running it" the cheapest way to
+    # turn this gate green, and it is what a person under deadline pressure actually does:
+    # retire the awkward case, rerun, ship.
+    #
+    # An earlier version of this check looked at `dropped_baseline_failure_case_ids` -- the
+    # cases the *baseline* was already failing -- while its comment claimed to stop "a
+    # candidate deleting the cases it broke". Cases a candidate broke are by definition
+    # cases the baseline passed, so the check covered the exact complement of its stated
+    # purpose, and deleting the four regressions from the bundled demo turned
+    # `Gate: FAIL (signal verdict: regression)` into `Gate: PASS`, exit 0. It survived four
+    # audits because the demo's baseline fails nothing, so the guard could never fire in
+    # the one workspace anybody tested it against.
+    #
+    # So the rule is the whole set: any case in the baseline and not in the candidate is a
+    # hole in the comparison, and a comparison with a hole in it does not get to say PASS.
+    # Shrinking a dataset on purpose is legitimate, and the way to record that is a waiver,
+    # which is a decision with a name on it.
+    dropped = conditions.dropped_case_ids
     if dropped:
         preview = ", ".join(dropped[:3])
-        return f"candidate dropped {len(dropped)} baseline failing case(s): {preview}"
+        more = "" if len(dropped) <= 3 else f", +{len(dropped) - 3} more"
+        already_failing = len(conditions.dropped_baseline_failure_case_ids)
+        detail = (
+            f" ({already_failing} already failing in the baseline)" if already_failing else ""
+        )
+        return (
+            f"candidate did not run {len(dropped)} case(s) the baseline ran{detail}: "
+            f"{preview}{more}"
+        )
     return None
 
 
@@ -143,19 +171,22 @@ def load_gate_conditions(comparison_id: str, *, root: str | Path | None = None) 
     delta = metrics.get("delta") if isinstance(metrics, dict) else None
     delta = delta if isinstance(delta, dict) else {}
 
-    dropped = details.get("dropped_baseline_failure_case_ids") if details is not None else None
-    dropped_ids = (
-        tuple(sorted(value for value in dropped if isinstance(value, str)))
-        if isinstance(dropped, list)
-        else ()
-    )
+    def _ids(key: str) -> tuple[str, ...]:
+        value = details.get(key) if details is not None else None
+        if not isinstance(value, list):
+            return ()
+        return tuple(sorted(item for item in value if isinstance(item, str)))
+
+    dropped_ids = _ids("baseline_only_case_ids")
+    dropped_failing_ids = _ids("dropped_baseline_failure_case_ids")
 
     return GateConditions(
         verdict=str(signal.get("verdict", "unknown")),
         compatible=comparison.get("compatible") is not False,
         execution_success_delta=_float_or_none(delta.get("execution_success_rate")),
         classification_coverage_delta=_float_or_none(delta.get("classification_coverage")),
-        dropped_baseline_failure_case_ids=dropped_ids,
+        dropped_case_ids=dropped_ids,
+        dropped_baseline_failure_case_ids=dropped_failing_ids,
     )
 
 

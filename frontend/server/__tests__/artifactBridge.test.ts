@@ -255,6 +255,60 @@ describe("missing artifacts", () => {
     );
     expect(status).toBe(404);
   });
+
+  // A run whose report has not been written yet is not a broken workspace: it is step one
+  // of the documented loop, before step two. The inventory lists it and links here, and
+  // this used to answer `{"message": "run detail failed"}` -- which the console rendered as
+  // "Run detail failed to load / run detail failed" beside a Retry button that re-fetched
+  // the same 404 forever. DESIGN.md: state what failed, which file, then what to run.
+  it("tells an operator how to produce a report that has not been written yet", async () => {
+    const runId = "unreported";
+    fs.cpSync(path.join(DEMO_RUNS, "baseline"), path.join(workspace, "runs", runId), {
+      recursive: true,
+    });
+
+    const { status, body } = await call(
+      `/__failure_lab__/artifacts/run-detail.json?runId=${runId}`,
+    );
+
+    expect(status).toBe(404);
+    expect(body).toMatchObject({
+      message: `No report for run ${runId}.`,
+      path: `reports/${runId}_report/report.json`,
+      remedy: `failure-lab report --run ${runId}`,
+    });
+    // The remedy is a real command: `test_console_commands_are_runnable.py` reads this
+    // file's source and parses every `failure-lab …` literal against the argparse tree.
+    fs.rmSync(path.join(workspace, "runs", runId), { recursive: true, force: true });
+  });
+
+  it("recovers once the report exists", async () => {
+    // Retry is only an honest button if doing what the message says makes it work.
+    const runId = "reportable";
+    fs.cpSync(path.join(DEMO_RUNS, "baseline"), path.join(workspace, "runs", runId), {
+      recursive: true,
+    });
+    expect(
+      (await call(`/__failure_lab__/artifacts/run-detail.json?runId=${runId}`)).status,
+    ).toBe(404);
+
+    const runJsonPath = path.join(workspace, "runs", runId, "run.json");
+    const resultsPath = path.join(workspace, "runs", runId, "results.json");
+    for (const file of [runJsonPath, resultsPath]) {
+      const payload = JSON.parse(fs.readFileSync(file, "utf-8"));
+      payload.run_id = runId;
+      fs.writeFileSync(file, JSON.stringify(payload));
+    }
+    execFileSync(
+      "python3",
+      ["-m", "model_failure_lab", "report", "--run", runId, "--root", workspace],
+      { cwd: REPO_ROOT, env: { ...process.env, PYTHONPATH: path.join(REPO_ROOT, "src") } },
+    );
+
+    expect(
+      (await call(`/__failure_lab__/artifacts/run-detail.json?runId=${runId}`)).status,
+    ).toBe(200);
+  });
 });
 
 // ---------------------------------------------------------------------------------------

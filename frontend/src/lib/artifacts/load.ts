@@ -2999,12 +2999,10 @@ export async function loadComparisonDetail(
   }
 
   if (!response.ok) {
-    const data = payload as Record<string, unknown> | null;
-    const message =
-      data !== null && typeof data.message === "string"
-        ? data.message
-        : `comparison detail request failed with status ${response.status}`;
-    throw new Error(message);
+    throw actionableError(
+      payload,
+      `comparison detail request failed with status ${response.status}`,
+    );
   }
 
   return validateComparisonDetail(payload);
@@ -3072,6 +3070,34 @@ export function validateRunDetail(payload: unknown): RunDetail {
   };
 }
 
+/**
+ * An error the screen can act on: the sentence, the file, and the command that fixes it.
+ *
+ * The bridge answers a missing artifact with `{ message, path, remedy }`; keeping the last
+ * two as fields rather than folding them into the sentence is what lets a screen render
+ * the command as a command. Before this, a run with no report reached the operator as
+ * "run detail failed" beside a Retry button that re-fetched the same 404 forever.
+ */
+export class ArtifactRequestError extends Error {
+  constructor(
+    message: string,
+    readonly artifactPath?: string,
+    readonly remedy?: string,
+  ) {
+    super(message);
+    this.name = "ArtifactRequestError";
+  }
+}
+
+function actionableError(payload: unknown, fallback: string): ArtifactRequestError {
+  const data = payload as Record<string, unknown> | null;
+  const message =
+    data !== null && typeof data.message === "string" ? data.message : fallback;
+  const artifactPath = data !== null && typeof data.path === "string" ? data.path : undefined;
+  const remedy = data !== null && typeof data.remedy === "string" ? data.remedy : undefined;
+  return new ArtifactRequestError(message, artifactPath, remedy);
+}
+
 export async function loadRunDetail(
   runId: string,
   fetchImpl: typeof fetch = fetch,
@@ -3089,12 +3115,7 @@ export async function loadRunDetail(
   }
 
   if (!response.ok) {
-    const data = payload as Record<string, unknown> | null;
-    const message =
-      data !== null && typeof data.message === "string"
-        ? data.message
-        : `run detail request failed with status ${response.status}`;
-    throw new Error(message);
+    throw actionableError(payload, `run detail request failed with status ${response.status}`);
   }
 
   return validateRunDetail(payload);

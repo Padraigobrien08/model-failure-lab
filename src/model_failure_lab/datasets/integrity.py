@@ -105,7 +105,8 @@ def verify_content_digest(dataset: FailureDataset, *, source: str | None = None)
         f"dataset '{dataset.dataset_id}'{location} was modified after promotion: "
         f"recorded content digest {recorded}, actual {actual}. "
         "Restore the promoted version from source control, or promote the change as a new "
-        "version with `failure-lab dataset evolve`."
+        f"version with `failure-lab dataset evolve {dataset.dataset_id} "
+        "--from-comparison <comparison-id>`."
     )
 
 
@@ -239,7 +240,8 @@ def audit_dataset_directory(
                         f"recorded {recorded_content_digest(dataset)}, "
                         f"actual {compute_content_digest(dataset)}. Restore the promoted "
                         "version from source control, or promote the change as a new "
-                        "version with `failure-lab dataset evolve`."
+                        f"version with `failure-lab dataset evolve {dataset.dataset_id} "
+                        "--from-comparison <comparison-id>`."
                     ),
                 )
             )

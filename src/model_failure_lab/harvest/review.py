@@ -130,7 +130,8 @@ def promote_harvest_dataset(
         raise DatasetPromotionConflictError(
             f"dataset '{normalized_dataset_id}' already exists at {target_path}. A promoted "
             "version is immutable: add the new cases as the next version with "
-            f"`failure-lab dataset evolve {normalized_dataset_id}`, promote under a new "
+            f"`failure-lab dataset evolve {normalized_dataset_id} "
+            f"--from-comparison <comparison-id>`, promote under a new "
             "--dataset-id, or pass --force to replace it deliberately."
         )
 
