@@ -10,13 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from model_failure_lab.datasets import FailureDataset, load_dataset
-from model_failure_lab.datasets.integrity import (
-    INTEGRITY_METADATA_KEY,
-    integrity_payload,
-    record_promotion,
-)
+from model_failure_lab.datasets.integrity import write_curated_dataset
 from model_failure_lab.schemas import PromptCase
-from model_failure_lab.storage import write_json
 from model_failure_lab.storage.layout import dataset_file, project_root
 
 
@@ -150,29 +145,14 @@ def promote_harvest_dataset(
         cases=tuple(curated_cases),
         metadata={**review.dataset.metadata, "harvest": harvest_metadata},
     )
-    # Stamp the content digest so a later edit to the promoted file is detectable on load.
-    promoted_dataset = FailureDataset(
-        dataset_id=promoted_dataset.dataset_id,
-        name=promoted_dataset.name,
-        description=promoted_dataset.description,
-        version=promoted_dataset.version,
-        created_at=promoted_dataset.created_at,
-        lifecycle=promoted_dataset.lifecycle,
-        source=promoted_dataset.source,
-        cases=promoted_dataset.cases,
-        metadata={
-            **promoted_dataset.metadata,
-            INTEGRITY_METADATA_KEY: integrity_payload(promoted_dataset),
-        },
-    )
-    write_json(target_path, promoted_dataset.to_payload())
-    # ...and record it outside the pack. A digest inside the file it protects can be deleted
-    # along with the `lifecycle` marker that made its absence suspicious; a ledger entry
-    # cannot be, because removing it means editing a second, committed file.
-    record_promotion(
+    # Stamp the digest, write the pack, and record the promotion outside it. A digest
+    # inside the file it protects can be deleted along with the `lifecycle` marker that
+    # made its absence suspicious; a ledger entry cannot be, because removing it means
+    # editing a second, committed file. `dataset evolve` goes through the same call.
+    promoted_dataset = write_curated_dataset(
         promoted_dataset,
+        path=target_path,
         root=artifact_root,
-        dataset_path=target_path,
         promoted_at=promoted_at,
     )
     return HarvestPromotionSummary(

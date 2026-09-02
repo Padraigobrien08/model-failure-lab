@@ -424,11 +424,29 @@ def _add_datasets_parser(subparsers: argparse._SubParsersAction) -> None:
 
 
 def _add_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
+    """The `dataset` group: 21 subcommands across three unrelated concerns.
+
+    Split by concern rather than left as one 453-line function. The builders run in the
+    order the subcommands were written, which is the order `--help` lists them, so this is
+    pure motion -- checked by diffing the resolved argparse tree and all 22 `--help`
+    outputs before and after.
+    """
+
     dataset_parser = subparsers.add_parser(
         "dataset",
         help="Review or promote harvested dataset packs.",
     )
     dataset_subparsers = dataset_parser.add_subparsers(dest="dataset_command")
+
+    _add_dataset_pack_parsers(dataset_subparsers)
+    _add_dataset_lifecycle_parsers(dataset_subparsers)
+    _add_dataset_plan_parsers(dataset_subparsers)
+    _add_dataset_outcome_parsers(dataset_subparsers)
+    _add_dataset_evolution_parser(dataset_subparsers)
+
+
+def _add_dataset_pack_parsers(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`review`, `promote`, `versions`, `families` -- the harvested-pack surface."""
 
     dataset_review_parser = dataset_subparsers.add_parser(
         "review",
@@ -509,6 +527,10 @@ def _add_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
     dataset_families_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_families_parser.set_defaults(handler=_handle_dataset_families)
 
+
+def _add_dataset_lifecycle_parsers(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`lifecycle-review`, `lifecycle-apply`, `portfolio` -- family-level governance."""
+
     dataset_lifecycle_review_parser = dataset_subparsers.add_parser(
         "lifecycle-review",
         help="Review deterministic lifecycle recommendations for dataset families.",
@@ -566,6 +588,15 @@ def _add_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
     _add_portfolio_filter_arguments(dataset_portfolio_parser)
     dataset_portfolio_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_portfolio_parser.set_defaults(handler=_handle_dataset_portfolio)
+
+
+def _add_dataset_plan_parsers(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`planning-units` and `plan-create` .. `plan-execute` -- building a plan.
+
+    This and `_add_dataset_outcome_parsers` are the twelve subcommands `docs/api.md` says
+    the supported `run -> compare -> harvest -> promote` loop never requires. Grouping
+    them puts that scope split in the code, not only in the documentation.
+    """
 
     dataset_planning_units_parser = dataset_subparsers.add_parser(
         "planning-units",
@@ -692,6 +723,10 @@ def _add_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     dataset_plan_execute_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_plan_execute_parser.set_defaults(handler=_handle_dataset_plan_execute)
+
+
+def _add_dataset_outcome_parsers(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`executions`, `follow-up-*`, `plan-promote` -- recording what a plan produced."""
 
     dataset_executions_parser = dataset_subparsers.add_parser(
         "executions",
@@ -853,6 +888,10 @@ def _add_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
     dataset_plan_promote_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_plan_promote_parser.set_defaults(handler=_handle_dataset_plan_promote)
 
+
+def _add_dataset_evolution_parser(dataset_subparsers: argparse._SubParsersAction) -> None:
+    """`evolve` -- the second writer of an immutable curated version."""
+
     dataset_evolve_parser = dataset_subparsers.add_parser(
         "evolve",
         help="Create the next immutable dataset version from one saved comparison signal.",
@@ -876,6 +915,7 @@ def _add_dataset_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     dataset_evolve_parser.add_argument("--json", action="store_true", dest="as_json")
     dataset_evolve_parser.set_defaults(handler=_handle_dataset_evolve)
+
 
 
 def _add_index_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -1053,6 +1093,13 @@ def _add_cluster_parser(subparsers: argparse._SubParsersAction) -> None:
 
 
 def _add_regressions_parser(subparsers: argparse._SubParsersAction) -> None:
+    """The `regressions` group.
+
+    Every filter declared here is redeclared by each subcommand so that both placements
+    parse; `build_parser` then calls `_suppress_inherited_defaults`, without which the
+    inner copy's default overwrites the value the outer one parsed.
+    """
+
     regressions_parser = subparsers.add_parser(
         "regressions",
         help="List recent saved comparison signals ordered by severity.",
@@ -1083,6 +1130,13 @@ def _add_regressions_parser(subparsers: argparse._SubParsersAction) -> None:
     regressions_parser.add_argument("--limit", type=int, default=10)
     regressions_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_parser.set_defaults(handler=_handle_regressions)
+
+    _add_regressions_signal_parsers(regressions_subparsers)
+    _add_regressions_gate_parsers(regressions_subparsers)
+
+
+def _add_regressions_signal_parsers(regressions_subparsers: argparse._SubParsersAction) -> None:
+    """`generate`, `recommend`, `review`, `apply` -- turning signals into decisions."""
 
     regressions_generate_parser = regressions_subparsers.add_parser(
         "generate",
@@ -1168,6 +1222,11 @@ def _add_regressions_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     regressions_apply_parser.add_argument("--json", action="store_true", dest="as_json")
     regressions_apply_parser.set_defaults(handler=_handle_regressions_apply)
+
+
+def _add_regressions_gate_parsers(regressions_subparsers: argparse._SubParsersAction) -> None:
+    """`gate`, `waive`, `patterns`, `pr-comment` -- what CI reads, and what suppresses it."""
+
     regressions_gate_parser = regressions_subparsers.add_parser(
         "gate",
         help="Evaluate policy-as-code regression gate and optional waivers.",
@@ -1254,6 +1313,7 @@ def _add_regressions_parser(subparsers: argparse._SubParsersAction) -> None:
         ),
     )
     regressions_pr_comment_parser.set_defaults(handler=_handle_regressions_pr_comment)
+
 
 
 def _add_baselines_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -1372,7 +1432,69 @@ def build_parser() -> argparse.ArgumentParser:
     _add_baselines_parser(subparsers)
     _add_harvest_parser(subparsers)
 
+    _suppress_inherited_defaults(parser)
+
     return parser
+
+
+def _suppress_inherited_defaults(
+    parser: argparse.ArgumentParser,
+    _ancestors: tuple[dict[str, argparse.Action], ...] = (),
+) -> None:
+    """Stop a subcommand's option defaults from overwriting the same option on its parent.
+
+    `argparse` parses a subcommand into a fresh namespace and then copies every attribute
+    of it onto the outer one. An option a subcommand redeclares therefore writes its
+    *default* over whatever the parent already parsed, so `regressions --root X gate`
+    silently evaluated the current directory -- and `--strict-exit` reported a clean pass
+    for a workspace it never read. `SUPPRESS` keeps the attribute out of the subcommand's
+    namespace unless it was actually given, which makes both placements mean the same
+    thing. Placing an option before the subcommand is the shape the CLI's own `--help`
+    advertises (`usage: failure-lab regressions [-h] [--root ROOT] ...`), so it has to work.
+
+    This runs over the assembled tree rather than at each `add_argument` call on purpose.
+    The per-site version of this fix shipped in 0.13.0 for `baselines` and left 56 other
+    collisions across `regressions` -- every filter flag, not just `--root`. A rule applied
+    to the finished tree cannot be forgotten by the next subcommand somebody adds;
+    `tests/unit/test_cli_option_inheritance.py` asserts the tree comes out clean.
+
+    Suppression is only safe where the two declarations agree, so a divergent redeclaration
+    raises instead: the parent's default would silently win, which is a behaviour change and
+    not something to paper over.
+    """
+
+    declared: dict[str, argparse.Action] = {}
+    subactions: list[argparse._SubParsersAction] = []
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            subactions.append(action)
+            continue
+        for option in action.option_strings:
+            declared[option] = action
+
+    for option, action in declared.items():
+        inherited = next(
+            (scope[option] for scope in reversed(_ancestors) if option in scope), None
+        )
+        if inherited is None or action.default is argparse.SUPPRESS:
+            continue
+        if (
+            action.dest != inherited.dest
+            or type(action) is not type(inherited)
+            or action.type is not inherited.type
+            or action.default != inherited.default
+        ):
+            raise AssertionError(
+                f"{parser.prog}: {option} redeclares its parent's option with different "
+                f"behaviour (dest/type/default), so the parent's value cannot be inherited. "
+                f"Give it a distinct name or make the two declarations agree."
+            )
+        action.default = argparse.SUPPRESS
+
+    scopes = (*_ancestors, declared)
+    for subaction in subactions:
+        for subparser in subaction.choices.values():
+            _suppress_inherited_defaults(subparser, scopes)
 
 
 def _add_signal_filter_arguments(parser: argparse.ArgumentParser) -> None:
@@ -1492,17 +1614,16 @@ def _build_governance_policy(args: argparse.Namespace) -> GovernancePolicy:
 
 
 def _add_root_argument(parser: argparse.ArgumentParser) -> None:
-    """Add `--root` to a subcommand that already inherits one from its parent parser.
+    """Add `--root` to a subcommand that also inherits one from its parent parser.
 
-    `default=SUPPRESS` matters: a plain `default=None` writes the attribute during
-    subparser parsing and clobbers whatever the parent already stored, so
-    `baselines --root X list` would silently fall back to the current directory.
+    The `SUPPRESS` that makes both placements work is applied by
+    `_suppress_inherited_defaults` once the whole tree exists, not here -- see that
+    function for why per-site fixes do not hold.
     """
 
     parser.add_argument(
         "--root",
         type=Path,
-        default=argparse.SUPPRESS,
         help=(
             "Override the artifact root for this invocation. Defaults to the current working "
             "directory."
@@ -1846,7 +1967,13 @@ def _handle_datasets_list(args: argparse.Namespace) -> int:
 
 
 def _resolve_draft_path(draft_path: Path, *, root: Path | None) -> Path:
-    """Resolve a draft pack path, honoring --root for relative paths."""
+    """Resolve a draft pack path, honoring --root for relative paths.
+
+    Every command that takes a draft path must call this. `dataset review` did and
+    `dataset promote` did not, so `--root W dataset promote datasets/harvested/x.json`
+    -- the shape the console prints -- read the draft from the current directory and
+    failed, or worse, promoted a same-named draft from the wrong workspace.
+    """
 
     if root is None or draft_path.is_absolute():
         return draft_path
@@ -1882,7 +2009,7 @@ def _handle_dataset_review(args: argparse.Namespace) -> int:
 
 def _handle_dataset_promote(args: argparse.Namespace) -> int:
     summary = promote_harvest_dataset(
-        args.draft_path,
+        _resolve_draft_path(args.draft_path, root=args.root),
         dataset_id=args.dataset_id,
         root=_normalized_root(args.root),
         output_path=args.out,

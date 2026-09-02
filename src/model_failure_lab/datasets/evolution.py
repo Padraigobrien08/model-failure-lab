@@ -15,7 +15,7 @@ from model_failure_lab.storage import dataset_file, datasets_root, write_json
 from model_failure_lab.storage.layout import project_root
 
 from .contracts import FailureDataset
-from .integrity import INTEGRITY_METADATA_KEY, integrity_payload
+from .integrity import write_curated_dataset
 from .load import load_dataset
 
 _SEGMENT_PATTERN = re.compile(r"[^a-z0-9]+")
@@ -389,10 +389,14 @@ def evolve_dataset_family(
             }
         },
     )
-    # Stamp the content digest, exactly as `dataset promote` does, so both writers of a
-    # curated version produce a pack whose immutability the loader can check.
-    evolved_dataset = _with_integrity_stamp(evolved_dataset)
-    write_json(target_path, evolved_dataset.to_payload())
+    # Stamp, write, and record in one call -- the same door `dataset promote` uses, so an
+    # evolved version carries the same checkable immutability a promoted one does.
+    evolved_dataset = write_curated_dataset(
+        evolved_dataset,
+        path=target_path,
+        root=artifact_root,
+        promoted_at=created_at,
+    )
     return DatasetEvolutionSummary(
         dataset=evolved_dataset,
         output_path=target_path,
@@ -720,22 +724,6 @@ def _resolve_draft_output_path(
         candidate = harvested_dir / f"{family_id}-draft-{suffix}.json"
         suffix += 1
     return candidate.resolve()
-
-
-def _with_integrity_stamp(dataset: FailureDataset) -> FailureDataset:
-    """Return `dataset` with its content digest recorded in metadata."""
-
-    return FailureDataset(
-        dataset_id=dataset.dataset_id,
-        name=dataset.name,
-        description=dataset.description,
-        version=dataset.version,
-        created_at=dataset.created_at,
-        lifecycle=dataset.lifecycle,
-        source=dataset.source,
-        cases=dataset.cases,
-        metadata={**dataset.metadata, INTEGRITY_METADATA_KEY: integrity_payload(dataset)},
-    )
 
 
 def _resolve_curated_output_path(output_path: str | Path, *, root: Path) -> Path:

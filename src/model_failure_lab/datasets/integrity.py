@@ -22,10 +22,11 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:  # pragma: no cover - import cycle guard
-    from .contracts import FailureDataset
+from model_failure_lab.storage import write_json
+
+from .contracts import FailureDataset
 
 INTEGRITY_METADATA_KEY = "integrity"
 CONTENT_DIGEST_KEY = "content_digest"
@@ -327,6 +328,45 @@ def load_promotion_ledger(root: Path) -> dict[str, PromotionRecord]:
             path=str(row.get("path") or ""),
         )
     return records
+
+
+def write_curated_dataset(
+    dataset: FailureDataset,
+    *,
+    path: Path,
+    root: Path,
+    promoted_at: str,
+) -> FailureDataset:
+    """The one way a curated dataset reaches disk: stamped, written, and recorded.
+
+    Two commands produce a `lifecycle: curated` pack -- `dataset promote` and
+    `dataset evolve` -- and both guarantees have to hold for both of them. They did not:
+    0.13.0 added the ledger and wired it into `promote` only, so an evolved version kept
+    the bypass the ledger exists to close. Stripping `metadata.integrity` and `lifecycle`
+    from an evolved pack left `index validate` at exit 0 with three of four cases gone,
+    while the same edit to a promoted pack was caught. `dataset evolve` is the mode the
+    console's harvest dialog offers first, so the guarantee failed on the common path.
+
+    Keeping the stamp, the write, and the ledger entry in one function is the point: a
+    third writer cannot pick up two of the three, because there is nothing to pick from.
+    `tests/unit/test_curated_packs_are_recorded.py` drives every curated-producing command
+    and asserts the ledger grew, so a new one that routes around this door fails there.
+    """
+
+    stamped = FailureDataset(
+        dataset_id=dataset.dataset_id,
+        name=dataset.name,
+        description=dataset.description,
+        version=dataset.version,
+        created_at=dataset.created_at,
+        lifecycle=dataset.lifecycle,
+        source=dataset.source,
+        cases=dataset.cases,
+        metadata={**dataset.metadata, INTEGRITY_METADATA_KEY: integrity_payload(dataset)},
+    )
+    write_json(path, stamped.to_payload())
+    record_promotion(stamped, root=root, dataset_path=path, promoted_at=promoted_at)
+    return stamped
 
 
 def record_promotion(

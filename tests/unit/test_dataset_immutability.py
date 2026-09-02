@@ -386,6 +386,44 @@ def test_audit_classifies_each_pack_state(tmp_path: Path) -> None:
 # second one is committed.
 
 
+#: Both commands that write a `lifecycle: curated` pack. The ledger guarantees below are
+#: parametrized over both, because 0.13.0 wired the ledger into `dataset promote` alone and
+#: shipped `dataset evolve` writing no record at all -- so the bypass this section exists to
+#: close stayed open on the mode the console's harvest dialog offers first.
+EVOLVED_FAMILY = "support-regressions-evolved"
+
+
+@pytest.fixture()
+def evolved_workspace(promoted_workspace: tuple[Path, Path]) -> tuple[Path, Path, str]:
+    root, _ = promoted_workspace
+    assert (
+        main(
+            [
+                "dataset",
+                "evolve",
+                EVOLVED_FAMILY,
+                "--from-comparison",
+                COMPARISON_ID,
+                "--root",
+                str(root),
+            ]
+        )
+        == 0
+    )
+    dataset_id = f"{EVOLVED_FAMILY}-v1"
+    return root, root / "datasets" / f"{dataset_id}.json", dataset_id
+
+
+@pytest.fixture(params=["dataset promote", "dataset evolve"])
+def curated_workspace(request: pytest.FixtureRequest) -> tuple[Path, Path, str]:
+    """A workspace holding one curated pack, written by each command in turn."""
+
+    if request.param == "dataset promote":
+        root, dataset_path = request.getfixturevalue("promoted_workspace")
+        return root, dataset_path, DATASET_ID
+    return request.getfixturevalue("evolved_workspace")
+
+
 def _strip_curation(dataset_path: Path) -> None:
     payload = json.loads(dataset_path.read_text(encoding="utf-8"))
     payload["metadata"].pop("integrity", None)
@@ -393,24 +431,31 @@ def _strip_curation(dataset_path: Path) -> None:
     dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def test_promotion_is_recorded_outside_the_promoted_file(
-    promoted_workspace: tuple[Path, Path],
+def test_a_curated_pack_is_recorded_outside_itself(
+    curated_workspace: tuple[Path, Path, str],
 ) -> None:
-    root, dataset_path = promoted_workspace
+    root, dataset_path, dataset_id = curated_workspace
     ledger = json.loads((root / "governance" / "promotions.json").read_text(encoding="utf-8"))
 
-    entry = next(row for row in ledger["promotions"] if row["dataset_id"] == DATASET_ID)
+    entry = next(
+        (row for row in ledger["promotions"] if row["dataset_id"] == dataset_id), None
+    )
+    assert entry is not None, (
+        f"{dataset_id} is a curated pack with no ledger entry, so deleting its own "
+        f"integrity block leaves nothing to contradict it. Ledger holds: "
+        f"{[row['dataset_id'] for row in ledger['promotions']]}"
+    )
     promoted = json.loads(dataset_path.read_text(encoding="utf-8"))
     assert entry["content_digest"] == promoted["metadata"]["integrity"]["content_digest"]
     assert entry["case_count"] == len(promoted["cases"])
     # governance/, not .failure_lab/: it is a record of something a human did.
-    assert entry["path"] == f"datasets/{DATASET_ID}.json"
+    assert entry["path"] == f"datasets/{dataset_id}.json"
 
 
 def test_stripping_both_the_digest_and_the_lifecycle_no_longer_hides_a_tamper(
-    promoted_workspace: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+    curated_workspace: tuple[Path, Path, str], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, dataset_path = promoted_workspace
+    root, dataset_path, _ = curated_workspace
     payload = json.loads(dataset_path.read_text(encoding="utf-8"))
     payload["cases"] = payload["cases"][:2]
     dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -423,14 +468,14 @@ def test_stripping_both_the_digest_and_the_lifecycle_no_longer_hides_a_tamper(
 
 
 def test_re_stamping_the_digest_after_a_tamper_is_caught(
-    promoted_workspace: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+    curated_workspace: tuple[Path, Path, str], capsys: pytest.CaptureFixture[str]
 ) -> None:
     # The self-consistent lie: edit the cases, then recompute the digest so the pack agrees
     # with itself. Only a record kept elsewhere can still object.
     from model_failure_lab.datasets import parse_dataset_payload
     from model_failure_lab.datasets.integrity import integrity_payload
 
-    root, dataset_path = promoted_workspace
+    root, dataset_path, _ = curated_workspace
     payload = json.loads(dataset_path.read_text(encoding="utf-8"))
     payload["cases"] = payload["cases"][:2]
     payload["metadata"]["integrity"] = integrity_payload(parse_dataset_payload(payload))

@@ -7,6 +7,79 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
+## [0.14.0] - 2026-09-02
+
+Round four. All three round-three findings are closed, and all three were defects the
+round-three remediation introduced. That report named the pattern exactly: **the remediation
+identifies the class and then fixes the instance.** So every fix here is applied to the whole
+tree rather than the example that was reported, each ships with a predicate that fails when
+the fix is removed, and each was checked for other callers before this entry was written.
+Two of those predicates found defects the audit had not.
+
+### Fixed
+- **`failure-lab regressions --root W gate --strict-exit` exited 0 against a workspace it
+  never read** -- a green CI build for a directory the gate never opened, which is the exact
+  failure this tool exists to prevent. `argparse` parses a subcommand into a fresh namespace
+  and copies every attribute onto the outer one, so an option a subcommand redeclares writes
+  its *default* over the value the parent parsed. The CLI's own `--help` advertises the
+  placement that broke (`usage: failure-lab regressions [-h] [--root ROOT] ...`).
+  `0.13.0` fixed this by hand for `baselines` and left **56** other collisions: every filter
+  flag -- `--model`, `--limit`, `--json`, `--since` and eight more -- on all seven
+  `regressions` subcommands. `build_parser` now calls `_suppress_inherited_defaults` over the
+  assembled tree, which cannot be forgotten by the next subcommand somebody adds, and refuses
+  rather than papers over a redeclaration whose type or default diverges from its parent's.
+  `test_cli_option_inheritance.py` walks the tree, parses every collision with the option in
+  the outer position, and checks the gate's exit code from both placements; it reports 119
+  failures with the fix removed.
+- **`dataset evolve` wrote no ledger entry, so the immutability bypass survived on evolved
+  dataset versions.** `governance/promotions.json` was added in `0.13.0` to close the
+  strip-both-keys bypass by recording a promotion outside the pack it protects, and it was
+  wired into `dataset promote` only. Both commands write `lifecycle: curated` packs, and
+  `dataset evolve` is the mode the console's harvest dialog offers first: stripping
+  `metadata.integrity` and `lifecycle` from an evolved pack left `index validate` at exit 0
+  with four cases silently reduced to one. Both writers now go through
+  `datasets.integrity.write_curated_dataset`, which stamps the digest, writes the file and
+  records the ledger entry in one call -- so a third writer cannot pick up two of the three.
+  The `0.13.0` note that "a stripped pack is now a disagreement between two committed files"
+  is true for both paths as of this release. `test_dataset_immutability.py` runs the three
+  tamper attacks against packs from each writer in turn.
+- **The gate screen sent operators to the pre-`0.13.0` baseline registry.** Its empty state
+  named `.failure_lab/baseline_registry.json` for a full release after the registry moved to
+  `governance/baselines.json` -- pointing at the one directory that release had just finished
+  explaining a shared registry must not be in, because `make clean` deletes it. Found by
+  reading a screenshot, which is not a method. `test_console_names_real_paths.py` resolves
+  every workspace path the console prints against `storage/layout.py` and the engine's path
+  constants, and separately refuses any screen that sends an operator into the derived index.
+- **`dataset promote` ignored `--root` for a relative draft path**, so
+  `failure-lab --root W dataset promote datasets/harvested/x.json` -- the shape the console
+  prints -- read the draft from the current directory. `_resolve_draft_path` already existed
+  for this and was called by `dataset review` and not by `dataset promote`: the same
+  one-of-two mistake as the two above, found by the predicate written for the second one
+  rather than by the audit. `test_governance_state_is_durable.py` now drives every
+  decision-recording command, `dataset promote` among them, against a workspace elsewhere.
+
+### Changed
+- **`test_governance_state_is_durable.py` covers every command that records a decision**, not
+  the two it happened to be written for, and it diffs file *contents* rather than filenames --
+  a name-only diff reported the second writer of an append-only ledger as writing nothing,
+  which would have hidden the `dataset evolve` bug above. It also asserts the converse: every
+  such command must leave a record under `governance/`, so a curated pack written without a
+  ledger entry fails there.
+- **`_add_dataset_parser` (453 lines, 21 subcommands) and `_add_regressions_parser` (202)
+  are split by concern.** The `dataset` group is now five builders, one of which holds the
+  twelve `plan-*` / `execution*` / `follow-up-*` subcommands `docs/api.md` says the supported
+  loop never requires -- putting that scope split in the code and not only in the docs. Pure
+  motion: the resolved argparse tree and all 1,201 lines of `--help` output across the whole
+  command tree are byte-identical to `0.13.0`. The largest function in `cli.py` went from 453
+  lines to 162, and `test_cli_stays_navigable.py` ratchets both that number and the file's
+  total so the next round cannot quietly give it back.
+- **A CHANGELOG entry that names a command or a module must cite a test that proves it.**
+  Three releases running, this file overstated a guarantee -- the manifest stack that was
+  "deleted", the remedy that was "fixed", the pack that was "a disagreement between two
+  committed files" -- because each entry was written from the fix rather than from the
+  surface. `test_changelog_cites_its_evidence.py` enforces the citation on the entry for the
+  version in `pyproject.toml`.
+
 ## [0.13.0] - 2026-08-26
 
 A third audit pass, this one re-run against the `0.12.0` remediation branch. Four of the

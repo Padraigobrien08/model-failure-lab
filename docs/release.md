@@ -12,7 +12,7 @@ This is the runbook for cutting a public OSS release. It covers versioning/tag s
 ## Current release state: nothing since `0.1.0` is published
 
 **PyPI holds exactly one release of `model-failure-lab`: `0.1.0`, uploaded 2026-04-27.** Neither
-`0.9.0`, `0.10.0`, `0.10.1`, `0.11.0`, `0.12.0`, nor `0.13.0` was ever published — verify with
+`0.9.0`, `0.10.0`, `0.10.1`, `0.11.0`, `0.12.0`, `0.13.0`, nor `0.14.0` was ever published — verify with
 `curl -s https://pypi.org/pypi/model-failure-lab/json | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['releases']))"`.
 
 Consequences, which the README and `action.yml` are written around until this changes:
@@ -26,11 +26,13 @@ Consequences, which the README and `action.yml` are written around until this ch
 
 ### Publishing the current tree
 
-`0.13.0` is the current tree: everything through `0.12.0`, plus the second audit pass over
-that remediation — waivers honoured by every gate surface including the one CI uses, a
-promotion ledger kept outside the packs it protects, a write token on the bridge, and
-predicates (rather than one-off corrections) behind the printed remedies and the console's
-vocabulary. See the CHANGELOG. Publishing it is what ships all of that to anyone not cloning.
+`0.14.0` is the current tree: everything through `0.13.0`, plus the third audit pass over
+that remediation. Three findings, all three introduced by the previous round's fixes and all
+three the same shape — a helper written for the general case and called from one of its
+sites. `0.14.0` closes them across the whole tree: `--root` and every other inherited flag
+resolve identically wherever they are written, both writers of a curated pack record it in
+the ledger, and the predicates that pin those two now cover every command in their class.
+See the CHANGELOG. Publishing it is what ships all of that to anyone not cloning.
 
 Before tagging: bump the version in `pyproject.toml` and `src/model_failure_lab/__init__.py`, add the
 matching `CHANGELOG.md` entry, and confirm `make check` and the frontend build are green.
@@ -42,7 +44,7 @@ That test exists to keep the README honest while the gap is open, not forever.
 
 ## Public versioning policy
 
-**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.13.0`.
+**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.14.0`.
 
 Pre-1.0 semantics (also in the README): patch = fixes/docs, minor = CLI-compatible additions,
 breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
@@ -93,8 +95,8 @@ git push origin --delete v1.0 v1.1 ... v5.3
 **Then, in either case, cut the public release** (substitute the version being released):
 
 ```bash
-git tag -a v0.13.0 -m "Waivers every surface honours, and predicates instead of patches"
-git push origin v0.13.0
+git tag -a v0.14.0 -m "Every caller, not every example"
+git push origin v0.14.0
 ```
 
 > Until a maintainer performs the cleanup, **do not** create a GitHub Release from any `vX.Y` tag.
