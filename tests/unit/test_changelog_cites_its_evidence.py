@@ -66,7 +66,9 @@ def _bullets(version: str) -> list[str]:
     bullets: list[str] = []
     #: Bullets under `### Docs` describe documentation, which has no behaviour to test.
     heading = ""
-    exempt_headings = {"docs", "documentation"}
+    #: `Errata` corrects a number in a released entry. It makes no claim about behaviour,
+    #: and the thing it corrects is by definition not something a test can now prove.
+    exempt_headings = {"docs", "documentation", "errata"}
     for line in section.splitlines():
         if line.startswith("###"):
             heading = line.lstrip("#").strip().lower()

@@ -32,7 +32,11 @@ TRANSITION_ORDER = (
 
 
 def _case_is_failure(case) -> bool:
-    """True when a baseline case was a classified failure (not a pass or an error)."""
+    """True when a case was a classified failure (not a pass and not an error).
+
+    Used on both runs. It was named and documented for the baseline while only the baseline
+    called it, which is how the scope rule built on it ended up covering one direction.
+    """
 
     if case.output is None or case.classification is None:
         return False
@@ -280,6 +284,30 @@ def build_comparison_report(
         for case_id in baseline_only_case_ids
         if _case_is_failure(baseline_map[case_id])
     )
+    # The mirror of `baseline_only_case_ids`, narrowed to the ones that matter.
+    #
+    # Every metric here is computed on the shared set, so a case in only one run is invisible
+    # to all of them. `0.15.0` blocked the gate on cases missing from the *candidate* and said
+    # nothing about the other direction, so shrinking the *baseline* instead had the identical
+    # effect: the four regressed cases became candidate-only, the shared set was four clean
+    # cases, and the gate passed.
+    #
+    # The two directions warrant different rules, and the difference is what is known:
+    #
+    #   * a case the candidate did not run has an *unknown* candidate outcome. It might have
+    #     regressed. Every one of them is a hole.
+    #   * a case the baseline did not run has a *known* candidate outcome. If it passed, the
+    #     candidate is fine on it and adding coverage should not need a waiver. If it failed,
+    #     it is a known-bad result that no comparison examined.
+    #
+    # So: all of the first, and the failing subset of the second. The rule is not "block on
+    # failures" -- a failure present in both runs is compared and found unchanged, and passes.
+    # It is "block on a case whose candidate outcome is unknown or bad and was never compared".
+    unexamined_candidate_failure_case_ids = tuple(
+        case_id
+        for case_id in candidate_only_case_ids
+        if _case_is_failure(candidate_map[case_id])
+    )
     details: dict[str, JsonValue] = {
         "report_id": report_id,
         "report_kind": "comparison",
@@ -290,6 +318,7 @@ def build_comparison_report(
         "baseline_only_case_ids": list(baseline_only_case_ids),
         "candidate_only_case_ids": list(candidate_only_case_ids),
         "dropped_baseline_failure_case_ids": list(dropped_baseline_failure_case_ids),
+        "unexamined_candidate_failure_case_ids": list(unexamined_candidate_failure_case_ids),
         "baseline_full_metrics": baseline_full.metrics_payload(),
         "candidate_full_metrics": candidate_full.metrics_payload(),
         "baseline_shared_metrics": baseline_shared.metrics_payload(),

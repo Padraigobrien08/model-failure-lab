@@ -380,7 +380,10 @@ export function EvidencePage() {
             {detailState.status === "ready" ? (
               <EmptyState
                 title="No changed cases to inspect."
-                detail={`reports/${reportId}/report_details.json holds no case deltas`}
+                detail={
+                  `reports/${reportId}/report_details.json holds no case deltas · ` +
+                  `run: failure-lab compare <baseline-run> <candidate-run>`
+                }
               />
             ) : (
               <div className="h-24 animate-pulse rounded-tok bg-panel" aria-label="Loading" />

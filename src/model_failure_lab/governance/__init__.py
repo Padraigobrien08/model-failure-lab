@@ -26,6 +26,7 @@ from .gates import (
     GateWaiver,
     RegressionGateResult,
     WaiverWriteResult,
+    build_gate_conditions,
     default_waiver_path,
     evaluate_gate_conditions,
     evaluate_regression_gate,
@@ -100,6 +101,7 @@ from .workflow import (
 )
 
 __all__ = [
+    "build_gate_conditions",
     "BaselineEntry",
     "DEFAULT_GOVERNANCE_POLICY",
     "DatasetFamilyHealth",

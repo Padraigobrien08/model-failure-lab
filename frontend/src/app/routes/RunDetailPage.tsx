@@ -372,7 +372,10 @@ export function RunDetailPage() {
               {detail.cases.length === 0 ? (
                 <EmptyState
                   title="No cases in this run."
-                  detail={`read runs/${run.runId}/results.json`}
+                  detail={
+                    `read runs/${run.runId}/results.json · ` +
+                    `run: failure-lab run --dataset ${run.dataset} --model <model>`
+                  }
                 />
               ) : filtered.length === 0 ? (
                 <EmptyState

@@ -97,6 +97,37 @@ def _workspace_dropping_the_cases_the_candidate_broke(root: Path) -> Path:
     return root
 
 
+def _workspace_dropping_the_broken_cases_from_the_baseline(root: Path) -> Path:
+    """The mirror of the fixture above, and the one `0.15.0` shipped without.
+
+    Hiding a regression does not require touching the candidate at all: re-record the
+    *baseline* on a smaller suite and the broken cases become candidate-only, the shared set
+    is four clean cases, and every metric the gate reads is computed on those four. `0.15.0`
+    blocked on cases missing from the candidate and said nothing about this direction, so it
+    passed on all three surfaces.
+    """
+
+    _copy_run(DEMO_RUNS / "baseline", root / "runs" / "base", run_id="base")
+    _copy_run(DEMO_RUNS / "candidate", root / "runs" / "cand", run_id="cand")
+
+    candidate_results = json.loads(
+        (root / "runs" / "cand" / "results.json").read_text(encoding="utf-8")
+    )
+    broke = {
+        case["case_id"]
+        for case in candidate_results["cases"]
+        if (case.get("classification") or {}).get("failure_type") != "no_failure"
+    }
+    assert broke, "fixture must have cases the candidate broke"
+
+    results_path = root / "runs" / "base" / "results.json"
+    results = json.loads(results_path.read_text(encoding="utf-8"))
+    results["cases"] = [case for case in results["cases"] if case["case_id"] not in broke]
+    results["total_cases"] = len(results["cases"])
+    results_path.write_text(json.dumps(results, indent=1, sort_keys=True))
+    return root
+
+
 def _workspace_with_incompatible_runs(root: Path) -> Path:
     """Two runs over entirely different datasets, so nothing is comparable."""
 
@@ -138,9 +169,18 @@ def _governance_gate(root: Path):
             _workspace_dropping_the_cases_the_candidate_broke,
             "did not run 4 case(s) the baseline ran",
         ),
+        (
+            _workspace_dropping_the_broken_cases_from_the_baseline,
+            "failed 4 case(s) the baseline never ran",
+        ),
         (_workspace_with_incompatible_runs, "runs are not comparable"),
     ],
-    ids=["dropped_failing_cases", "dropped_the_cases_it_broke", "incompatible_runs"],
+    ids=[
+        "dropped_failing_cases",
+        "dropped_the_cases_it_broke",
+        "dropped_them_from_the_baseline_instead",
+        "incompatible_runs",
+    ],
 )
 def test_every_gate_surface_blocks_the_same_comparison(
     tmp_path: Path,

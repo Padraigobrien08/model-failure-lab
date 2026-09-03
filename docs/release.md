@@ -12,7 +12,7 @@ This is the runbook for cutting a public OSS release. It covers versioning/tag s
 ## Current release state: nothing since `0.1.0` is published
 
 **PyPI holds exactly one release of `model-failure-lab`: `0.1.0`, uploaded 2026-04-27.** Neither
-`0.9.0` through `0.14.0` was ever published — verify with
+`0.9.0` through `0.15.0` was ever published — verify with
 `curl -s https://pypi.org/pypi/model-failure-lab/json | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['releases']))"`.
 
 Consequences, which the README and `action.yml` are written around until this changes:
@@ -26,23 +26,23 @@ Consequences, which the README and `action.yml` are written around until this ch
 
 ### Publishing the current tree
 
-`0.15.0` is the current tree: everything through `0.14.0`, plus the fourth audit pass. The
-headline fix is the gate itself. `compare --gate` used to exit 0 when a candidate stopped
-running the cases it broke — the guard for that checked the cases the *baseline* had been
-failing, which is the complement of what its comment described, and the bundled demo's
-baseline fails nothing, so the guard could not fire in the workspace it was tested against
-(`tests/unit/test_gate_surface_agreement.py`). Also in this release: a run without a report
-names the command that writes one, `failure-lab init` writes the workspace `.gitignore` that
-separates the committed record from the derived index, and the printed-command check reads
-the repository rather than three frontend directories. See the CHANGELOG.
+`0.16.0` is the current tree: everything through `0.15.0`, plus the fifth audit pass. `0.15.0`
+stopped a candidate hiding a regression by deleting the cases it broke; the audit found the
+same trick works by deleting them from the *baseline* instead, because the rule had been
+written for one of the comparison's two runs. Both directions are covered now, and the attack
+suite that missed it is a `RUNS × EDITS` product rather than a hand-written list
+(`tests/unit/test_gate_resists_a_motivated_operator.py`). See the CHANGELOG.
 
-The new guard worth knowing about is
-`tests/unit/test_gate_resists_a_motivated_operator.py`: black-box attacks on the gate that
-import nothing from the engine, plus a list of the attacks it does not stop and why.
+**Before writing the notes, run `make release-facts`** and paste the numbers. Every release
+from `0.11.0` to `0.15.0` carried at least one figure that was typed from memory and wrong;
+the citation rule added in `0.14.0` checks that a bullet names a test, not that its arithmetic
+holds. `0.15.0`'s miscount is recorded under Errata in the CHANGELOG rather than edited away.
+
 Publishing this release is what ships the gate fix to anyone not cloning.
 
 Before tagging: bump the version in `pyproject.toml` and `src/model_failure_lab/__init__.py`, add the
-matching `CHANGELOG.md` entry, and confirm `make check` and the frontend build are green.
+matching `CHANGELOG.md` entry with its numbers taken from `make release-facts`, and confirm
+`make check` and the frontend build are green.
 
 **After the release lands, in the same follow-up commit:** restore the PyPI-first install block in the
 README, drop the "Install from source for now" note, and delete
@@ -51,7 +51,7 @@ That test exists to keep the README honest while the gap is open, not forever.
 
 ## Public versioning policy
 
-**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.15.0`.
+**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.16.0`.
 
 Pre-1.0 semantics (also in the README): patch = fixes/docs, minor = CLI-compatible additions,
 breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
@@ -102,8 +102,8 @@ git push origin --delete v1.0 v1.1 ... v5.3
 **Then, in either case, cut the public release** (substitute the version being released):
 
 ```bash
-git tag -a v0.15.0 -m "A gate that cannot be walked around by deleting the evidence"
-git push origin v0.15.0
+git tag -a v0.16.0 -m "Both ends of the comparison, and numbers with a command behind them"
+git push origin v0.16.0
 ```
 
 > Until a maintainer performs the cleanup, **do not** create a GitHub Release from any `vX.Y` tag.
