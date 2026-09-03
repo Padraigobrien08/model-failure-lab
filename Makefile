@@ -76,5 +76,8 @@ publish: verify-dist ## Publish distributions to PyPI using TWINE_* env vars
 	fi
 	$(PYTHON) -m twine upload dist/*
 
+release-facts: ## Print the countable facts a release note states, so they are not typed from memory
+	python3 scripts/release_facts.py
+
 clean: ## Remove local artifact dirs generated in workspace root
 	rm -rf runs reports .failure_lab dist build *.egg-info

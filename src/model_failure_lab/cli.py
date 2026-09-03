@@ -37,7 +37,6 @@ from model_failure_lab.governance import (
     DatasetLifecycleAlert,
     DatasetPlanningUnit,
     DatasetPortfolioItem,
-    GateConditions,
     GateDecision,
     GovernanceApplyResult,
     GovernancePolicy,
@@ -57,6 +56,7 @@ from model_failure_lab.governance import (
     apply_dataset_lifecycle_action,
     apply_saved_portfolio_plan_action,
     attest_portfolio_execution_outcome,
+    build_gate_conditions,
     build_pr_reliability_comment,
     create_saved_portfolio_plan,
     evaluate_gate_conditions,
@@ -4734,15 +4734,11 @@ def _evaluate_compare_gate(
     signal = _comparison_signal_payload(report, details)
     verdict = str(signal.get("verdict", "unknown"))
     delta = report.metrics.get("delta", {}) if isinstance(report.metrics, dict) else {}
-    conditions = GateConditions(
+    conditions = build_gate_conditions(
         verdict=verdict,
         compatible=report.comparison.get("compatible") is not False,
-        execution_success_delta=_gate_float(delta.get("execution_success_rate")),
-        classification_coverage_delta=_gate_float(delta.get("classification_coverage")),
-        dropped_case_ids=_detail_case_ids(details, "baseline_only_case_ids"),
-        dropped_baseline_failure_case_ids=_detail_case_ids(
-            details, "dropped_baseline_failure_case_ids"
-        ),
+        delta=delta,
+        details=details,
     )
     block_reason = evaluate_gate_conditions(conditions)
     if block_reason is None:
@@ -4763,21 +4759,6 @@ def _evaluate_compare_gate(
             f"Gate: FAIL ({block_reason}); waiver expired {waiver.expires_at}"
         )
     return 1, f"Gate: FAIL ({block_reason})"
-
-
-def _gate_float(value: object) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(value)
-
-
-def _detail_case_ids(details: dict[str, object], key: str) -> tuple[str, ...]:
-    """One of the comparison detail artifact's case-id lists, sorted and type-checked."""
-
-    value = details.get(key)
-    if not isinstance(value, list):
-        return ()
-    return tuple(sorted(item for item in value if isinstance(item, str)))
 
 
 def _render_compare_markdown(report, details: dict[str, object], *, gate_line: str | None) -> str:

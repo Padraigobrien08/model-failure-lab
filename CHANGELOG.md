@@ -7,6 +7,60 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
+## [0.16.0] - 2026-09-03
+
+`0.15.0` stopped a candidate hiding a regression by deleting the cases it broke. The
+round-five audit found the same trick works from the other end — delete them from the
+*baseline* — because the rule was written for one of the comparison's two runs. This closes
+the other side, and replaces the hand-written attack list that could not see it.
+
+### Fixed
+- **Deleting the broken cases from the baseline passed the gate on every surface.** The
+  regressions become candidate-only, the shared set is four clean cases, every metric is
+  computed on those four, and `compare --gate` and `regressions gate` both returned 0. The
+  scope rule now covers both directions, and they are deliberately not identical: a case the
+  candidate did not run has an *unknown* candidate outcome and is always a hole, while a case
+  the baseline did not run has a *known* one — blocked when it failed, allowed when it passed,
+  so adding passing coverage still needs no waiver. Verified in both directions across all
+  three surfaces by `tests/unit/test_gate_surface_agreement.py`.
+- **The black-box attack suite enumerated candidate-side edits only**, written straight after
+  a candidate-side fix, so it could not see the mirror of the bug it existed for. It is a
+  product now — `RUNS × EDITS`, six edits against both runs — so neither side can be missing
+  by omission. An edit with nothing to change in a run is skipped by name and counted; the two
+  combinations the gate genuinely does not stop are listed with reasons and the suite fails if
+  either starts being caught. `tests/unit/test_gate_resists_a_motivated_operator.py` also gains
+  a positive control, without which a gate that blocked unconditionally would pass every
+  attack above it.
+- **The empty-state rule had an escape and the fix for it had another.** Keying on the title
+  let a failure be renamed `"No gate available."` into the exempt shape; keying on the
+  enclosing `status === "…"` guard misreads any screen whose failure branch returns early. The
+  exemption is deleted rather than guarded — the two states that used it turned out to have
+  obvious next steps, which is the usual result of being made to write one down.
+  `frontend/src/app/__tests__/emptyStatesOfferANextStep.test.tsx`.
+- A 404 from the artifact bridge no longer repeats the HTTP status inside its body.
+  `frontend/server/__tests__/artifactBridge.test.ts`.
+
+### Added
+- **`make release-facts`** prints the countable facts a release note states — test counts,
+  `cli.py` shape, the command scan's coverage, the option-collision count, the size of the
+  gate attack grid. Five releases running, this file has carried a number typed from memory
+  that was wrong, and the citation rule added in `0.14.0` cannot catch arithmetic. Now there
+  is a command behind each one. `scripts/release_facts.py`, wired into `docs/release.md`
+  and pinned by `tests/unit/test_release_facts_are_computable.py` so a fact that stops
+  resolving fails a test instead of quietly printing "unavailable".
+
+### Changed
+- `build_gate_conditions` is the only place a comparison's artifacts become the gate's inputs.
+  `compare --gate` built them in memory and the governance gate rebuilt them from disk, so the
+  mapping existed twice — which is how a field lands on one surface and not the other. Same
+  reason `evaluate_gate_conditions` is the only place the decision is made.
+  `tests/unit/test_gate_surface_agreement.py`.
+
+### Errata
+- The `0.15.0` entry says the command scan reads "27 files, 70 commands, up from 25". The
+  correct figures at that commit were **28 files** and 70 commands, up from **16**. The entry
+  is left as published; `make release-facts` exists so the next one is not typed at all.
+
 ## [0.15.0] - 2026-09-02
 
 Round four found seven defects. Six were pre-existing and one was a guarantee the round-three

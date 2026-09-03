@@ -2350,10 +2350,12 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
         }),
       );
     } catch (error) {
-      const failure = detailFailure(error, "comparison detail failed");
-      res.statusCode = failure.status;
+      const { status, ...body } = detailFailure(error, "comparison detail failed");
+      res.statusCode = status;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify(failure));
+      // `status` is the HTTP status and belongs there only; serialising it into the body
+      // as well gives one fact two sources, which is how the two drift.
+      res.end(JSON.stringify(body));
     }
   }
 
@@ -2380,10 +2382,12 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(payload));
     } catch (error) {
-      const failure = detailFailure(error, "run detail failed");
-      res.statusCode = failure.status;
+      const { status, ...body } = detailFailure(error, "run detail failed");
+      res.statusCode = status;
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify(failure));
+      // `status` is the HTTP status and belongs there only; serialising it into the body
+      // as well gives one fact two sources, which is how the two drift.
+      res.end(JSON.stringify(body));
     }
   }
 

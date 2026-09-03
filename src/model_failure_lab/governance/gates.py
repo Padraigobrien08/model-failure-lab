@@ -93,6 +93,10 @@ class GateConditions:
     #: The subset of those the baseline was already failing. Reported for a clearer block
     #: reason; `dropped_case_ids` is what the gate decides on.
     dropped_baseline_failure_case_ids: tuple[str, ...] = ()
+    #: Cases the candidate ran, the baseline did not, and the candidate failed. The other
+    #: half of the scope rule -- see `evaluate_gate_conditions` for why the two directions
+    #: are not treated identically.
+    unexamined_candidate_failure_case_ids: tuple[str, ...] = ()
 
 
 def evaluate_gate_conditions(conditions: GateConditions) -> str | None:
@@ -130,19 +134,35 @@ def evaluate_gate_conditions(conditions: GateConditions) -> str | None:
     # hole in the comparison, and a comparison with a hole in it does not get to say PASS.
     # Shrinking a dataset on purpose is legitimate, and the way to record that is a waiver,
     # which is a decision with a name on it.
+    #
+    # `0.15.0` stopped here, which covered one of the two ways to open that hole. Deleting the
+    # broken cases from the *baseline* has the same effect -- the regressions become
+    # candidate-only, the shared set is clean, and the gate passed on every surface. The
+    # mirror is below, and it is deliberately narrower: see `reporting/compare.py` for why a
+    # case missing from the candidate is always a hole while a case missing from the baseline
+    # is only a hole when the candidate failed it.
     dropped = conditions.dropped_case_ids
     if dropped:
-        preview = ", ".join(dropped[:3])
-        more = "" if len(dropped) <= 3 else f", +{len(dropped) - 3} more"
         already_failing = len(conditions.dropped_baseline_failure_case_ids)
         detail = (
             f" ({already_failing} already failing in the baseline)" if already_failing else ""
         )
         return (
             f"candidate did not run {len(dropped)} case(s) the baseline ran{detail}: "
-            f"{preview}{more}"
+            f"{_preview(dropped)}"
+        )
+    unexamined = conditions.unexamined_candidate_failure_case_ids
+    if unexamined:
+        return (
+            f"candidate failed {len(unexamined)} case(s) the baseline never ran, so nothing "
+            f"compared them: {_preview(unexamined)}"
         )
     return None
+
+
+def _preview(case_ids: Sequence[str], limit: int = 3) -> str:
+    head = ", ".join(case_ids[:limit])
+    return head if len(case_ids) <= limit else f"{head}, +{len(case_ids) - limit} more"
 
 
 def load_gate_conditions(comparison_id: str, *, root: str | Path | None = None) -> GateConditions:
@@ -171,22 +191,43 @@ def load_gate_conditions(comparison_id: str, *, root: str | Path | None = None) 
     delta = metrics.get("delta") if isinstance(metrics, dict) else None
     delta = delta if isinstance(delta, dict) else {}
 
+    return build_gate_conditions(
+        verdict=str(signal.get("verdict", "unknown")),
+        compatible=comparison.get("compatible") is not False,
+        delta=delta,
+        details=details or {},
+    )
+
+
+def build_gate_conditions(
+    *,
+    verdict: str,
+    compatible: bool,
+    delta: dict[str, JsonValue],
+    details: dict[str, JsonValue],
+) -> GateConditions:
+    """Turn one comparison's artifacts into the gate's inputs. The only place that happens.
+
+    `compare --gate` builds this from the report it just produced in memory and the
+    governance gate rebuilds it from disk, so the *mapping* used to exist twice -- and a
+    field added to one copy and not the other is how `0.15.0` shipped its scope rule to some
+    surfaces. Same reason `evaluate_gate_conditions` is the only place the decision is made.
+    """
+
     def _ids(key: str) -> tuple[str, ...]:
-        value = details.get(key) if details is not None else None
+        value = details.get(key)
         if not isinstance(value, list):
             return ()
         return tuple(sorted(item for item in value if isinstance(item, str)))
 
-    dropped_ids = _ids("baseline_only_case_ids")
-    dropped_failing_ids = _ids("dropped_baseline_failure_case_ids")
-
     return GateConditions(
-        verdict=str(signal.get("verdict", "unknown")),
-        compatible=comparison.get("compatible") is not False,
+        verdict=verdict,
+        compatible=compatible,
         execution_success_delta=_float_or_none(delta.get("execution_success_rate")),
         classification_coverage_delta=_float_or_none(delta.get("classification_coverage")),
-        dropped_case_ids=dropped_ids,
-        dropped_baseline_failure_case_ids=dropped_failing_ids,
+        dropped_case_ids=_ids("baseline_only_case_ids"),
+        dropped_baseline_failure_case_ids=_ids("dropped_baseline_failure_case_ids"),
+        unexamined_candidate_failure_case_ids=_ids("unexamined_candidate_failure_case_ids"),
     )
 
 

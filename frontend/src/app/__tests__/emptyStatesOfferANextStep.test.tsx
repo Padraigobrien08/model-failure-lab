@@ -22,11 +22,14 @@
  *     actionable (`artifactBridge.test.ts` pins the remedy fields on a missing artifact);
  *  3. a no-match state whose action clears the filter that caused it -- there is no command
  *     to run, and the button is the next step;
- *  4. an *empty* state ("No …") naming the workspace path it read and found empty. DESIGN.md
- *     asks empty states for the path; a comparison with no case deltas has nothing to run.
  *
- * A *failure* state gets shapes 1 and 2 only. "It broke" with a path and no command is the
- * screen this file exists to prevent.
+ * There used to be a fourth: an *empty* state could name the workspace path it read and stop
+ * there. Distinguishing "empty" from "broken" needed a heuristic, and every heuristic tried
+ * was escapable -- keying on the title let a failure be renamed `"No gate available."` into
+ * the exemption, and keying on the enclosing `status === "…"` guard misreads any screen whose
+ * failure branch returns early. So the shape is gone rather than guarded. The two states that
+ * relied on it turned out to have obvious next steps (compare two other runs; re-run the
+ * dataset), which is the usual outcome of being made to write one down.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -38,7 +41,14 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(HERE, "../..");
 const ROOTS = ["app/routes", "components/console"];
 
-type Usage = { file: string; title: string; body: string; source: string };
+type Usage = {
+  file: string;
+  title: string;
+  body: string;
+  source: string;
+  /** The nearest enclosing `status === "…"` value, or null when there is no state guard. */
+  branch: string | null;
+};
 
 /** Every `<EmptyState …>` in the console, with the source of its props. */
 function emptyStates(): Usage[] {
@@ -71,11 +81,13 @@ function emptyStates(): Usage[] {
         }
         const body = text.slice(index, end);
         const title = /title=(?:"([^"]*)"|\{([^}]*)\})/.exec(body);
+        const guards = [...text.slice(0, index).matchAll(/status\s*===\s*"(\w+)"/g)];
         found.push({
           file: `${root}/${entry}`,
           title: (title?.[1] ?? title?.[2] ?? "(dynamic)").trim(),
           body,
           source: text,
+          branch: guards.length ? guards[guards.length - 1][1] : null,
         });
         index = text.indexOf("<EmptyState", end);
       }
@@ -90,8 +102,6 @@ const USAGES = emptyStates();
 const FROM_LOADER = /\bstate\.message\b|State\.message\b|\bmessage\}/;
 /** A no-match state: the next step is the button, not a command. */
 const CLEARS_A_FILTER = /clear the .*filter|Clear filter|Clear filters/i;
-/** A workspace path the screen read: `runs/…`, `reports/…`, `datasets/…`, `governance/…`. */
-const NAMES_A_PATH = /(runs|reports|datasets|governance)\/[^\s"'`]/;
 
 /**
  * True when the detail is (or resolves to) something holding a `failure-lab` command.
@@ -119,19 +129,14 @@ describe("every empty and error state offers a next step", () => {
   it.each(USAGES.map((usage) => [`${usage.file} — ${usage.title}`, usage] as const))(
     "%s",
     (_label, usage) => {
-      const isEmptyRatherThanBroken = /^No\b/.test(usage.title);
       const ok =
-        namesACommand(usage) ||
-        FROM_LOADER.test(usage.body) ||
-        CLEARS_A_FILTER.test(usage.body) ||
-        (isEmptyRatherThanBroken && NAMES_A_PATH.test(usage.body));
+        namesACommand(usage) || FROM_LOADER.test(usage.body) || CLEARS_A_FILTER.test(usage.body);
 
       expect(
         ok,
         `${usage.file} renders "${usage.title}" with no next step. Name the command that ` +
           `resolves it, relay the loader's message (the bridge is required to make those ` +
-          `actionable), offer the control that clears the filter, or -- for an empty state ` +
-          `only -- name the workspace path that came back empty.`,
+          `actionable), or offer the control that clears the filter.`,
       ).toBe(true);
     },
   );
