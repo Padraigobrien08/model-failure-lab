@@ -18,7 +18,7 @@ bash examples/regression_demo/run.sh      # see a real regression caught
 
 > **Install from source for now.** The PyPI release is behind the source tree — `pip install
 > model-failure-lab` currently gets `0.1.0`, which predates `init`, `compare --gate`, `--html`
-> export and the `openai-compat` adapter. Clone until the badge below reads `0.16.0`.
+> export and the `openai-compat` adapter. Clone until the badge below reads `0.17.0`.
 
 [![Production CI](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml/badge.svg)](https://github.com/Padraigobrien08/model-failure-lab/actions/workflows/production.yml)
 [![PyPI](https://img.shields.io/pypi/v/model-failure-lab)](https://pypi.org/project/model-failure-lab/)
@@ -287,7 +287,7 @@ The production CLI is dependency-isolated from the optional research/ML stack: r
 
 ## Project status
 
-Pre-1.0 (`0.16.0`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
+Pre-1.0 (`0.17.0`, public beta). Versioning intent: patch = fixes/docs, minor = CLI-compatible additions, breaking
 = CLI or artifact-schema changes. The DistilBERT/CivilComments benchmark stack under `[legacy]` is
 retained for reference and is not part of the supported workflow (`docs/legacy.md`).
 

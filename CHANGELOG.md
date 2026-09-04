@@ -7,6 +7,58 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Publi
 at `0.9.0` (see `docs/decisions/0003-public-versioning-starts-at-v0.9.0.md`); earlier `v1.0`–`v5.3`
 git tags are internal development milestones, not public releases.
 
+## [0.17.0] - 2026-09-04
+
+The gate got hard enough to fool that the attack moved out of the comparison entirely: don't
+edit the runs, delete the permanent test. Nothing the README puts in CI noticed, and the
+command that would — `index validate` — was not in it.
+
+### Fixed
+- **Deleting a promoted regression pack and re-running both sides shipped green.** The loop's
+  headline promise is that a harvested failure becomes "a permanent test you can re-run
+  forever". Empty the pack (or `rm` it), re-run baseline and candidate on what is left, and
+  there is no `baseline_only`, no `candidate_only`, and nothing in the comparison that could
+  know a test ever existed — `compare --gate` and `regressions gate` both exited 0. No gate
+  over two runs can catch that, so the gate now asks a different question of a different
+  artifact: do the packs still match `governance/promotions.json`? A pack that was edited,
+  re-stamped or deleted contradicts a committed file, and that contradiction holds whether or
+  not any run touched it. All three surfaces inherit it through `evaluate_gate_conditions`.
+  `tests/unit/test_gate_resists_a_motivated_operator.py`.
+- **`rm datasets/<id>.json` was invisible to the integrity audit.** Every check in
+  `audit_dataset_directory` started from a file and asked whether it was intact, so the
+  simplest attack on the two-witness scheme — delete the witness's subject — produced no
+  finding at all and `index validate` reported `ok`. A ledger entry with no file is now a
+  `missing` finding that names the recorded digest, the case count and both remedies.
+  `tests/unit/test_dataset_immutability.py`.
+- **The shipped Action ran one command.** `action.yml` is what the README tells you to put in
+  CI, and it ran `compare --gate` and nothing else — so three releases of immutability
+  machinery were reachable only by a command the product never mentioned. It now runs
+  `index validate` first, behind a `validate_artifacts` input that defaults to true.
+  `tests/unit/test_the_shipped_action_catches_what_it_promises.py` reads the commands out of
+  `action.yml`, runs them against a workspace whose permanent test was deleted, and requires
+  the sequence to fail — a test of the composition, which no test of a part could have been.
+- **The actionable 404 was a mechanism wired to one of four endpoints.** `BridgeDetailError`
+  carries what failed, which file, and what to run; it was thrown from one place, so a missing
+  comparison or an absent run still answered `{"message":"comparison detail failed"}`. That
+  mattered because `emptyStatesOfferANextStep.test.tsx` lets a screen pass by relaying the
+  loader's message *on the stated grounds that the bridge makes those actionable*. Every
+  artifact the bridge reads now goes through `requireArtifact`, and
+  `frontend/server/__tests__/artifactBridge.test.ts` asserts it as a property: no missing
+  artifact may answer with a bare sentence.
+
+### Changed
+- **The gate attack grid is a product over targets, not over runs.** `RUNS` was a pair, so an
+  edit applied to *both* — which is what deleting a test and re-running amounts to — was not a
+  combination the grid could express. Targets are now `{baseline}`, `{candidate}`, `{both}`,
+  plus the promoted pack, which is not a run at all: 6 run edits × 3 targets + 2 dataset edits
+  = 20 combinations against the previous 12. Widening it immediately surfaced a fourth cell of
+  the known run-artifact-forgery gap, now documented with the other three.
+  `tests/unit/test_gate_resists_a_motivated_operator.py`.
+
+### Chore
+- Five merged branches removed from the remote. Two unmerged ones
+  (`v1.9-datasets-report-quality`, `v2.0-react-debugger-on-real-artifacts`) were left alone.
+
 ## [0.16.0] - 2026-09-03
 
 `0.15.0` stopped a candidate hiding a regression by deleting the cases it broke. The

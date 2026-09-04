@@ -18,8 +18,12 @@
  * So this asserts presence. Each `EmptyState` must be one of three honest shapes:
  *
  *  1. a `failure-lab …` command in its detail, written there or held in a constant;
- *  2. a message from the loader, which the bridge is separately required to make
- *     actionable (`artifactBridge.test.ts` pins the remedy fields on a missing artifact);
+ *  2. a message from the loader. That is only an honest exemption because the bridge is
+ *     required to make those messages actionable, which `artifactBridge.test.ts` asserts as
+ *     a property over its detail endpoints -- every missing artifact answers with a message,
+ *     the file, and a `failure-lab` command, and none may answer a bare sentence. For one
+ *     release that guarantee was pinned for a single endpoint while this comment claimed it
+ *     in general;
  *  3. a no-match state whose action clears the filter that caused it -- there is no command
  *     to run, and the button is the next step;
  *

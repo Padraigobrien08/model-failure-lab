@@ -103,8 +103,9 @@ def _gate_attack_grid() -> str:
     except Exception as error:  # pragma: no cover - defensive
         return f"unavailable ({error})"
     return (
-        f"{len(attacks.EDITS)} edits x {len(attacks.RUNS)} runs = {len(attacks.CASES)} "
-        f"combinations, {len(attacks.DOCUMENTED_GAPS)} documented gaps"
+        f"{len(attacks.RUN_EDITS)} run edits x {len(attacks.RUN_TARGETS)} targets + "
+        f"{len(attacks.DATASET_EDITS)} dataset edits = {len(attacks.CASES)} combinations, "
+        f"{len(attacks.DOCUMENTED_GAPS)} documented gaps"
     )
 
 

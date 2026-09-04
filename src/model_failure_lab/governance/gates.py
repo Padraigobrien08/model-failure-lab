@@ -97,6 +97,10 @@ class GateConditions:
     #: half of the scope rule -- see `evaluate_gate_conditions` for why the two directions
     #: are not treated identically.
     unexamined_candidate_failure_case_ids: tuple[str, ...] = ()
+    #: Promoted datasets in this workspace that no longer match what was promoted, or are
+    #: gone. Everything above reasons about two runs; this is the one condition that looks
+    #: at the tests themselves.
+    promoted_dataset_findings: tuple[str, ...] = ()
 
 
 def evaluate_gate_conditions(conditions: GateConditions) -> str | None:
@@ -157,6 +161,25 @@ def evaluate_gate_conditions(conditions: GateConditions) -> str | None:
             f"candidate failed {len(unexamined)} case(s) the baseline never ran, so nothing "
             f"compared them: {_preview(unexamined)}"
         )
+    # Everything above compares two runs, and every one of those checks is defeated the same
+    # way: stop running the case in both. Delete a promoted regression from the pack, re-run
+    # both sides, and there is no baseline_only, no candidate_only, and nothing in the
+    # comparison that could know a test used to exist. `Gate: PASS`, exit 0.
+    #
+    # No gate over two runs can catch that, and this one does not try. It asks a different
+    # question, of a different artifact: are the tests somebody promised to keep still the
+    # tests that were promised? `governance/promotions.json` records what each promotion
+    # contained, so a pack that was edited, re-stamped or deleted contradicts a committed
+    # file -- and that contradiction is the same evidence whether or not any run touched it.
+    #
+    # This was already implemented and already correct; it lived in `index validate`, which
+    # `action.yml` -- the file the README tells you to put in CI -- does not run. Three
+    # releases of immutability machinery were reachable only by a command nobody was told
+    # to invoke. Putting the question in the gate is what connects it to the promise.
+    findings = conditions.promoted_dataset_findings
+    if findings:
+        more = "" if len(findings) == 1 else f" (+{len(findings) - 1} more)"
+        return f"promoted dataset no longer matches what was promoted: {findings[0]}{more}"
     return None
 
 
@@ -196,6 +219,27 @@ def load_gate_conditions(comparison_id: str, *, root: str | Path | None = None) 
         compatible=comparison.get("compatible") is not False,
         delta=delta,
         details=details or {},
+        root=root,
+    )
+
+
+def promoted_dataset_findings(root: str | Path | None = None) -> tuple[str, ...]:
+    """Every promoted pack in this workspace that no longer matches its ledger entry."""
+
+    from model_failure_lab.datasets.integrity import (
+        audit_dataset_directory,
+        load_promotion_ledger,
+    )
+
+    base = project_root(root)
+    ledger = load_promotion_ledger(base)
+    if not ledger:
+        # No promotions recorded, so there is nothing this condition can say. Keeping the
+        # directory walk out of the common path also keeps `compare --gate` cheap for the
+        # many workspaces that never promote anything.
+        return ()
+    return tuple(
+        finding.detail for finding in audit_dataset_directory(base / "datasets", ledger=ledger)
     )
 
 
@@ -205,6 +249,7 @@ def build_gate_conditions(
     compatible: bool,
     delta: dict[str, JsonValue],
     details: dict[str, JsonValue],
+    root: str | Path | None = None,
 ) -> GateConditions:
     """Turn one comparison's artifacts into the gate's inputs. The only place that happens.
 
@@ -228,6 +273,7 @@ def build_gate_conditions(
         dropped_case_ids=_ids("baseline_only_case_ids"),
         dropped_baseline_failure_case_ids=_ids("dropped_baseline_failure_case_ids"),
         unexamined_candidate_failure_case_ids=_ids("unexamined_candidate_failure_case_ids"),
+        promoted_dataset_findings=promoted_dataset_findings(root),
     )
 
 
