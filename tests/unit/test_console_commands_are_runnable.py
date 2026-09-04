@@ -59,9 +59,14 @@ _PIECE = r"(?:--\$?\{[^}]*\}|<[A-Za-z0-9_.\-]*>|\$?\{[^}]*\}|[A-Za-z0-9_./=:\-]+
 #: A token is one or more pieces with no space between them, so a path with a placeholder
 #: inside it (`datasets/harvested/<draft-id>.json`) stays one argv token.
 TOKEN = re.compile(f"(?:{_PIECE})+")
-#: In a shell or a fenced block, `--reason "tracked in JIRA-123"` is two argv tokens. In a
-#: `.tsx` file a quote *ends* the string, so the same rule there swallows the JSX after it.
-SHELL_TOKEN = re.compile(f'(?:"[^"\n]*"|{_PIECE})+')
+#: `--reason "tracked in JIRA-123"` is two argv tokens, so a quoted run has to be one of
+#: them. But in a `.ts` file a quote also *ends* the string, and treating every quote as the
+#: start of a value made `remedy: "failure-lab compare <a> <b>",` swallow the rest of the
+#: file. A quoted run is only a value when it follows a flag, which is true in the shell too.
+#: Either a quoted run or a run of pieces -- never a concatenation of the two. Allowing
+#: them to mix let `<model>` glue onto the `"` that closed the string it sat in, and the
+#: token then ran to the next quote hundreds of characters later.
+SHELL_TOKEN = re.compile(f'"[^"\n]*"|(?:{_PIECE})+')
 
 #: A flag or subcommand chosen at runtime (`--${scope.kind}`, `failure-lab {command_name}`)
 #: cannot be checked against argparse without enumerating the runtime values, so those are
@@ -185,7 +190,8 @@ def _scan(segment: str, *, shell: bool = False) -> list[str]:
         tokens: list[str] = []
         position = match.end()
         while True:
-            token = token_re.match(flat, position)
+            follows_a_flag = bool(tokens) and tokens[-1].startswith("--")
+            token = (token_re if follows_a_flag else TOKEN).match(flat, position)
             if token is None:
                 break
             word = token.group(0)

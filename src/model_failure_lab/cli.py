@@ -4739,6 +4739,7 @@ def _evaluate_compare_gate(
         compatible=report.comparison.get("compatible") is not False,
         delta=delta,
         details=details,
+        root=root,
     )
     block_reason = evaluate_gate_conditions(conditions)
     if block_reason is None:

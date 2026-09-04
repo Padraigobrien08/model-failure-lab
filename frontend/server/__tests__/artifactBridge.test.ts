@@ -238,22 +238,46 @@ describe("artifact id validation", () => {
 // ---------------------------------------------------------------------------------------
 
 describe("missing artifacts", () => {
-  it("answers 404 for a run that does not exist", async () => {
-    // `bridgeErrorMessage` always returns its fallback string, so the old check --
-    // `message.includes("ENOENT")` on that return value -- was dead code and every miss
-    // answered 500.
-    const { status, body } = await call(
+  // Every missing artifact, not just the one the mechanism was built for. Three of the four
+  // detail endpoints used to answer a bare sentence -- naming neither the file nor a
+  // command -- while the console's empty-state rule justified relaying loader messages on
+  // the grounds that the bridge makes them actionable.
+  it.each([
+    [
+      "a run that does not exist",
       "/__failure_lab__/artifacts/run-detail.json?runId=does-not-exist",
-    );
+      {
+        message: "No saved run does-not-exist.",
+        path: "runs/does-not-exist/run.json",
+        remedy: "failure-lab run --dataset <dataset> --model <model>",
+      },
+    ],
+    [
+      "a comparison that does not exist",
+      "/__failure_lab__/artifacts/comparison-detail.json?reportId=nope",
+      {
+        message: "No saved comparison nope.",
+        path: "reports/nope/report.json",
+        remedy: "failure-lab compare <baseline-run> <candidate-run>",
+      },
+    ],
+  ])("names the file and the command for %s", async (_label, url, expected) => {
+    const { status, body } = await call(url as string);
     expect(status).toBe(404);
-    expect(body).toMatchObject({ message: "run detail failed" });
+    expect(body).toMatchObject(expected as Record<string, string>);
   });
 
-  it("answers 404 for a comparison that does not exist", async () => {
-    const { status } = await call(
+  it("never answers a missing artifact with a bare sentence", async () => {
+    // The property, so a fifth endpoint added later cannot regress to "detail failed".
+    for (const url of [
+      "/__failure_lab__/artifacts/run-detail.json?runId=nope",
       "/__failure_lab__/artifacts/comparison-detail.json?reportId=nope",
-    );
-    expect(status).toBe(404);
+    ]) {
+      const { body } = await call(url);
+      const payload = body as Record<string, unknown>;
+      expect(Object.keys(payload).sort(), url).toEqual(["message", "path", "remedy"]);
+      expect(String(payload.remedy), url).toContain("failure-lab ");
+    }
   });
 
   // A run whose report has not been written yet is not a broken workspace: it is step one

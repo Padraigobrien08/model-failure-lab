@@ -12,7 +12,7 @@ This is the runbook for cutting a public OSS release. It covers versioning/tag s
 ## Current release state: nothing since `0.1.0` is published
 
 **PyPI holds exactly one release of `model-failure-lab`: `0.1.0`, uploaded 2026-04-27.** Neither
-`0.9.0` through `0.15.0` was ever published — verify with
+`0.9.0` through `0.16.0` was ever published — verify with
 `curl -s https://pypi.org/pypi/model-failure-lab/json | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['releases']))"`.
 
 Consequences, which the README and `action.yml` are written around until this changes:
@@ -26,12 +26,18 @@ Consequences, which the README and `action.yml` are written around until this ch
 
 ### Publishing the current tree
 
-`0.16.0` is the current tree: everything through `0.15.0`, plus the fifth audit pass. `0.15.0`
-stopped a candidate hiding a regression by deleting the cases it broke; the audit found the
-same trick works by deleting them from the *baseline* instead, because the rule had been
-written for one of the comparison's two runs. Both directions are covered now, and the attack
-suite that missed it is a `RUNS × EDITS` product rather than a hand-written list
-(`tests/unit/test_gate_resists_a_motivated_operator.py`). See the CHANGELOG.
+`0.17.0` is the current tree: everything through `0.16.0`, plus the sixth audit pass. The gate
+is now hard enough to fool from inside a comparison that the attack moved outside one — delete
+the promoted regression pack, re-run both sides, and nothing in the comparison could notice.
+The gate consults `governance/promotions.json` now, `action.yml` runs `index validate` before
+comparing, and a deleted pack is a finding rather than silence. See the CHANGELOG.
+
+**Before writing the notes, run `make release-facts`** and paste the numbers. Every release
+from `0.11.0` to `0.15.0` carried at least one figure typed from memory and wrong; the citation
+rule added in `0.14.0` checks that a bullet names a test, not that its arithmetic holds.
+`0.15.0`'s miscount is recorded under Errata rather than edited away.
+
+Publishing this release is what ships the gate fix to anyone not cloning.
 
 **Before writing the notes, run `make release-facts`** and paste the numbers. Every release
 from `0.11.0` to `0.15.0` carried at least one figure that was typed from memory and wrong;
@@ -51,7 +57,7 @@ That test exists to keep the README honest while the gap is open, not forever.
 
 ## Public versioning policy
 
-**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.16.0`.
+**Public OSS releases start at `v0.9.0`.** The package version in `pyproject.toml` is `0.17.0`.
 
 Pre-1.0 semantics (also in the README): patch = fixes/docs, minor = CLI-compatible additions,
 breaking = CLI or artifact-schema changes. The first stable line is `1.0.0`.
@@ -102,8 +108,8 @@ git push origin --delete v1.0 v1.1 ... v5.3
 **Then, in either case, cut the public release** (substitute the version being released):
 
 ```bash
-git tag -a v0.16.0 -m "Both ends of the comparison, and numbers with a command behind them"
-git push origin v0.16.0
+git tag -a v0.17.0 -m "The permanent test, actually enforced"
+git push origin v0.17.0
 ```
 
 > Until a maintainer performs the cleanup, **do not** create a GitHub Release from any `vX.Y` tag.

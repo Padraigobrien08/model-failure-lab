@@ -66,9 +66,11 @@ def _bullets(version: str) -> list[str]:
     bullets: list[str] = []
     #: Bullets under `### Docs` describe documentation, which has no behaviour to test.
     heading = ""
-    #: `Errata` corrects a number in a released entry. It makes no claim about behaviour,
-    #: and the thing it corrects is by definition not something a test can now prove.
-    exempt_headings = {"docs", "documentation", "errata"}
+    #: `Errata` corrects a number in a released entry and `Chore` records repository
+    #: housekeeping -- branches removed, files moved. Neither makes a claim about how the
+    #: software behaves, which is the only kind of claim a test can settle. A bullet that
+    #: does make one belongs under Fixed, Added or Changed, where it owes a citation.
+    exempt_headings = {"docs", "documentation", "errata", "chore"}
     for line in section.splitlines():
         if line.startswith("###"):
             heading = line.lstrip("#").strip().lower()

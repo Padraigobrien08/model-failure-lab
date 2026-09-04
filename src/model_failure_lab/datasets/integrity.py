@@ -135,7 +135,9 @@ class DatasetIntegrityFinding:
 
     path: Path
     dataset_id: str
-    #: `mismatch` = cases changed under a recorded digest. `unstamped` = curated, no digest.
+    #: `mismatch` = cases changed under a recorded digest. `unstamped` = curated, no
+    #: digest. `unrecorded` / `re_stamped` = the pack disagrees with the ledger.
+    #: `missing` = the ledger records a promotion and the file is gone.
     kind: str
     detail: str
 
@@ -177,8 +179,9 @@ def audit_dataset_directory(
 
     ledger = {} if ledger is None else ledger
     findings: list[DatasetIntegrityFinding] = []
+    seen: set[str] = set()
     if not directory.is_dir():
-        return ()
+        return _missing_promotions(directory, ledger, seen)
     for path in sorted(directory.glob("*.json")):
         try:
             dataset = parse_dataset_payload(
@@ -187,6 +190,7 @@ def audit_dataset_directory(
             )
         except Exception:  # noqa: BLE001 - malformed packs are the index builder's report
             continue
+        seen.add(dataset.dataset_id)
         status = dataset_integrity_status(dataset)
         recorded = ledger.get(dataset.dataset_id)
         if status == "unmanaged" and recorded is not None:
@@ -261,7 +265,43 @@ def audit_dataset_directory(
                     ),
                 )
             )
-    return tuple(findings)
+    return tuple(findings) + _missing_promotions(directory, ledger, seen)
+
+
+def _missing_promotions(
+    directory: Path,
+    ledger: dict[str, PromotionRecord],
+    seen: set[str],
+) -> tuple[DatasetIntegrityFinding, ...]:
+    """Promotions the ledger records and the directory no longer contains.
+
+    Every other check here starts from a file and asks whether it is intact, so the whole
+    scheme -- two witnesses, a digest inside the pack and a ledger entry outside it -- had
+    nothing to say about the simplest attack on it: `rm datasets/perm.json`. The ledger
+    knew, the file was gone, `index validate` reported `ok`, and the promoted regression
+    pack the product calls permanent had silently ceased to exist.
+
+    A deleted pack is not always tampering -- a workspace can be pruned deliberately -- but
+    it is always a promotion that no longer holds, and the remedy is the same either way:
+    restore it, or record the decision by removing its ledger entry in the same commit.
+    """
+
+    return tuple(
+        DatasetIntegrityFinding(
+            path=directory / f"{dataset_id}.json",
+            dataset_id=dataset_id,
+            kind="missing",
+            detail=(
+                f"'{dataset_id}' was promoted on {record.promoted_at} with "
+                f"{record.case_count} case(s) and digest {record.content_digest}, but "
+                f"{record.path or f'{directory}/{dataset_id}.json'} no longer exists. "
+                "Restore it from source control, or drop its entry from "
+                f"{PROMOTION_LEDGER_PATH} in the same commit that removes it."
+            ),
+        )
+        for dataset_id, record in sorted(ledger.items())
+        if dataset_id not in seen
+    )
 
 
 # --------------------------------------------------------------------------------------

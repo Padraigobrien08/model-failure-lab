@@ -1164,6 +1164,11 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
   ): Promise<ComparisonDetailPayload> {
     assertSafeArtifactId(reportId, "reportId");
     const reportDir = path.join(reportsPath, reportId);
+    await requireArtifact(path.join(reportDir, REPORT_FILENAME), {
+      message: `No saved comparison ${reportId}.`,
+      workspacePath: `reports/${reportId}/report.json`,
+      remedy: "failure-lab compare <baseline-run> <candidate-run>",
+    });
     const reportPayload = await readJsonRecord(
       path.join(reportDir, REPORT_FILENAME),
       `${reportId}.report`,
@@ -1374,15 +1379,24 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
     });
   }
 
-  async function assertReportExists(reportDir: string, runId: string): Promise<void> {
+  /**
+   * Fail with something the operator can act on when an expected artifact is not there.
+   *
+   * Built for the run-detail case and, for one release, thrown from that one place -- so
+   * three of the four detail endpoints still answered `{"message":"comparison detail
+   * failed"}`, naming neither the file nor a command. That mattered beyond the rough edge:
+   * `emptyStatesOfferANextStep.test.tsx` lets a screen pass by relaying the loader's
+   * message, on the stated grounds that the bridge makes those actionable. One endpoint
+   * did. Every artifact this bridge reads now goes through here.
+   */
+  async function requireArtifact(
+    filePath: string,
+    options: { message: string; workspacePath: string; remedy: string },
+  ): Promise<void> {
     try {
-      await fs.access(path.join(reportDir, REPORT_FILENAME));
+      await fs.access(filePath);
     } catch {
-      throw new BridgeDetailError(
-        `No report for run ${runId}.`,
-        `reports/${runId}_report/report.json`,
-        `failure-lab report --run ${runId}`,
-      );
+      throw new BridgeDetailError(options.message, options.workspacePath, options.remedy);
     }
   }
 
@@ -1394,6 +1408,11 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
     assertSafeArtifactId(runId, "runId");
     const runDir = path.join(runsPath, runId);
     const reportDir = path.join(reportsPath, `${runId}_report`);
+    await requireArtifact(path.join(runDir, RUN_FILENAME), {
+      message: `No saved run ${runId}.`,
+      workspacePath: `runs/${runId}/run.json`,
+      remedy: "failure-lab run --dataset <dataset> --model <model>",
+    });
     const runPayload = await readJsonRecord(path.join(runDir, RUN_FILENAME), `${runId}.run`);
     const resultsPayload = await readJsonRecord(
       path.join(runDir, RESULTS_FILENAME),
@@ -1404,7 +1423,11 @@ export function failureLabArtifactsPlugin(options: ArtifactBridgeOptions): Plugi
     // lists the run and links to this page, so it is reached by clicking, not by accident,
     // and it used to answer "run detail failed" with a Retry button that could never
     // succeed. DESIGN.md: errors state what failed and which file, then what to run.
-    await assertReportExists(reportDir, runId);
+    await requireArtifact(path.join(reportDir, REPORT_FILENAME), {
+      message: `No report for run ${runId}.`,
+      workspacePath: `reports/${runId}_report/report.json`,
+      remedy: `failure-lab report --run ${runId}`,
+    });
     const reportPayload = await readJsonRecord(
       path.join(reportDir, REPORT_FILENAME),
       `${runId}.report`,

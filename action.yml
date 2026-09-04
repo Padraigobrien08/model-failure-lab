@@ -31,6 +31,14 @@ inputs:
     description: "Fail the job on regression (set to `false` to only report)."
     required: false
     default: "true"
+  validate_artifacts:
+    description: >-
+      Run `index validate` before comparing, so a promoted dataset that no longer matches
+      `governance/promotions.json` fails the job. Deleting a promoted regression and
+      re-running both sides leaves nothing for the comparison to notice; this is the check
+      that does. Set to `false` only if your workspace is not the one holding the packs.
+    required: false
+    default: "true"
 
 outputs:
   verdict:
@@ -54,6 +62,25 @@ runs:
         else
           python -m pip install --quiet "$PACKAGE"
         fi
+
+    - name: Check the promoted datasets are the ones that were promoted
+      shell: bash
+      env:
+        ROOT: ${{ inputs.root }}
+        VALIDATE: ${{ inputs.validate_artifacts }}
+      # The gate compares two runs, and the cheapest way past any check over two runs is to
+      # stop running the case in both: delete a promoted regression from the pack, re-run,
+      # and the comparison has nothing to notice. `index validate` asks the other question --
+      # do the packs still match `governance/promotions.json` -- and until `0.17.0` this
+      # action did not run it, so three releases of immutability machinery were reachable
+      # only by a command nobody was told to invoke.
+      run: |
+        if [ "$VALIDATE" != "true" ]; then
+          echo "Artifact validation skipped (validate_artifacts=$VALIDATE)."
+          exit 0
+        fi
+        failure-lab index rebuild --root "$ROOT" >/dev/null
+        failure-lab index validate --root "$ROOT"
 
     - name: Compare baseline vs candidate
       id: compare
